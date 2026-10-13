@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { CommanderError } from "commander";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createProgram } from "../src/cli.js";
@@ -104,10 +107,18 @@ describe("usage errors exit 2", () => {
   });
 });
 
-describe("run stub", () => {
-  it("prints not implemented and exits 1", async () => {
-    expect(await exitCodeOf(parse(["run", "--base", "a", "--head", "b"]))).toBe(1);
-    expect(stderr + stdout).toMatch(/not implemented/i);
+describe("run errors", () => {
+  it("exits 1 and prints an error when the repo is not a git repo", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pr-review-not-a-repo-"));
+    try {
+      const fake = createFakeSdkClient(() => okOutcome);
+      const args = ["run", "--repo", dir, "--base", "a", "--head", "b", "--out", join(dir, "out")];
+      expect(await exitCodeOf(parse(args, fake))).toBe(1);
+      expect(stderr).toMatch(/pr-review run:/);
+      expect(fake.calls).toHaveLength(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

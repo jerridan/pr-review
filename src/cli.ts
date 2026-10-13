@@ -6,7 +6,10 @@ import { pathToFileURL } from "node:url";
 import { Command, CommanderError, Option } from "commander";
 import { z } from "zod";
 import { ROLE_DEFAULTS, resolveModel } from "./config/models.js";
+import { formatJson } from "./output/json.js";
+import { formatTable } from "./output/table.js";
 import { loadPrompt } from "./prompts/load.js";
+import { runReview } from "./run.js";
 import type { SdkClient } from "./sdk/client.js";
 
 export const EXIT_OK = 0;
@@ -77,10 +80,37 @@ async function runSmoke(deps: { client?: SdkClient }, allowApiKey: boolean): Pro
   process.stdout.write(`${lines.join("\n")}\n`);
 }
 
-// The record-and-run package replaces this stub.
-async function runReview(_deps: { client?: SdkClient }, _options: RunCliOptions): Promise<void> {
-  process.stderr.write("pr-review run: not implemented\n");
-  process.exitCode = EXIT_FAILURE;
+/** The default record directory, relative to the current directory. */
+export const DEFAULT_OUT_DIR = "pr-review-records";
+
+// Run one review. A run that writes a record exits 0, whatever its
+// verdict. A run that cannot write a record exits 1.
+async function runCommand(deps: { client?: SdkClient }, options: RunCliOptions): Promise<void> {
+  try {
+    const { record, recordPath } = await runReview({
+      repo: options.repo ?? process.cwd(),
+      base: options.base,
+      head: options.head,
+      ...(options.tier ? { tierOverride: options.tier } : {}),
+      outDir: options.out ?? DEFAULT_OUT_DIR,
+      allowApiKey: options.allowApiKey === true,
+      ...(deps.client ? { client: deps.client } : {}),
+    });
+    if (options.format === "json") {
+      // stdout holds one JSON document, so the skip reason goes to stderr.
+      if (record.identity.tier === "skip") {
+        process.stderr.write(`Skipped: ${record.identity.tier_reason}\n`);
+      }
+      process.stdout.write(formatJson(record, recordPath));
+    } else {
+      process.stdout.write(`${formatTable(record)}\nRecord: ${recordPath}\n`);
+    }
+    process.exitCode = EXIT_OK;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`pr-review run: ${message}\n`);
+    process.exitCode = EXIT_FAILURE;
+  }
 }
 
 /** Make the pr-review program. Tests give a fake client in "deps". */
@@ -112,7 +142,7 @@ export function createProgram(deps: { client?: SdkClient }): Command {
     )
     .option("--allow-api-key", "keep ANTHROPIC_API_KEY in the SDK environment")
     .action(async (options: RunCliOptions) => {
-      await runReview(deps, options);
+      await runCommand(deps, options);
     });
 
   program
