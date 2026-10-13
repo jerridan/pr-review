@@ -30,9 +30,10 @@ export type Verification = {
   rejected?: string;
 };
 
-// A line number prefix: "  11| " from the user message, "  11→" from
-// the Read tool, or "11:".
-const NUMBER_PREFIX = /^\s*\d+[|→:]\s?/;
+// A line number prefix: "  11| " from the user message, "11<tab>" from
+// the Read tool, "11:" from the Read tool when the line holds a tab, or
+// "  11→" from an earlier Read tool format.
+const NUMBER_PREFIX = /^\s*\d+[|→\t:]\s?/;
 // A Grep prefix: "path/file.ts:7:".
 const GREP_PREFIX = /^[^\s:]+:\d+:\s?/;
 
@@ -46,16 +47,19 @@ export function stripLinePrefixes(quote: string): string {
 
 /**
  * Return true when at least one quote is a substring of the head file,
- * after line prefixes are removed from the quote and after whitespace
- * collapse in both. An empty quote never matches.
+ * after whitespace collapse in both. The quote can match as written, or
+ * with its line prefixes removed: a code line such as '  200: "ok",'
+ * looks like a prefix, so the removal can change real code. An empty
+ * quote never matches.
  */
 export function quoteMatches(quotes: string[], headFileText: string | null): boolean {
   if (headFileText === null) return false;
   const file = normalizeWs(headFileText);
-  return quotes.some((q) => {
-    const quote = normalizeWs(stripLinePrefixes(q));
+  const found = (text: string): boolean => {
+    const quote = normalizeWs(text);
     return quote !== "" && file.includes(quote);
-  });
+  };
+  return quotes.some((q) => found(q) || found(stripLinePrefixes(q)));
 }
 
 /** True when the value is a failed query, not a verifier result. */

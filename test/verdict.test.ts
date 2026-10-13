@@ -189,7 +189,45 @@ describe("coverage (A8)", () => {
       ],
     );
     // A failed or refused escalation drops its finding too.
-    expect(counts).toEqual({ droppedByFailedVerifier: 4, failedVerifierCalls: 4, refusals: 3 });
+    expect(counts).toEqual({
+      droppedByFailedVerifier: 4,
+      failedVerifierCalls: 4,
+      rejectedResults: 0,
+      refusals: 3,
+    });
+  });
+
+  it("counts a result that code rejected as a dropped finding, and the verdict is incomplete", () => {
+    const runs = [run("diff-bugs", "ok")];
+    const rejected = {
+      first: vresult(90),
+      final: vresult(90),
+      passed: false,
+      rejected: "No quote of the verifier is in the head file of the finding.",
+    };
+    const counts = verificationCounts(runs, [
+      { first: vresult(90), final: vresult(90), passed: true },
+      rejected,
+      { ...rejected, first: vresult(70), escalated: vresult(90) },
+    ]);
+    expect(counts).toEqual({
+      droppedByFailedVerifier: 2,
+      failedVerifierCalls: 0,
+      rejectedResults: 2,
+      refusals: 0,
+    });
+    expect(coverage(runs, counts.droppedByFailedVerifier).findings_dropped_by_failed_verifier).toBe(
+      2,
+    );
+    expect(
+      decideVerdict({
+        tier: "full",
+        reviewerRuns: runs,
+        verifierFailures: counts.failedVerifierCalls + counts.rejectedResults,
+        refusals: counts.refusals,
+        posted: [],
+      }),
+    ).toBe("incomplete");
   });
 });
 

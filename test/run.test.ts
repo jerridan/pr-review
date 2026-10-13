@@ -425,7 +425,7 @@ describe("refusals and the verdict", () => {
 });
 
 describe("a verifier result that the quote check rejects", () => {
-  it("is not posted and is in the errors of the record", async () => {
+  it("is not posted, is in the errors, counts as dropped and makes the verdict incomplete", async () => {
     const fake = createFakeSdkClient((req) =>
       req.role === "verifier" || req.role === "verifier-escalation"
         ? { ok: true, output: { ...PASS, quotes: ["this text is not in the file"] }, raw: META }
@@ -441,6 +441,8 @@ describe("a verifier result that the quote check rejects", () => {
     });
     expect(record.stages.verifications[0]?.rejected).toMatch(/quote/i);
     expect(record.posted.findings).toEqual([]);
+    expect(record.posted.verdict).toBe("incomplete");
+    expect(record.posted.coverage.findings_dropped_by_failed_verifier).toBe(1);
     expect(record.cost.errors).toEqual([
       {
         stage: "verify",

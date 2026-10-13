@@ -7,9 +7,10 @@ import type { Verification } from "./verify/index.js";
 
 /**
  * The first rule that matches sets the verdict: skipped for the skip
- * tier; incomplete when a reviewer failed, a verifier call failed or a
- * reviewer or verifier call was refused; would request changes with a
- * blocking finding; else would approve.
+ * tier; incomplete when a reviewer failed, a verifier call failed, code
+ * rejected a verifier result, or a reviewer or verifier call was refused;
+ * would request changes with a blocking finding; else would approve.
+ * "verifierFailures" counts the failed calls and the rejected results.
  */
 export function decideVerdict(input: {
   tier: Tier;
@@ -31,7 +32,8 @@ function uniqueNames(runs: ReviewerRun[]): string[] {
 
 /**
  * The reviewers that ran with no failed pass, the reviewers with a failed
- * pass, and the findings dropped because their verifier call failed.
+ * pass, and the findings dropped because their verifier call failed or
+ * because code rejected their verifier result.
  */
 export function coverage(
   reviewerRuns: ReviewerRun[],
@@ -53,17 +55,24 @@ function failureOf(value: VerifierCall | undefined): QueryFailure | null {
 }
 
 /**
- * Count from the stage outputs: the findings dropped because their first
- * verifier call or their escalation call failed (for coverage), every
- * failed verifier call, first or escalation (for the verdict), and every
- * reviewer or verifier call that ended in a refusal.
+ * Count from the stage outputs: the findings dropped because a verifier
+ * call failed or because code rejected a result that the verifier passed
+ * (for coverage); every failed verifier call, first or escalation, and
+ * every rejected result (for the verdict); and every reviewer or verifier
+ * call that ended in a refusal.
  */
 export function verificationCounts(
   reviewerRuns: ReviewerRun[],
   verifications: Verification[],
-): { droppedByFailedVerifier: number; failedVerifierCalls: number; refusals: number } {
+): {
+  droppedByFailedVerifier: number;
+  failedVerifierCalls: number;
+  rejectedResults: number;
+  refusals: number;
+} {
   let droppedByFailedVerifier = 0;
   let failedVerifierCalls = 0;
+  let rejectedResults = 0;
   let refusals = reviewerRuns.filter((r) => r.failure?.kind === "refusal").length;
   for (const v of verifications) {
     // A failed first call stops the verification, so at most one call of
@@ -71,9 +80,11 @@ export function verificationCounts(
     const failures = [failureOf(v.first), failureOf(v.escalated)].filter(
       (f): f is QueryFailure => f !== null,
     );
-    if (failures.length > 0) droppedByFailedVerifier += 1;
+    // A rejected result drops a finding that the verifier confirmed.
+    if (v.rejected) rejectedResults += 1;
+    if (failures.length > 0 || v.rejected) droppedByFailedVerifier += 1;
     failedVerifierCalls += failures.length;
     refusals += failures.filter((f) => f.kind === "refusal").length;
   }
-  return { droppedByFailedVerifier, failedVerifierCalls, refusals };
+  return { droppedByFailedVerifier, failedVerifierCalls, rejectedResults, refusals };
 }

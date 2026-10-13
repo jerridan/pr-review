@@ -49,6 +49,8 @@ const head = mkdtempSync(join(tmpdir(), "pr-review-verify-"));
 mkdirSync(join(head, "src"));
 writeFileSync(join(head, "src/stats.ts"), FILE_TEXT);
 writeFileSync(join(head, "src/other.ts"), "export const other = 42;\n");
+const CODES_TEXT = 'const codes = {\n  200: "ok",\n  404: "missing",\n};\n';
+writeFileSync(join(head, "src/codes.ts"), CODES_TEXT);
 afterAll(() => rmSync(head, { recursive: true, force: true }));
 
 const OPTIONS: RunOptions = { allowApiKey: false, env: {} };
@@ -319,13 +321,37 @@ describe("verifyFinding (A6)", () => {
     ]);
     expect(twoLines.passed).toBe(true);
 
-    // The output of the Read tool.
-    const read = await verify(["     3→  for (let i = 0; i <= values.length; i++) {"]);
+    // The output of the Read tool: the line number, a tab, then the line.
+    const read = await verify(["3\t  for (let i = 0; i <= values.length; i++) {"]);
     expect(read.passed).toBe(true);
+    expect(read.rejected).toBeUndefined();
+
+    // Two lines of the Read tool output.
+    const readTwo = await verify([
+      "3\t  for (let i = 0; i <= values.length; i++) {\n4\t    total += values[i];",
+    ]);
+    expect(readTwo.passed).toBe(true);
+
+    // A legacy Read format with an arrow.
+    const arrow = await verify(["     3→  for (let i = 0; i <= values.length; i++) {"]);
+    expect(arrow.passed).toBe(true);
 
     // The output of the Grep tool.
     const grep = await verify(["src/stats.ts:3:  for (let i = 0; i <= values.length; i++) {"]);
     expect(grep.passed).toBe(true);
+  });
+
+  it("passes a quote whose inner line starts like a line prefix but is code", async () => {
+    const noBand = { ...DEFAULT_VERIFY_CONFIG, bandLow: 101, bandHigh: 101 };
+    const quote = 'const codes = {\n  200: "ok",\n  404: "missing",';
+    const out = await verifyFinding(
+      createFakeSdkClient(script(result(95, { quotes: [quote] }))),
+      OPTIONS,
+      finding({ file: "src/codes.ts", start_line: 2, end_line: 2, evidence: '200: "ok",' }),
+      ctx(noBand),
+    );
+    expect(out.passed).toBe(true);
+    expect(out.rejected).toBeUndefined();
   });
 
   it("fails a result whose only quote is from a file that the finding does not name", async () => {

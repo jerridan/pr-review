@@ -271,12 +271,13 @@ export async function runReview(
     );
 
     // A failed or refused verifier call, first or escalation, drops its
-    // finding and makes the verdict incomplete.
+    // finding and makes the verdict incomplete. So does a result that code
+    // rejected after the verifier passed it.
     const counts = verificationCounts(runs, verifications);
     const verdict = decideVerdict({
       tier: decision.tier,
       reviewerRuns: runs,
-      verifierFailures: counts.failedVerifierCalls,
+      verifierFailures: counts.failedVerifierCalls + counts.rejectedResults,
       refusals: counts.refusals,
       posted: merged.posted,
     });
