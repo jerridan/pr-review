@@ -1,7 +1,7 @@
 // Verify: one verifier query per finding, with escalation to a second
 // verifier on a middle-band score or when the finding needs context.
 import { normalizeWs, readHeadFile } from "../find/evidence.js";
-import { filterDiff } from "../gather/diff.js";
+import { diffSections } from "../gather/diff.js";
 import { loadPrompt, render, type PromptFile } from "../prompts/load.js";
 import type { Finding } from "../schemas/finding.js";
 import type { QueryFailure } from "../schemas/record.js";
@@ -19,7 +19,20 @@ export interface VerifyConfig {
 
 export const DEFAULT_VERIFY_CONFIG: VerifyConfig = { threshold: 80, bandLow: 60, bandHigh: 85 };
 
-type VerifyContext = { cwd: string; diff: string; semaphore: Semaphore; config: VerifyConfig };
+export type VerifyContext = {
+  cwd: string;
+  semaphore: Semaphore;
+  config: VerifyConfig;
+  /**
+   * The diff split per file (see diffSections). The run splits it once and
+   * gives it here.
+   */
+  sections?: Map<string, string>;
+  /** The whole diff. It is used only when "sections" is not set. */
+  diff?: string;
+  /** The verifier prompt. The run loads it once and gives it here. */
+  prompt?: VerifierPrompt;
+};
 
 export type Verification = {
   first: VerifierResult | QueryFailure;
@@ -110,17 +123,27 @@ export function verifierTexts(prompt: PromptFile): VerifierTexts {
   };
 }
 
+/** prompts/verifier.md, loaded: the system prompt and the user message texts. */
+export type VerifierPrompt = { system: string; texts: VerifierTexts };
+
+/** Load prompts/verifier.md. Throw when the file or a text field is missing. */
+export function loadVerifierPrompt(): VerifierPrompt {
+  const prompt = loadPrompt("verifier.md");
+  return { system: prompt.body, texts: verifierTexts(prompt) };
+}
+
 /**
  * Build the verifier user message: the finding, the head file and its
  * diff. "text" is the head file, or null when the head has no such file.
+ * "fileDiff" is the diff section of the finding's file, or "" when the
+ * diff does not change the file.
  */
 export function buildVerifierMessage(
   texts: VerifierTexts,
   finding: Finding,
   text: string | null,
-  ctx: VerifyContext,
+  fileDiff: string,
 ): string {
-  const fileDiff = filterDiff(ctx.diff, (path) => path === finding.file);
   const blocks = {
     finding: wrapUntrusted("finding", describeFinding(finding)).block,
     file: wrapUntrusted("head_file", text === null ? texts.noFileText : numberLines(text)).block,
@@ -142,8 +165,9 @@ export async function verifyFinding(
   finding: Finding,
   ctx: VerifyContext,
 ): Promise<Verification> {
-  const prompt = loadPrompt("verifier.md");
-  const texts = verifierTexts(prompt);
+  const prompt = ctx.prompt ?? loadVerifierPrompt();
+  const sections = ctx.sections ?? diffSections(ctx.diff ?? "");
+  const fileDiff = sections.get(finding.file) ?? "";
   // One read serves both verifier messages and the quote check.
   const headText = readHeadFile(ctx.cwd, finding.file);
 
@@ -151,13 +175,13 @@ export async function verifyFinding(
     role: "verifier" | "verifier-escalation",
   ): Promise<VerifierResult | QueryFailure> => {
     // Each query gets its own message, so its blocks get new ids.
-    const userMessage = buildVerifierMessage(texts, finding, headText, ctx);
+    const userMessage = buildVerifierMessage(prompt.texts, finding, headText, fileDiff);
     try {
       const outcome = await ctx.semaphore(() =>
         client.query<VerifierResult>(
           {
             role,
-            systemPrompt: prompt.body,
+            systemPrompt: prompt.system,
             userMessage,
             schema: VerifierResultSchema,
             cwd: ctx.cwd,

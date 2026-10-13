@@ -12,6 +12,7 @@ import {
   loadReviewer,
   ReviewerLoadError,
   reviewerOverrides,
+  reviewerTools,
   type ReviewerDefinition,
 } from "../src/reviewers/loader.js";
 import { selectReviewers } from "../src/reviewers/select.js";
@@ -168,6 +169,69 @@ describe("model overrides from frontmatter", () => {
     expect(verifier.model).toBe("claude-sonnet-5-5");
     expect(verifier.effort).toBe("high");
     expect(ROLE_DEFAULTS.reviewer.model).toBe("claude-opus-5-5");
+  });
+});
+
+describe("the tools of a reviewer", () => {
+  function withTools(tools: string[]): ReviewerDefinition {
+    const def = loadReviewer(writeReviewer(GOOD_FRONTMATTER));
+    return { ...def, frontmatter: { ...def.frontmatter, tools } };
+  }
+
+  it("grants the read-only tools that the reviewer names, in canonical form", () => {
+    expect(reviewerTools(withTools(["Read", "Grep", "Glob"]))).toEqual({
+      granted: ["Read", "Grep", "Glob"],
+      ignored: [],
+    });
+    expect(reviewerTools(withTools(["glob", "READ"]))).toEqual({
+      granted: ["Read", "Glob"],
+      ignored: [],
+    });
+    expect(reviewerTools(withTools([]))).toEqual({ granted: [], ignored: [] });
+  });
+
+  it("ignores a tool outside the read-only set and never grants it", () => {
+    expect(reviewerTools(withTools(["Bash", "Read", "WebFetch", "Write"]))).toEqual({
+      granted: ["Read"],
+      ignored: ["Bash", "WebFetch", "Write"],
+    });
+  });
+
+  it("narrows the query options of the reviewer to its granted tools", () => {
+    const def = withTools(["Read", "Bash"]);
+    const opts = buildQueryOptions(
+      {
+        role: "reviewer",
+        reviewerName: def.frontmatter.name,
+        systemPrompt: def.systemPrompt,
+        userMessage: "u",
+        schema: FindingsOutputSchema,
+        cwd: "/tmp/x",
+        overrides: reviewerOverrides(def),
+        tools: def.frontmatter.tools,
+      },
+      { allowApiKey: false, env: {} },
+    );
+    expect(opts.tools).toEqual(["Read"]);
+    expect(opts.allowedTools).toEqual(["Read(./**)"]);
+    expect(opts.disallowedTools).toEqual(expect.arrayContaining(["Bash", "Grep", "Glob"]));
+  });
+
+  it("keeps trusted parsed but unused", () => {
+    const def = withTools(["Read"]);
+    const opts = buildQueryOptions(
+      {
+        role: "reviewer",
+        systemPrompt: "s",
+        userMessage: "u",
+        schema: FindingsOutputSchema,
+        cwd: "/tmp/x",
+        tools: def.frontmatter.tools,
+      },
+      { allowApiKey: false, env: {} },
+    );
+    expect(def.frontmatter.trusted).toBe(false);
+    expect(JSON.stringify(opts)).not.toMatch(/trusted/);
   });
 });
 

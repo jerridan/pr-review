@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { z } from "zod";
 import { SmokeOutputSchema } from "../src/cli.js";
 import { MODEL_IDS, ROLE_DEFAULTS, resolveModel, type Role } from "../src/config/models.js";
@@ -7,9 +8,16 @@ import { toSdkJsonSchema } from "../src/schemas/json-schema.js";
 import { MergeOutputSchema } from "../src/schemas/merge.js";
 import { TriageBriefSchema } from "../src/schemas/triage.js";
 import { VerifierResultSchema } from "../src/schemas/verifier.js";
-import { classifyResult, type QueryOutcome, type QueryRequest } from "../src/sdk/client.js";
+import {
+  classifyResult,
+  createSdkClient,
+  type QueryFn,
+  type QueryOutcome,
+  type QueryRequest,
+} from "../src/sdk/client.js";
 import { createFakeSdkClient } from "../src/sdk/fake.js";
 import { buildQueryOptions, type RunOptions } from "../src/sdk/options.js";
+import { createSemaphore } from "../src/semaphore.js";
 
 // The pinned values from the spec. The test holds its own copy so that a
 // change to the config module fails here.
@@ -20,6 +28,7 @@ const EXPECTED: Record<
     effort: string;
     maxTurns: number;
     maxBudgetUsd: number;
+    timeoutMs: number;
     tools: "read-only" | "none";
     schema: z.ZodType;
   }
@@ -29,6 +38,7 @@ const EXPECTED: Record<
     effort: "medium",
     maxTurns: 5,
     maxBudgetUsd: 0.5,
+    timeoutMs: 120_000,
     tools: "none",
     schema: TriageBriefSchema,
   },
@@ -37,6 +47,7 @@ const EXPECTED: Record<
     effort: "low",
     maxTurns: 40,
     maxBudgetUsd: 2,
+    timeoutMs: 600_000,
     tools: "read-only",
     schema: FindingsOutputSchema,
   },
@@ -45,6 +56,7 @@ const EXPECTED: Record<
     effort: "high",
     maxTurns: 25,
     maxBudgetUsd: 0.5,
+    timeoutMs: 300_000,
     tools: "read-only",
     schema: VerifierResultSchema,
   },
@@ -53,6 +65,7 @@ const EXPECTED: Record<
     effort: "high",
     maxTurns: 25,
     maxBudgetUsd: 1,
+    timeoutMs: 300_000,
     tools: "read-only",
     schema: VerifierResultSchema,
   },
@@ -61,6 +74,7 @@ const EXPECTED: Record<
     effort: "medium",
     maxTurns: 5,
     maxBudgetUsd: 0.25,
+    timeoutMs: 120_000,
     tools: "none",
     schema: MergeOutputSchema,
   },
@@ -69,6 +83,7 @@ const EXPECTED: Record<
     effort: "low",
     maxTurns: 2,
     maxBudgetUsd: 0.05,
+    timeoutMs: 60_000,
     tools: "none",
     schema: SmokeOutputSchema,
   },
@@ -144,6 +159,9 @@ describe("A13: query options for every role", () => {
       expect(opts).not.toHaveProperty("fallbackModel");
       expect(opts).not.toHaveProperty("thinking");
       expect(opts).not.toHaveProperty("maxThinkingTokens");
+      // The client adds the abort controller, so this function stays pure.
+      expect(opts).not.toHaveProperty("abortController");
+      expect(opts).not.toHaveProperty("timeoutMs");
       expect(opts.model).toBe(want.model);
       expect(opts.effort).toBe(want.effort);
       expect(opts.maxTurns).toBe(want.maxTurns);
@@ -231,6 +249,165 @@ describe("A13: query options for every role", () => {
 
     const plain = buildQueryOptions(request("reviewer"), runOptions(false));
     expect(plain.model).toBe("claude-opus-5-5");
+  });
+});
+
+describe("the tools of a reviewer narrow the read-only set", () => {
+  it("grants only the read-only tools that the request names", () => {
+    const opts = buildQueryOptions(request("reviewer", { tools: ["Read"] }), runOptions(false));
+    expect(opts.tools).toEqual(["Read"]);
+    expect(opts.allowedTools).toEqual(["Read(./**)"]);
+    const disallowed = opts.disallowedTools as string[];
+    expect(disallowed).toEqual(expect.arrayContaining([...WRITE_AND_NET_TOOLS, "Grep", "Glob"]));
+    expect(disallowed).not.toContain("Read");
+  });
+
+  it("never grants a tool outside the read-only set, and matches names case-insensitively", () => {
+    const opts = buildQueryOptions(
+      request("reviewer", { tools: ["Bash", "WebFetch", "grep", "Read", "Write"] }),
+      runOptions(false),
+    );
+    expect(opts.tools).toEqual(["Read", "Grep"]);
+    expect(opts.allowedTools).toEqual(["Read(./**)", "Grep(./**)"]);
+    const disallowed = opts.disallowedTools as string[];
+    expect(disallowed).toEqual(expect.arrayContaining([...WRITE_AND_NET_TOOLS, "Glob"]));
+    expect(bareRules(opts.allowedTools as string[])).toEqual([]);
+  });
+
+  it("grants no tool for an empty list", () => {
+    const opts = buildQueryOptions(request("reviewer", { tools: [] }), runOptions(false));
+    expect(opts.tools).toEqual([]);
+    expect(opts.allowedTools).toEqual([]);
+    expect(opts.disallowedTools).toEqual(expect.arrayContaining(READ_TOOLS));
+  });
+
+  it("does not widen a role with no tools", () => {
+    const opts = buildQueryOptions(
+      request("merge", { tools: ["Read", "Grep"] }),
+      runOptions(false),
+    );
+    expect(opts.tools).toEqual([]);
+    expect(opts.allowedTools).toEqual([]);
+  });
+
+  it("keeps the full read-only set when the request names no tools", () => {
+    const opts = buildQueryOptions(request("reviewer"), runOptions(false));
+    expect(opts.tools).toEqual(READ_TOOLS);
+    expect(opts.allowedTools).toEqual(SCOPED_READ_RULES);
+  });
+});
+
+describe("the wall-clock timeout of a query", () => {
+  const VERIFIER_OUTPUT = {
+    in_scope: true,
+    claim_holds: true,
+    introduced_by_pr: true,
+    quotes: ["q"],
+    rationale: "r",
+    score: 90,
+    severity: "blocking",
+  };
+  const SUCCESS = {
+    type: "result",
+    subtype: "success",
+    duration_ms: 3,
+    stop_reason: "end_turn",
+    total_cost_usd: 0.01,
+    structured_output: VERIFIER_OUTPUT,
+  } as unknown as SDKMessage;
+
+  type Seen = { abortController?: AbortController };
+
+  // A query that sends no message. When "honorAbort" is true it throws on
+  // abort, as the SDK does; when false it never ends.
+  function hangingQuery(seen: Seen[], honorAbort: boolean): QueryFn {
+    return (args) => {
+      seen.push(args.options as Seen);
+      const signal = args.options.abortController?.signal;
+      return {
+        [Symbol.asyncIterator]: () => ({
+          next: () =>
+            new Promise<IteratorResult<SDKMessage>>((_, reject) => {
+              if (honorAbort) signal?.addEventListener("abort", () => reject(new Error("aborted")));
+            }),
+        }),
+      };
+    };
+  }
+
+  function quickQuery(seen: Seen[]): QueryFn {
+    return (args) => {
+      seen.push(args.options as Seen);
+      return (async function* (): AsyncGenerator<SDKMessage> {
+        await Promise.resolve();
+        yield SUCCESS;
+      })();
+    };
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("aborts the query and fails it with the kind timeout when the role's time ends", async () => {
+    const seen: Seen[] = [];
+    const client = createSdkClient(hangingQuery(seen, true));
+    let settled = false;
+    const outcome = client.query(request("verifier"), runOptions(false));
+    void outcome.then(() => {
+      settled = true;
+    });
+    await vi.advanceTimersByTimeAsync(ROLE_DEFAULTS.verifier.timeoutMs - 1);
+    expect(settled).toBe(false);
+    expect(seen[0]?.abortController).toBeInstanceOf(AbortController);
+    expect(seen[0]?.abortController?.signal.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await outcome).toEqual({
+      ok: false,
+      failure: { kind: "timeout", message: expect.stringContaining("300000") },
+      raw: null,
+    });
+    expect(seen[0]?.abortController?.signal.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("ends the query also when the SDK does not stop on abort", async () => {
+    const client = createSdkClient(hangingQuery([], false));
+    const outcome = client.query(request("triage"), runOptions(false));
+    await vi.advanceTimersByTimeAsync(ROLE_DEFAULTS.triage.timeoutMs);
+    expect(await outcome).toMatchObject({ ok: false, failure: { kind: "timeout" } });
+  });
+
+  it("releases the semaphore slot of a query that times out", async () => {
+    const seen: Seen[] = [];
+    const hang = hangingQuery(seen, true);
+    const quick = quickQuery(seen);
+    let calls = 0;
+    const client = createSdkClient((args) => {
+      calls += 1;
+      return calls === 1 ? hang(args) : quick(args);
+    });
+    const semaphore = createSemaphore(1);
+    const first = semaphore(() => client.query(request("verifier"), runOptions(false)));
+    const second = semaphore(() => client.query(request("verifier"), runOptions(false)));
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(calls).toBe(1);
+    await vi.advanceTimersByTimeAsync(ROLE_DEFAULTS.verifier.timeoutMs);
+    expect(await first).toMatchObject({ ok: false, failure: { kind: "timeout" } });
+    expect(await second).toMatchObject({ ok: true, output: VERIFIER_OUTPUT });
+    expect(calls).toBe(2);
+  });
+
+  it("does not abort a query that ends in time, and leaves no timer", async () => {
+    const seen: Seen[] = [];
+    const client = createSdkClient(quickQuery(seen));
+    const outcome = await client.query(request("verifier"), runOptions(false));
+    expect(outcome).toMatchObject({ ok: true, output: VERIFIER_OUTPUT });
+    expect(seen[0]?.abortController?.signal.aborted).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
 

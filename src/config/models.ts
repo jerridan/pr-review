@@ -10,6 +10,12 @@ export interface RoleConfig {
   effort: Effort;
   maxTurns: number;
   maxBudgetUsd: number;
+  /**
+   * The wall-clock limit of one query, in milliseconds. The client aborts
+   * a query that runs longer, so a hung process does not hold its
+   * semaphore slot.
+   */
+  timeoutMs: number;
   tools: "read-only" | "none";
 }
 
@@ -40,6 +46,7 @@ export const ROLE_DEFAULTS: Record<Role, RoleConfig> = {
     effort: "medium",
     maxTurns: 5,
     maxBudgetUsd: 0.5,
+    timeoutMs: 120_000,
     tools: "none",
   },
   reviewer: {
@@ -47,6 +54,7 @@ export const ROLE_DEFAULTS: Record<Role, RoleConfig> = {
     effort: "low",
     maxTurns: 40,
     maxBudgetUsd: 2,
+    timeoutMs: 600_000,
     tools: "read-only",
   },
   verifier: {
@@ -54,6 +62,7 @@ export const ROLE_DEFAULTS: Record<Role, RoleConfig> = {
     effort: "high",
     maxTurns: 25,
     maxBudgetUsd: 0.5,
+    timeoutMs: 300_000,
     tools: "read-only",
   },
   "verifier-escalation": {
@@ -61,6 +70,7 @@ export const ROLE_DEFAULTS: Record<Role, RoleConfig> = {
     effort: "high",
     maxTurns: 25,
     maxBudgetUsd: 1,
+    timeoutMs: 300_000,
     tools: "read-only",
   },
   merge: {
@@ -68,6 +78,7 @@ export const ROLE_DEFAULTS: Record<Role, RoleConfig> = {
     effort: "medium",
     maxTurns: 5,
     maxBudgetUsd: 0.25,
+    timeoutMs: 120_000,
     tools: "none",
   },
   smoke: {
@@ -75,6 +86,7 @@ export const ROLE_DEFAULTS: Record<Role, RoleConfig> = {
     effort: "low",
     maxTurns: 2,
     maxBudgetUsd: 0.05,
+    timeoutMs: 60_000,
     tools: "none",
   },
 };

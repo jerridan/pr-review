@@ -34,7 +34,7 @@ Reason: Triage: New logic in a public function.
 Verdict: incomplete
 Coverage: reviewers ran: none; reviewers failed: diff-bugs; findings dropped by failed verifier calls: 2
 Excluded files: package-lock.json (generated), src/old-name.ts (rename-only)
-Cost: unknown
+Cost: unknown (3 queries without a cost)
 
 Findings: none posted.
 "

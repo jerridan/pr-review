@@ -169,10 +169,14 @@ describe("pr-review run through the CLI", () => {
       "coverage",
       "excluded_files",
       "findings",
+      "queries_without_cost",
       "record_path",
       "tier",
+      "total_cost_usd",
       "verdict",
     ]);
+    expect(doc.queries_without_cost).toBe(0);
+    expect(typeof doc.total_cost_usd).toBe("number");
     expect(doc.tier).toBe("full");
     expect(doc.verdict).toBe("would request changes");
     expect(doc.findings).toHaveLength(1);

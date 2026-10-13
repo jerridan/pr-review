@@ -72,6 +72,7 @@ function record(
           trigger: "min_tier fast <= full; paths: any; categories: any",
           model: "claude-opus-5-5",
           effort: "low",
+          tools_ignored: [],
         },
       ],
       models: {
@@ -96,7 +97,13 @@ function record(
       findings,
       ...overrides,
     },
-    cost: { queries: [], total_cost_usd: 0.4321, stage_ms: {}, errors: [] },
+    cost: {
+      queries: [],
+      total_cost_usd: 0.4321,
+      queries_without_cost: 0,
+      stage_ms: {},
+      errors: [],
+    },
   };
 }
 
@@ -131,7 +138,20 @@ describe("table output (A10)", () => {
         findings_dropped_by_failed_verifier: 2,
       },
     });
-    expect(formatTable({ ...r, cost: { ...r.cost, total_cost_usd: null } })).toMatchSnapshot();
+    expect(
+      formatTable({ ...r, cost: { ...r.cost, total_cost_usd: null, queries_without_cost: 3 } }),
+    ).toMatchSnapshot();
+  });
+
+  it("marks the total as a lower bound when a query has no cost", () => {
+    const r = record([]);
+    expect(formatTable({ ...r, cost: { ...r.cost, queries_without_cost: 2 } })).toContain(
+      "Cost: at least $0.4321 (2 queries without a cost)\n",
+    );
+    expect(formatTable({ ...r, cost: { ...r.cost, queries_without_cost: 1 } })).toContain(
+      "Cost: at least $0.4321 (1 query without a cost)\n",
+    );
+    expect(formatTable(r)).toContain("Cost: $0.4321\n");
   });
 
   it("shows the tier, the reason, the verdict, the coverage and each finding", () => {
@@ -158,6 +178,23 @@ describe("json output", () => {
     const text = formatJson(WITH_FINDINGS, "/out/r.json");
     expect(text.endsWith("\n")).toBe(true);
     expect(JSON.parse(text).findings).toHaveLength(3);
+  });
+
+  it("holds the total cost and the count of the queries without a cost", () => {
+    const r = record([]);
+    const doc = JSON.parse(
+      formatJson({ ...r, cost: { ...r.cost, queries_without_cost: 2 } }, "/out/r.json"),
+    );
+    expect(doc.total_cost_usd).toBe(0.4321);
+    expect(doc.queries_without_cost).toBe(2);
+    const unknown = JSON.parse(
+      formatJson(
+        { ...r, cost: { ...r.cost, total_cost_usd: null, queries_without_cost: 3 } },
+        "/out/r.json",
+      ),
+    );
+    expect(unknown.total_cost_usd).toBeNull();
+    expect(unknown.queries_without_cost).toBe(3);
   });
 
   it("holds the excluded files with their reasons", () => {

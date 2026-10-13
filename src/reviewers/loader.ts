@@ -4,6 +4,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { resolveModel, type Effort } from "../config/models.js";
 import { parseFrontmatter, promptPath } from "../prompts/load.js";
+import { narrowReadOnlyTools } from "../sdk/options.js";
 import { ReviewerFrontmatterSchema, type ReviewerFrontmatter } from "../schemas/reviewer.js";
 
 export interface ReviewerDefinition {
@@ -108,4 +109,13 @@ export function loadBuiltinReviewers(): ReviewerDefinition[] {
  */
 export function reviewerOverrides(def: ReviewerDefinition): { model: string; effort: Effort } {
   return { model: resolveModel(def.frontmatter.model), effort: def.frontmatter.effort };
+}
+
+/**
+ * The tools of a reviewer: the read-only tools that its frontmatter names,
+ * and the names that are not read-only tools. The query never gets an
+ * ignored tool. The "trusted" field is parsed but not used in D1.
+ */
+export function reviewerTools(def: ReviewerDefinition): { granted: string[]; ignored: string[] } {
+  return narrowReadOnlyTools(def.frontmatter.tools);
 }

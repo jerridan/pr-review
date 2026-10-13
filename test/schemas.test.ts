@@ -113,7 +113,13 @@ function makeRecord(): RunRecord {
       tier: "full",
       tier_reason: "triage",
       selected_reviewers: [
-        { name: "diff-bugs", trigger: "always", model: "claude-opus-5-5", effort: "low" },
+        {
+          name: "diff-bugs",
+          trigger: "always",
+          model: "claude-opus-5-5",
+          effort: "low",
+          tools_ignored: [],
+        },
       ],
       models: {
         triage: { model: "claude-sonnet-5-5", effort: "medium" },
@@ -192,6 +198,7 @@ function makeRecord(): RunRecord {
         },
       ],
       total_cost_usd: 0.1,
+      queries_without_cost: 0,
       stage_ms: { gather: 10 },
       errors: [],
     },
@@ -382,6 +389,51 @@ describe("RecordSchema", () => {
         },
       }).success,
     ).toBe(false);
+  });
+
+  it("accepts the failure kind timeout", () => {
+    const record = makeRecord();
+    const stages = {
+      ...record.stages,
+      verifications: [
+        { finding, first: { kind: "timeout", message: "x" }, final: null, passed: false },
+      ],
+    };
+    expect(RecordSchema.safeParse({ ...record, stages }).error).toBeUndefined();
+  });
+
+  it("requires an integer count of the queries without a cost", () => {
+    const record = makeRecord();
+    const { queries_without_cost: _count, ...rest } = record.cost;
+    expect(RecordSchema.safeParse({ ...record, cost: rest }).success).toBe(false);
+    expect(
+      RecordSchema.safeParse({ ...record, cost: { ...record.cost, queries_without_cost: 1.5 } })
+        .success,
+    ).toBe(false);
+    expect(
+      RecordSchema.safeParse({ ...record, cost: { ...record.cost, queries_without_cost: 2 } })
+        .success,
+    ).toBe(true);
+  });
+
+  it("requires the ignored tools of each selected reviewer", () => {
+    const record = makeRecord();
+    const entry = { name: "r", trigger: "t", model: "claude-opus-5-5", effort: "low" };
+    expect(
+      RecordSchema.safeParse({
+        ...record,
+        identity: { ...record.identity, selected_reviewers: [entry] },
+      }).success,
+    ).toBe(false);
+    expect(
+      RecordSchema.safeParse({
+        ...record,
+        identity: {
+          ...record.identity,
+          selected_reviewers: [{ ...entry, tools_ignored: ["Bash"] }],
+        },
+      }).success,
+    ).toBe(true);
   });
 
   it("rejects an unknown verdict and an unknown failure kind", () => {

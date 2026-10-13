@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { countHunks, filterDiff, parseNameStatus } from "../src/gather/diff.js";
+import { countHunks, diffSections, filterDiff, parseNameStatus } from "../src/gather/diff.js";
 import { applyExclusions } from "../src/gather/exclusions.js";
 import { gather, type GatherResult } from "../src/gather/index.js";
 import { withHeadWorktree } from "../src/gather/worktree.js";
@@ -140,6 +140,26 @@ describe("countHunks", () => {
       "",
     ].join("\n");
     expect(countHunks(patch).get("x.md")).toBe(1);
+  });
+});
+
+describe("diffSections", () => {
+  it("maps each new path to the text of its sections, as filterDiff selects it", () => {
+    const sections = diffSections(PATCH);
+    expect([...sections.keys()].sort()).toEqual([...countHunks(PATCH).keys()].sort());
+    for (const path of sections.keys()) {
+      expect(sections.get(path)).toBe(filterDiff(PATCH, (p) => p === path));
+    }
+    expect(sections.get("src/a.ts")).toContain("+ten and a half");
+    expect(sections.get("src/a.ts")).not.toContain("yarn.lock");
+    expect(sections.get("new/name.ts")).toContain("rename to new/name.ts");
+  });
+
+  it("joins two sections of the same path, and gives an empty map for an empty diff", () => {
+    const one = "diff --git a/x.ts b/x.ts\n--- a/x.ts\n+++ b/x.ts\n@@ -1 +1 @@\n-a\n+b\n";
+    const two = "diff --git a/x.ts b/x.ts\n--- a/x.ts\n+++ b/x.ts\n@@ -9 +9 @@\n-c\n+d\n";
+    expect(diffSections(one + two).get("x.ts")).toBe(one + two);
+    expect(diffSections("").size).toBe(0);
   });
 });
 

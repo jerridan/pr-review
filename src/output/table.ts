@@ -31,6 +31,15 @@ function excluded(files: RunRecord["identity"]["excluded_files"]): string {
   return list(files.map((f) => `${f.path} (${f.reason})`));
 }
 
+// The total is a lower bound when a query has no cost, so say that.
+function costLine(cost: RunRecord["cost"]): string {
+  const missing = cost.queries_without_cost;
+  const note = `(${missing} ${missing === 1 ? "query" : "queries"} without a cost)`;
+  if (cost.total_cost_usd === null) return missing > 0 ? `unknown ${note}` : "unknown";
+  const total = `$${cost.total_cost_usd.toFixed(4)}`;
+  return missing > 0 ? `at least ${total} ${note}` : total;
+}
+
 export function formatTable(record: RunRecord): string {
   const { identity, posted, cost } = record;
   const coverage = posted.coverage;
@@ -40,7 +49,7 @@ export function formatTable(record: RunRecord): string {
     `Verdict: ${posted.verdict}`,
     `Coverage: reviewers ran: ${list(coverage.reviewers_ran)}; reviewers failed: ${list(coverage.reviewers_failed)}; findings dropped by failed verifier calls: ${coverage.findings_dropped_by_failed_verifier}`,
     `Excluded files: ${excluded(identity.excluded_files)}`,
-    `Cost: ${cost.total_cost_usd === null ? "unknown" : `$${cost.total_cost_usd.toFixed(4)}`}`,
+    `Cost: ${costLine(cost)}`,
     "",
   ];
   if (posted.findings.length === 0) {

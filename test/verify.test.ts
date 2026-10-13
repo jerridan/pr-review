@@ -15,7 +15,13 @@ import { createFakeSdkClient, type FakeScript } from "../src/sdk/fake.js";
 import type { RunOptions } from "../src/sdk/options.js";
 import { createSemaphore } from "../src/semaphore.js";
 import { UNTRUSTED_SYSTEM_LINE } from "../src/untrusted.js";
-import { DEFAULT_VERIFY_CONFIG, verifyFinding, type VerifyConfig } from "../src/verify/index.js";
+import {
+  DEFAULT_VERIFY_CONFIG,
+  loadVerifierPrompt,
+  verifyFinding,
+  type VerifyConfig,
+} from "../src/verify/index.js";
+import { diffSections } from "../src/gather/diff.js";
 
 const FILE_TEXT = [
   "export function average(values: number[]): number {",
@@ -431,6 +437,29 @@ describe("verifyFinding (A6)", () => {
     expect(second.userMessage).toContain("CLAIM-loop-reads-past-end");
   });
 
+  it("uses the verifier prompt that the context gives, and does not load it again", async () => {
+    const loaded = loadVerifierPrompt();
+    expect(loaded.system).toBe(loadPrompt("verifier.md").body);
+    const fake = createFakeSdkClient(script(result(90)));
+    await verifyFinding(fake, OPTIONS, finding(), {
+      ...ctx(),
+      prompt: { ...loaded, system: "SYSTEM-FROM-CONTEXT" },
+    });
+    expect(fake.calls[0]?.systemPrompt).toBe("SYSTEM-FROM-CONTEXT");
+  });
+
+  it("takes the diff of the finding's file from the sections that the context gives", async () => {
+    const fake = createFakeSdkClient(script(result(90)));
+    const sections = new Map([["src/stats.ts", "SECTION-FROM-CONTEXT\n"]]);
+    await verifyFinding(fake, OPTIONS, finding(), { ...ctx(), diff: "", sections });
+    expect(fake.calls[0]?.userMessage).toContain("SECTION-FROM-CONTEXT");
+    const split = diffSections(DIFF);
+    const second = createFakeSdkClient(script(result(90)));
+    await verifyFinding(second, OPTIONS, finding(), { ...ctx(), diff: "", sections: split });
+    expect(second.calls[0]?.userMessage).toContain("+++ b/src/stats.ts");
+    expect(second.calls[0]?.userMessage).not.toContain("OTHER-NEW");
+  });
+
   it("runs each verifier query inside the semaphore", async () => {
     let active = 0;
     let peak = 0;
@@ -520,6 +549,39 @@ describe("verification starts per finding", () => {
     );
     await Promise.all(verifications);
     expect(events).toEqual(["fast reviewer returns", "verifier starts", "slow reviewer returns"]);
+  });
+
+  it("sends the diff of a file that the reviewer named with a ./ prefix", async () => {
+    const fake = createFakeSdkClient((req) => {
+      if (req.role === "reviewer")
+        return okOutcome({ findings: [finding({ file: "./src/stats.ts" })] });
+      return okOutcome(result(90));
+    });
+    const semaphore = createSemaphore(5);
+    const sections = diffSections(DIFF);
+    const verifications: Promise<unknown>[] = [];
+    await runReviewers(
+      fake,
+      OPTIONS,
+      [{ def: def("diff-bugs"), trigger: "t" }],
+      { gathered: GATHERED, brief: null, cwd: head, semaphore, sections },
+      (f) => {
+        expect(f.file).toBe("src/stats.ts");
+        verifications.push(
+          verifyFinding(fake, OPTIONS, f, {
+            cwd: head,
+            sections,
+            prompt: loadVerifierPrompt(),
+            semaphore,
+            config: DEFAULT_VERIFY_CONFIG,
+          }),
+        );
+      },
+    );
+    await Promise.all(verifications);
+    const verifier = fake.calls.find((c) => c.role === "verifier");
+    expect(verifier?.userMessage).toContain("+++ b/src/stats.ts");
+    expect(verifier?.userMessage).toContain('"file": "src/stats.ts"');
   });
 
   it("leaves a finding that fails the verifier out of the posted output", async () => {

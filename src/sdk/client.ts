@@ -1,8 +1,13 @@
 // The SDK boundary. This is the only module that imports the Agent SDK.
 // Tests replace it with the fake in "fake.ts".
-import { query, type Options, type SDKResultMessage } from "@anthropic-ai/claude-agent-sdk";
+import {
+  query,
+  type Options,
+  type SDKMessage,
+  type SDKResultMessage,
+} from "@anthropic-ai/claude-agent-sdk";
 import type { z } from "zod";
-import type { Role, RoleConfig } from "../config/models.js";
+import { ROLE_DEFAULTS, type Role, type RoleConfig } from "../config/models.js";
 import type { QueryFailure } from "../schemas/record.js";
 import { buildQueryOptions, type RunOptions } from "./options.js";
 
@@ -16,6 +21,11 @@ export interface QueryRequest {
   schema: z.ZodType;
   cwd: string;
   overrides?: Partial<Pick<RoleConfig, "model" | "effort">>;
+  /**
+   * The tools of a reviewer. They narrow the read-only set of the role and
+   * never widen it. When this is not set, the role gets its full set.
+   */
+  tools?: readonly string[];
 }
 
 export type QueryMeta = {
@@ -99,24 +109,60 @@ export function classifyResult<T>(
   return { ok: true, output: parsed.data as T, raw };
 }
 
-/** Make the real SDK client. Each query spawns its own Claude Code process. */
-export function createSdkClient(): SdkClient {
+/** The SDK "query" function, or a fake of it in tests. */
+export type QueryFn = (args: { prompt: string; options: Options }) => AsyncIterable<SDKMessage>;
+
+const TIMED_OUT = Symbol("timed out");
+
+/**
+ * Make the real SDK client. Each query spawns its own Claude Code process.
+ * "run" is the SDK "query" function; tests give a fake.
+ */
+export function createSdkClient(run: QueryFn = query): SdkClient {
   return {
     async query<T>(req: QueryRequest, options: RunOptions): Promise<QueryOutcome<T>> {
       // A bad request is a bug in the caller, so this throws and is not a
       // query failure.
       const sdkOptions = buildQueryOptions(req, options);
       const model = sdkOptions.model as string;
+      const timeoutMs = ROLE_DEFAULTS[req.role].timeoutMs;
+      // Each query has its own controller. The timer aborts it, and the
+      // query ends at that time also when the SDK does not stop.
+      const controller = new AbortController();
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timedOut = new Promise<typeof TIMED_OUT>((resolve) => {
+        timer = setTimeout(() => {
+          controller.abort();
+          resolve(TIMED_OUT);
+        }, timeoutMs);
+      });
+      const consume = async (): Promise<SDKResultMessage | undefined> => {
+        let last: SDKResultMessage | undefined;
+        for await (const message of run({
+          prompt: req.userMessage,
+          options: { ...(sdkOptions as Options), abortController: controller },
+        })) {
+          if (message.type === "result") last = message;
+        }
+        return last;
+      };
       let result: SDKResultMessage | undefined;
       try {
-        for await (const message of query({
-          prompt: req.userMessage,
-          options: sdkOptions as Options,
-        })) {
-          if (message.type === "result") result = message;
+        // Promise.race attaches a handler to both promises, so an abort
+        // error after the timeout is not an unhandled rejection.
+        const winner = await Promise.race([consume(), timedOut]);
+        if (winner === TIMED_OUT) {
+          return {
+            ok: false,
+            failure: { kind: "timeout", message: `The query did not end in ${timeoutMs} ms.` },
+            raw: null,
+          };
         }
+        result = winner;
       } catch (err) {
         return { ok: false, failure: { kind: "thrown", message: errorMessage(err) }, raw: null };
+      } finally {
+        clearTimeout(timer);
       }
       if (!result) {
         return {

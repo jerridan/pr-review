@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { ROLE_DEFAULTS, ROLES, resolveModel, type Effort, type Role } from "./config/models.js";
 import { runReviewers, type ReviewerRun } from "./find/index.js";
+import { diffSections } from "./gather/diff.js";
 import { gather, type GatherResult } from "./gather/index.js";
 import { withHeadWorktree } from "./gather/worktree.js";
 import { mergeFindings } from "./merge/index.js";
@@ -11,6 +12,7 @@ import { writeRecord } from "./record/write.js";
 import {
   loadBuiltinReviewers,
   reviewerOverrides,
+  reviewerTools,
   type ReviewerDefinition,
 } from "./reviewers/loader.js";
 import { selectReviewers } from "./reviewers/select.js";
@@ -24,7 +26,13 @@ import { createSemaphore } from "./semaphore.js";
 import { runTriage } from "./triage/index.js";
 import { decideTier, shouldRunTriage, type Tier } from "./triage/tier.js";
 import { coverage, decideVerdict, verificationCounts } from "./verdict.js";
-import { DEFAULT_VERIFY_CONFIG, verifyFinding, type Verification } from "./verify/index.js";
+import {
+  DEFAULT_VERIFY_CONFIG,
+  loadVerifierPrompt,
+  verifyFinding,
+  type Verification,
+  type VerifierPrompt,
+} from "./verify/index.js";
 
 export interface RunInput {
   repo: string;
@@ -64,7 +72,8 @@ function defaultModels(): Record<Role, { model: string; effort: Effort }> {
 
 /**
  * The record entry of each selected reviewer, with the model and effort
- * that its queries use after its frontmatter override.
+ * that its queries use after its frontmatter override, and the tools of
+ * its frontmatter that the run did not grant.
  */
 export function describeSelected(
   selected: { def: ReviewerDefinition; trigger: string }[],
@@ -73,6 +82,7 @@ export function describeSelected(
     name: s.def.frontmatter.name,
     trigger: s.trigger,
     ...reviewerOverrides(s.def),
+    tools_ignored: reviewerTools(s.def).ignored,
   }));
 }
 
@@ -110,6 +120,10 @@ async function settleAll<T>(promises: Promise<T>[]): Promise<T[]> {
   const failed = results.find((r): r is PromiseRejectedResult => r.status === "rejected");
   if (failed) throw failed.reason;
   return results.map((r) => (r as PromiseFulfilledResult<T>).value);
+}
+
+function messageOf(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
 function describeFailure(failure: QueryFailure): string {
@@ -167,6 +181,8 @@ function collectErrors(
   return errors;
 }
 
+// The sum of the known costs. A query with no cost is not in the sum, so
+// the record also holds the count of those queries.
 function totalCost(entries: CostEntry[]): number | null {
   const known = entries.map((e) => e.cost_usd).filter((c): c is number => c !== null);
   if (entries.length > 0 && known.length === 0) return null;
@@ -228,6 +244,12 @@ export async function runReview(
       selected.map((s) => [s.def.frontmatter.name, s.def.frontmatter.threshold]),
     );
 
+    // The run splits the diff per file once. Find and verify use the map.
+    const sections = diffSections(gathered.diff);
+    // The verifier prompt loads once, at the first finding. A load that
+    // fails is tried again at the next finding.
+    let verifierPrompt: VerifierPrompt | undefined;
+
     // Each finding goes to its verifier as soon as its reviewer pass
     // returns. Merge is the only barrier.
     const pending: Promise<VerificationEntry>[] = [];
@@ -236,14 +258,32 @@ export async function runReview(
         ...DEFAULT_VERIFY_CONFIG,
         threshold: thresholds.get(reviewer) ?? DEFAULT_VERIFY_CONFIG.threshold,
       };
-      pending.push(
-        verifyFinding(client, options, finding, {
-          cwd,
-          diff: gathered.diff,
-          semaphore,
-          config,
-        }).then((v: Verification) => ({ finding, ...v })),
-      );
+      // The rejection handler is attached here, when the promise is made.
+      // Other reviewer passes can run for a long time before the run waits
+      // for this promise, and a rejection with no handler stops the
+      // process. So an error (a prompt that does not load, for example)
+      // becomes a failed verification here.
+      const verification = Promise.resolve()
+        .then(() => {
+          verifierPrompt ??= loadVerifierPrompt();
+          return verifyFinding(client, options, finding, {
+            cwd,
+            sections,
+            prompt: verifierPrompt,
+            semaphore,
+            config,
+          });
+        })
+        .then(
+          (v: Verification): VerificationEntry => ({ finding, ...v }),
+          (err: unknown): VerificationEntry => ({
+            finding,
+            first: { kind: "thrown", message: messageOf(err) },
+            final: null,
+            passed: false,
+          }),
+        );
+      pending.push(verification);
     };
     const { runs, verifications } = await timed("find_verify", async () => {
       let found: ReviewerRun[];
@@ -252,7 +292,7 @@ export async function runReview(
           client,
           options,
           selected,
-          { gathered, brief, cwd, semaphore },
+          { gathered, brief, cwd, semaphore, sections },
           onFinding,
         );
       } catch (err) {
@@ -314,6 +354,7 @@ export async function runReview(
       cost: {
         queries,
         total_cost_usd: totalCost(queries),
+        queries_without_cost: queries.filter((q) => q.cost_usd === null).length,
         stage_ms: stageMs,
         errors: collectErrors(triageFailure, runs, verifications, merged.merges),
       },

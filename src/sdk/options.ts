@@ -17,7 +17,31 @@ export const READ_ONLY_TOOLS: readonly string[] = ["Read", "Grep", "Glob"];
  * path specifier, so it approves reads in the head checkout (the cwd)
  * only. A rule with no specifier approves a read of any path.
  */
-export const READ_ONLY_RULES: readonly string[] = READ_ONLY_TOOLS.map((tool) => `${tool}(./**)`);
+export const READ_ONLY_RULES: readonly string[] = READ_ONLY_TOOLS.map(readRule);
+
+function readRule(tool: string): string {
+  return `${tool}(./**)`;
+}
+
+/**
+ * Split a reviewer's tool list against the read-only set. "granted" holds
+ * the read-only tools that the list names (case-insensitive, in canonical
+ * form and order). "ignored" holds every other name: the list can narrow
+ * the read-only set, but it cannot widen it. When there is no list
+ * (undefined), the full read-only set is granted.
+ */
+export function narrowReadOnlyTools(tools: readonly string[] | undefined): {
+  granted: string[];
+  ignored: string[];
+} {
+  if (tools === undefined) return { granted: [...READ_ONLY_TOOLS], ignored: [] };
+  const named = new Set(tools.map((tool) => tool.trim().toLowerCase()));
+  const known = new Set(READ_ONLY_TOOLS.map((tool) => tool.toLowerCase()));
+  return {
+    granted: READ_ONLY_TOOLS.filter((tool) => named.has(tool.toLowerCase())),
+    ignored: tools.filter((tool) => !known.has(tool.trim().toLowerCase())),
+  };
+}
 
 /**
  * Variables that send the subprocess to a credential or an endpoint that
@@ -52,7 +76,9 @@ export function buildQueryOptions(req: QueryRequest, options: RunOptions): Recor
   const role = ROLE_DEFAULTS[req.role];
   const model = resolveModel(req.overrides?.model ?? role.model);
   const effort = req.overrides?.effort ?? role.effort;
-  const readOnly = role.tools === "read-only";
+  // A role with no tools gets none. A read-only role gets the read-only
+  // tools that the request names, or all of them when it names none.
+  const granted = role.tools === "read-only" ? narrowReadOnlyTools(req.tools).granted : [];
 
   // The SDK replaces the subprocess environment with "env", so spread the
   // parent environment. An API key, another token or another provider wins
@@ -72,11 +98,12 @@ export function buildQueryOptions(req: QueryRequest, options: RunOptions): Recor
     settingSources: [],
     permissionMode: "dontAsk",
     // "tools" sets which built-in tools exist; "allowedTools" approves them.
-    tools: readOnly ? [...READ_ONLY_TOOLS] : [],
-    allowedTools: readOnly ? [...READ_ONLY_RULES] : [],
-    disallowedTools: readOnly
-      ? [...ALWAYS_DISALLOWED_TOOLS]
-      : [...ALWAYS_DISALLOWED_TOOLS, ...READ_ONLY_TOOLS],
+    tools: granted,
+    allowedTools: granted.map(readRule),
+    disallowedTools: [
+      ...ALWAYS_DISALLOWED_TOOLS,
+      ...READ_ONLY_TOOLS.filter((tool) => !granted.includes(tool)),
+    ],
     outputFormat: { type: "json_schema", schema: toSdkJsonSchema(req.schema) },
     maxTurns: role.maxTurns,
     maxBudgetUsd: role.maxBudgetUsd,

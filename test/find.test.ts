@@ -3,9 +3,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import {
+  diffEvidenceText,
   evidenceMatches,
   lineCount,
   lineRangeValid,
+  normalizeFindingPath,
   normalizeWs,
   readHeadFile,
 } from "../src/find/evidence.js";
@@ -142,15 +144,58 @@ describe("evidence checks", () => {
   });
 
   it("matches a quote in the head file or the diff, after whitespace collapse", () => {
-    expect(evidenceMatches("for (let i = 0;\n   i <= values.length; i++)", STATS, "")).toBe(true);
-    expect(evidenceMatches("+  let total = 0;", null, DIFF)).toBe(true);
-    expect(evidenceMatches("return total / values.length;", null, DIFF)).toBe(true);
+    const stats = normalizeWs(STATS);
+    expect(evidenceMatches("for (let i = 0;\n   i <= values.length; i++)", stats, "")).toBe(true);
+    expect(evidenceMatches("+  let total = 0;", null, diffEvidenceText(DIFF))).toBe(true);
+    expect(evidenceMatches("return total / values.length;", null, diffEvidenceText(DIFF))).toBe(
+      true,
+    );
   });
 
   it("is case-sensitive and rejects an empty or invented quote", () => {
-    expect(evidenceMatches("RETURN total / values.length;", STATS, DIFF)).toBe(false);
-    expect(evidenceMatches("values.pop()", STATS, DIFF)).toBe(false);
-    expect(evidenceMatches("   ", STATS, DIFF)).toBe(false);
+    const stats = normalizeWs(STATS);
+    const diff = diffEvidenceText(DIFF);
+    expect(evidenceMatches("RETURN total / values.length;", stats, diff)).toBe(false);
+    expect(evidenceMatches("values.pop()", stats, diff)).toBe(false);
+    expect(evidenceMatches("   ", stats, diff)).toBe(false);
+  });
+
+  it("takes the added and context lines of a diff section, not removed or header lines", () => {
+    const section = [
+      "diff --git a/src/x.ts b/src/x.ts",
+      "index 1111111..2222222 100644",
+      "--- a/src/x.ts",
+      "+++ b/src/x.ts",
+      "@@ -1,3 +1,3 @@ function f() {",
+      " CONTEXT-LINE",
+      "-REMOVED-LINE",
+      "+ADDED-LINE",
+      "\\ No newline at end of file",
+      "",
+    ].join("\n");
+    const text = diffEvidenceText(section);
+    expect(text).toBe(normalizeWs(text));
+    expect(text).toContain("CONTEXT-LINE");
+    expect(text).toContain("+ADDED-LINE");
+    expect(text).not.toContain("REMOVED-LINE");
+    expect(text).not.toContain("+++ b/src/x.ts");
+    expect(text).not.toContain("--- a/src/x.ts");
+    expect(text).not.toContain("@@");
+    expect(text).not.toContain("diff --git");
+    expect(diffEvidenceText("")).toBe("");
+  });
+
+  it("normalizes a finding path, and refuses a path that is absolute or goes up", () => {
+    expect(normalizeFindingPath("src/stats.ts")).toBe("src/stats.ts");
+    expect(normalizeFindingPath("./src/stats.ts")).toBe("src/stats.ts");
+    expect(normalizeFindingPath("././src//stats.ts")).toBe("src/stats.ts");
+    expect(normalizeFindingPath("src/./stats.ts")).toBe("src/stats.ts");
+    expect(normalizeFindingPath("../src/stats.ts")).toBeNull();
+    expect(normalizeFindingPath("src/../../x.ts")).toBeNull();
+    expect(normalizeFindingPath("src/../stats.ts")).toBeNull();
+    expect(normalizeFindingPath("/etc/hosts")).toBeNull();
+    expect(normalizeFindingPath("")).toBeNull();
+    expect(normalizeFindingPath("./")).toBeNull();
   });
 
   it("checks the line range against the head file", () => {
@@ -201,6 +246,113 @@ describe("runReviewers (A5)", () => {
     expect(call.schema).toBe(FindingsOutputSchema);
     expect(call.cwd).toBe(head);
     expect(call.overrides).toEqual({ model: "claude-opus-5-5", effort: "low" });
+    expect(call.tools).toEqual(["Read", "Grep", "Glob"]);
+  });
+
+  it("sends the tools of the reviewer with its query", async () => {
+    const narrow = def("narrow");
+    narrow.frontmatter.tools = ["Read", "Bash"];
+    const fake = createFakeSdkClient(() => ok([]));
+    await runReviewers(fake, OPTIONS, [{ def: narrow, trigger: "t" }], ctx(), () => {});
+    expect(fake.calls[0]?.tools).toEqual(["Read", "Bash"]);
+  });
+
+  it("normalizes the path of a finding once and sends the clean path on", async () => {
+    const dotted = finding({ file: "./src/stats.ts" });
+    const doubled = finding({ file: "src//stats.ts", start_line: 14, end_line: 14 });
+    const fake = createFakeSdkClient(() => ok([dotted, doubled]));
+    const seen: Finding[] = [];
+    const [run] = await runReviewers(
+      fake,
+      OPTIONS,
+      [{ def: def("diff-bugs"), trigger: "t" }],
+      ctx(),
+      (f) => seen.push(f),
+    );
+    expect(run?.dropped).toEqual([]);
+    expect(run?.findings.map((f) => f.file)).toEqual(["src/stats.ts", "src/stats.ts"]);
+    expect(seen.map((f) => f.file)).toEqual(["src/stats.ts", "src/stats.ts"]);
+  });
+
+  it("drops a finding whose path is absolute or goes up as out of range", async () => {
+    const up = finding({ file: "../stats.ts" });
+    const upAndBack = finding({ file: "src/../src/stats.ts" });
+    const absolute = finding({ file: join(head, "src/stats.ts") });
+    const fake = createFakeSdkClient(() => ok([up, upAndBack, absolute]));
+    const seen: Finding[] = [];
+    const [run] = await runReviewers(
+      fake,
+      OPTIONS,
+      [{ def: def("diff-bugs"), trigger: "t" }],
+      ctx(),
+      (f) => seen.push(f),
+    );
+    expect(run?.findings).toEqual([]);
+    expect(run?.dropped).toEqual([
+      { finding: up, reason: "out-of-range" },
+      { finding: upAndBack, reason: "out-of-range" },
+      { finding: absolute, reason: "out-of-range" },
+    ]);
+    expect(seen).toEqual([]);
+  });
+
+  it("matches a diff quote only in the added and context lines of the finding's own file", async () => {
+    const other = [
+      "diff --git a/src/old.ts b/src/old.ts",
+      "--- a/src/old.ts",
+      "+++ b/src/old.ts",
+      "@@ -1,2 +1,1 @@",
+      " OTHER-CONTEXT-LINE();",
+      "-REMOVED-ONLY-IN-OLD();",
+      "",
+    ].join("\n");
+    const ownRemoved = [
+      "diff --git a/src/stats.ts b/src/stats.ts",
+      "--- a/src/stats.ts",
+      "+++ b/src/stats.ts",
+      "@@ -20,1 +20,0 @@",
+      "-REMOVED-FROM-STATS();",
+      "",
+    ].join("\n");
+    const gathered = { ...GATHERED, diff: DIFF + other + ownRemoved };
+    const removedOther = finding({ evidence: "REMOVED-ONLY-IN-OLD();" });
+    const removedOtherPrefixed = finding({ evidence: "-REMOVED-ONLY-IN-OLD();" });
+    const contextOther = finding({ evidence: "OTHER-CONTEXT-LINE();" });
+    const removedOwn = finding({ evidence: "REMOVED-FROM-STATS();" });
+    const header = finding({ evidence: "+++ b/src/stats.ts" });
+    const added = finding({ evidence: "+  let total = 0;" });
+    const fake = createFakeSdkClient(() =>
+      ok([removedOther, removedOtherPrefixed, contextOther, removedOwn, header, added]),
+    );
+    const [run] = await runReviewers(
+      fake,
+      OPTIONS,
+      [{ def: def("diff-bugs"), trigger: "t" }],
+      { ...ctx(), gathered },
+      () => {},
+    );
+    expect(run?.dropped).toEqual([
+      { finding: removedOther, reason: "bad-quote" },
+      { finding: removedOtherPrefixed, reason: "bad-quote" },
+      { finding: contextOther, reason: "bad-quote" },
+      { finding: removedOwn, reason: "bad-quote" },
+      { finding: header, reason: "bad-quote" },
+    ]);
+    expect(run?.findings).toEqual([added]);
+  });
+
+  it("uses the diff sections of the context when the run gives them", async () => {
+    const sections = new Map([["src/stats.ts", "@@ -1 +1 @@\n+ONLY-IN-THE-CONTEXT-SECTION\n"]]);
+    const quoted = finding({ evidence: "+ONLY-IN-THE-CONTEXT-SECTION" });
+    const fake = createFakeSdkClient(() => ok([quoted]));
+    const [run] = await runReviewers(
+      fake,
+      OPTIONS,
+      [{ def: def("diff-bugs"), trigger: "t" }],
+      { ...ctx(), sections },
+      () => {},
+    );
+    expect(run?.findings).toEqual([quoted]);
   });
 
   it("drops a finding with a bad quote and records the drop", async () => {

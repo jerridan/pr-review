@@ -200,6 +200,7 @@ describe("the record parts", () => {
         trigger: expect.stringContaining("min_tier fast"),
         model: "claude-opus-5-5",
         effort: "low",
+        tools_ignored: [],
       },
     ]);
     expect(id.models).toEqual({
@@ -263,6 +264,8 @@ describe("the record parts", () => {
       stop_reason: null,
     });
     expect(record.cost.total_cost_usd).toBeCloseTo(0.62, 10);
+    // The failed escalation has no cost, so the total is a lower bound.
+    expect(record.cost.queries_without_cost).toBe(1);
     expect(Object.keys(record.cost.stage_ms)).toEqual(
       expect.arrayContaining(["gather", "triage", "find_verify", "merge"]),
     );
@@ -273,14 +276,16 @@ describe("the record parts", () => {
 });
 
 describe("--format json output (A9)", () => {
-  it("prints one document with the six keys, and findings is posted.findings", () => {
+  it("prints one document with the eight keys, and findings is posted.findings", () => {
     const doc = JSON.parse(formatJson(record, recordPath));
     expect(Object.keys(doc).sort()).toEqual([
       "coverage",
       "excluded_files",
       "findings",
+      "queries_without_cost",
       "record_path",
       "tier",
+      "total_cost_usd",
       "verdict",
     ]);
     expect(doc).toEqual({
@@ -289,6 +294,8 @@ describe("--format json output (A9)", () => {
       verdict: record.posted.verdict,
       coverage: record.posted.coverage,
       excluded_files: record.identity.excluded_files,
+      total_cost_usd: record.cost.total_cost_usd,
+      queries_without_cost: 1,
       findings: record.posted.findings,
     });
     expect(doc.excluded_files).toContainEqual({ path: "package-lock.json", reason: "generated" });

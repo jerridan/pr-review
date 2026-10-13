@@ -15,6 +15,8 @@ import { promisify } from "node:util";
 import { CommanderError } from "commander";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createProgram } from "../src/cli.js";
+import type * as PromptLoad from "../src/prompts/load.js";
+import type * as ReviewerLoader from "../src/reviewers/loader.js";
 import type { ReviewerDefinition } from "../src/reviewers/loader.js";
 import { describeSelected, runReview } from "../src/run.js";
 import type { Finding } from "../src/schemas/finding.js";
@@ -23,6 +25,41 @@ import type { TriageBrief } from "../src/schemas/triage.js";
 import type { VerifierResult } from "../src/schemas/verifier.js";
 import type { QueryMeta, QueryOutcome, QueryRequest } from "../src/sdk/client.js";
 import { createFakeSdkClient } from "../src/sdk/fake.js";
+
+// Test switches for the module mocks below. They are off unless a test
+// sets them.
+const mocks = vi.hoisted(() => ({
+  failVerifierPrompt: false,
+  reviewerPasses: undefined as number | undefined,
+}));
+
+vi.mock("../src/prompts/load.js", async (importOriginal) => {
+  const original = await importOriginal<typeof PromptLoad>();
+  return {
+    ...original,
+    loadPrompt: (relativePath: string) => {
+      if (mocks.failVerifierPrompt && relativePath === "verifier.md") {
+        throw new Error("PROMPT-LOAD-FAILED");
+      }
+      return original.loadPrompt(relativePath);
+    },
+  };
+});
+
+vi.mock("../src/reviewers/loader.js", async (importOriginal) => {
+  const original = await importOriginal<typeof ReviewerLoader>();
+  return {
+    ...original,
+    loadBuiltinReviewers: () =>
+      original
+        .loadBuiltinReviewers()
+        .map((def) =>
+          mocks.reviewerPasses === undefined
+            ? def
+            : { ...def, frontmatter: { ...def.frontmatter, passes: mocks.reviewerPasses } },
+        ),
+  };
+});
 
 const run = promisify(execFile);
 const SCRIPT = fileURLToPath(new URL("../scripts/make-fixture.sh", import.meta.url));
@@ -478,8 +515,101 @@ describe("the selected reviewers in the record", () => {
         { def: def("b", "claude-opus-4-1", "low"), trigger: "t2" },
       ]),
     ).toEqual([
-      { name: "a", trigger: "t1", model: "claude-sonnet-5-5", effort: "high" },
-      { name: "b", trigger: "t2", model: "claude-opus-4-1", effort: "low" },
+      { name: "a", trigger: "t1", model: "claude-sonnet-5-5", effort: "high", tools_ignored: [] },
+      { name: "b", trigger: "t2", model: "claude-opus-4-1", effort: "low", tools_ignored: [] },
     ]);
+  });
+
+  it("names each tool of the reviewer that is not in the read-only set", () => {
+    const wide = def("w", "opus", "low");
+    wide.frontmatter.tools = ["Read", "Bash", "WebFetch", "grep"];
+    expect(describeSelected([{ def: wide, trigger: "t" }])).toEqual([
+      {
+        name: "w",
+        trigger: "t",
+        model: "claude-opus-5-5",
+        effort: "low",
+        tools_ignored: ["Bash", "WebFetch"],
+      },
+    ]);
+  });
+});
+
+describe("a verifier prompt that does not load", () => {
+  afterEach(() => {
+    mocks.failVerifierPrompt = false;
+    mocks.reviewerPasses = undefined;
+  });
+
+  it("fails the verification, writes the record and removes the worktree while a reviewer pass is pending", async () => {
+    mocks.failVerifierPrompt = true;
+    mocks.reviewerPasses = 2;
+    let reviewerCalls = 0;
+    const fake = createFakeSdkClient(async (req) => {
+      if (req.role === "reviewer") {
+        reviewerCalls += 1;
+        if (reviewerCalls === 1) {
+          return { ok: true, output: { findings: [plantedFinding(fx)] }, raw: META };
+        }
+        // The second pass is still pending when the first finding goes
+        // to its verifier.
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        return { ok: true, output: { findings: [] }, raw: META };
+      }
+      return script(fx)(req);
+    });
+    const { record, recordPath } = await runReview({
+      repo: fx.repo,
+      base: fx.base,
+      head: fx.head,
+      outDir: join(outRoot, "verifier-prompt-fails"),
+      allowApiKey: false,
+      client: fake,
+    });
+    expect(reviewerCalls).toBe(2);
+    expect(existsSync(recordPath)).toBe(true);
+    expect(record.stages.verifications).toEqual([
+      {
+        finding: plantedFinding(fx),
+        first: { kind: "thrown", message: expect.stringContaining("PROMPT-LOAD-FAILED") },
+        final: null,
+        passed: false,
+      },
+    ]);
+    expect(fake.calls.filter((c) => c.role === "verifier")).toEqual([]);
+    expect(record.posted.findings).toEqual([]);
+    expect(record.posted.verdict).toBe("incomplete");
+    expect(record.posted.coverage.findings_dropped_by_failed_verifier).toBe(1);
+    const cwd = fake.calls[0]?.cwd ?? "";
+    expect(cwd).not.toBe("");
+    expect(existsSync(cwd)).toBe(false);
+    expect(await worktrees(fx.repo)).not.toContain(cwd);
+  });
+});
+
+describe("a finding path with a ./ prefix", () => {
+  it("is normalized once, so the verifier gets the diff of the file and the record the clean path", async () => {
+    const fake = createFakeSdkClient((req) =>
+      req.role === "reviewer"
+        ? {
+            ok: true,
+            output: { findings: [{ ...plantedFinding(fx), file: `./${fx.file}` }] },
+            raw: META,
+          }
+        : script(fx)(req),
+    );
+    const { record } = await runReview({
+      repo: fx.repo,
+      base: fx.base,
+      head: fx.head,
+      outDir: join(outRoot, "dot-slash"),
+      allowApiKey: false,
+      client: fake,
+    });
+    const verifier = fake.calls.find((c) => c.role === "verifier");
+    expect(verifier?.userMessage).toContain(`+++ b/${fx.file}`);
+    expect(record.stages.reviewers[0]?.findings.map((f) => f.file)).toEqual([fx.file]);
+    expect(record.stages.verifications[0]?.finding.file).toBe(fx.file);
+    expect(record.posted.findings.map((f) => f.file)).toEqual([fx.file]);
   });
 });

@@ -17,7 +17,8 @@ export type QueryFailure = {
     | "max_tokens"
     | "out-of-range"
     | "thrown"
-    | "limit";
+    | "limit"
+    | "timeout";
   message: string;
 };
 
@@ -45,7 +46,14 @@ export type RunRecord = {
     triage: TriageBrief | null;
     tier: "skip" | "fast" | "full";
     tier_reason: string;
-    selected_reviewers: { name: string; trigger: string; model: string; effort: Effort }[];
+    selected_reviewers: {
+      name: string;
+      trigger: string;
+      model: string;
+      effort: Effort;
+      /** Tools in the reviewer's frontmatter that are not read-only tools. */
+      tools_ignored: string[];
+    }[];
     models: Record<Role, { model: string; effort: Effort }>;
   };
   stages: {
@@ -89,7 +97,13 @@ export type RunRecord = {
       usage: unknown;
       cost_usd: number | null;
     }[];
+    /**
+     * The sum of the known query costs. When queries_without_cost is above
+     * 0, the true cost is higher. Null when no query has a cost.
+     */
     total_cost_usd: number | null;
+    /** The number of queries with no cost (a query that threw, for example). */
+    queries_without_cost: number;
     stage_ms: Record<string, number>;
     errors: { stage: string; message: string }[];
   };
@@ -103,6 +117,7 @@ export const FAILURE_KINDS = [
   "out-of-range",
   "thrown",
   "limit",
+  "timeout",
 ] as const;
 
 export const QueryFailureSchema: z.ZodType<QueryFailure> = z.strictObject({
@@ -153,6 +168,7 @@ const IdentitySchema = z.strictObject({
       trigger: z.string(),
       model: z.string(),
       effort: effortEnum,
+      tools_ignored: z.array(z.string()),
     }),
   ),
   models: z.record(roleEnum, z.strictObject({ model: z.string(), effort: effortEnum })),
@@ -219,6 +235,7 @@ const CostSchema = z.strictObject({
     }),
   ),
   total_cost_usd: z.number().nullable(),
+  queries_without_cost: integer(),
   stage_ms: z.record(z.string(), z.number()),
   errors: z.array(z.strictObject({ stage: z.string(), message: z.string() })),
 });

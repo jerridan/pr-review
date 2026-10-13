@@ -140,6 +140,19 @@ export function countHunks(diff: string): Map<string, number> {
   return counts;
 }
 
+/**
+ * Map each new path to the text of its sections, in diff order. A run
+ * splits its diff once with this function, and each finding then gets the
+ * section of its file from the map.
+ */
+export function diffSections(diff: string): Map<string, string> {
+  const sections = new Map<string, string>();
+  for (const section of splitSections(diff).sections) {
+    sections.set(section.path, (sections.get(section.path) ?? "") + section.text);
+  }
+  return sections;
+}
+
 /** Keep the sections of the files for which "keep" is true. */
 export function filterDiff(diff: string, keep: (path: string) => boolean): string {
   const { preamble, sections } = splitSections(diff);

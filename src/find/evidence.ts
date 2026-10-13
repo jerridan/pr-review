@@ -9,19 +9,57 @@ export function normalizeWs(s: string): string {
 }
 
 /**
+ * Return the text in a file's diff section that a quote can match: the
+ * added and context lines, each with its "+" or " " prefix, after
+ * whitespace collapse. Removed lines, file headers and hunk headers are
+ * not in it.
+ */
+export function diffEvidenceText(section: string): string {
+  const kept: string[] = [];
+  let inHunk = false;
+  for (const line of section.split("\n")) {
+    // A hunk body line starts with " ", "+", "-" or "\", so these two
+    // prefixes always start a file header or a hunk header.
+    if (line.startsWith("diff --git ")) {
+      inHunk = false;
+    } else if (line.startsWith("@@")) {
+      inHunk = true;
+    } else if (inHunk && (line.startsWith("+") || line.startsWith(" "))) {
+      kept.push(line);
+    }
+  }
+  return normalizeWs(kept.join("\n"));
+}
+
+/**
  * Return true when the evidence is a substring of the head file or of the
- * diff, after whitespace collapse in both. The match is case-sensitive.
- * An empty quote never matches.
+ * diff text of the finding's file, after whitespace collapse. The two
+ * texts must be normalized already (normalizeWs for the head file,
+ * diffEvidenceText for the diff), so a run normalizes each text once. The
+ * match is case-sensitive. An empty quote never matches.
  */
 export function evidenceMatches(
   evidence: string,
-  headFileText: string | null,
-  diff: string,
+  normalizedHeadFile: string | null,
+  normalizedFileDiff: string,
 ): boolean {
   const quote = normalizeWs(evidence);
   if (quote === "") return false;
-  if (headFileText !== null && normalizeWs(headFileText).includes(quote)) return true;
-  return normalizeWs(diff).includes(quote);
+  if (normalizedHeadFile !== null && normalizedHeadFile.includes(quote)) return true;
+  return normalizedFileDiff.includes(quote);
+}
+
+/**
+ * Normalize the path of a finding: remove "./" and empty segments, so
+ * "./src//a.ts" becomes "src/a.ts". Return null for an absolute path, a
+ * path with a ".." segment, or an empty path. The path comes from model
+ * output, so it is not trusted.
+ */
+export function normalizeFindingPath(file: string): string | null {
+  if (isAbsolute(file)) return null;
+  const parts = file.split("/").filter((part) => part !== "" && part !== ".");
+  if (parts.length === 0 || parts.includes("..")) return null;
+  return parts.join("/");
 }
 
 /** The number of lines in a file. A final newline does not start a line. */

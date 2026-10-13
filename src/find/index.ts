@@ -1,5 +1,6 @@
 // Find: run each selected reviewer, one query per pass, and check each
 // finding before it goes to verification.
+import { diffSections } from "../gather/diff.js";
 import type { GatherResult } from "../gather/index.js";
 import { loadPrompt, render, type PromptFile } from "../prompts/load.js";
 import { reviewerOverrides, type ReviewerDefinition } from "../reviewers/loader.js";
@@ -10,7 +11,15 @@ import type { QueryMeta, SdkClient } from "../sdk/client.js";
 import type { RunOptions } from "../sdk/options.js";
 import type { Semaphore } from "../semaphore.js";
 import { wrapUntrusted } from "../untrusted.js";
-import { evidenceMatches, lineCount, lineRangeValid, readHeadFile } from "./evidence.js";
+import {
+  diffEvidenceText,
+  evidenceMatches,
+  lineCount,
+  lineRangeValid,
+  normalizeFindingPath,
+  normalizeWs,
+  readHeadFile,
+} from "./evidence.js";
 
 export interface ReviewerRun {
   name: string;
@@ -27,6 +36,11 @@ type FindContext = {
   brief: TriageBrief | null;
   cwd: string;
   semaphore: Semaphore;
+  /**
+   * The diff split per file (see diffSections). The run splits it once and
+   * gives it here. When it is not set, runReviewers splits the diff itself.
+   */
+  sections?: Map<string, string>;
 };
 
 /** The texts of prompts/reviewer-user.md that the user message uses. */
@@ -113,10 +127,25 @@ export async function runReviewers(
   onFinding: (f: Finding, reviewer: string) => void,
 ): Promise<ReviewerRun[]> {
   const texts = reviewerTexts(loadPrompt("reviewer-user.md"));
-  const headFiles = new Map<string, string | null>();
-  const headFile = (file: string): string | null => {
-    if (!headFiles.has(file)) headFiles.set(file, readHeadFile(ctx.cwd, file));
+  const sections = ctx.sections ?? diffSections(ctx.gathered.diff);
+  // Each head file is read and normalized once, and so is the diff text
+  // of each file, also when many findings name the same file.
+  const headFiles = new Map<string, { raw: string; normalized: string } | null>();
+  const headFile = (file: string): { raw: string; normalized: string } | null => {
+    if (!headFiles.has(file)) {
+      const raw = readHeadFile(ctx.cwd, file);
+      headFiles.set(file, raw === null ? null : { raw, normalized: normalizeWs(raw) });
+    }
     return headFiles.get(file) ?? null;
+  };
+  const fileDiffs = new Map<string, string>();
+  const fileDiff = (file: string): string => {
+    let text = fileDiffs.get(file);
+    if (text === undefined) {
+      text = diffEvidenceText(sections.get(file) ?? "");
+      fileDiffs.set(file, text);
+    }
+    return text;
   };
 
   const runPass = async (
@@ -138,6 +167,7 @@ export async function runReviewers(
             schema: FindingsOutputSchema,
             cwd: ctx.cwd,
             overrides: reviewerOverrides(def),
+            tools: def.frontmatter.tools,
           },
           options,
         ),
@@ -160,11 +190,19 @@ export async function runReviewers(
 
     const findings: Finding[] = [];
     const dropped: ReviewerRun["dropped"] = [];
-    for (const finding of outcome.output.findings) {
-      const text = headFile(finding.file);
-      if (!lineRangeValid(finding, text === null ? null : lineCount(text))) {
+    for (const reported of outcome.output.findings) {
+      // The path is normalized here, once. Every later stage gets the
+      // finding with the normalized path.
+      const file = normalizeFindingPath(reported.file);
+      if (file === null) {
+        dropped.push({ finding: reported, reason: "out-of-range" });
+        continue;
+      }
+      const finding = file === reported.file ? reported : { ...reported, file };
+      const text = headFile(file);
+      if (!lineRangeValid(finding, text === null ? null : lineCount(text.raw))) {
         dropped.push({ finding, reason: "out-of-range" });
-      } else if (!evidenceMatches(finding.evidence, text, ctx.gathered.diff)) {
+      } else if (!evidenceMatches(finding.evidence, text?.normalized ?? null, fileDiff(file))) {
         dropped.push({ finding, reason: "bad-quote" });
       } else {
         findings.push(finding);
