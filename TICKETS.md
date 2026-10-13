@@ -32,5 +32,5 @@ Goal: measure a change to a prompt, a threshold or a model before it ships (sect
 - The default record directory `./pr-review-records` sits inside the repo under review (skeptical review nit, declined for D1); D3 moves records to workflow artifacts and a branch.
 - The verifier message numbers every line and the quote check strips the prefixes back off; an alternative is to ask for quotes by line span and compare against the span text, to be measured in D4.
 - The acceptance run on 2026-10-13 cost about $0.61 for one reviewer pass and one verification on a 2-file fixture. Track this per run in D4.
-- D2 added `scripts/measure-passes.sh`. Its first result, one pass against two passes of diff-bugs on the fixture, goes in `docs/research/passes-recall.md`. Set the diff-bugs `passes` default from it.
+- `docs/research/passes-recall.md` holds the first run of `scripts/measure-passes.sh`: both arms found the one planted bug in every run, so the fixture cannot separate one pass from two. Repeat it in the D4 harness on a harder case set, and set the diff-bugs `passes` default from that.
 - The skip fields and `pre_existing` in `.pr-review/config.yaml` are parsed and recorded but not applied; D3 applies them when it has the PR metadata.
