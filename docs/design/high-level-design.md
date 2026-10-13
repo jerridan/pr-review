@@ -22,7 +22,7 @@ Two layers:
 1. **Orchestrator** (code, deterministic). Collects inputs, routes, selects reviewers, runs the stages below, merges, posts, records. No LLM decides control flow here.
 2. **Agents** (markdown definitions, one file per agent). Reviewers, the verifier, the triage agent, the summarizer. Built-in agents ship with the tool. Custom reviewers live in the repo.
 
-Recommended runtime: the Claude Agent SDK (TypeScript) with each reviewer passed as a programmatic subagent. The agent files use the Claude Code subagent frontmatter (`name`, `description`, `tools`, `model`) plus a small set of review-only fields. This gives the same files in three places: the CI run, the local CLI run, and interactive use inside Claude Code.
+Recommended runtime: the Claude Agent SDK (TypeScript). The pipeline runs one SDK `query()` for each reviewer pass. It does not pass reviewers as programmatic subagents. The agent files use the Claude Code subagent frontmatter (`name`, `description`, `tools`, `model`) plus a small set of review-only fields. This gives the same files in three places: the CI run, the local CLI run, and interactive use inside Claude Code.
 
 Alternative considered: a Claude Code slash command that spawns subagents through the Agent tool. Rejected for the main path because the merge, threshold, dedupe and post steps must be deterministic and testable. Kept as a thin `/review` command that calls the CLI.
 
@@ -42,6 +42,8 @@ Alternative considered: a Claude Code slash command that spawns subagents throug
 - Existing review threads posted by this tool, with their fingerprints and state.
 - Repo config and custom reviewers, read from the **base branch** only (see section 6).
 - Sanitize PR title and body: strip HTML comments and invisible characters, wrap in a data block.
+- The description block. It holds the PR title and body when they are known. Otherwise it holds the subject and body of each commit in base..head, oldest first.
+- The history block. It holds `git blame` and `git log` output at the merge base of base and head, limited to the old-side line ranges of each hunk and to files that exist on the merge base. It has a cap of 65536 bytes. The record notes a cut.
 
 ### 3.2 Triage (facts in code, then one Sonnet call)
 
@@ -66,6 +68,8 @@ Order of precedence:
 3. Sensitive globs (auth, crypto, payments, migrations, CI config, the tool's own config) set a floor of `full`. Triage can raise a tier, never lower it past this floor.
 4. Triage decides everything else.
 
+A sensitive path with no text hunks does not raise the tier. The record and the coverage line name it.
+
 Tier effects:
 
 | Tier | Reviewers | Verifier | Budget target |
@@ -82,7 +86,7 @@ Each reviewer declares triggers in frontmatter: path globs, languages, categorie
 
 ### 3.4 Find (parallel reviewer agents)
 
-Each reviewer gets: the diff, the sanitized PR description, the repo rules file, read-only tools over the checkout, and a per-reviewer token budget. Each returns structured findings:
+Each reviewer gets: the diff, the description block, the repo rules, read-only tools over the checkout, and a per-reviewer token budget. The history reviewer also gets the history block. Each returns structured findings:
 
 ```
 file, start_line, end_line, category, severity, claim,
@@ -101,9 +105,11 @@ Built-in reviewers for v1, split by evidence source:
 | conventions | CLAUDE.md, rules file, nearby code style | fast |
 | tests | changed behavior vs changed tests, silent failures | full |
 | security | input handling, secrets, authz on changed paths | full |
-| history | git blame and log on changed lines, prior fixes | full |
-| description-drift | PR text vs what the code does | full |
+| history | git blame and log on the changed lines, read by gather at the merge base and passed as a data block, prior fixes | full |
+| description-drift | the description block, compared with what the code does | full |
 | docs-and-comments | stale comments and docs touched by the change | full |
+
+The history reviewer has no Bash. Gather reads the blame and log, not the reviewer. The history reviewer quotes its evidence from the head file or the diff, never from the blame block. The verifier gets the description block for every finding and never sees the history block. So a history finding states a claim that the head file shows.
 
 ### 3.5 Verify (one Sonnet call per finding)
 
@@ -112,11 +118,11 @@ Each finding goes to a verifier with the finding, the quoted evidence, the full 
 - Is the claim true of the code as written?
 - Was the problem introduced or exposed by this PR?
 - Would a careful reviewer on this team post it?
-- Is it outside the do-not-flag list and suppressions?
+- Is it in scope? Scope is the only exclusion. Suppressions apply at merge, not here.
 
-Scope is a gate before the score: a finding on code the PR did not add, change or aggravate fails verification whatever its score, and is tagged pre-existing in the record. Findings under the threshold are dropped but kept in the record. Default threshold 80, configurable per repo and per reviewer. The verifier never sees which reviewer produced the finding.
+Scope is a gate before the score: a finding on code the PR did not add, change or aggravate fails verification whatever its score, and is tagged pre-existing in the record. Findings under the threshold are dropped but kept in the record. Default threshold 80, configurable per repo and per reviewer. The effective threshold of a reviewer is `reviewers.<name>.threshold` from the repo config when set. Otherwise it is the higher of the frontmatter value and `thresholds.default`. The verifier gets the description block for every finding, so it can check a description-drift claim. It never sees which reviewer produced the finding, and it never sees the history block.
 
-Verification starts per finding as soon as its reviewer returns. Merge is the only barrier, so the slowest reviewer delays only its own findings. The verifier runs on Sonnet 5.5 at high effort with thinking on, a different model from the finders, as Anthropic's evaluation guidance recommends. It has the full file in context and read-only tools to find its own supporting quotes, and must retract a finding it cannot quote. It escalates to Opus 5.5 at high when the reviewer marks a finding `needs_context: true` or when the score lands in a middle band (default 60 to 85), following Anthropic's two-pass pattern. The verifier also assigns severity, because reviewers rate their own findings too high. Merge may downgrade a severity when it sees the full set, never upgrade.
+Verification starts per finding as soon as its reviewer returns. Merge is the only barrier, so the slowest reviewer delays only its own findings. The verifier runs on Sonnet 5.5 at high effort with thinking on, a different model from the finders, as Anthropic's evaluation guidance recommends. It has the full file in context and read-only tools to find its own supporting quotes, and must retract a finding it cannot quote. It escalates to Opus 5.5 at high when the reviewer marks a finding `needs_context: true` or when the score lands in a middle band, following Anthropic's two-pass pattern. The band is `thresholds.middle_band` from the repo config, with the default 60 to 85. It is a fixed score range. It does not move when a reviewer threshold changes. The verifier also assigns severity, because reviewers rate their own findings too high. Merge may downgrade a severity when it sees the full set, never upgrade.
 
 | Severity | Test | Posts on later runs |
 |----------|------|---------------------|
@@ -128,8 +134,8 @@ Verification starts per finding as soon as its reviewer returns. Merge is the on
 
 1. Fingerprint each finding: file, normalized code span, category.
 2. Drop findings that match an open or dismissed thread from a previous run.
-3. Group by file and overlapping lines. One Sonnet call merges groups that say the same thing and picks the best wording.
-4. Apply repo suppressions by category, path and reviewer.
+3. Apply repo suppressions by category, path and reviewer. This happens before the groups form. The run checks each finding with the name of its own reviewer, and the record keeps each removed finding with its rule.
+4. Group by file and overlapping lines. One Sonnet call merges groups that say the same thing and picks the best wording.
 5. Rank by severity then verifier score. No cap on blocking findings. Non-blocking findings are capped per run at `3 + ceil(hunks / 4)`, at most 20, suggestions filled before nits. A 4-hunk PR gets 4, a 20-hunk PR gets 8. Overflow goes in the summary as a list. This is a starting formula for the harness to tune.
 
 ### 3.7 Report
@@ -173,7 +179,7 @@ Uses:
 
 The first run casts a wide net. Wide means more passes over the PR's own changes, not a wider scope. Every run reviews only what the PR adds, changes or aggravates. Later runs look only at what changed since the last review and only for blocking problems, so the cycle converges.
 
-**First run.** A reviewer with `passes: N` in its frontmatter runs N times with the same inputs. The union of findings goes to the verifier, then fingerprint and semantic dedupe collapse the repeats. Defaults: 2 passes for diff-bugs and security, 1 elsewhere. Five runs of one model on SWR-Bench agreed on only 27 golden hits, so repeats raise recall more than any prompt change.
+**First run.** A reviewer with `passes: N` in its frontmatter runs N times with the same inputs. The union of findings goes to the verifier, then fingerprint and semantic dedupe collapse the repeats. Defaults: 2 passes for diff-bugs and security, 1 elsewhere. The fast tier runs one pass of every selected reviewer. Five runs of one model on SWR-Bench agreed on only 27 golden hits, so repeats raise recall more than any prompt change.
 
 **Later runs** (a new push on a PR this tool has reviewed):
 
@@ -191,7 +197,7 @@ The first run casts a wide net. Wide means more passes over the PR's own changes
 
 ```
 .pr-review/
-  config.yaml        thresholds, suppressions, sensitive globs, skip rules, caps
+  config.yaml        thresholds, per-reviewer and per-role overrides, suppressions, sensitive globs, skip rules, caps
   rules.md           short shared rules, injected into every reviewer
   reviewers/*.md     custom reviewer agents, same frontmatter as built-ins
 ```
@@ -218,6 +224,34 @@ threshold: 85
 
 A custom reviewer can also override `threshold` to be stricter, never looser than the repo floor.
 
+`config.yaml` has a strict schema. An unknown key is an error. A file that does not parse or validate stops the run before any model call, and the run writes no record. The keys:
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `thresholds.default` | 80 | The floor for every reviewer threshold. |
+| `thresholds.middle_band` | `[60, 85]` | The score range that sends a finding to verifier escalation. |
+| `reviewers.<name>.enabled` | `true` | Whether the reviewer may run. |
+| `reviewers.<name>.passes` | the frontmatter value | The number of passes of the reviewer. |
+| `reviewers.<name>.threshold` | the frontmatter value, raised to `thresholds.default` | The threshold of the reviewer. A value below `thresholds.default` is an error. |
+| `reviewers.<name>.model` | the frontmatter value | The model of the reviewer. |
+| `reviewers.<name>.effort` | the frontmatter value | The effort of the reviewer. |
+| `models.<role>` | the table in section 5 | The model and effort of one role: triage, reviewer, verifier, verifier-escalation or merge. |
+| `suppressions` | empty | Rules that remove a verified finding. See below. |
+| `sensitive_globs` | empty | Globs added to the default sensitive globs. |
+| `generated_globs` | empty | Globs added to the default generated globs. |
+| `skip.draft`, `skip.title_keywords`, `skip.labels`, `skip.bot_authors` | off, empty | The skip rules of section 3.2. |
+| `caps.non_blocking_base`, `caps.non_blocking_per_hunks`, `caps.non_blocking_max` | 3, 4, 20 | The cap formula of section 3.6. |
+| `pre_existing` | `off` | `off` or `comment`, as in section 3.7. |
+| `concurrency` | 5 | The number of model queries that run at the same time. |
+| `token_ceiling` | none | The most tokens the run may use. |
+
+`<name>` is a built-in or a custom reviewer. Any other name is an error.
+
+- **Model and effort.** The order is `reviewers.<name>`, then `models.<role>`, then the frontmatter value. For a reviewer, the role is `models.reviewer`. Model and effort resolve apart. A `models.<role>` object can give either one or both. The result is fixed for the run.
+- **Suppressions.** Each item has `reviewer`, `category`, `path` and `reason`. It needs `reason` and at least one other key. A finding matches an item when it matches every key the item gives. The run applies suppressions to verified findings before the merge groups form. It checks each finding with the name of its own reviewer.
+- **Config hash.** The record field `config_hash` is the SHA-256 of the loaded `.pr-review/` files. Each entry is the path, one newline, and the file bytes. The run sorts the entries by the UTF-8 bytes of the path and joins them with one NUL byte. CLAUDE.md is not an entry. The hash is `null` when the base commit has no `.pr-review/` file.
+- **Bash for a custom reviewer.** The run grants Bash only when the reviewer sets `trusted: true` and the run knows that the PR author has write access. The CLI option `--author-write-access` carries that fact. A built-in reviewer never gets Bash, whatever `trusted` says. When a custom reviewer asks for Bash and does not get it, it runs with read-only tools, and the coverage line names it with the reason.
+
 ## 5. Models and budget
 
 | Role | Default model | Effort | Reason |
@@ -228,9 +262,9 @@ A custom reviewer can also override `threshold` to be stricter, never looser tha
 | semantic merge | Sonnet 5.5 | medium | needs judgment on wording |
 | summarizer | Haiku 5.5 | medium, thinking on | formatting only; low effort leaks reasoning text |
 
-Effort and output schema stay fixed per role, because changing either invalidates the prompt cache. Haiku 5.5 is not used as a verifier or reviewer: its system card reports the highest over-refusal rate of any tested model and work reported done without checking at low and medium effort.
+Effort and output schema stay fixed per role within a run, because changing either invalidates the prompt cache. Haiku 5.5 is not used as a verifier or reviewer: its system card reports the highest over-refusal rate of any tested model and work reported done without checking at low and medium effort.
 
-Per-repo overrides for any role. A run-level token ceiling stops new reviewer launches when reached and notes it in the summary. Each SDK query is its own Claude Code process of about 1 GiB, and a standard GitHub runner has 7 GiB, so the orchestrator runs at most 5 queries at once by default. Unattended runs set `CLAUDE_CODE_RETRY_WATCHDOG=1` so rate-limit responses retry without a cap.
+A repo can override the model and effort of any role with `models.<role>`, and of one reviewer with `reviewers.<name>`. Section 4 gives the order. A run-level token ceiling stops new reviewer launches when reached and notes it in the summary. Each SDK query is its own Claude Code process of about 1 GiB, and a standard GitHub runner has 7 GiB, so the orchestrator runs at most 5 queries at once by default. Unattended runs set `CLAUDE_CODE_RETRY_WATCHDOG=1` so rate-limit responses retry without a cap.
 
 ### 5.1 Model versions
 
@@ -332,7 +366,7 @@ Settled on 2026-10-13:
 3. **Fork policy**: label-gated run with restricted tools.
 4. **Review format**: one GitHub review per run, short body with verdict, inline comments on diff lines. Comment event only.
 5. **Verifier threshold**: 80 as the default, tuned by the harness.
-6. **Reviewer models**: per reviewer. Sonnet by default, Opus where judgment matters.
+6. **Reviewer models**: Opus 5.5 at low effort by default, as decision 15 states. A repo can override the model and effort per role or per reviewer. See section 4.
 7. **Severity**: blocking, suggestion, nit, with the tests in section 3.5.
 
 8. **Auth**: the user's Claude subscription, in CI and locally. See section 9.
