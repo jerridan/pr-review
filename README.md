@@ -6,7 +6,7 @@ pr-review reviews the diff between two commits of a local git repo. It runs tria
 |------|---------|
 | OS | macOS or Linux |
 | Shell | bash |
-| Node | 20 or later |
+| Node | 20.19 or later |
 | git | 2.40 or later |
 
 Run these commands in the repo root:

@@ -25,4 +25,4 @@ npm run build
 
 - `docs/design/` holds the design. Read `high-level-design.md` before you change the pipeline.
 - `docs/research/` holds the research notes. `claude-5-5-models.md` fixes the model pins and the SDK query options.
-- The spec for the current deliverable lives outside this repo. The project lead gives you its path. Read it before you start.
+- TICKETS.md lists the deliverables that remain. The spec for a deliverable in progress lives outside this repo; ask for its path before you start.
