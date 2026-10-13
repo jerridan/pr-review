@@ -1,0 +1,7 @@
+node_modules/
+dist/
+pr-review-records/
+coverage/
+*.log
+.env
+.env.*
