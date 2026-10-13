@@ -71,7 +71,7 @@ Exit codes:
 
 Each run writes one file named `<timestamp>-<7-char head sha>.json` in the records directory.
 
-With `--format json`, the command prints one JSON document to stdout. Its keys are `record_path`, `tier`, `verdict`, `coverage` and `findings`.
+With `--format json`, the command prints one JSON document to stdout. Its keys are `record_path`, `tier`, `verdict`, `coverage`, `excluded_files` and `findings`.
 
 The verdict is one of `skipped`, `incomplete`, `would request changes` and `would approve`.
 
