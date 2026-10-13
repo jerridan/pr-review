@@ -1,0 +1,441 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterAll, describe, expect, it } from "vitest";
+import { runReviewers } from "../src/find/index.js";
+import type { GatherResult } from "../src/gather/index.js";
+import { mergeFindings } from "../src/merge/index.js";
+import { loadPrompt } from "../src/prompts/load.js";
+import type { ReviewerDefinition } from "../src/reviewers/loader.js";
+import type { Finding } from "../src/schemas/finding.js";
+import type { VerifierResult } from "../src/schemas/verifier.js";
+import { VerifierResultSchema } from "../src/schemas/verifier.js";
+import type { QueryMeta, QueryOutcome, QueryRequest } from "../src/sdk/client.js";
+import { createFakeSdkClient, type FakeScript } from "../src/sdk/fake.js";
+import type { RunOptions } from "../src/sdk/options.js";
+import { createSemaphore } from "../src/semaphore.js";
+import { UNTRUSTED_SYSTEM_LINE } from "../src/untrusted.js";
+import { DEFAULT_VERIFY_CONFIG, verifyFinding, type VerifyConfig } from "../src/verify/index.js";
+
+const FILE_TEXT = [
+  "export function average(values: number[]): number {",
+  "  let total = 0;",
+  "  for (let i = 0; i <= values.length; i++) {",
+  "    total += values[i];",
+  "  }",
+  "  return total / values.length;",
+  "}",
+  "",
+].join("\n");
+
+const DIFF = [
+  "diff --git a/src/stats.ts b/src/stats.ts",
+  "--- a/src/stats.ts",
+  "+++ b/src/stats.ts",
+  "@@ -0,0 +1,7 @@",
+  ...FILE_TEXT.trimEnd()
+    .split("\n")
+    .map((l) => `+${l}`),
+  "diff --git a/other.ts b/other.ts",
+  "--- a/other.ts",
+  "+++ b/other.ts",
+  "@@ -1 +1 @@",
+  "-OTHER-OLD",
+  "+OTHER-NEW",
+  "",
+].join("\n");
+
+const head = mkdtempSync(join(tmpdir(), "pr-review-verify-"));
+mkdirSync(join(head, "src"));
+writeFileSync(join(head, "src/stats.ts"), FILE_TEXT);
+afterAll(() => rmSync(head, { recursive: true, force: true }));
+
+const OPTIONS: RunOptions = { allowApiKey: false, env: {} };
+const META: QueryMeta = {
+  model: "claude-sonnet-5-5",
+  durationMs: 5,
+  stopReason: "end_turn",
+  subtype: "success",
+  usage: {},
+  costUsd: 0.01,
+};
+
+function finding(overrides: Partial<Finding> = {}): Finding {
+  return {
+    file: "src/stats.ts",
+    start_line: 3,
+    end_line: 3,
+    category: "bug",
+    severity_estimate: "nit",
+    confidence: "low",
+    claim: "CLAIM-loop-reads-past-end",
+    evidence: "for (let i = 0; i <= values.length; i++) {",
+    explanation: "The bound must be i < values.length.",
+    needs_context: false,
+    ...overrides,
+  };
+}
+
+function result(score: number, overrides: Partial<VerifierResult> = {}): VerifierResult {
+  return {
+    in_scope: true,
+    claim_holds: true,
+    introduced_by_pr: true,
+    quotes: ["i <= values.length"],
+    rationale: "The loop reads values[values.length].",
+    score,
+    severity: "blocking",
+    ...overrides,
+  };
+}
+
+const okOutcome = (output: unknown): QueryOutcome<unknown> => ({ ok: true, output, raw: META });
+
+// The first verifier returns "first"; the escalation verifier returns "second".
+function script(
+  first: QueryOutcome<unknown> | VerifierResult,
+  second?: QueryOutcome<unknown> | VerifierResult,
+): FakeScript {
+  const wrap = (o: QueryOutcome<unknown> | VerifierResult) => ("ok" in o ? o : okOutcome(o));
+  return (req) => {
+    if (req.role === "verifier") return wrap(first);
+    if (req.role === "verifier-escalation" && second) return wrap(second);
+    throw new Error(`unexpected query for role ${req.role}`);
+  };
+}
+
+function ctx(config: VerifyConfig = DEFAULT_VERIFY_CONFIG) {
+  return { cwd: head, diff: DIFF, semaphore: createSemaphore(5), config };
+}
+
+const roles = (calls: QueryRequest[]) => calls.map((c) => c.role);
+
+describe("verifyFinding (A6)", () => {
+  it("has the default threshold and band", () => {
+    expect(DEFAULT_VERIFY_CONFIG).toEqual({ threshold: 80, bandLow: 60, bandHigh: 85 });
+  });
+
+  it("fails a finding that is not in scope, whatever its score, with no escalation", async () => {
+    const fake = createFakeSdkClient(script(result(99, { in_scope: false })));
+    const out = await verifyFinding(fake, OPTIONS, finding({ needs_context: true }), ctx());
+    expect(out.passed).toBe(false);
+    expect(out.escalated).toBeUndefined();
+    expect(out.final).toEqual(result(99, { in_scope: false }));
+    expect(roles(fake.calls)).toEqual(["verifier"]);
+  });
+
+  it("fails a score of 79 and passes a score of 80", async () => {
+    const noBand = { ...DEFAULT_VERIFY_CONFIG, bandLow: 101, bandHigh: 101 };
+    const low = await verifyFinding(
+      createFakeSdkClient(script(result(79))),
+      OPTIONS,
+      finding(),
+      ctx(noBand),
+    );
+    expect(low.passed).toBe(false);
+    const high = await verifyFinding(
+      createFakeSdkClient(script(result(80))),
+      OPTIONS,
+      finding(),
+      ctx(noBand),
+    );
+    expect(high.passed).toBe(true);
+    // With the default band both escalate; the escalated score decides.
+    const esc79 = await verifyFinding(
+      createFakeSdkClient(script(result(80), result(79))),
+      OPTIONS,
+      finding(),
+      ctx(),
+    );
+    expect(esc79.passed).toBe(false);
+    const esc80 = await verifyFinding(
+      createFakeSdkClient(script(result(79), result(80))),
+      OPTIONS,
+      finding(),
+      ctx(),
+    );
+    expect(esc80.passed).toBe(true);
+  });
+
+  it("escalates at the band edges 60 and 85", async () => {
+    for (const score of [60, 85]) {
+      const fake = createFakeSdkClient(script(result(score), result(90)));
+      const out = await verifyFinding(fake, OPTIONS, finding(), ctx());
+      expect(roles(fake.calls)).toEqual(["verifier", "verifier-escalation"]);
+      expect(out.escalated).toEqual(result(90));
+      expect(out.final).toEqual(result(90));
+      expect(out.passed).toBe(true);
+    }
+  });
+
+  it("does not escalate at 59 and 86", async () => {
+    const at59 = createFakeSdkClient(script(result(59)));
+    const out59 = await verifyFinding(at59, OPTIONS, finding(), ctx());
+    expect(roles(at59.calls)).toEqual(["verifier"]);
+    expect(out59.passed).toBe(false);
+    const at86 = createFakeSdkClient(script(result(86)));
+    const out86 = await verifyFinding(at86, OPTIONS, finding(), ctx());
+    expect(roles(at86.calls)).toEqual(["verifier"]);
+    expect(out86.passed).toBe(true);
+    expect(out86.escalated).toBeUndefined();
+  });
+
+  it("escalates a finding with needs_context, whatever its score", async () => {
+    const fake = createFakeSdkClient(script(result(97), result(40)));
+    const out = await verifyFinding(fake, OPTIONS, finding({ needs_context: true }), ctx());
+    expect(roles(fake.calls)).toEqual(["verifier", "verifier-escalation"]);
+    expect(out.final).toEqual(result(40));
+    expect(out.passed).toBe(false);
+  });
+
+  it("applies the threshold to the escalated result", async () => {
+    const up = await verifyFinding(
+      createFakeSdkClient(script(result(65), result(81))),
+      OPTIONS,
+      finding(),
+      ctx(),
+    );
+    expect(up).toEqual({
+      first: result(65),
+      escalated: result(81),
+      final: result(81),
+      passed: true,
+    });
+    const down = await verifyFinding(
+      createFakeSdkClient(script(result(84), result(50))),
+      OPTIONS,
+      finding(),
+      ctx(),
+    );
+    expect(down.final).toEqual(result(50));
+    expect(down.passed).toBe(false);
+    const outOfScope = await verifyFinding(
+      createFakeSdkClient(script(result(70), result(95, { in_scope: false }))),
+      OPTIONS,
+      finding(),
+      ctx(),
+    );
+    expect(outOfScope.passed).toBe(false);
+  });
+
+  it("treats an out-of-range score as a failed query", async () => {
+    for (const score of [101, -1, 150]) {
+      const out = await verifyFinding(
+        createFakeSdkClient(script(result(score))),
+        OPTIONS,
+        finding(),
+        ctx(),
+      );
+      expect(out.first).toMatchObject({ kind: "out-of-range" });
+      expect(out.final).toBeNull();
+      expect(out.passed).toBe(false);
+    }
+  });
+
+  it("drops the finding when the verifier query fails", async () => {
+    const failure = { kind: "subtype" as const, message: "error_during_execution" };
+    const fake = createFakeSdkClient(script({ ok: false, failure, raw: META }));
+    const out = await verifyFinding(fake, OPTIONS, finding({ needs_context: true }), ctx());
+    expect(out).toEqual({ first: failure, final: null, passed: false });
+    expect(roles(fake.calls)).toEqual(["verifier"]);
+  });
+
+  it("turns a thrown client error into a failed query", async () => {
+    const fake = createFakeSdkClient(() => {
+      throw new Error("spawn failed");
+    });
+    const out = await verifyFinding(fake, OPTIONS, finding(), ctx());
+    expect(out.first).toEqual({ kind: "thrown", message: "spawn failed" });
+    expect(out.passed).toBe(false);
+  });
+
+  it("leaves the first result standing when the escalation fails", async () => {
+    const failure = { kind: "refusal" as const, message: "The stop reason is refusal." };
+    const out = await verifyFinding(
+      createFakeSdkClient(script(result(82), { ok: false, failure, raw: META })),
+      OPTIONS,
+      finding(),
+      ctx(),
+    );
+    expect(out).toEqual({ first: result(82), escalated: failure, final: result(82), passed: true });
+    const oor = await verifyFinding(
+      createFakeSdkClient(script(result(70), result(200))),
+      OPTIONS,
+      finding(),
+      ctx(),
+    );
+    expect(oor.escalated).toMatchObject({ kind: "out-of-range" });
+    expect(oor.final).toEqual(result(70));
+    expect(oor.passed).toBe(false);
+  });
+
+  it("fails a finding whose claim does not hold", async () => {
+    const out = await verifyFinding(
+      createFakeSdkClient(script(result(95, { claim_holds: false }))),
+      OPTIONS,
+      finding(),
+      ctx(),
+    );
+    expect(out.passed).toBe(false);
+  });
+
+  it("sends the finding, the head file and its diff hunk, but not the reviewer name", async () => {
+    const fake = createFakeSdkClient(script(result(70), result(90)));
+    await verifyFinding(fake, OPTIONS, finding(), ctx());
+    const [first, second] = fake.calls as [QueryRequest, QueryRequest];
+    const prompt = loadPrompt("verifier.md");
+    expect(first.systemPrompt).toBe(prompt.body);
+    expect(first.systemPrompt).toContain(UNTRUSTED_SYSTEM_LINE);
+    expect(second.systemPrompt).toBe(prompt.body);
+    expect(first.schema).toBe(VerifierResultSchema);
+    expect(second.schema).toBe(VerifierResultSchema);
+    expect(first.cwd).toBe(head);
+    expect(first.overrides).toBeUndefined();
+    expect(first.reviewerName).toBeUndefined();
+    const message = first.userMessage;
+    expect(message).toContain("CLAIM-loop-reads-past-end");
+    expect(message).toContain("for (let i = 0; i <= values.length; i++) {");
+    expect(message).toContain("return total / values.length;");
+    expect(message).toContain("+++ b/src/stats.ts");
+    expect(message).not.toContain("OTHER-NEW");
+    expect(message).not.toContain("diff-bugs");
+    expect(message).not.toMatch(/severity_estimate|"confidence"/);
+    expect(message).toMatch(/<finding_[0-9a-f]{16}>/);
+    expect(second.userMessage).toContain("CLAIM-loop-reads-past-end");
+  });
+
+  it("runs each verifier query inside the semaphore", async () => {
+    let active = 0;
+    let peak = 0;
+    const fake = createFakeSdkClient(async () => {
+      active += 1;
+      peak = Math.max(peak, active);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      active -= 1;
+      return okOutcome(result(90));
+    });
+    const shared = { ...ctx(), semaphore: createSemaphore(1) };
+    await Promise.all([1, 2, 3].map(() => verifyFinding(fake, OPTIONS, finding(), shared)));
+    expect(peak).toBe(1);
+  });
+});
+
+describe("verification starts per finding", () => {
+  const GATHERED: GatherResult = {
+    base: "a".repeat(40),
+    head: "b".repeat(40),
+    changedFiles: [{ path: "src/stats.ts", hunks: 1 }],
+    excluded: [],
+    sensitive: [],
+    diff: DIFF,
+    totalHunks: 1,
+  };
+
+  function def(name: string): ReviewerDefinition {
+    return {
+      path: `/x/${name}.md`,
+      systemPrompt: `SYSTEM ${name}`,
+      frontmatter: {
+        name,
+        description: "d",
+        model: "opus",
+        effort: "low",
+        tools: [],
+        triggers: { paths: [], categories: [], min_tier: "fast" },
+        passes: 1,
+        threshold: 80,
+        trusted: true,
+      },
+    };
+  }
+
+  it("starts a verifier call before the slowest reviewer returns", async () => {
+    const events: string[] = [];
+    let releaseSlow!: () => void;
+    const slowGate = new Promise<void>((resolve) => {
+      releaseSlow = resolve;
+    });
+    const fake = createFakeSdkClient(async (req) => {
+      if (req.role === "reviewer" && req.reviewerName === "fast") {
+        events.push("fast reviewer returns");
+        return okOutcome({ findings: [finding()] });
+      }
+      if (req.role === "reviewer" && req.reviewerName === "slow") {
+        await slowGate;
+        events.push("slow reviewer returns");
+        return okOutcome({ findings: [] });
+      }
+      events.push("verifier starts");
+      // The slow reviewer may return only after a verifier call starts.
+      releaseSlow();
+      return okOutcome(result(90));
+    });
+    const semaphore = createSemaphore(5);
+    const verifications: Promise<unknown>[] = [];
+    await runReviewers(
+      fake,
+      OPTIONS,
+      [
+        { def: def("slow"), trigger: "t" },
+        { def: def("fast"), trigger: "t" },
+      ],
+      { gathered: GATHERED, brief: null, cwd: head, semaphore },
+      (f) => {
+        verifications.push(
+          verifyFinding(fake, OPTIONS, f, {
+            cwd: head,
+            diff: DIFF,
+            semaphore,
+            config: DEFAULT_VERIFY_CONFIG,
+          }),
+        );
+      },
+    );
+    await Promise.all(verifications);
+    expect(events).toEqual(["fast reviewer returns", "verifier starts", "slow reviewer returns"]);
+  });
+
+  it("leaves a finding that fails the verifier out of the posted output", async () => {
+    const good = finding();
+    const weak = finding({
+      start_line: 6,
+      end_line: 6,
+      claim: "CLAIM-weak",
+      evidence: "return total / values.length;",
+    });
+    const fake = createFakeSdkClient((req) => {
+      if (req.role === "reviewer") return okOutcome({ findings: [good, weak] });
+      if (req.userMessage.includes("CLAIM-weak")) return okOutcome(result(20));
+      return okOutcome(result(95));
+    });
+    const semaphore = createSemaphore(5);
+    const pending: Promise<{ finding: Finding; out: Awaited<ReturnType<typeof verifyFinding>> }>[] =
+      [];
+    await runReviewers(
+      fake,
+      OPTIONS,
+      [{ def: def("diff-bugs"), trigger: "t" }],
+      { gathered: GATHERED, brief: null, cwd: head, semaphore },
+      (f) => {
+        pending.push(
+          verifyFinding(fake, OPTIONS, f, {
+            cwd: head,
+            diff: DIFF,
+            semaphore,
+            config: DEFAULT_VERIFY_CONFIG,
+          }).then((out) => ({ finding: f, out })),
+        );
+      },
+    );
+    const verified = (await Promise.all(pending))
+      .filter((v) => v.out.passed && v.out.final)
+      .map((v) => ({ finding: v.finding, result: v.out.final as VerifierResult }));
+    const merged = await mergeFindings(fake, OPTIONS, verified, {
+      cwd: head,
+      totalHunks: 1,
+      semaphore,
+    });
+    expect(merged.posted.map((p) => p.claim)).toEqual(["CLAIM-loop-reads-past-end"]);
+    expect(merged.capped).toEqual([]);
+  });
+});
