@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import matter from "gray-matter";
+import { parse as parseYaml } from "yaml";
 
 export interface PromptFile {
   frontmatter: Record<string, unknown>;
@@ -14,13 +14,49 @@ export interface PromptFile {
 // cases the package root is two levels up.
 const PROMPTS_DIR = fileURLToPath(new URL("../../prompts/", import.meta.url));
 
-/** Read "prompts/<relativePath>" from the package root. */
-export function loadPrompt(relativePath: string): PromptFile {
+/**
+ * Give the absolute path of "prompts/<relativePath>". Throw when the path
+ * goes outside the prompts directory.
+ */
+export function promptPath(relativePath: string): string {
   const full = resolve(PROMPTS_DIR, relativePath);
   const inside = relative(PROMPTS_DIR, full);
   if (isAbsolute(relativePath) || inside.startsWith("..") || isAbsolute(inside)) {
     throw new Error(`Prompt path "${relativePath}" is outside the prompts directory.`);
   }
+  return full;
+}
+
+// The frontmatter starts with a line that is only "---" and ends at the
+// next line that is only "---".
+const OPEN_LINE = /^---[ \t]*\r?\n/;
+const CLOSE_LINE = /^---[ \t]*(?:\r?\n|$)/m;
+
+/**
+ * Split a markdown file into YAML frontmatter and body. A file without a
+ * frontmatter block gives an empty frontmatter. Throw when the block has
+ * no closing line, when the YAML is bad, or when it is not a mapping.
+ */
+export function parseFrontmatter(text: string): PromptFile {
+  const source = text.startsWith("\uFEFF") ? text.slice(1) : text;
+  const open = OPEN_LINE.exec(source);
+  if (!open) return { frontmatter: {}, body: source };
+  const rest = source.slice(open[0].length);
+  const close = CLOSE_LINE.exec(rest);
+  if (!close) throw new Error("The frontmatter has no closing --- line.");
+  const yamlText = rest.slice(0, close.index);
+  const body = rest.slice(close.index + close[0].length);
+  const data: unknown = parseYaml(yamlText);
+  if (data === null || data === undefined) return { frontmatter: {}, body };
+  if (typeof data !== "object" || Array.isArray(data)) {
+    throw new Error("The frontmatter is not a YAML mapping.");
+  }
+  return { frontmatter: { ...(data as Record<string, unknown>) }, body };
+}
+
+/** Read "prompts/<relativePath>" from the package root. */
+export function loadPrompt(relativePath: string): PromptFile {
+  const full = promptPath(relativePath);
   let text: string;
   try {
     text = readFileSync(full, "utf8");
@@ -28,10 +64,14 @@ export function loadPrompt(relativePath: string): PromptFile {
     const reason = err instanceof Error ? err.message : String(err);
     throw new Error(`Cannot read prompt "${relativePath}": ${reason}`, { cause: err });
   }
-  // Pass an options object so gray-matter does not use its cache, which
-  // can hold an old copy of a file with the same text.
-  const parsed = matter(text, {});
-  return { frontmatter: { ...parsed.data }, body: parsed.content.replace(/^\n+/, "") };
+  let parsed: PromptFile;
+  try {
+    parsed = parseFrontmatter(text);
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    throw new Error(`Bad prompt "${relativePath}": ${reason}`, { cause: err });
+  }
+  return { frontmatter: parsed.frontmatter, body: parsed.body.replace(/^(?:\r?\n)+/, "") };
 }
 
 const TOKEN = /\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g;

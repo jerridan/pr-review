@@ -1,8 +1,8 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import matter from "gray-matter";
 import { describe, expect, it } from "vitest";
+import { parseFrontmatter } from "../src/prompts/load.js";
 import { UNTRUSTED_SYSTEM_LINE, wrapUntrusted } from "../src/untrusted.js";
 
 const PROMPTS_DIR = fileURLToPath(new URL("../prompts/", import.meta.url));
@@ -55,7 +55,7 @@ describe("A13: untrusted blocks", () => {
     expect(files.length).toBeGreaterThan(0);
     const missing: string[] = [];
     for (const file of files) {
-      const { data, content } = matter(readFileSync(file, "utf8"));
+      const { frontmatter: data, body: content } = parseFrontmatter(readFileSync(file, "utf8"));
       const isReviewer = typeof data.triggers === "object" && data.triggers !== null;
       const isBlockRoleSystem =
         typeof data.role === "string" && BLOCK_ROLES.has(data.role) && data.kind !== "user";
@@ -68,7 +68,7 @@ describe("A13: untrusted blocks", () => {
 
   it("gives every prompt file that is not a reviewer definition a role", () => {
     for (const file of listMarkdown(PROMPTS_DIR)) {
-      const { data } = matter(readFileSync(file, "utf8"));
+      const { frontmatter: data } = parseFrontmatter(readFileSync(file, "utf8"));
       if (typeof data.triggers === "object") continue;
       expect(typeof data.role, relative(PROMPTS_DIR, file)).toBe("string");
     }
