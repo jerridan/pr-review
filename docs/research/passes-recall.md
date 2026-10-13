@@ -4,7 +4,14 @@ Date: 2026-10-13. Tool version: the D2 branch at commit 49062d0. Script: `script
 
 ## Method
 
-The script built the fixture repo from `scripts/make-fixture.sh` twice. Each fixture holds a `.pr-review/config.yaml` on its base commit. The first sets `reviewers.diff-bugs.passes` to 1. The second sets it to 2. Both disable the six other built-in reviewers, so only `diff-bugs` runs and every posted finding is a `diff-bugs` finding. The script ran `pr-review run --format json` five times per arm with the real SDK, on the user's Claude login. A run counts as covered when a posted finding covers the planted line.
+The script built the fixture repo from `scripts/make-fixture.sh` twice. Each fixture holds a `.pr-review/config.yaml` on its base commit. The first sets `reviewers.diff-bugs.passes` to 1. The second sets it to 2. Both disable the six other built-in reviewers, so only `diff-bugs` runs and every posted finding is a `diff-bugs` finding. The script ran `pr-review run --format json` five times per arm with the real SDK, on the user's Claude login. A run counts as covered when a posted finding covers the planted line. The fixture's head commit adds `.github/workflows/ci.yml`, a sensitive path, so every run took the full tier, and the two-pass arm ran two passes of `diff-bugs`.
+
+The script printed these two lines:
+
+```text
+passes=1: runs=5 failed=0 covered=5 mean_cost_usd=0.5659 mean_findings=1.00
+passes=2: runs=5 failed=0 covered=5 mean_cost_usd=0.6567 mean_findings=1.00
+```
 
 ## Result
 
