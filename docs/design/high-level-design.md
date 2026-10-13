@@ -280,9 +280,32 @@ Local and CI runs both use the user's Claude subscription.
 
 ### 9.2 Distribution
 
-No npm package for now. This repo is the GitHub Action and the CLI. Other repos the user owns reference the action by tag once this repo's Actions settings allow access from repositories the user owns. The action installs dependencies and runs from source, so no built bundle is committed. Locally, clone once and link the CLI. Making the repo public later changes nothing, and publishing to npm stays an option.
+This repo ships three things and no npm package.
 
-CI trigger: `pull_request` on opened, synchronize and ready_for_review, `pull_request` labeled for label overrides, and `issue_comment` for the comment override. Fork PRs reach the tool only through the label path, because secrets are absent on fork-triggered runs.
+- **A composite action, run from source.** It sets up Node, installs from the lockfile, and runs the CLI. No built bundle is committed. The Agent SDK package bundles the Claude Code binary, so the lockfile pins every version.
+- **A reusable workflow that wraps the action.** It holds the job steps, permissions, checkout settings, the comment filter and the fork gate once. A consumer repo carries only its trigger list and a one-line call with `secrets: inherit`. A repo that needs extra steps in the job uses the action directly.
+- **The CLI for local runs.** Clone once and link it. The `/review` command ships through the user's Claude Code plugin marketplace so it is available in every project.
+
+Other repos the user owns reference this one by tag once this repo's Actions settings allow access from repositories the user owns. Making the repo public later changes nothing. Publishing to npm stays an option.
+
+Consumer workflow:
+
+```yaml
+name: PR review
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, labeled]
+  issue_comment:
+    types: [created]
+jobs:
+  review:
+    uses: jerridan/pr-review/.github/workflows/review.yml@v1
+    secrets: inherit
+```
+
+The trigger list must live in the consumer, because GitHub reads `on:` only from the repo where the event happens. Fork PRs reach the tool only through the label path, because secrets are absent on fork-triggered runs.
+
+Options considered and set aside: a JavaScript action with a committed bundle (faster start, noisy bundle diffs), an npm package (needs a registry token in every consumer while private), a Docker image (strongest pinning, but the lockfile already pins the SDK and its bundled binary).
 
 Sources for 9.1: code.claude.com/docs/en/authentication, code.claude.com/docs/en/github-actions, code.claude.com/docs/en/legal-and-compliance, support.claude.com article 15036540.
 
@@ -304,7 +327,7 @@ Settled on 2026-10-13:
 10. **Non-blocking cap**: `3 + ceil(hunks / 4)`, at most 20. A starting value for the harness to tune.
 11. **Failures**: always visible in the review, verdict `incomplete`. Never post unverified findings.
 12. **Records**: workflow artifact plus a `pr-review-records` branch.
-13. **Distribution**: private action repo used from the user's own repos, no npm package. Concurrency cap deferred until it is a problem.
+13. **Distribution**: composite action run from source, wrapped in a reusable workflow, plus the CLI. No npm package. Concurrency cap deferred until it is a problem.
 
 ## 11. Open risks
 
