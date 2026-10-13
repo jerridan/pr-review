@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
@@ -14,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { CommanderError } from "commander";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_REPO_CONFIG } from "../src/config/repo-config.js";
 import { createProgram } from "../src/cli.js";
 import type * as PromptLoad from "../src/prompts/load.js";
 import type * as ReviewerLoader from "../src/reviewers/loader.js";
@@ -66,8 +68,8 @@ const SCRIPT = fileURLToPath(new URL("../scripts/make-fixture.sh", import.meta.u
 
 type Fixture = { repo: string; base: string; head: string; file: string; line: number };
 
-async function makeFixture(): Promise<Fixture> {
-  const { stdout } = await run("bash", [SCRIPT]);
+async function makeFixture(...options: string[]): Promise<Fixture> {
+  const { stdout } = await run("bash", [SCRIPT, ...options]);
   const value = (key: string) =>
     stdout
       .split("\n")
@@ -492,6 +494,7 @@ describe("a verifier result that the quote check rejects", () => {
 describe("the selected reviewers in the record", () => {
   function def(name: string, model: string, effort: "low" | "high"): ReviewerDefinition {
     return {
+      source: "builtin",
       path: `/x/${name}.md`,
       systemPrompt: "s",
       frontmatter: {
@@ -510,10 +513,13 @@ describe("the selected reviewers in the record", () => {
 
   it("holds the model and effort that each reviewer uses, after its frontmatter override", () => {
     expect(
-      describeSelected([
-        { def: def("a", "sonnet", "high"), trigger: "t1" },
-        { def: def("b", "claude-opus-4-1", "low"), trigger: "t2" },
-      ]),
+      describeSelected(
+        [
+          { def: def("a", "sonnet", "high"), trigger: "t1" },
+          { def: def("b", "claude-opus-4-1", "low"), trigger: "t2" },
+        ],
+        DEFAULT_REPO_CONFIG,
+      ),
     ).toEqual([
       { name: "a", trigger: "t1", model: "claude-sonnet-5-5", effort: "high", tools_ignored: [] },
       { name: "b", trigger: "t2", model: "claude-opus-4-1", effort: "low", tools_ignored: [] },
@@ -523,7 +529,7 @@ describe("the selected reviewers in the record", () => {
   it("names each tool of the reviewer that is not in the read-only set", () => {
     const wide = def("w", "opus", "low");
     wide.frontmatter.tools = ["Read", "Bash", "WebFetch", "grep"];
-    expect(describeSelected([{ def: wide, trigger: "t" }])).toEqual([
+    expect(describeSelected([{ def: wide, trigger: "t" }], DEFAULT_REPO_CONFIG)).toEqual([
       {
         name: "w",
         trigger: "t",
@@ -531,6 +537,26 @@ describe("the selected reviewers in the record", () => {
         effort: "low",
         tools_ignored: ["Bash", "WebFetch"],
       },
+    ]);
+  });
+
+  it("holds the model and effort after the repo config: the reviewer key, then models.reviewer", () => {
+    const config = {
+      ...DEFAULT_REPO_CONFIG,
+      models: { reviewer: { model: "haiku", effort: "medium" as const } },
+      reviewers: { b: { enabled: true, model: "sonnet" } },
+    };
+    expect(
+      describeSelected(
+        [
+          { def: def("a", "opus", "high"), trigger: "t1" },
+          { def: def("b", "opus", "low"), trigger: "t2" },
+        ],
+        config,
+      ),
+    ).toEqual([
+      { name: "a", trigger: "t1", model: "claude-haiku-5-5", effort: "medium", tools_ignored: [] },
+      { name: "b", trigger: "t2", model: "claude-sonnet-5-5", effort: "medium", tools_ignored: [] },
     ]);
   });
 });
@@ -612,4 +638,202 @@ describe("a finding path with a ./ prefix", () => {
     expect(record.stages.verifications[0]?.finding.file).toBe(fx.file);
     expect(record.posted.findings.map((f) => f.file)).toEqual([fx.file]);
   });
+});
+
+describe("the repo config in a run (R3)", () => {
+  const fixtures: Fixture[] = [];
+  afterAll(() => {
+    for (const f of fixtures) rmSync(f.repo, { recursive: true, force: true });
+  });
+
+  async function fixtureWithConfig(configYaml: string): Promise<Fixture> {
+    const source = mkdtempSync(join(tmpdir(), "pr-review-run-config-"));
+    try {
+      mkdirSync(join(source, "dir"));
+      writeFileSync(join(source, "dir", "config.yaml"), configYaml);
+      const made = await makeFixture("--pr-review-dir", join(source, "dir"));
+      fixtures.push(made);
+      return made;
+    } finally {
+      rmSync(source, { recursive: true, force: true });
+    }
+  }
+
+  it("applies role models, the reviewer threshold, the band, globs and concurrency", async () => {
+    const cfx = await fixtureWithConfig(
+      [
+        "thresholds:",
+        "  middle_band: [10, 20]",
+        "reviewers:",
+        "  diff-bugs:",
+        "    threshold: 95",
+        "models:",
+        "  triage:",
+        "    model: haiku",
+        "  reviewer:",
+        "    model: sonnet",
+        "  verifier:",
+        "    effort: max",
+        "  verifier-escalation:",
+        "    model: sonnet",
+        "  merge:",
+        "    effort: low",
+        "generated_globs: ['.github/**']",
+        "concurrency: 1",
+        "",
+      ].join("\n"),
+    );
+    let active = 0;
+    let most = 0;
+    const base = script(cfx);
+    const fake = createFakeSdkClient(async (req) => {
+      active += 1;
+      most = Math.max(most, active);
+      await new Promise((r) => setTimeout(r, 5));
+      active -= 1;
+      return base(req);
+    });
+    const { record } = await runReview({
+      repo: cfx.repo,
+      base: cfx.base,
+      head: cfx.head,
+      outDir: join(outRoot, "config-run"),
+      allowApiKey: false,
+      client: fake,
+    });
+
+    const byRole = (role: string) => fake.calls.filter((c) => c.role === role);
+    expect(byRole("triage").map((c) => c.overrides)).toEqual([{ model: "claude-haiku-5-5" }]);
+    expect(byRole("reviewer").map((c) => c.overrides)).toEqual([
+      { model: "claude-sonnet-5-5", effort: "low" },
+    ]);
+    expect(byRole("verifier").map((c) => c.overrides)).toEqual([{ effort: "max" }]);
+    // The score 92 is outside the band 10 to 20, so no escalation runs, and
+    // it is below the reviewer threshold 95, so the finding fails.
+    expect(byRole("verifier-escalation")).toEqual([]);
+    expect(record.stages.verifications.map((v) => v.passed)).toEqual([false]);
+    expect(record.posted.findings).toEqual([]);
+    expect(most).toBe(1);
+
+    expect(record.identity.models).toEqual({
+      triage: { model: "claude-haiku-5-5", effort: "medium" },
+      reviewer: { model: "claude-sonnet-5-5", effort: "low" },
+      verifier: { model: "claude-sonnet-5-5", effort: "max" },
+      "verifier-escalation": { model: "claude-sonnet-5-5", effort: "high" },
+      merge: { model: "claude-sonnet-5-5", effort: "low" },
+      smoke: { model: "claude-sonnet-5-5", effort: "low" },
+    });
+    expect(record.identity.selected_reviewers).toEqual([
+      expect.objectContaining({ name: "diff-bugs", model: "claude-sonnet-5-5", effort: "low" }),
+    ]);
+    expect(record.identity.excluded_files).toContainEqual({
+      path: ".github/workflows/ci.yml",
+      reason: "generated",
+    });
+    expect(record.identity.sensitive_files).toEqual([]);
+    expect(record.identity.config.values.concurrency).toBe(1);
+  }, 30_000);
+
+  it("escalates a score inside the configured band, with the escalation model", async () => {
+    const cfx = await fixtureWithConfig(
+      "thresholds:\n  middle_band: [90, 95]\nmodels:\n  verifier-escalation:\n    model: haiku\n",
+    );
+    const fake = createFakeSdkClient(script(cfx));
+    const { record } = await runReview({
+      repo: cfx.repo,
+      base: cfx.base,
+      head: cfx.head,
+      outDir: join(outRoot, "config-band"),
+      allowApiKey: false,
+      client: fake,
+    });
+    const escalations = fake.calls.filter((c) => c.role === "verifier-escalation");
+    expect(escalations.map((c) => c.overrides)).toEqual([{ model: "claude-haiku-5-5" }]);
+    expect(fake.calls.filter((c) => c.role === "verifier").map((c) => c.overrides)).toEqual([
+      undefined,
+    ]);
+    expect(record.posted.findings).toHaveLength(1);
+    const entry = record.cost.queries.find((q) => q.role === "verifier-escalation");
+    expect(entry?.model).toBe("m");
+  }, 30_000);
+
+  it("selects a custom reviewer from the base commit and sends its body and its model", async () => {
+    const source = mkdtempSync(join(tmpdir(), "pr-review-run-custom-"));
+    let cfx: Fixture;
+    try {
+      mkdirSync(join(source, "dir", "reviewers"), { recursive: true });
+      writeFileSync(
+        join(source, "dir", "reviewers", "naming.md"),
+        [
+          "---",
+          "name: naming",
+          "description: Checks names.",
+          "model: haiku",
+          "effort: medium",
+          "tools: [Read, Bash]",
+          "triggers:",
+          "  paths: ['src/**']",
+          "  categories: []",
+          "  min_tier: fast",
+          "passes: 1",
+          "threshold: 85",
+          "---",
+          "CUSTOM-BODY: you review names.",
+          "",
+        ].join("\n"),
+      );
+      cfx = await makeFixture("--pr-review-dir", join(source, "dir"));
+      fixtures.push(cfx);
+    } finally {
+      rmSync(source, { recursive: true, force: true });
+    }
+    const fake = createFakeSdkClient(script(cfx));
+    const { record } = await runReview({
+      repo: cfx.repo,
+      base: cfx.base,
+      head: cfx.head,
+      tierOverride: "fast",
+      outDir: join(outRoot, "config-custom"),
+      allowApiKey: false,
+      client: fake,
+    });
+    const custom = fake.calls.filter((c) => c.reviewerName === "naming");
+    expect(custom).toHaveLength(1);
+    expect(custom[0]?.systemPrompt).toContain("CUSTOM-BODY");
+    expect(custom[0]?.overrides).toEqual({ model: "claude-haiku-5-5", effort: "medium" });
+    expect(record.identity.selected_reviewers.map((r) => r.name).sort()).toEqual([
+      "diff-bugs",
+      "naming",
+    ]);
+    expect(record.identity.selected_reviewers.find((r) => r.name === "naming")).toMatchObject({
+      trigger: expect.stringContaining("path src/stats.ts"),
+      tools_ignored: ["Bash"],
+    });
+    expect(record.posted.coverage.reviewers_ran).toContain("naming");
+    expect(record.identity.config.files).toEqual([".pr-review/reviewers/naming.md"]);
+    // The custom reviewer's threshold 85 holds: the score 92 passes.
+    expect(record.posted.findings.length).toBeGreaterThan(0);
+  }, 30_000);
+
+  it("runs with the defaults when the base commit has no .pr-review/", async () => {
+    const fake = createFakeSdkClient(script(fx));
+    const { record } = await runReview({
+      repo: fx.repo,
+      base: fx.base,
+      head: fx.head,
+      outDir: join(outRoot, "config-none"),
+      allowApiKey: false,
+      client: fake,
+    });
+    expect(record.identity.config).toEqual({
+      files: [],
+      values: DEFAULT_REPO_CONFIG,
+      custom_reviewers: [],
+    });
+    expect(record.identity.config_hash).toBeNull();
+    expect(record.posted.coverage.reviewers_skipped).toEqual([]);
+    expect(
+      fake.calls.filter((c) => c.role !== "reviewer").every((c) => c.overrides === undefined),
+    ).toBe(true);
+  }, 30_000);
 });

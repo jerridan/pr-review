@@ -14,7 +14,8 @@ export interface GatherResult {
   totalHunks: number;
 }
 
-async function resolveCommit(repo: string, rev: string): Promise<string> {
+/** Give the full sha of the commit that "rev" names. Throw when it is not a commit. */
+export async function resolveCommit(repo: string, rev: string): Promise<string> {
   const sha = (
     await runGit(repo, ["rev-parse", "--verify", "--end-of-options", `${rev}^{commit}`])
   ).trim();
@@ -31,7 +32,16 @@ const DIFF_OPTIONS = [
   "--no-textconv",
 ];
 
-export async function gather(repo: string, base: string, head: string): Promise<GatherResult> {
+/**
+ * Gather the diff of base...head. "globs" are the sensitive and generated
+ * globs: the defaults with the repo config's globs added.
+ */
+export async function gather(
+  repo: string,
+  base: string,
+  head: string,
+  globs: { sensitive: readonly string[]; generated: readonly string[] },
+): Promise<GatherResult> {
   const baseSha = await resolveCommit(repo, base);
   const headSha = await resolveCommit(repo, head);
   const range = `${baseSha}...${headSha}`;
@@ -44,6 +54,6 @@ export async function gather(repo: string, base: string, head: string): Promise<
     "--unified=3",
     range,
   ]);
-  const result = applyExclusions(parseNameStatus(nameStatus), patch);
+  const result = applyExclusions(parseNameStatus(nameStatus), patch, globs);
   return { base: baseSha, head: headSha, ...result };
 }

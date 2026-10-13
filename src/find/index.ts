@@ -1,9 +1,10 @@
 // Find: run each selected reviewer, one query per pass, and check each
 // finding before it goes to verification.
 import { diffSections } from "../gather/diff.js";
+import type { RepoConfig } from "../config/repo-config.js";
 import type { GatherResult } from "../gather/index.js";
 import { loadPrompt, render, type PromptFile } from "../prompts/load.js";
-import { reviewerOverrides, type ReviewerDefinition } from "../reviewers/loader.js";
+import { effectiveModel, type ReviewerDefinition } from "../reviewers/loader.js";
 import { FindingsOutputSchema, type Finding, type FindingsOutput } from "../schemas/finding.js";
 import type { QueryFailure } from "../schemas/record.js";
 import type { TriageBrief } from "../schemas/triage.js";
@@ -36,6 +37,8 @@ type FindContext = {
   brief: TriageBrief | null;
   cwd: string;
   semaphore: Semaphore;
+  /** The repo config. It sets the model and the effort of each reviewer. */
+  config: RepoConfig;
   /**
    * The diff split per file (see diffSections). The run splits it once and
    * gives it here. When it is not set, runReviewers splits the diff itself.
@@ -166,7 +169,7 @@ export async function runReviewers(
             userMessage,
             schema: FindingsOutputSchema,
             cwd: ctx.cwd,
-            overrides: reviewerOverrides(def),
+            overrides: effectiveModel(def, ctx.config),
             tools: def.frontmatter.tools,
           },
           options,

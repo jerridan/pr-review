@@ -2,22 +2,26 @@
 // find with verification per finding, merge, verdict, and the record.
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { withRepoGlobs } from "./config/globs.js";
 import { ROLE_DEFAULTS, ROLES, resolveModel, type Effort, type Role } from "./config/models.js";
+import { loadRepoConfig, type ConfigRole, type RepoConfig } from "./config/repo-config.js";
 import { runReviewers, type ReviewerRun } from "./find/index.js";
 import { diffSections } from "./gather/diff.js";
-import { gather, type GatherResult } from "./gather/index.js";
+import { gather, resolveCommit, type GatherResult } from "./gather/index.js";
 import { withHeadWorktree } from "./gather/worktree.js";
 import { mergeFindings } from "./merge/index.js";
 import { writeRecord } from "./record/write.js";
 import {
+  effectiveModel,
+  effectiveThreshold,
   loadBuiltinReviewers,
-  reviewerOverrides,
+  reviewerEntry,
   reviewerTools,
   type ReviewerDefinition,
 } from "./reviewers/loader.js";
 import { selectReviewers } from "./reviewers/select.js";
 import type { Finding } from "./schemas/finding.js";
-import type { QueryFailure, RunRecord } from "./schemas/record.js";
+import type { QueryFailure, RunRecord, SkippedReviewer } from "./schemas/record.js";
 import type { TriageBrief } from "./schemas/triage.js";
 import type { VerifierResult } from "./schemas/verifier.js";
 import type { QueryOutcome, QueryRequest, SdkClient } from "./sdk/client.js";
@@ -27,8 +31,8 @@ import { runTriage } from "./triage/index.js";
 import { decideTier, shouldRunTriage, type Tier } from "./triage/tier.js";
 import { coverage, decideVerdict, verificationCounts } from "./verdict.js";
 import {
-  DEFAULT_VERIFY_CONFIG,
   loadVerifierPrompt,
+  verifyConfigFor,
   verifyFinding,
   type Verification,
   type VerifierPrompt,
@@ -45,7 +49,10 @@ export interface RunInput {
   now?: () => Date;
 }
 
-/** The default bound on SDK queries at once. Each query is its own process. */
+/**
+ * The default bound on SDK queries at once. Each query is its own process.
+ * The repo config key "concurrency" replaces it.
+ */
 export const DEFAULT_CONCURRENCY = 5;
 
 type CostEntry = RunRecord["cost"]["queries"][number];
@@ -59,12 +66,18 @@ function toolVersion(): string {
   return pkg.version ?? "0.0.0";
 }
 
-function defaultModels(): Record<Role, { model: string; effort: Effort }> {
+function isConfigRole(role: Role): role is ConfigRole {
+  return role !== "smoke";
+}
+
+/** The model, as a pinned ID, and the effort of each role, after the repo config. */
+export function roleModels(config: RepoConfig): Record<Role, { model: string; effort: Effort }> {
   const models = {} as Record<Role, { model: string; effort: Effort }>;
   for (const role of ROLES) {
+    const set = isConfigRole(role) ? config.models[role] : undefined;
     models[role] = {
-      model: resolveModel(ROLE_DEFAULTS[role].model),
-      effort: ROLE_DEFAULTS[role].effort,
+      model: resolveModel(set?.model ?? ROLE_DEFAULTS[role].model),
+      effort: set?.effort ?? ROLE_DEFAULTS[role].effort,
     };
   }
   return models;
@@ -72,25 +85,54 @@ function defaultModels(): Record<Role, { model: string; effort: Effort }> {
 
 /**
  * The record entry of each selected reviewer, with the model and effort
- * that its queries use after its frontmatter override, and the tools of
- * its frontmatter that the run did not grant.
+ * that its queries use after the repo config and the frontmatter, and the
+ * tools of its frontmatter that the run did not grant.
  */
 export function describeSelected(
   selected: { def: ReviewerDefinition; trigger: string }[],
+  config: RepoConfig,
 ): RunRecord["identity"]["selected_reviewers"] {
   return selected.map((s) => ({
     name: s.def.frontmatter.name,
     trigger: s.trigger,
-    ...reviewerOverrides(s.def),
+    ...effectiveModel(s.def, config),
     tools_ignored: reviewerTools(s.def).ignored,
   }));
 }
 
-// Wrap the client so that each query gives one cost entry, also a query
-// that fails or throws.
-function recordingClient(inner: SdkClient, entries: CostEntry[]): SdkClient {
+// The roles whose model and effort the recording client sets from the
+// repo config. The reviewer role is not here: find sends the overrides of
+// each reviewer itself.
+const CLIENT_OVERRIDE_ROLES: ReadonlySet<Role> = new Set<Role>([
+  "triage",
+  "verifier",
+  "verifier-escalation",
+  "merge",
+]);
+
+// Add the repo config's model and effort for the role of the request.
+// An override that the request sets itself wins.
+function withRoleOverrides(req: QueryRequest, config: RepoConfig): QueryRequest {
+  if (!CLIENT_OVERRIDE_ROLES.has(req.role) || !isConfigRole(req.role)) return req;
+  const set = config.models[req.role];
+  if (!set || (set.model === undefined && set.effort === undefined)) return req;
   return {
-    async query<T>(req: QueryRequest, options: RunOptions): Promise<QueryOutcome<T>> {
+    ...req,
+    overrides: {
+      ...(set.model !== undefined ? { model: resolveModel(set.model) } : {}),
+      ...(set.effort !== undefined ? { effort: set.effort } : {}),
+      ...req.overrides,
+    },
+  };
+}
+
+// Wrap the client so that each query gives one cost entry, also a query
+// that fails or throws. The wrapper also applies the role overrides of
+// the repo config.
+function recordingClient(inner: SdkClient, entries: CostEntry[], config: RepoConfig): SdkClient {
+  return {
+    async query<T>(original: QueryRequest, options: RunOptions): Promise<QueryOutcome<T>> {
+      const req = withRoleOverrides(original, config);
       const start = performance.now();
       let outcome: QueryOutcome<T> | null = null;
       try {
@@ -196,12 +238,6 @@ export async function runReview(
   const now = input.now ?? (() => new Date());
   const startedAt = now();
   const repo = resolve(input.repo);
-  const inner = input.client ?? (await import("./sdk/client.js")).createSdkClient();
-  const queries: CostEntry[] = [];
-  const client = recordingClient(inner, queries);
-  const options: RunOptions = { allowApiKey: input.allowApiKey, env: process.env };
-  // One semaphore bounds every SDK query of the run.
-  const semaphore = createSemaphore(DEFAULT_CONCURRENCY);
   const stageMs: Record<string, number> = {};
   const timed = async <T>(stage: string, fn: () => Promise<T>): Promise<T> => {
     const start = performance.now();
@@ -212,7 +248,23 @@ export async function runReview(
     }
   };
 
-  const gathered: GatherResult = await timed("gather", () => gather(repo, input.base, input.head));
+  // The config loads from the base commit before any model call and
+  // before gather, because its globs change the exclusions. A config that
+  // does not validate throws here, so the run writes no record.
+  const baseSha = await resolveCommit(repo, input.base);
+  const loaded = await timed("config", () => loadRepoConfig(repo, baseSha));
+  const config = loaded.config;
+
+  const inner = input.client ?? (await import("./sdk/client.js")).createSdkClient();
+  const queries: CostEntry[] = [];
+  const client = recordingClient(inner, queries, config);
+  const options: RunOptions = { allowApiKey: input.allowApiKey, env: process.env };
+  // One semaphore bounds every SDK query of the run.
+  const semaphore = createSemaphore(config.concurrency);
+
+  const gathered: GatherResult = await timed("gather", () =>
+    gather(repo, baseSha, input.head, withRepoGlobs(config)),
+  );
 
   // The head checkout lives for the whole review and is the cwd of every
   // query. withHeadWorktree removes it at the end, also on failure.
@@ -234,14 +286,26 @@ export async function runReview(
       triageFailed: triageFailure !== null,
     });
 
-    const selected = selectReviewers(
-      loadBuiltinReviewers(),
+    // The tier and the triggers select from the built-in and the custom
+    // reviewers. A selected reviewer that the config disables does not
+    // run, and coverage names it.
+    const candidates = selectReviewers(
+      [...loadBuiltinReviewers(), ...loaded.customReviewers],
       decision.tier,
       gathered.changedFiles.map((f) => f.path),
       brief?.categories ?? [],
     );
+    const skipped: SkippedReviewer[] = [];
+    const selected = candidates.filter((s) => {
+      const name = s.def.frontmatter.name;
+      if (reviewerEntry(config, name)?.enabled === false) {
+        skipped.push({ name, reason: "disabled by config" });
+        return false;
+      }
+      return true;
+    });
     const thresholds = new Map(
-      selected.map((s) => [s.def.frontmatter.name, s.def.frontmatter.threshold]),
+      selected.map((s) => [s.def.frontmatter.name, effectiveThreshold(s.def, config)]),
     );
 
     // The run splits the diff per file once. Find and verify use the map.
@@ -254,10 +318,10 @@ export async function runReview(
     // returns. Merge is the only barrier.
     const pending: Promise<VerificationEntry>[] = [];
     const onFinding = (finding: Finding, reviewer: string): void => {
-      const config = {
-        ...DEFAULT_VERIFY_CONFIG,
-        threshold: thresholds.get(reviewer) ?? DEFAULT_VERIFY_CONFIG.threshold,
-      };
+      const verifyConfig = verifyConfigFor(
+        thresholds.get(reviewer) ?? config.thresholds.default,
+        config,
+      );
       // The rejection handler is attached here, when the promise is made.
       // Other reviewer passes can run for a long time before the run waits
       // for this promise, and a rejection with no handler stops the
@@ -271,7 +335,7 @@ export async function runReview(
             sections,
             prompt: verifierPrompt,
             semaphore,
-            config,
+            config: verifyConfig,
           });
         })
         .then(
@@ -292,7 +356,7 @@ export async function runReview(
           client,
           options,
           selected,
-          { gathered, brief, cwd, semaphore, sections },
+          { gathered, brief, cwd, semaphore, sections, config },
           onFinding,
         );
       } catch (err) {
@@ -307,7 +371,12 @@ export async function runReview(
       v.passed && v.final ? [{ finding: v.finding, result: v.final }] : [],
     );
     const merged = await timed("merge", () =>
-      mergeFindings(client, options, verified, { cwd, totalHunks: gathered.totalHunks, semaphore }),
+      mergeFindings(client, options, verified, {
+        cwd,
+        totalHunks: gathered.totalHunks,
+        semaphore,
+        caps: config.caps,
+      }),
     );
 
     // A failed or refused verifier call, first or escalation, drops its
@@ -330,15 +399,16 @@ export async function runReview(
         head: gathered.head,
         started_at: startedAt.toISOString(),
         tool_version: toolVersion(),
-        config_hash: null,
+        config_hash: loaded.hash,
+        config: { files: loaded.files, values: config, custom_reviewers: [] },
         changed_files: gathered.changedFiles,
         excluded_files: gathered.excluded,
         sensitive_files: gathered.sensitive,
         triage: brief,
         tier: decision.tier,
         tier_reason: decision.reason,
-        selected_reviewers: describeSelected(selected),
-        models: defaultModels(),
+        selected_reviewers: describeSelected(selected, config),
+        models: roleModels(config),
       },
       stages: {
         reviewers: runs,
@@ -348,7 +418,7 @@ export async function runReview(
       },
       posted: {
         verdict,
-        coverage: coverage(runs, counts.droppedByFailedVerifier),
+        coverage: coverage(runs, counts.droppedByFailedVerifier, skipped),
         findings: merged.posted,
       },
       cost: {

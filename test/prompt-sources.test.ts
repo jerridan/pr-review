@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import ts from "typescript";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { DEFAULT_REPO_CONFIG } from "../src/config/repo-config.js";
 import { createProgram } from "../src/cli.js";
 import type { Role } from "../src/config/models.js";
 import { runReviewers } from "../src/find/index.js";
@@ -414,6 +415,7 @@ describe("A13: placeholder and list text in a block comes from the prompt files"
 
   function reviewerDef(): ReviewerDefinition {
     return {
+      source: "builtin",
       path: "/x/r.md",
       systemPrompt: "s",
       frontmatter: {
@@ -436,7 +438,7 @@ describe("A13: placeholder and list text in a block comes from the prompt files"
       fake,
       { allowApiKey: false, env: {} },
       [{ def: reviewerDef(), trigger: "t" }],
-      { gathered, brief, cwd: head, semaphore: createSemaphore(1) },
+      { gathered, brief, cwd: head, semaphore: createSemaphore(1), config: DEFAULT_REPO_CONFIG },
       () => {},
     );
     return blocks(fake.calls[0]?.userMessage ?? "").get("triage_brief") ?? "";

@@ -1,5 +1,13 @@
 import { execFile } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,8 +24,8 @@ const SCRIPT = fileURLToPath(new URL("../scripts/make-fixture.sh", import.meta.u
 
 type Fixture = { repo: string; base: string; head: string; file: string; line: number };
 
-async function makeFixture(): Promise<Fixture> {
-  const { stdout } = await run("bash", [SCRIPT]);
+async function makeFixture(...options: string[]): Promise<Fixture> {
+  const { stdout } = await run("bash", [SCRIPT, ...options]);
   const value = (key: string) =>
     stdout
       .split("\n")
@@ -128,20 +136,36 @@ afterAll(() => {
 });
 
 function args(out: string, ...extra: string[]): string[] {
+  return argsFor(fx, out, ...extra);
+}
+
+function argsFor(fixture: Fixture, out: string, ...extra: string[]): string[] {
   return [
     "node",
     "pr-review",
     "run",
     "--repo",
-    fx.repo,
+    fixture.repo,
     "--base",
-    fx.base,
+    fixture.base,
     "--head",
-    fx.head,
+    fixture.head,
     "--out",
     out,
     ...extra,
   ];
+}
+
+/** Build a fixture whose base commit holds a .pr-review/config.yaml with this text. */
+async function fixtureWithConfig(configYaml: string): Promise<Fixture> {
+  const source = mkdtempSync(join(tmpdir(), "pr-review-cli-config-"));
+  try {
+    mkdirSync(join(source, "dir"));
+    writeFileSync(join(source, "dir", "config.yaml"), configYaml);
+    return await makeFixture("--pr-review-dir", join(source, "dir"));
+  } finally {
+    rmSync(source, { recursive: true, force: true });
+  }
 }
 
 describe("pr-review run through the CLI", () => {
@@ -253,4 +277,53 @@ describe("a skip run (A3)", () => {
     expect(stdout).toContain("skipped");
     expect(stdout).toContain("Tier set by --tier skip.");
   });
+});
+
+describe("the repo config on the base commit (R3)", () => {
+  const fixtures: Fixture[] = [];
+  afterAll(() => {
+    for (const f of fixtures) rmSync(f.repo, { recursive: true, force: true });
+  });
+
+  it("exits 1 on an invalid config, writes no record, and names the file and the field", async () => {
+    const bad = await fixtureWithConfig("thresholds:\n  default: 150\n");
+    fixtures.push(bad);
+    const fake = createFakeSdkClient(script(bad));
+    const out = join(outRoot, "bad-config");
+    const code = await exitCodeOf(
+      createProgram({ client: fake }).parseAsync(argsFor(bad, out, "--format", "json")),
+    );
+    expect(code).toBe(1);
+    expect(fake.calls).toEqual([]);
+    expect(existsSync(out) ? readdirSync(out) : []).toEqual([]);
+    expect(stdout).toBe("");
+    expect(stderr).toContain(".pr-review/config.yaml");
+    expect(stderr).toContain("thresholds.default");
+  }, 30_000);
+
+  it("lists a reviewer that the config disables under reviewers_skipped, not reviewers_ran", async () => {
+    const off = await fixtureWithConfig("reviewers:\n  diff-bugs:\n    enabled: false\n");
+    fixtures.push(off);
+    const fake = createFakeSdkClient(script(off));
+    const code = await exitCodeOf(
+      createProgram({ client: fake }).parseAsync(
+        argsFor(off, join(outRoot, "disabled"), "--format", "json"),
+      ),
+    );
+    expect(code).toBe(0);
+    const doc = JSON.parse(stdout);
+    expect(doc.coverage.reviewers_skipped).toEqual([
+      { name: "diff-bugs", reason: "disabled by config" },
+    ]);
+    expect(doc.coverage.reviewers_ran).not.toContain("diff-bugs");
+    const record = JSON.parse(readFileSync(doc.record_path, "utf8")) as RunRecord;
+    expect(RecordSchema.safeParse(record).error).toBeUndefined();
+    expect(record.posted.coverage.reviewers_skipped).toEqual([
+      { name: "diff-bugs", reason: "disabled by config" },
+    ]);
+    expect(record.posted.coverage.reviewers_ran).not.toContain("diff-bugs");
+    expect(record.identity.selected_reviewers.map((r) => r.name)).not.toContain("diff-bugs");
+    expect(fake.calls.filter((c) => c.reviewerName === "diff-bugs")).toEqual([]);
+    expect(record.identity.config_hash).toMatch(/^[0-9a-f]{64}$/);
+  }, 30_000);
 });

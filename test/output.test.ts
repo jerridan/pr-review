@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_REPO_CONFIG } from "../src/config/repo-config.js";
 import { formatJson } from "../src/output/json.js";
 import { formatTable } from "../src/output/table.js";
 import type { Finding, Severity } from "../src/schemas/finding.js";
@@ -60,6 +61,7 @@ function record(
       started_at: "2026-10-13T12:00:00.000Z",
       tool_version: "0.1.0",
       config_hash: null,
+      config: { files: [], values: DEFAULT_REPO_CONFIG, custom_reviewers: [] },
       changed_files: [{ path: "src/stats.ts", hunks: 1 }],
       excluded_files: excluded,
       sensitive_files: [],
@@ -92,6 +94,7 @@ function record(
       coverage: {
         reviewers_ran: ["diff-bugs"],
         reviewers_failed: [],
+        reviewers_skipped: [],
         findings_dropped_by_failed_verifier: 0,
       },
       findings,
@@ -135,6 +138,7 @@ describe("table output (A10)", () => {
       coverage: {
         reviewers_ran: [],
         reviewers_failed: ["diff-bugs"],
+        reviewers_skipped: [],
         findings_dropped_by_failed_verifier: 2,
       },
     });
@@ -195,6 +199,21 @@ describe("json output", () => {
     );
     expect(unknown.total_cost_usd).toBeNull();
     expect(unknown.queries_without_cost).toBe(3);
+  });
+
+  it("holds the skipped reviewers in its coverage", () => {
+    const r = record([]);
+    const skipped = [{ name: "diff-bugs", reason: "disabled by config" as const }];
+    const doc = JSON.parse(
+      formatJson(
+        {
+          ...r,
+          posted: { ...r.posted, coverage: { ...r.posted.coverage, reviewers_skipped: skipped } },
+        },
+        "/out/r.json",
+      ),
+    );
+    expect(doc.coverage.reviewers_skipped).toEqual(skipped);
   });
 
   it("holds the excluded files with their reasons", () => {

@@ -2,7 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { applyCap, nonBlockingCap } from "../src/merge/cap.js";
+import { DEFAULT_REPO_CONFIG } from "../src/config/repo-config.js";
+import { applyCap, DEFAULT_CAPS, nonBlockingCap } from "../src/merge/cap.js";
 import { fingerprint } from "../src/merge/fingerprint.js";
 import { groupFindings, mergeFindings } from "../src/merge/index.js";
 import { loadPrompt } from "../src/prompts/load.js";
@@ -379,6 +380,17 @@ describe("mergeFindings (A7)", () => {
     ]);
     expect(out.capped.map((p) => p.severity)).toEqual(["nit", "nit"]);
   });
+
+  it("uses the caps that the run gives", async () => {
+    const verified = Array.from({ length: 4 }, (_, i) => ({
+      finding: finding(i * 2 + 1, i * 2 + 1),
+      result: result(90 - i, "nit" as const),
+    }));
+    const caps = { non_blocking_base: 0, non_blocking_per_hunks: 4, non_blocking_max: 20 };
+    const out = await mergeFindings(noMergeClient(), OPTIONS, verified, { ...ctx(1), caps });
+    expect(out.posted).toHaveLength(1);
+    expect(out.capped).toHaveLength(3);
+  });
 });
 
 describe("cap", () => {
@@ -391,6 +403,17 @@ describe("cap", () => {
     expect(nonBlockingCap(68)).toBe(20);
     expect(nonBlockingCap(69)).toBe(20);
     expect(nonBlockingCap(10_000)).toBe(20);
+  });
+
+  it("takes the base, the hunks per step and the maximum from the repo config", () => {
+    expect(nonBlockingCap(0, DEFAULT_CAPS)).toBe(3);
+    expect(DEFAULT_CAPS).toEqual(DEFAULT_REPO_CONFIG.caps);
+    const caps = { non_blocking_base: 1, non_blocking_per_hunks: 2, non_blocking_max: 5 };
+    expect(nonBlockingCap(0, caps)).toBe(1);
+    expect(nonBlockingCap(1, caps)).toBe(2);
+    expect(nonBlockingCap(4, caps)).toBe(3);
+    expect(nonBlockingCap(100, caps)).toBe(5);
+    expect(nonBlockingCap(3, { ...caps, non_blocking_base: 0 })).toBe(2);
   });
 
   function posted(severity: Severity, score: number, n: number): PostedFinding {

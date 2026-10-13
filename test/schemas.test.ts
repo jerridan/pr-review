@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_REPO_CONFIG } from "../src/config/repo-config.js";
 import { z } from "zod";
 import { SmokeOutputSchema } from "../src/cli.js";
 import type { Role } from "../src/config/models.js";
@@ -98,6 +99,7 @@ function makeRecord(): RunRecord {
       started_at: "2026-10-13T12:00:00.000Z",
       tool_version: "0.1.0",
       config_hash: null,
+      config: { files: [], values: DEFAULT_REPO_CONFIG, custom_reviewers: [] },
       changed_files: [{ path: "src/a.ts", hunks: 1 }],
       excluded_files: [{ path: "package-lock.json", reason: "generated" }],
       sensitive_files: [],
@@ -172,6 +174,7 @@ function makeRecord(): RunRecord {
       coverage: {
         reviewers_ran: ["diff-bugs"],
         reviewers_failed: [],
+        reviewers_skipped: [],
         findings_dropped_by_failed_verifier: 1,
       },
       findings: [
@@ -360,7 +363,7 @@ describe("RecordSchema", () => {
     }
   });
 
-  it("requires pr and config_hash to be null", () => {
+  it("requires pr to be null, and config_hash to be null or a hex SHA-256", () => {
     const record = makeRecord();
     expect(
       RecordSchema.safeParse({ ...record, identity: { ...record.identity, pr: 12 } }).success,
@@ -369,6 +372,55 @@ describe("RecordSchema", () => {
       RecordSchema.safeParse({ ...record, identity: { ...record.identity, config_hash: "x" } })
         .success,
     ).toBe(false);
+    expect(
+      RecordSchema.safeParse({
+        ...record,
+        identity: { ...record.identity, config_hash: "a".repeat(64) },
+      }).success,
+    ).toBe(true);
+  });
+
+  it("requires identity.config with the files, the validated values and the custom reviewers", () => {
+    const record = makeRecord();
+    const withConfig = (config: unknown) =>
+      RecordSchema.safeParse({ ...record, identity: { ...record.identity, config } }).success;
+    expect(withConfig(record.identity.config)).toBe(true);
+    expect(
+      withConfig({
+        files: [".pr-review/config.yaml"],
+        values: DEFAULT_REPO_CONFIG,
+        custom_reviewers: [{ name: "m", bash_granted: false, reason: "not trusted" }],
+      }),
+    ).toBe(true);
+    expect(withConfig(undefined)).toBe(false);
+    expect(withConfig({ files: [], custom_reviewers: [] })).toBe(false);
+    expect(
+      withConfig({
+        files: [],
+        values: { ...DEFAULT_REPO_CONFIG, colour: 1 },
+        custom_reviewers: [],
+      }),
+    ).toBe(false);
+    expect(
+      withConfig({ files: [], values: DEFAULT_REPO_CONFIG, custom_reviewers: [], hash: "x" }),
+    ).toBe(false);
+  });
+
+  it("requires coverage.reviewers_skipped, with a known reason", () => {
+    const record = makeRecord();
+    const withSkipped = (skipped: unknown) =>
+      RecordSchema.safeParse({
+        ...record,
+        posted: {
+          ...record.posted,
+          coverage: { ...record.posted.coverage, reviewers_skipped: skipped },
+        },
+      }).success;
+    expect(withSkipped([{ name: "diff-bugs", reason: "disabled by config" }])).toBe(true);
+    expect(withSkipped([{ name: "diff-bugs", reason: "token ceiling", pass: 2 }])).toBe(true);
+    expect(withSkipped([{ name: "description-drift", reason: "no description" }])).toBe(true);
+    expect(withSkipped([{ name: "diff-bugs", reason: "bored" }])).toBe(false);
+    expect(withSkipped(undefined)).toBe(false);
   });
 
   it("requires the resolved model and effort of each selected reviewer", () => {

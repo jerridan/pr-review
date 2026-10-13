@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
+import { DEFAULT_REPO_CONFIG } from "../src/config/repo-config.js";
 import { runReviewers } from "../src/find/index.js";
 import type { GatherResult } from "../src/gather/index.js";
 import { mergeFindings } from "../src/merge/index.js";
@@ -17,6 +18,7 @@ import { createSemaphore } from "../src/semaphore.js";
 import { UNTRUSTED_SYSTEM_LINE } from "../src/untrusted.js";
 import {
   DEFAULT_VERIFY_CONFIG,
+  verifyConfigFor,
   loadVerifierPrompt,
   verifyFinding,
   type VerifyConfig,
@@ -122,6 +124,15 @@ const roles = (calls: QueryRequest[]) => calls.map((c) => c.role);
 describe("verifyFinding (A6)", () => {
   it("has the default threshold and band", () => {
     expect(DEFAULT_VERIFY_CONFIG).toEqual({ threshold: 80, bandLow: 60, bandHigh: 85 });
+    expect(verifyConfigFor(80, DEFAULT_REPO_CONFIG)).toEqual(DEFAULT_VERIFY_CONFIG);
+  });
+
+  it("takes the band from the repo config and the threshold from the reviewer", () => {
+    const config = {
+      ...DEFAULT_REPO_CONFIG,
+      thresholds: { default: 70, middle_band: [40, 50] as [number, number] },
+    };
+    expect(verifyConfigFor(90, config)).toEqual({ threshold: 90, bandLow: 40, bandHigh: 50 });
   });
 
   it("fails a finding that is not in scope, whatever its score, with no escalation", async () => {
@@ -489,6 +500,7 @@ describe("verification starts per finding", () => {
 
   function def(name: string): ReviewerDefinition {
     return {
+      source: "builtin",
       path: `/x/${name}.md`,
       systemPrompt: `SYSTEM ${name}`,
       frontmatter: {
@@ -535,7 +547,7 @@ describe("verification starts per finding", () => {
         { def: def("slow"), trigger: "t" },
         { def: def("fast"), trigger: "t" },
       ],
-      { gathered: GATHERED, brief: null, cwd: head, semaphore },
+      { gathered: GATHERED, brief: null, cwd: head, semaphore, config: DEFAULT_REPO_CONFIG },
       (f) => {
         verifications.push(
           verifyFinding(fake, OPTIONS, f, {
@@ -564,7 +576,14 @@ describe("verification starts per finding", () => {
       fake,
       OPTIONS,
       [{ def: def("diff-bugs"), trigger: "t" }],
-      { gathered: GATHERED, brief: null, cwd: head, semaphore, sections },
+      {
+        gathered: GATHERED,
+        brief: null,
+        cwd: head,
+        semaphore,
+        sections,
+        config: DEFAULT_REPO_CONFIG,
+      },
       (f) => {
         expect(f.file).toBe("src/stats.ts");
         verifications.push(
@@ -604,7 +623,7 @@ describe("verification starts per finding", () => {
       fake,
       OPTIONS,
       [{ def: def("diff-bugs"), trigger: "t" }],
-      { gathered: GATHERED, brief: null, cwd: head, semaphore },
+      { gathered: GATHERED, brief: null, cwd: head, semaphore, config: DEFAULT_REPO_CONFIG },
       (f) => {
         pending.push(
           verifyFinding(fake, OPTIONS, f, {

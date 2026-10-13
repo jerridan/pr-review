@@ -10,6 +10,7 @@ import { buildQueryOptions } from "../src/sdk/options.js";
 import {
   loadBuiltinReviewers,
   loadReviewer,
+  parseReviewer,
   ReviewerLoadError,
   reviewerOverrides,
   reviewerTools,
@@ -98,6 +99,26 @@ describe("built-in reviewers (A4)", () => {
 });
 
 describe("loadReviewer", () => {
+  it("makes trusted optional, with the default false", () => {
+    const def = loadReviewer(writeReviewer(withField("trusted", null)));
+    expect(def.frontmatter.trusted).toBe(false);
+    expect(loadError(writeReviewer(withField("trusted", "trusted: maybe"))).message).toMatch(
+      /trusted/,
+    );
+  });
+
+  it("marks a built-in reviewer with source builtin, and a custom one as told", () => {
+    expect(loadBuiltinReviewers().every((d) => d.source === "builtin")).toBe(true);
+    expect(loadReviewer(writeReviewer(GOOD_FRONTMATTER)).source).toBe("builtin");
+    expect(
+      parseReviewer(`---\n${GOOD_FRONTMATTER.join("\n")}\n---\nBody.\n`, "x.md", "custom"),
+    ).toMatchObject({
+      source: "custom",
+      path: "x.md",
+      systemPrompt: "Body.\n",
+    });
+  });
+
   it("reads passes, threshold and trusted", () => {
     const def = loadReviewer(writeReviewer(withField("trusted", "trusted: true")));
     expect(def.frontmatter.passes).toBe(2);
@@ -248,6 +269,7 @@ describe("selectReviewers", () => {
     triggers: Partial<ReviewerDefinition["frontmatter"]["triggers"]> = {},
   ): ReviewerDefinition {
     return {
+      source: "builtin",
       path: `/x/${name}.md`,
       systemPrompt: "p",
       frontmatter: {

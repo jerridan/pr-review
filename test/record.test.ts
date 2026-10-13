@@ -1,10 +1,20 @@
 import { execFile } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { DEFAULT_REPO_CONFIG } from "../src/config/repo-config.js";
 import { formatJson } from "../src/output/json.js";
 import { recordFileName, writeRecord } from "../src/record/write.js";
 import { runReview } from "../src/run.js";
@@ -19,8 +29,8 @@ const SCRIPT = fileURLToPath(new URL("../scripts/make-fixture.sh", import.meta.u
 
 type Fixture = { repo: string; base: string; head: string; file: string; line: number };
 
-async function makeFixture(): Promise<Fixture> {
-  const { stdout } = await run("bash", [SCRIPT]);
+async function makeFixture(...options: string[]): Promise<Fixture> {
+  const { stdout } = await run("bash", [SCRIPT, ...options]);
   const value = (key: string) =>
     stdout
       .split("\n")
@@ -176,6 +186,95 @@ describe("the record file (A9)", () => {
     expect(record.identity.pr).toBeNull();
     expect(record.identity.config_hash).toBeNull();
   });
+
+  it("holds the default config, no loaded files and no custom reviewers", () => {
+    expect(record.identity.config).toEqual({
+      files: [],
+      values: DEFAULT_REPO_CONFIG,
+      custom_reviewers: [],
+    });
+  });
+});
+
+/** The config hash by spec R4, computed here apart from the code. */
+function r4Hash(files: Record<string, string>): string {
+  const paths = Object.keys(files).sort((a, b) => Buffer.compare(Buffer.from(a), Buffer.from(b)));
+  const joined = paths.map((p) => `${p}\n${files[p]}`).join("\0");
+  return createHash("sha256").update(Buffer.from(joined, "utf8")).digest("hex");
+}
+
+describe("the config hash of a fixture with config (R4)", () => {
+  const files: Record<string, string> = {
+    ".pr-review/config.yaml": "thresholds:\n  default: 82\nconcurrency: 2\n",
+    ".pr-review/rules.md": "Name each test after its behaviour.\n",
+  };
+  let configFx: Fixture;
+  let configRecord: RunRecord;
+  let configPath: string;
+
+  beforeAll(async () => {
+    const source = mkdtempSync(join(tmpdir(), "pr-review-record-config-"));
+    mkdirSync(join(source, "dir"));
+    writeFileSync(join(source, "dir", "config.yaml"), files[".pr-review/config.yaml"] ?? "");
+    writeFileSync(join(source, "dir", "rules.md"), files[".pr-review/rules.md"] ?? "");
+    writeFileSync(join(source, "claude.md"), "Not part of the hash.\n");
+    try {
+      configFx = await makeFixture(
+        "--pr-review-dir",
+        join(source, "dir"),
+        "--claude-md",
+        join(source, "claude.md"),
+      );
+    } finally {
+      rmSync(source, { recursive: true, force: true });
+    }
+    const fake = createFakeSdkClient((req): QueryOutcome<unknown> => {
+      if (req.role === "reviewer") return { ok: true, output: { findings: [] }, raw: meta(0.1) };
+      throw new Error(`unexpected role ${req.role}`);
+    });
+    const out = await runReview({
+      repo: configFx.repo,
+      base: configFx.base,
+      head: configFx.head,
+      tierOverride: "fast",
+      outDir: join(outRoot, "config-records"),
+      allowApiKey: false,
+      client: fake,
+    });
+    configRecord = out.record;
+    configPath = out.recordPath;
+  }, 30_000);
+
+  afterAll(() => {
+    if (configFx) rmSync(configFx.repo, { recursive: true, force: true });
+  });
+
+  it("equals the SHA-256 that the test computes from the loaded files", () => {
+    expect(configRecord.identity.config_hash).toBe(r4Hash(files));
+    expect(configRecord.identity.config_hash).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("lists the loaded paths and the validated values under identity.config", () => {
+    expect(configRecord.identity.config.files).toEqual([
+      ".pr-review/config.yaml",
+      ".pr-review/rules.md",
+    ]);
+    expect(configRecord.identity.config.values).toEqual({
+      ...DEFAULT_REPO_CONFIG,
+      thresholds: { ...DEFAULT_REPO_CONFIG.thresholds, default: 82 },
+      concurrency: 2,
+    });
+    expect(configRecord.identity.config.custom_reviewers).toEqual([]);
+  });
+
+  it("writes a record that validates", () => {
+    const written = JSON.parse(readFileSync(configPath, "utf8"));
+    expect(RecordSchema.safeParse(written).error).toBeUndefined();
+  });
+
+  it("is null for the default fixture, which has no .pr-review/", () => {
+    expect(record.identity.config_hash).toBeNull();
+  });
 });
 
 describe("the record parts", () => {
@@ -240,6 +339,7 @@ describe("the record parts", () => {
     expect(record.posted.coverage).toEqual({
       reviewers_ran: ["diff-bugs"],
       reviewers_failed: [],
+      reviewers_skipped: [],
       findings_dropped_by_failed_verifier: 1,
     });
   });

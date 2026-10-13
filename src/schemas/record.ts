@@ -1,6 +1,7 @@
 // The run record: one JSON file per run, with four parts. This schema is
 // not sent to a model.
 import { z } from "zod";
+import { RepoConfigSchema, type RepoConfig } from "../config/repo-config.js";
 import { EFFORTS, ROLES, type Effort, type Role } from "../config/models.js";
 import type { QueryMeta } from "../sdk/client.js";
 import { FindingSchema, SEVERITIES, findingShape, type Finding } from "./finding.js";
@@ -29,6 +30,17 @@ export type PostedFinding = Finding & {
   verifier: VerifierResult;
 };
 
+/** A reviewer that the tier and the triggers selected, but that did not run. */
+export type SkippedReviewer = {
+  name: string;
+  reason: "disabled by config" | "no description" | "token ceiling";
+  /** The pass that did not start, for the reason "token ceiling". */
+  pass?: number;
+};
+
+/** A custom reviewer, and whether the run gave it Bash. */
+export type CustomReviewerEntry = { name: string; bash_granted: boolean; reason: string | null };
+
 export type Verdict = "skipped" | "incomplete" | "would request changes" | "would approve";
 
 export type RunRecord = {
@@ -39,7 +51,14 @@ export type RunRecord = {
     head: string;
     started_at: string;
     tool_version: string;
-    config_hash: null;
+    /** The SHA-256 of the loaded .pr-review/ files, or null when none loaded. */
+    config_hash: string | null;
+    /** The repo config of the run: the loaded paths and the values with defaults. */
+    config: {
+      files: string[];
+      values: RepoConfig;
+      custom_reviewers: CustomReviewerEntry[];
+    };
     changed_files: { path: string; hunks: number }[];
     excluded_files: { path: string; reason: "rename-only" | "generated" }[];
     sensitive_files: string[];
@@ -82,6 +101,7 @@ export type RunRecord = {
     coverage: {
       reviewers_ran: string[];
       reviewers_failed: string[];
+      reviewers_skipped: SkippedReviewer[];
       findings_dropped_by_failed_verifier: number;
     };
     findings: PostedFinding[];
@@ -153,7 +173,21 @@ const IdentitySchema = z.strictObject({
   head: z.string(),
   started_at: z.string(),
   tool_version: z.string(),
-  config_hash: z.null(),
+  config_hash: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/)
+    .nullable(),
+  config: z.strictObject({
+    files: z.array(z.string()),
+    values: RepoConfigSchema,
+    custom_reviewers: z.array(
+      z.strictObject({
+        name: z.string(),
+        bash_granted: z.boolean(),
+        reason: z.string().nullable(),
+      }),
+    ),
+  }),
   changed_files: z.array(z.strictObject({ path: z.string(), hunks: integer() })),
   excluded_files: z.array(
     z.strictObject({ path: z.string(), reason: z.enum(["rename-only", "generated"]) }),
@@ -211,11 +245,18 @@ const StagesSchema = z.strictObject({
   capped: z.array(PostedFindingSchema),
 });
 
+export const SkippedReviewerSchema: z.ZodType<SkippedReviewer> = z.strictObject({
+  name: z.string(),
+  reason: z.enum(["disabled by config", "no description", "token ceiling"]),
+  pass: integer().optional(),
+});
+
 const PostedSchema = z.strictObject({
   verdict: z.enum(["skipped", "incomplete", "would request changes", "would approve"]),
   coverage: z.strictObject({
     reviewers_ran: z.array(z.string()),
     reviewers_failed: z.array(z.string()),
+    reviewers_skipped: z.array(SkippedReviewerSchema),
     findings_dropped_by_failed_verifier: integer(),
   }),
   findings: z.array(PostedFindingSchema),

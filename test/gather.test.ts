@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { DEFAULT_GLOBS, withRepoGlobs } from "../src/config/globs.js";
 import { countHunks, diffSections, filterDiff, parseNameStatus } from "../src/gather/diff.js";
 import { applyExclusions } from "../src/gather/exclusions.js";
 import { gather, type GatherResult } from "../src/gather/index.js";
@@ -259,7 +260,7 @@ describe("gather on the fixture repo (A2)", () => {
 
   beforeAll(async () => {
     fixture = await makeFixture();
-    result = await gather(fixture.repo, fixture.base, fixture.head);
+    result = await gather(fixture.repo, fixture.base, fixture.head, DEFAULT_GLOBS);
   }, 30_000);
 
   afterAll(() => {
@@ -314,7 +315,22 @@ describe("gather on the fixture repo (A2)", () => {
   });
 
   it("throws on a SHA that does not exist", async () => {
-    await expect(gather(fixture.repo, "0".repeat(40), fixture.head)).rejects.toThrow();
+    await expect(
+      gather(fixture.repo, "0".repeat(40), fixture.head, DEFAULT_GLOBS),
+    ).rejects.toThrow();
+  });
+
+  it("adds the repo config's globs to the defaults", async () => {
+    const globs = withRepoGlobs({
+      sensitive_globs: ["src/stats.ts"],
+      generated_globs: [".github/**"],
+    });
+    const out = await gather(fixture.repo, fixture.base, fixture.head, globs);
+    expect(out.excluded).toContainEqual({ path: ".github/workflows/ci.yml", reason: "generated" });
+    expect(out.excluded).toContainEqual({ path: "package-lock.json", reason: "generated" });
+    expect(out.changedFiles).toEqual([{ path: "src/stats.ts", hunks: 1 }]);
+    expect(out.sensitive).toEqual(["src/stats.ts"]);
+    expect(out.diff).not.toContain(".github/workflows/ci.yml");
   });
 });
 

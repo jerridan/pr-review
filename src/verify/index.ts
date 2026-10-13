@@ -3,6 +3,7 @@
 import { normalizeWs, readHeadFile } from "../find/evidence.js";
 import { diffSections } from "../gather/diff.js";
 import { loadPrompt, render, type PromptFile } from "../prompts/load.js";
+import type { RepoConfig } from "../config/repo-config.js";
 import type { Finding } from "../schemas/finding.js";
 import type { QueryFailure } from "../schemas/record.js";
 import { VerifierResultSchema, type VerifierResult } from "../schemas/verifier.js";
@@ -18,6 +19,15 @@ export interface VerifyConfig {
 }
 
 export const DEFAULT_VERIFY_CONFIG: VerifyConfig = { threshold: 80, bandLow: 60, bandHigh: 85 };
+
+/**
+ * The verify config of one finding: the threshold of its reviewer, and
+ * the middle band of the repo config.
+ */
+export function verifyConfigFor(threshold: number, config: RepoConfig): VerifyConfig {
+  const [bandLow, bandHigh] = config.thresholds.middle_band;
+  return { threshold, bandLow, bandHigh };
+}
 
 export type VerifyContext = {
   cwd: string;

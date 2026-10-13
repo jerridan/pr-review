@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
+import { DEFAULT_REPO_CONFIG } from "../src/config/repo-config.js";
 import {
   diffEvidenceText,
   evidenceMatches,
@@ -112,6 +113,7 @@ function finding(overrides: Partial<Finding> = {}): Finding {
 
 function def(name: string, passes = 1): ReviewerDefinition {
   return {
+    source: "builtin",
     path: `/x/${name}.md`,
     systemPrompt: `SYSTEM ${name}`,
     frontmatter: {
@@ -135,7 +137,7 @@ const ok = (findings: Finding[]): QueryOutcome<unknown> => ({
 });
 
 function ctx(semaphore = createSemaphore(5)) {
-  return { gathered: GATHERED, brief: BRIEF, cwd: head, semaphore };
+  return { gathered: GATHERED, brief: BRIEF, cwd: head, semaphore, config: DEFAULT_REPO_CONFIG };
 }
 
 describe("evidence checks", () => {
