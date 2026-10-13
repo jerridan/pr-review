@@ -15,13 +15,12 @@ import {
   effectiveModel,
   effectiveThreshold,
   loadBuiltinReviewers,
-  reviewerEntry,
   reviewerTools,
   type ReviewerDefinition,
 } from "./reviewers/loader.js";
-import { selectReviewers } from "./reviewers/select.js";
+import { selectReviewers, skipSelected } from "./reviewers/select.js";
 import type { Finding } from "./schemas/finding.js";
-import type { QueryFailure, RunRecord, SkippedReviewer } from "./schemas/record.js";
+import type { QueryFailure, RunRecord } from "./schemas/record.js";
 import type { TriageBrief } from "./schemas/triage.js";
 import type { VerifierResult } from "./schemas/verifier.js";
 import type { QueryOutcome, QueryRequest, SdkClient } from "./sdk/client.js";
@@ -288,21 +287,17 @@ export async function runReview(
 
     // The tier and the triggers select from the built-in and the custom
     // reviewers. A selected reviewer that the config disables does not
-    // run, and coverage names it.
+    // run, nor does the description reviewer when the description is
+    // empty. Coverage names each of them.
     const candidates = selectReviewers(
       [...loadBuiltinReviewers(), ...loaded.customReviewers],
       decision.tier,
       gathered.changedFiles.map((f) => f.path),
       brief?.categories ?? [],
     );
-    const skipped: SkippedReviewer[] = [];
-    const selected = candidates.filter((s) => {
-      const name = s.def.frontmatter.name;
-      if (reviewerEntry(config, name)?.enabled === false) {
-        skipped.push({ name, reason: "disabled by config" });
-        return false;
-      }
-      return true;
+    const { run: selected, skipped } = skipSelected(candidates, {
+      config,
+      description: gathered.description,
     });
     // The rules block of every reviewer holds the base commit's CLAUDE.md
     // and rules.md, which the config loader already read.
@@ -360,7 +355,7 @@ export async function runReview(
           client,
           options,
           selected,
-          { gathered, brief, cwd, semaphore, sections, config, rules },
+          { gathered, brief, cwd, semaphore, sections, config, rules, tier: decision.tier },
           onFinding,
         );
       } catch (err) {

@@ -1,7 +1,8 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
+import { DEFAULT_REPO_CONFIG } from "../src/config/repo-config.js";
 import { ROLE_DEFAULTS } from "../src/config/models.js";
 import { FindingsOutputSchema } from "../src/schemas/finding.js";
 import { VerifierResultSchema } from "../src/schemas/verifier.js";
@@ -16,7 +17,7 @@ import {
   reviewerTools,
   type ReviewerDefinition,
 } from "../src/reviewers/loader.js";
-import { selectReviewers } from "../src/reviewers/select.js";
+import { selectReviewers, skipSelected } from "../src/reviewers/select.js";
 import { UNTRUSTED_SYSTEM_LINE } from "../src/untrusted.js";
 
 const dir = mkdtempSync(join(tmpdir(), "pr-review-reviewers-"));
@@ -61,40 +62,133 @@ function loadError(path: string): ReviewerLoadError {
   throw new Error(`Expected ${path} to fail to load.`);
 }
 
-describe("built-in reviewers (A4)", () => {
-  it("loads diff-bugs with the shipped values", () => {
-    const defs = loadBuiltinReviewers();
-    expect(defs.map((d) => d.frontmatter.name)).toEqual(["diff-bugs"]);
-    const def = defs[0] as ReviewerDefinition;
-    expect(def.frontmatter).toMatchObject({
-      name: "diff-bugs",
-      model: "opus",
-      effort: "low",
-      passes: 1,
-      threshold: 80,
-      triggers: { paths: [], categories: [], min_tier: "fast" },
-    });
-    expect(def.path).toMatch(/prompts[/\\]reviewers[/\\]diff-bugs\.md$/);
-  });
+// The built-in reviewers of spec R1, in file name order, with their triggers.
+const BUILTINS: { name: string; minTier: "fast" | "full"; passes: number }[] = [
+  { name: "conventions", minTier: "fast", passes: 1 },
+  { name: "description-drift", minTier: "full", passes: 1 },
+  { name: "diff-bugs", minTier: "fast", passes: 2 },
+  { name: "docs-and-comments", minTier: "full", passes: 1 },
+  { name: "history", minTier: "full", passes: 1 },
+  { name: "security", minTier: "full", passes: 2 },
+  { name: "tests", minTier: "full", passes: 1 },
+];
 
-  it("uses the body as the system prompt, with the prompt rules", () => {
-    const def = loadBuiltinReviewers()[0] as ReviewerDefinition;
-    const prompt = def.systemPrompt;
-    expect(prompt).not.toMatch(/^---/);
-    expect(prompt).toContain(UNTRUSTED_SYSTEM_LINE);
-    expect(prompt).toMatch(/every issue/i);
-    expect(prompt).toMatch(/confidence/i);
-    expect(prompt).toMatch(/severity/i);
-    expect(prompt).toMatch(/quote/i);
-    expect(prompt).toMatch(/subagent/i);
-    expect(prompt.split("\n").length).toBeLessThan(80);
-  });
+const PATH_RULE =
+  "the path from the repo root, without the a/ or b/ prefix of the diff and without a leading /";
 
-  it("tells the reviewer to give the file path without the diff prefix or a leading /", () => {
-    const def = loadBuiltinReviewers()[0] as ReviewerDefinition;
-    expect(def.systemPrompt).toContain(
-      "the path from the repo root, without the a/ or b/ prefix of the diff and without a leading /",
+function builtin(name: string): ReviewerDefinition {
+  const def = loadBuiltinReviewers().find((d) => d.frontmatter.name === name);
+  if (!def) throw new Error(`no built-in reviewer ${name}`);
+  return def;
+}
+
+// The text of one section of a body: from its "## " heading to the next.
+function section(body: string, heading: string): string {
+  const start = body.indexOf(`## ${heading}\n`);
+  if (start < 0) return "";
+  const rest = body.slice(start + heading.length + 4);
+  const next = rest.search(/^## /m);
+  return next < 0 ? rest : rest.slice(0, next);
+}
+
+describe("built-in reviewers (A4, R1)", () => {
+  it("loads the seven reviewers, in file name order", () => {
+    expect(loadBuiltinReviewers().map((d) => d.frontmatter.name)).toEqual(
+      BUILTINS.map((b) => b.name),
     );
+  });
+
+  for (const { name, minTier, passes } of BUILTINS) {
+    describe(name, () => {
+      it("has the frontmatter of spec R1", () => {
+        const def = builtin(name);
+        expect(def.frontmatter).toEqual({
+          name,
+          description: expect.any(String),
+          model: "opus",
+          effort: "low",
+          tools: ["Read", "Grep", "Glob"],
+          triggers: { paths: [], categories: [], min_tier: minTier },
+          passes,
+          threshold: 80,
+          trusted: false,
+        });
+        expect(def.frontmatter.description.trim()).not.toBe("");
+        expect(def.source).toBe("builtin");
+        expect(def.path).toMatch(new RegExp(`prompts[/\\\\]reviewers[/\\\\]${name}\\.md$`));
+        // The file omits the trusted key; the schema fills in false.
+        expect(readFileSync(def.path, "utf8")).not.toMatch(/^trusted:/m);
+      });
+
+      it("uses the body as the system prompt, with the prompt rules", () => {
+        const prompt = builtin(name).systemPrompt;
+        expect(prompt).not.toMatch(/^---/);
+        expect(prompt).toContain(UNTRUSTED_SYSTEM_LINE);
+        expect(prompt).toMatch(/every issue/i);
+        expect(prompt).toMatch(/confidence/i);
+        expect(prompt).toMatch(/severity/i);
+        expect(prompt).toMatch(/quote/i);
+        expect(prompt).toMatch(/subagent/i);
+        expect(prompt).toMatch(/lint or formatting/i);
+        expect(prompt.split("\n").length).toBeLessThan(80);
+      });
+
+      it("tells the reviewer to give the file path without the diff prefix or a leading /", () => {
+        expect(builtin(name).systemPrompt).toContain(PATH_RULE);
+      });
+
+      it("has a Do not flag section with content", () => {
+        const body = builtin(name).systemPrompt;
+        expect(body).toContain("\n## Do not flag\n");
+        expect(section(body, "Do not flag").trim()).not.toBe("");
+      });
+    });
+  }
+
+  it("lists in each Do not flag section what spec R1 gives", () => {
+    const doNotFlag = (name: string) => section(builtin(name).systemPrompt, "Do not flag");
+    expect(doNotFlag("diff-bugs")).toMatch(/security/i);
+    expect(doNotFlag("diff-bugs")).toMatch(/test/i);
+    expect(doNotFlag("diff-bugs")).toMatch(/docs/i);
+    expect(doNotFlag("diff-bugs")).toMatch(/convention/i);
+    expect(doNotFlag("conventions")).toMatch(/logic bug/i);
+    expect(doNotFlag("conventions")).toMatch(/missing test/i);
+    expect(doNotFlag("conventions")).toMatch(/security/i);
+    expect(doNotFlag("conventions")).toMatch(/linter or a formatter/i);
+    expect(doNotFlag("tests")).toMatch(/logic bug/i);
+    expect(doNotFlag("tests")).toMatch(/naming/i);
+    expect(doNotFlag("security")).toMatch(/no security effect/i);
+    expect(doNotFlag("history")).toMatch(/does not show/i);
+    expect(doNotFlag("description-drift")).toMatch(/code itself/i);
+    expect(doNotFlag("docs-and-comments")).toMatch(/no comment or doc/i);
+  });
+
+  it("names the evidence source of each reviewer", () => {
+    const opening = (name: string) => builtin(name).systemPrompt.split("\n## ")[0] ?? "";
+    expect(opening("conventions")).toMatch(/CLAUDE\.md/);
+    expect(opening("conventions")).toMatch(/rules\.md/);
+    expect(opening("conventions")).toMatch(/nearby code/i);
+    expect(opening("tests")).toMatch(/test/i);
+    expect(opening("security")).toContain(".pr-review/");
+    expect(opening("history")).toMatch(/history block/i);
+    expect(opening("description-drift")).toMatch(/description block/i);
+    expect(opening("docs-and-comments")).toMatch(/comments/i);
+    expect(opening("diff-bugs")).toMatch(/diff and the files of the head commit/);
+  });
+
+  it("tells the history reviewer that the block holds blame and log at the merge base, and never to quote it", () => {
+    const body = builtin("history").systemPrompt;
+    expect(body).toMatch(/blame/i);
+    expect(body).toMatch(/merge base/i);
+    expect(body).toMatch(/never quote the history block/i);
+    expect(body).toMatch(/head file or .*diff/i);
+  });
+
+  it("tells the description-drift reviewer what to report and where to quote from", () => {
+    const body = builtin("description-drift").systemPrompt;
+    expect(body).toMatch(/does not keep/i);
+    expect(body).toMatch(/does not mention/i);
+    expect(body).toMatch(/never quote the description block/i);
   });
 });
 
@@ -330,11 +424,42 @@ describe("selectReviewers", () => {
     expect(picked?.trigger).toContain("bug");
   });
 
-  it("selects the built-in diff-bugs in the fast and the full tier", () => {
+  it("skips a disabled reviewer, and the description reviewer when the description is empty", () => {
+    const picked = [def("diff-bugs"), def("description-drift"), def("tests")].map((d) => ({
+      def: d,
+      trigger: "t",
+    }));
+    const config = {
+      ...DEFAULT_REPO_CONFIG,
+      reviewers: { tests: { enabled: false } },
+    };
+    const empty = skipSelected(picked, { config, description: "  \n" });
+    expect(names(empty.run)).toEqual(["diff-bugs"]);
+    expect(empty.skipped).toEqual([
+      { name: "description-drift", reason: "no description" },
+      { name: "tests", reason: "disabled by config" },
+    ]);
+    const described = skipSelected(picked, { config, description: "Adds average." });
+    expect(names(described.run)).toEqual(["diff-bugs", "description-drift"]);
+    expect(described.skipped).toEqual([{ name: "tests", reason: "disabled by config" }]);
+    // A disabled description reviewer gives the config reason.
+    const off = skipSelected(picked, {
+      config: { ...DEFAULT_REPO_CONFIG, reviewers: { "description-drift": { enabled: false } } },
+      description: "",
+    });
+    expect(off.skipped).toEqual([{ name: "description-drift", reason: "disabled by config" }]);
+    // A reviewer that was not selected is in neither list.
+    expect(skipSelected([], { config, description: "" })).toEqual({ run: [], skipped: [] });
+  });
+
+  it("selects conventions and diff-bugs at the fast tier, and all seven at the full tier", () => {
     const builtins = loadBuiltinReviewers();
-    expect(names(selectReviewers(builtins, "fast", ["src/stats.ts"], []))).toEqual(["diff-bugs"]);
-    expect(names(selectReviewers(builtins, "full", ["src/stats.ts"], ["bug"]))).toEqual([
+    expect(names(selectReviewers(builtins, "fast", ["src/stats.ts"], []))).toEqual([
+      "conventions",
       "diff-bugs",
     ]);
+    expect(names(selectReviewers(builtins, "full", ["src/stats.ts"], []))).toEqual(
+      BUILTINS.map((b) => b.name),
+    );
   });
 });

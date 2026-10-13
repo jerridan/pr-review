@@ -82,6 +82,15 @@ function script(fx: Fixture) {
         ],
       });
     }
+    // Every reviewer returns the same finding, so the verified copies form
+    // one merge group, and merge keeps one of them.
+    if (req.role === "merge") {
+      return out({
+        merged: [
+          { member_index: 0, claim: "CLAIM-off-by-one", explanation: "e", severity: "blocking" },
+        ],
+      });
+    }
     return out({
       in_scope: true,
       claim_holds: true,
@@ -203,6 +212,8 @@ describe("pr-review run through the CLI", () => {
     expect(typeof doc.total_cost_usd).toBe("number");
     expect(doc.tier).toBe("full");
     expect(doc.verdict).toBe("would request changes");
+    // Seven reviewers report the same finding, and merge keeps one.
+    expect(doc.coverage.reviewers_ran).toHaveLength(7);
     expect(doc.findings).toHaveLength(1);
     expect(doc.findings[0]).toMatchObject({
       file: fx.file,

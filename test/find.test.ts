@@ -448,6 +448,88 @@ describe("runReviewers (A5)", () => {
     expect(seen).toContainEqual(second);
   });
 
+  it("dedupes by fingerprint: the same span and category with other words is one finding (R6)", async () => {
+    // The same line and category as finding(), but other words, another
+    // confidence and another severity. The fingerprint is the same.
+    const reworded = finding({
+      claim: "Off by one in the loop bound.",
+      explanation: "Use < in place of <=.",
+      confidence: "medium",
+      severity_estimate: "suggestion",
+    });
+    const otherCategory = finding({ category: "performance" });
+    let call = 0;
+    const fake = createFakeSdkClient(() => {
+      call += 1;
+      return call === 1 ? ok([finding()]) : ok([reworded, otherCategory]);
+    });
+    const seen: Finding[] = [];
+    const runs = await runReviewers(
+      fake,
+      OPTIONS,
+      [{ def: def("diff-bugs", 2), trigger: "t" }],
+      ctx(),
+      (f) => seen.push(f),
+    );
+    // The record keeps every pass's findings.
+    expect(runs.flatMap((r) => r.findings)).toHaveLength(3);
+    // One copy per fingerprint goes to verification.
+    expect(seen).toHaveLength(2);
+    expect(seen.filter((f) => f.category === "bug")).toHaveLength(1);
+    expect(seen).toContainEqual(otherCategory);
+  });
+
+  it("gives the same union whatever order the passes return in", async () => {
+    const a = finding();
+    const b = finding({ start_line: 14, end_line: 14, evidence: "return total / values.length;" });
+    const keys = async (delays: number[]) => {
+      let call = 0;
+      const fake = createFakeSdkClient(async () => {
+        const mine = call;
+        call += 1;
+        await new Promise((r) => setTimeout(r, delays[mine] ?? 0));
+        return mine === 0 ? ok([a]) : ok([b, { ...a, claim: "reworded" }]);
+      });
+      const seen: Finding[] = [];
+      await runReviewers(fake, OPTIONS, [{ def: def("d", 2), trigger: "t" }], ctx(), (f) =>
+        seen.push(f),
+      );
+      return seen.map((f) => `${f.start_line}:${f.category}`).sort();
+    };
+    expect(await keys([0, 20])).toEqual(await keys([20, 0]));
+    expect(await keys([0, 20])).toEqual(["11:bug", "14:bug"]);
+  });
+
+  it("runs the passes of the config, and one pass at the fast tier (R6)", async () => {
+    const config = {
+      ...DEFAULT_REPO_CONFIG,
+      reviewers: { "diff-bugs": { enabled: true, passes: 3 } },
+    };
+    const count = async (tier?: "fast" | "full") => {
+      const fake = createFakeSdkClient(() => ok([]));
+      const runs = await runReviewers(
+        fake,
+        OPTIONS,
+        [
+          { def: def("diff-bugs", 2), trigger: "t" },
+          { def: def("security", 2), trigger: "t" },
+        ],
+        { ...ctx(), config, ...(tier ? { tier } : {}) },
+        () => {},
+      );
+      return runs.map((r) => `${r.name}:${r.pass}`);
+    };
+    expect(await count("full")).toEqual([
+      "diff-bugs:1",
+      "diff-bugs:2",
+      "diff-bugs:3",
+      "security:1",
+      "security:2",
+    ]);
+    expect(await count()).toEqual(await count("full"));
+    expect(await count("fast")).toEqual(["diff-bugs:1", "security:1"]);
+  });
+
   it("marks the reviewer failed when the second pass fails", async () => {
     let call = 0;
     const fake = createFakeSdkClient(() => {

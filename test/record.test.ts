@@ -17,6 +17,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DEFAULT_REPO_CONFIG } from "../src/config/repo-config.js";
 import { formatJson } from "../src/output/json.js";
 import { recordFileName, writeRecord } from "../src/record/write.js";
+import { loadBuiltinReviewers } from "../src/reviewers/loader.js";
 import { runReview } from "../src/run.js";
 import type { Finding } from "../src/schemas/finding.js";
 import { RecordSchema, type RunRecord } from "../src/schemas/record.js";
@@ -85,6 +86,17 @@ function plantedFinding(fx: Fixture, overrides: Partial<Finding> = {}): Finding 
   };
 }
 
+// The seven built-in reviewers, in file name order.
+const SEVEN = [
+  "conventions",
+  "description-drift",
+  "diff-bugs",
+  "docs-and-comments",
+  "history",
+  "security",
+  "tests",
+];
+
 let fx: Fixture;
 let outRoot: string;
 let record: RunRecord;
@@ -110,14 +122,18 @@ beforeAll(async () => {
         raw: meta(0.02),
       };
     }
+    // Only diff-bugs reports findings. The other reviewers report none.
     if (req.role === "reviewer") {
       return {
         ok: true,
         output: {
-          findings: [
-            plantedFinding(fx),
-            plantedFinding(fx, { evidence: "this text is not in the file" }),
-          ],
+          findings:
+            req.reviewerName === "diff-bugs"
+              ? [
+                  plantedFinding(fx),
+                  plantedFinding(fx, { evidence: "this text is not in the file" }),
+                ]
+              : [],
         },
         raw: meta(0.5),
       };
@@ -193,9 +209,13 @@ describe("the record file (A9)", () => {
     );
     expect(record.identity.history).toEqual({ built: true, truncated: false });
     expect(record.identity.injected).toEqual([]);
-    // The reviewer got the body alone, with no rules block.
-    const reviewer = calls.find((c) => c.role === "reviewer");
-    expect(reviewer?.systemPrompt).not.toContain("CLAUDE.md");
+    // Each reviewer got its body alone, with no rules block.
+    const bodies = new Map(loadBuiltinReviewers().map((d) => [d.frontmatter.name, d.systemPrompt]));
+    const reviewers = calls.filter((c) => c.role === "reviewer");
+    expect(reviewers.length).toBeGreaterThan(0);
+    for (const call of reviewers) {
+      expect(call.systemPrompt).toBe(bodies.get(call.reviewerName ?? ""));
+    }
   });
 
   it("holds the default config, no loaded files and no custom reviewers", () => {
@@ -311,15 +331,17 @@ describe("the record parts", () => {
     expect(id.tier).toBe("full");
     expect(id.tier_reason).toMatch(/sensitive/i);
     expect(id.triage?.summary).toBe("s");
-    expect(id.selected_reviewers).toEqual([
-      {
-        name: "diff-bugs",
-        trigger: expect.stringContaining("min_tier fast"),
-        model: "claude-opus-5-5",
-        effort: "low",
-        tools_ignored: [],
-      },
-    ]);
+    expect(id.selected_reviewers.map((r) => r.name)).toEqual(SEVEN);
+    expect(id.selected_reviewers.find((r) => r.name === "diff-bugs")).toEqual({
+      name: "diff-bugs",
+      trigger: expect.stringContaining("min_tier fast"),
+      model: "claude-opus-5-5",
+      effort: "low",
+      tools_ignored: [],
+    });
+    expect(id.selected_reviewers.find((r) => r.name === "tests")?.trigger).toContain(
+      "min_tier full",
+    );
     expect(id.models).toEqual({
       triage: { model: "claude-sonnet-5-5", effort: "medium" },
       reviewer: { model: "claude-opus-5-5", effort: "low" },
@@ -331,13 +353,20 @@ describe("the record parts", () => {
   });
 
   it("holds the raw stage outputs, the drop and the failed escalation", () => {
-    expect(record.stages.reviewers).toHaveLength(1);
-    expect(record.stages.reviewers[0]?.dropped).toEqual([
-      {
-        finding: plantedFinding(fx, { evidence: "this text is not in the file" }),
-        reason: "bad-quote",
-      },
-    ]);
+    // diff-bugs and security run two passes; the other five run one.
+    expect(record.stages.reviewers).toHaveLength(9);
+    const diffBugs = record.stages.reviewers.filter((r) => r.name === "diff-bugs");
+    expect(diffBugs.map((r) => r.pass).sort()).toEqual([1, 2]);
+    for (const run of diffBugs) {
+      expect(run.findings).toEqual([plantedFinding(fx)]);
+      expect(run.dropped).toEqual([
+        {
+          finding: plantedFinding(fx, { evidence: "this text is not in the file" }),
+          reason: "bad-quote",
+        },
+      ]);
+    }
+    // Both passes give the same finding, so one copy is verified.
     expect(record.stages.verifications).toEqual([
       {
         finding: plantedFinding(fx),
@@ -355,7 +384,7 @@ describe("the record parts", () => {
     expect(record.posted.findings).toEqual([]);
     expect(record.posted.verdict).toBe("incomplete");
     expect(record.posted.coverage).toEqual({
-      reviewers_ran: ["diff-bugs"],
+      reviewers_ran: expect.arrayContaining(SEVEN),
       reviewers_failed: [],
       reviewers_skipped: [],
       findings_dropped_by_failed_verifier: 1,
@@ -364,10 +393,13 @@ describe("the record parts", () => {
 
   it("holds one cost entry per query, the total and every error", () => {
     expect(record.cost.queries).toHaveLength(calls.length);
-    expect(record.cost.queries.map((q) => q.role).sort()).toEqual(
-      ["reviewer", "triage", "verifier", "verifier-escalation"].sort(),
+    expect(new Set(record.cost.queries.map((q) => q.role))).toEqual(
+      new Set(["reviewer", "triage", "verifier", "verifier-escalation"]),
     );
-    const reviewer = record.cost.queries.find((q) => q.role === "reviewer");
+    expect(record.cost.queries.filter((q) => q.role === "reviewer")).toHaveLength(9);
+    const reviewer = record.cost.queries.find(
+      (q) => q.role === "reviewer" && q.reviewer === "diff-bugs",
+    );
     expect(reviewer).toMatchObject({
       reviewer: "diff-bugs",
       model: "claude-test",
@@ -381,7 +413,8 @@ describe("the record parts", () => {
       cost_usd: null,
       stop_reason: null,
     });
-    expect(record.cost.total_cost_usd).toBeCloseTo(0.62, 10);
+    // Triage 0.02, nine reviewer passes at 0.5 each, one verifier at 0.1.
+    expect(record.cost.total_cost_usd).toBeCloseTo(0.02 + 9 * 0.5 + 0.1, 10);
     // The failed escalation has no cost, so the total is a lower bound.
     expect(record.cost.queries_without_cost).toBe(1);
     expect(Object.keys(record.cost.stage_ms)).toEqual(

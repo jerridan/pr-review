@@ -4,13 +4,15 @@ import { diffSections } from "../gather/diff.js";
 import { CLAUDE_FILE, RULES_FILE, type RepoConfig } from "../config/repo-config.js";
 import type { GatherResult } from "../gather/index.js";
 import { loadPrompt, render, type PromptFile } from "../prompts/load.js";
-import { effectiveModel, type ReviewerDefinition } from "../reviewers/loader.js";
+import { fingerprint } from "../merge/fingerprint.js";
+import { effectiveModel, effectivePasses, type ReviewerDefinition } from "../reviewers/loader.js";
 import { FindingsOutputSchema, type Finding, type FindingsOutput } from "../schemas/finding.js";
 import type { QueryFailure } from "../schemas/record.js";
 import type { TriageBrief } from "../schemas/triage.js";
 import type { QueryMeta, SdkClient } from "../sdk/client.js";
 import type { RunOptions } from "../sdk/options.js";
 import type { Semaphore } from "../semaphore.js";
+import type { Tier } from "../triage/tier.js";
 import { wrapUntrusted } from "../untrusted.js";
 import {
   diffEvidenceText,
@@ -37,8 +39,13 @@ type FindContext = {
   brief: TriageBrief | null;
   cwd: string;
   semaphore: Semaphore;
-  /** The repo config. It sets the model and the effort of each reviewer. */
+  /** The repo config. It sets the model, the effort and the passes of each reviewer. */
   config: RepoConfig;
+  /**
+   * The tier of the run. At the fast tier every reviewer runs one pass.
+   * Absent means full: the passes of the config or the frontmatter.
+   */
+  tier?: Tier;
   /**
    * The base commit's CLAUDE.md and .pr-review/rules.md, for the rules
    * block of each reviewer's system prompt. Absent means neither file.
@@ -186,23 +193,6 @@ export function buildReviewerMessage(
   return render(texts.historyTemplate, blocks);
 }
 
-// A key that is the same for two findings with the same fields.
-function findingKey(f: Finding): string {
-  return JSON.stringify([
-    f.file,
-    f.start_line,
-    f.end_line,
-    f.category,
-    f.severity_estimate,
-    f.confidence,
-    f.claim,
-    f.evidence,
-    f.suggested_fix ?? null,
-    f.explanation,
-    f.needs_context,
-  ]);
-}
-
 function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
@@ -210,8 +200,9 @@ function messageOf(err: unknown): string {
 /**
  * Run every pass of every selected reviewer. All queries start at once,
  * and the semaphore bounds them. "onFinding" gets each checked finding as
- * its pass returns, so verification starts per finding. A finding that an
- * earlier pass of the same reviewer gave is not sent again.
+ * its pass returns, so verification starts per finding. A finding with the
+ * fingerprint of a finding that the same reviewer already gave is not sent
+ * again.
  */
 export async function runReviewers(
   client: SdkClient,
@@ -307,8 +298,11 @@ export async function runReviewers(
         findings.push(finding);
       }
     }
+    // The passes of a reviewer have the same inputs, so they often give
+    // the same finding. One copy per fingerprint goes to verification:
+    // the copy of the pass that returns first.
     for (const finding of findings) {
-      const key = findingKey(finding);
+      const key = fingerprint(finding, headFile(finding.file)?.raw ?? null);
       if (seen.has(key)) continue;
       seen.add(key);
       onFinding(finding, name);
@@ -326,7 +320,8 @@ export async function runReviewers(
   const tasks: Promise<ReviewerRun>[] = [];
   for (const { def } of selected) {
     const seen = new Set<string>();
-    for (let pass = 1; pass <= def.frontmatter.passes; pass++) {
+    const passes = effectivePasses(def, ctx.config, ctx.tier ?? "full");
+    for (let pass = 1; pass <= passes; pass++) {
       tasks.push(runPass(def, pass, seen));
     }
   }

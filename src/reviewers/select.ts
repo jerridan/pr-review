@@ -1,7 +1,12 @@
 // Select the reviewers for a run from their triggers.
 import { matchesAny } from "../config/globs.js";
+import type { RepoConfig } from "../config/repo-config.js";
+import type { SkippedReviewer } from "../schemas/record.js";
 import type { Tier } from "../triage/tier.js";
-import type { ReviewerDefinition } from "./loader.js";
+import { reviewerEntry, type ReviewerDefinition } from "./loader.js";
+
+/** The reviewer that needs a description. With no description, it does not run. */
+export const DESCRIPTION_REVIEWER = "description-drift";
 
 const TIER_RANK: Record<Tier, number> = { skip: 0, fast: 1, full: 2 };
 
@@ -49,4 +54,31 @@ export function selectReviewers(
     picked.push({ def, trigger: `min_tier ${minTier} <= ${tier}; ${pathPart}; ${categoryPart}` });
   }
   return picked;
+}
+
+/**
+ * Split the selected reviewers into the ones that run and the ones that
+ * are skipped. A reviewer that the config disables is skipped with the
+ * reason "disabled by config". The description reviewer is skipped with
+ * the reason "no description" when the description is empty. Only a
+ * selected reviewer can be skipped, so a reviewer that the tier or the
+ * triggers do not select is in neither list.
+ */
+export function skipSelected<T extends { def: ReviewerDefinition }>(
+  selected: T[],
+  context: { config: RepoConfig; description: string },
+): { run: T[]; skipped: SkippedReviewer[] } {
+  const run: T[] = [];
+  const skipped: SkippedReviewer[] = [];
+  for (const s of selected) {
+    const name = s.def.frontmatter.name;
+    if (reviewerEntry(context.config, name)?.enabled === false) {
+      skipped.push({ name, reason: "disabled by config" });
+    } else if (name === DESCRIPTION_REVIEWER && context.description.trim() === "") {
+      skipped.push({ name, reason: "no description" });
+    } else {
+      run.push(s);
+    }
+  }
+  return { run, skipped };
 }

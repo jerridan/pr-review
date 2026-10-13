@@ -129,11 +129,15 @@ const PASS: VerifierResult = {
   severity: "blocking",
 };
 
+// Only diff-bugs reports the planted finding. The other built-in
+// reviewers report nothing, so one finding goes through the run.
 function script(fx: Fixture) {
   return (req: QueryRequest): QueryOutcome<unknown> => {
     const out = (output: unknown): QueryOutcome<unknown> => ({ ok: true, output, raw: META });
     if (req.role === "triage") return out(BRIEF);
-    if (req.role === "reviewer") return out({ findings: [plantedFinding(fx)] });
+    if (req.role === "reviewer") {
+      return out({ findings: req.reviewerName === "diff-bugs" ? [plantedFinding(fx)] : [] });
+    }
     if (req.role === "verifier" || req.role === "verifier-escalation") return out(PASS);
     throw new Error(`unexpected role ${req.role}`);
   };
@@ -572,7 +576,7 @@ describe("a verifier prompt that does not load", () => {
     mocks.reviewerPasses = 2;
     let reviewerCalls = 0;
     const fake = createFakeSdkClient(async (req) => {
-      if (req.role === "reviewer") {
+      if (req.role === "reviewer" && req.reviewerName === "diff-bugs") {
         reviewerCalls += 1;
         if (reviewerCalls === 1) {
           return { ok: true, output: { findings: [plantedFinding(fx)] }, raw: META };
@@ -616,7 +620,7 @@ describe("a verifier prompt that does not load", () => {
 describe("a finding path with a ./ prefix", () => {
   it("is normalized once, so the verifier gets the diff of the file and the record the clean path", async () => {
     const fake = createFakeSdkClient((req) =>
-      req.role === "reviewer"
+      req.role === "reviewer" && req.reviewerName === "diff-bugs"
         ? {
             ok: true,
             output: { findings: [{ ...plantedFinding(fx), file: `./${fx.file}` }] },
@@ -634,7 +638,10 @@ describe("a finding path with a ./ prefix", () => {
     });
     const verifier = fake.calls.find((c) => c.role === "verifier");
     expect(verifier?.userMessage).toContain(`+++ b/${fx.file}`);
-    expect(record.stages.reviewers[0]?.findings.map((f) => f.file)).toEqual([fx.file]);
+    const diffBugs = record.stages.reviewers.filter((r) => r.name === "diff-bugs");
+    expect(diffBugs.length).toBeGreaterThan(0);
+    for (const run of diffBugs) expect(run.findings.map((f) => f.file)).toEqual([fx.file]);
+    expect(record.stages.verifications).toHaveLength(1);
     expect(record.stages.verifications[0]?.finding.file).toBe(fx.file);
     expect(record.posted.findings.map((f) => f.file)).toEqual([fx.file]);
   });
@@ -704,9 +711,15 @@ describe("the repo config in a run (R3)", () => {
 
     const byRole = (role: string) => fake.calls.filter((c) => c.role === role);
     expect(byRole("triage").map((c) => c.overrides)).toEqual([{ model: "claude-haiku-5-5" }]);
-    expect(byRole("reviewer").map((c) => c.overrides)).toEqual([
-      { model: "claude-sonnet-5-5", effort: "low" },
-    ]);
+    // Every built-in reviewer has effort low in its frontmatter, and
+    // models.reviewer sets the model of each one.
+    expect(byRole("reviewer").length).toBeGreaterThan(1);
+    for (const call of byRole("reviewer")) {
+      expect(call.overrides, call.reviewerName).toEqual({
+        model: "claude-sonnet-5-5",
+        effort: "low",
+      });
+    }
     expect(byRole("verifier").map((c) => c.overrides)).toEqual([{ effort: "max" }]);
     // The score 92 is outside the band 10 to 20, so no escalation runs, and
     // it is below the reviewer threshold 95, so the finding fails.
@@ -723,9 +736,10 @@ describe("the repo config in a run (R3)", () => {
       merge: { model: "claude-sonnet-5-5", effort: "low" },
       smoke: { model: "claude-sonnet-5-5", effort: "low" },
     });
-    expect(record.identity.selected_reviewers).toEqual([
-      expect.objectContaining({ name: "diff-bugs", model: "claude-sonnet-5-5", effort: "low" }),
-    ]);
+    expect(record.identity.selected_reviewers.map((r) => r.name)).toContain("diff-bugs");
+    for (const entry of record.identity.selected_reviewers) {
+      expect(entry, entry.name).toMatchObject({ model: "claude-sonnet-5-5", effort: "low" });
+    }
     expect(record.identity.excluded_files).toContainEqual({
       path: ".github/workflows/ci.yml",
       reason: "generated",
@@ -802,6 +816,7 @@ describe("the repo config in a run (R3)", () => {
     expect(custom[0]?.systemPrompt).toContain("CUSTOM-BODY");
     expect(custom[0]?.overrides).toEqual({ model: "claude-haiku-5-5", effort: "medium" });
     expect(record.identity.selected_reviewers.map((r) => r.name).sort()).toEqual([
+      "conventions",
       "diff-bugs",
       "naming",
     ]);
@@ -878,5 +893,168 @@ describe("the repo config in a run (R3)", () => {
     expect(
       fake.calls.filter((c) => c.role !== "reviewer").every((c) => c.overrides === undefined),
     ).toBe(true);
+  }, 30_000);
+});
+
+describe("the seven built-in reviewers in a run (R1, R6)", () => {
+  const SEVEN = [
+    "conventions",
+    "description-drift",
+    "diff-bugs",
+    "docs-and-comments",
+    "history",
+    "security",
+    "tests",
+  ];
+  const fixtures: Fixture[] = [];
+  afterAll(() => {
+    for (const f of fixtures) rmSync(f.repo, { recursive: true, force: true });
+  });
+
+  // The run script, with a merge answer: every reviewer returns the same
+  // finding, so the verified findings form one merge group.
+  function scriptWithMerge(f: Fixture) {
+    const base = script(f);
+    return (req: QueryRequest): QueryOutcome<unknown> => {
+      if (req.role === "reviewer") {
+        return { ok: true, output: { findings: [plantedFinding(f)] }, raw: META };
+      }
+      if (req.role !== "merge") return base(req);
+      return {
+        ok: true,
+        output: {
+          merged: [
+            {
+              member_index: 0,
+              claim: "The loop reads one item past the end.",
+              explanation: "The bound must be i < values.length.",
+              severity: "blocking",
+            },
+          ],
+        },
+        raw: META,
+      };
+    };
+  }
+
+  async function fixtureWith(configYaml: string | null): Promise<Fixture> {
+    if (configYaml === null) {
+      const made = await makeFixture();
+      fixtures.push(made);
+      return made;
+    }
+    const source = mkdtempSync(join(tmpdir(), "pr-review-run-seven-"));
+    try {
+      mkdirSync(join(source, "dir"));
+      writeFileSync(join(source, "dir", "config.yaml"), configYaml);
+      const made = await makeFixture("--pr-review-dir", join(source, "dir"));
+      fixtures.push(made);
+      return made;
+    } finally {
+      rmSync(source, { recursive: true, force: true });
+    }
+  }
+
+  async function review(f: Fixture, out: string, tier?: "full" | "fast") {
+    const fake = createFakeSdkClient(scriptWithMerge(f));
+    const { record } = await runReview({
+      repo: f.repo,
+      base: f.base,
+      head: f.head,
+      ...(tier ? { tierOverride: tier } : {}),
+      outDir: join(outRoot, out),
+      allowApiKey: false,
+      client: fake,
+    });
+    return { record, fake };
+  }
+
+  const passesOf = (record: RunRecord, name: string) =>
+    record.stages.reviewers.filter((r) => r.name === name).map((r) => r.pass);
+
+  it("selects all seven at tier full, with two passes for diff-bugs and security", async () => {
+    const f = await fixtureWith(null);
+    const { record } = await review(f, "seven-full", "full");
+    expect(record.identity.selected_reviewers.map((r) => r.name).sort()).toEqual(SEVEN);
+    expect([...record.posted.coverage.reviewers_ran].sort()).toEqual(SEVEN);
+    expect(record.posted.coverage.reviewers_skipped).toEqual([]);
+    expect(passesOf(record, "diff-bugs").sort()).toEqual([1, 2]);
+    expect(passesOf(record, "security").sort()).toEqual([1, 2]);
+    expect(passesOf(record, "tests")).toEqual([1]);
+    expect(record.stages.reviewers).toHaveLength(9);
+    // One verification per reviewer: the passes of one reviewer give one.
+    expect(record.stages.verifications).toHaveLength(7);
+    expect(record.posted.findings).toHaveLength(1);
+  }, 30_000);
+
+  it("selects six and lists description-drift as skipped when the description is empty", async () => {
+    const f = await fixtureWith(null);
+    // A head whose only commit after the merge base has an empty message.
+    const env = {
+      ...process.env,
+      GIT_CONFIG_NOSYSTEM: "1",
+      GIT_CONFIG_GLOBAL: "/dev/null",
+      GIT_AUTHOR_NAME: "Fixture",
+      GIT_AUTHOR_EMAIL: "fixture@example.invalid",
+      GIT_COMMITTER_NAME: "Fixture",
+      GIT_COMMITTER_EMAIL: "fixture@example.invalid",
+    };
+    const git = async (...args: string[]) =>
+      (await run("git", ["-C", f.repo, ...args], { env })).stdout.trim();
+    const mergeBase = await git("merge-base", f.base, f.head);
+    await git("checkout", "--quiet", "-b", "no-description", mergeBase);
+    writeFileSync(
+      join(f.repo, "src/stats.ts"),
+      `${readFileSync(join(f.repo, "src/stats.ts"), "utf8")}\nexport const answer = 42;\n`,
+    );
+    await git("commit", "--quiet", "--no-gpg-sign", "--allow-empty-message", "-am", "");
+    const head = await git("rev-parse", "HEAD");
+
+    const { record } = await review({ ...f, head }, "seven-no-description", "full");
+    expect(record.identity.description).toBe("");
+    expect(record.identity.selected_reviewers.map((r) => r.name).sort()).toEqual(
+      SEVEN.filter((n) => n !== "description-drift"),
+    );
+    expect(record.posted.coverage.reviewers_skipped).toEqual([
+      { name: "description-drift", reason: "no description" },
+    ]);
+    expect(record.posted.coverage.reviewers_ran).not.toContain("description-drift");
+  }, 30_000);
+
+  it("does not list description-drift as skipped at the fast tier, which does not select it", async () => {
+    const f = await fixtureWith(null);
+    const { record } = await review(f, "seven-fast", "fast");
+    expect(record.identity.selected_reviewers.map((r) => r.name)).toEqual([
+      "conventions",
+      "diff-bugs",
+    ]);
+    expect(record.posted.coverage.reviewers_skipped).toEqual([]);
+  }, 30_000);
+
+  it("verifies one copy of a finding that two passes return, and records both passes", async () => {
+    const others = SEVEN.filter((n) => n !== "diff-bugs")
+      .map((n) => `  ${n}:\n    enabled: false\n`)
+      .join("");
+    const f = await fixtureWith(`reviewers:\n${others}`);
+    const { record, fake } = await review(f, "seven-dedupe", "full");
+    expect(record.stages.reviewers.map((r) => [r.name, r.pass, r.findings.length])).toEqual([
+      ["diff-bugs", 1, 1],
+      ["diff-bugs", 2, 1],
+    ]);
+    expect(record.stages.verifications).toHaveLength(1);
+    expect(fake.calls.filter((c) => c.role === "verifier")).toHaveLength(1);
+    expect(record.posted.findings).toHaveLength(1);
+  }, 30_000);
+
+  it("runs one pass per reviewer at the fast tier, even when the config sets more", async () => {
+    const f = await fixtureWith(
+      "reviewers:\n  diff-bugs:\n    passes: 3\n  conventions:\n    passes: 2\n",
+    );
+    const fast = await review(f, "seven-passes-fast", "fast");
+    expect(passesOf(fast.record, "diff-bugs")).toEqual([1]);
+    expect(passesOf(fast.record, "conventions")).toEqual([1]);
+    const full = await review(f, "seven-passes-full", "full");
+    expect(passesOf(full.record, "diff-bugs").sort()).toEqual([1, 2, 3]);
+    expect(passesOf(full.record, "conventions").sort()).toEqual([1, 2]);
   }, 30_000);
 });
