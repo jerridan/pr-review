@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -507,5 +507,113 @@ describe("effective reviewer values (R3, R6)", () => {
     expect(effectivePasses(def, config, "full")).toBe(4);
     expect(effectivePasses(def, config, "fast")).toBe(1);
     expect(effectivePasses(def, DEFAULT_REPO_CONFIG, "fast")).toBe(1);
+  });
+});
+
+describe("loadRepoConfig: suppressions name a known reviewer", () => {
+  it("fails when suppressions[i].reviewer is not a built-in or custom reviewer", async () => {
+    const err = await loadError({
+      ".pr-review/config.yaml":
+        "suppressions:\n  - path: a.ts\n    reason: ok\n  - reviewer: no-such-reviewer\n    reason: typo\n",
+    });
+    expect(err.file).toBe(".pr-review/config.yaml");
+    expect(err.field).toBe("suppressions.1.reviewer");
+    expect(err.message).toContain("suppressions.1.reviewer");
+  });
+
+  it("accepts a built-in reviewer name and a custom reviewer name", async () => {
+    const { repo, sha } = await repoWith({
+      ".pr-review/reviewers/migration-safety.md": CUSTOM_REVIEWER,
+      ".pr-review/config.yaml":
+        "suppressions:\n  - reviewer: diff-bugs\n    reason: a\n  - reviewer: migration-safety\n    reason: b\n",
+    });
+    const { config } = await loadRepoConfig(repo, sha);
+    expect(config.suppressions.map((s) => s.reviewer)).toEqual(["diff-bugs", "migration-safety"]);
+  });
+});
+
+describe("loadRepoConfig: a config path that is not a regular file", () => {
+  /** Make a repo whose one commit holds the files and the symlinks (path to target). */
+  async function repoWithLinks(
+    files: Record<string, string>,
+    links: Record<string, string>,
+  ): Promise<{ repo: string; sha: string }> {
+    const repo = mkdtempSync(join(tmpdir(), "pr-review-config-"));
+    roots.push(repo);
+    await git(repo, "init", "--quiet", "--initial-branch=main");
+    writeFiles(repo, { "README.md": "# r\n", ...files });
+    for (const [path, target] of Object.entries(links)) {
+      mkdirSync(dirname(join(repo, path)), { recursive: true });
+      symlinkSync(target, join(repo, path));
+    }
+    await git(repo, "add", "-A");
+    await git(repo, "commit", "--quiet", "--no-gpg-sign", "-m", "one");
+    return { repo, sha: await git(repo, "rev-parse", "HEAD") };
+  }
+
+  async function errorOf(repo: string, sha: string): Promise<RepoConfigError> {
+    try {
+      await loadRepoConfig(repo, sha);
+    } catch (err) {
+      if (err instanceof RepoConfigError) return err;
+      throw err;
+    }
+    throw new Error("Expected the config to fail to load.");
+  }
+
+  it("fails on a symlink at .pr-review/config.yaml and names the mode", async () => {
+    const { repo, sha } = await repoWithLinks(
+      { "elsewhere.yaml": "caps: {}\n" },
+      {
+        ".pr-review/config.yaml": "../elsewhere.yaml",
+      },
+    );
+    const err = await errorOf(repo, sha);
+    expect(err.file).toBe(".pr-review/config.yaml");
+    expect(err.field).toBe("(root)");
+    expect(err.message).toContain("120000");
+  });
+
+  it("fails on a symlink at .pr-review/rules.md", async () => {
+    const { repo, sha } = await repoWithLinks(
+      { "elsewhere.md": "rules\n" },
+      {
+        ".pr-review/rules.md": "../elsewhere.md",
+      },
+    );
+    const err = await errorOf(repo, sha);
+    expect(err.file).toBe(".pr-review/rules.md");
+    expect(err.field).toBe("(root)");
+    expect(err.message).toContain("120000");
+  });
+
+  it("fails on a symlink under .pr-review/reviewers/", async () => {
+    const { repo, sha } = await repoWithLinks(
+      { "elsewhere.md": CUSTOM_REVIEWER },
+      {
+        ".pr-review/reviewers/linked.md": "../../elsewhere.md",
+      },
+    );
+    const err = await errorOf(repo, sha);
+    expect(err.file).toBe(".pr-review/reviewers/linked.md");
+    expect(err.field).toBe("(root)");
+    expect(err.message).toContain("120000");
+  });
+
+  it("fails on a submodule entry at .pr-review/config.yaml", async () => {
+    const { repo } = await repoWith({});
+    const oid = "1".repeat(40);
+    await git(repo, "update-index", "--add", "--cacheinfo", `160000,${oid},.pr-review/config.yaml`);
+    await git(repo, "commit", "--quiet", "--no-gpg-sign", "-m", "two");
+    const err = await errorOf(repo, await git(repo, "rev-parse", "HEAD"));
+    expect(err.file).toBe(".pr-review/config.yaml");
+    expect(err.field).toBe("(root)");
+    expect(err.message).toContain("160000");
+  });
+
+  it("still gives the defaults when the paths are absent", async () => {
+    const { repo, sha } = await repoWithLinks({}, {});
+    const loaded = await loadRepoConfig(repo, sha);
+    expect(loaded.config).toEqual(DEFAULT_REPO_CONFIG);
   });
 });

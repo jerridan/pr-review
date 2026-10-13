@@ -78,6 +78,23 @@ export async function readBlobBytesAt(
 }
 
 /**
+ * Give the git mode of the entry at "path" in "commit" (for example
+ * "100644", "120000" for a symlink or "160000" for a submodule), or null
+ * when the commit has no entry at that path. The loader uses it to tell an
+ * absent file from an entry that is not a regular file.
+ */
+export async function readEntryModeAt(
+  repo: string,
+  commit: string,
+  path: string,
+): Promise<string | null> {
+  const entries = parseTree(
+    await gitBytes(repo, ["ls-tree", "-z", "--full-tree", `${commit}^{commit}`, "--", path]),
+  );
+  return entries.find((e) => e.path === path)?.mode ?? null;
+}
+
+/**
  * Give the text of the file at "path" in "commit", or null when the
  * commit has no regular file at that path.
  */
@@ -91,8 +108,10 @@ export async function readBlobAt(
 }
 
 /**
- * List the paths of the regular files directly in the directory "dir" of
- * "commit", in git's order. Give an empty list when the directory is absent.
+ * List the paths of the entries that are not directories, directly in the
+ * directory "dir" of "commit", in git's order. A regular file, a symlink
+ * and a submodule all count, so the caller can reject the last two. Give an
+ * empty list when the directory is absent.
  */
 export async function listFilesAt(repo: string, commit: string, dir: string): Promise<string[]> {
   const prefix = dir.endsWith("/") ? dir : `${dir}/`;
@@ -101,7 +120,10 @@ export async function listFilesAt(repo: string, commit: string, dir: string): Pr
   );
   return entries
     .filter(
-      (e) => isFile(e) && e.path.startsWith(prefix) && !e.path.slice(prefix.length).includes("/"),
+      (e) =>
+        e.type !== "tree" &&
+        e.path.startsWith(prefix) &&
+        !e.path.slice(prefix.length).includes("/"),
     )
     .map((e) => e.path);
 }

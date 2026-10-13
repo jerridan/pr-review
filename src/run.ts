@@ -289,7 +289,11 @@ export async function runReview(
   const semaphore = createSemaphore(config.concurrency);
 
   const gathered: GatherResult = await timed("gather", () =>
-    gather(repo, baseSha, input.head, withRepoGlobs(config)),
+    gather(repo, baseSha, input.head, {
+      ...withRepoGlobs(config),
+      // The history block exists only for the history reviewer.
+      history: config.reviewers.history?.enabled !== false,
+    }),
   );
 
   // The head checkout lives for the whole review and is the cwd of every

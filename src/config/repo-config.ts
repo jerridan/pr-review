@@ -4,7 +4,7 @@
 import { createHash } from "node:crypto";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
-import { listFilesAt, readBlobBytesAt } from "../gather/blob.js";
+import { listFilesAt, readBlobBytesAt, readEntryModeAt } from "../gather/blob.js";
 import {
   loadBuiltinReviewers,
   parseReviewer,
@@ -238,6 +238,17 @@ export function parseRepoConfig(
       );
     }
   }
+  // A suppression for a reviewer that does not exist would never match.
+  // It is most likely a typo, so reject it.
+  for (const [i, item] of result.data.suppressions.entries()) {
+    if (item.reviewer !== undefined && !known.has(item.reviewer)) {
+      throw new RepoConfigError(
+        file,
+        fieldOf(["suppressions", i, "reviewer"]),
+        `"${item.reviewer}" is not a built-in or a custom reviewer`,
+      );
+    }
+  }
   return result.data;
 }
 
@@ -273,6 +284,27 @@ function loadCustomReviewer(path: string, bytes: Buffer): ReviewerDefinition {
   }
 }
 
+// A symlink and a submodule are not files that the run reads.
+const NON_REGULAR_MODES = new Set(["120000", "160000"]);
+
+/**
+ * Read a config file at the commit. Give null when it is absent. Throw
+ * RepoConfigError when the entry is a symlink or a submodule, so a config
+ * file that git does not store as a file never passes as an absent one.
+ */
+async function readConfigFile(repo: string, commit: string, path: string): Promise<Buffer | null> {
+  const mode = await readEntryModeAt(repo, commit, path);
+  if (mode !== null && NON_REGULAR_MODES.has(mode)) {
+    const kind = mode === "120000" ? "a symlink" : "a submodule";
+    throw new RepoConfigError(
+      path,
+      ROOT_FIELD,
+      `is ${kind} (mode ${mode}) at the base commit, not a regular file`,
+    );
+  }
+  return readBlobBytesAt(repo, commit, path);
+}
+
 /**
  * Load the repo config from the git objects of "commit": config.yaml,
  * rules.md and reviewers/*.md under .pr-review/, and the root CLAUDE.md.
@@ -290,7 +322,7 @@ export async function loadRepoConfig(repo: string, commit: string): Promise<Load
     .filter((path) => path.endsWith(".md"))
     .sort(byPathBytes);
   for (const path of reviewerFiles) {
-    const bytes = await readBlobBytesAt(repo, commit, path);
+    const bytes = await readConfigFile(repo, commit, path);
     if (bytes === null) continue;
     const def = loadCustomReviewer(path, bytes);
     const name = def.frontmatter.name;
@@ -307,7 +339,7 @@ export async function loadRepoConfig(repo: string, commit: string): Promise<Load
   }
 
   let config = DEFAULT_REPO_CONFIG;
-  const configBytes = await readBlobBytesAt(repo, commit, CONFIG_FILE);
+  const configBytes = await readConfigFile(repo, commit, CONFIG_FILE);
   if (configBytes !== null) {
     config = parseRepoConfig(configBytes.toString("utf8"), CONFIG_FILE, [
       ...builtinNames,
@@ -316,7 +348,7 @@ export async function loadRepoConfig(repo: string, commit: string): Promise<Load
     loaded.set(CONFIG_FILE, configBytes);
   }
 
-  const rulesBytes = await readBlobBytesAt(repo, commit, RULES_FILE);
+  const rulesBytes = await readConfigFile(repo, commit, RULES_FILE);
   if (rulesBytes !== null) loaded.set(RULES_FILE, rulesBytes);
 
   // CLAUDE.md is injected into the prompts, but it is not part of the hash.

@@ -45,13 +45,16 @@ const DIFF_OPTIONS = [
 
 /**
  * Gather the diff of base...head. "globs" are the sensitive and generated
- * globs: the defaults with the repo config's globs added.
+ * globs: the defaults with the repo config's globs added. "globs.history"
+ * is true by default. When it is false, gather builds no history block.
+ * A git failure in the history block gives a null history. It does not
+ * stop the run, because the history is only extra context.
  */
 export async function gather(
   repo: string,
   base: string,
   head: string,
-  globs: { sensitive: readonly string[]; generated: readonly string[] },
+  globs: { sensitive: readonly string[]; generated: readonly string[]; history?: boolean },
 ): Promise<GatherResult> {
   const baseSha = await resolveCommit(repo, base);
   const headSha = await resolveCommit(repo, head);
@@ -67,6 +70,7 @@ export async function gather(
   ]);
   const entries = parseNameStatus(nameStatus);
   const result = applyExclusions(entries, patch, globs);
+  const wantHistory = globs.history !== false;
   const mergeBase = (
     await runGit(repo, ["merge-base", "--end-of-options", baseSha, headSha])
   ).trim();
@@ -86,8 +90,21 @@ export async function gather(
     ...result,
     mergeBase,
     description: await describeChange(repo, baseSha, headSha),
-    history: await gatherHistory(repo, mergeBase, hunks),
+    history: wantHistory ? await tryGatherHistory(repo, mergeBase, hunks) : null,
   };
+}
+
+// The history block is extra context. A git failure gives no block.
+async function tryGatherHistory(
+  repo: string,
+  mergeBase: string,
+  hunks: Parameters<typeof gatherHistory>[2],
+): Promise<GatherResult["history"]> {
+  try {
+    return await gatherHistory(repo, mergeBase, hunks);
+  } catch {
+    return null;
+  }
 }
 
 /**

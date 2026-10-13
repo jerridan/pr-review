@@ -4,13 +4,29 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_GLOBS, withRepoGlobs } from "../src/config/globs.js";
 import { countHunks, diffSections, filterDiff, parseNameStatus } from "../src/gather/diff.js";
 import { applyExclusions } from "../src/gather/exclusions.js";
+import type * as History from "../src/gather/history.js";
 import { gatherHistory, HISTORY_CAP_BYTES, oldSideRanges } from "../src/gather/history.js";
 import { gather, type GatherResult } from "../src/gather/index.js";
 import { withHeadWorktree } from "../src/gather/worktree.js";
+
+// A switch for the history mock below. It is off unless a test sets it.
+const mocks = vi.hoisted(() => ({ failHistory: false, historyCalls: 0 }));
+
+vi.mock("../src/gather/history.js", async (importOriginal) => {
+  const original = await importOriginal<typeof History>();
+  return {
+    ...original,
+    gatherHistory: (...args: Parameters<typeof original.gatherHistory>) => {
+      mocks.historyCalls += 1;
+      if (mocks.failHistory) return Promise.reject(new Error("git blame failed"));
+      return original.gatherHistory(...args);
+    },
+  };
+});
 
 const run = promisify(execFile);
 const SCRIPT = fileURLToPath(new URL("../scripts/make-fixture.sh", import.meta.url));
@@ -348,6 +364,45 @@ describe("gather on the fixture repo (A2)", () => {
 
   it("gives no history for a file that the merge base does not have", () => {
     expect(result.history?.text ?? "").not.toContain("ci.yml");
+  });
+
+  describe("the history block", () => {
+    beforeEach(() => {
+      mocks.historyCalls = 0;
+    });
+
+    afterEach(() => {
+      mocks.failHistory = false;
+    });
+
+    it("builds the history block when the history flag is true or absent", async () => {
+      const on = await gather(fixture.repo, fixture.base, fixture.head, {
+        ...DEFAULT_GLOBS,
+        history: true,
+      });
+      expect(on.history).not.toBeNull();
+      expect(mocks.historyCalls).toBe(1);
+    });
+
+    it("skips the history block when the history flag is false", async () => {
+      const off = await gather(fixture.repo, fixture.base, fixture.head, {
+        ...DEFAULT_GLOBS,
+        history: false,
+      });
+      expect(off.history).toBeNull();
+      expect(mocks.historyCalls).toBe(0);
+      expect(off.changedFiles).toEqual(result.changedFiles);
+      expect(off.description).toBe(result.description);
+    });
+
+    it("gives null history, and does not stop, when gatherHistory fails", async () => {
+      mocks.failHistory = true;
+      const out = await gather(fixture.repo, fixture.base, fixture.head, DEFAULT_GLOBS);
+      expect(mocks.historyCalls).toBe(1);
+      expect(out.history).toBeNull();
+      expect(out.diff).toBe(result.diff);
+      expect(out.description).toBe(result.description);
+    });
   });
 
   it("throws on a SHA that does not exist", async () => {

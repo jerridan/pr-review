@@ -7,14 +7,16 @@
 #
 # The script builds the fixture repo twice. Each fixture holds a
 # .pr-review/config.yaml on its base commit. The first sets
-# reviewers.diff-bugs.passes to 1. The second sets it to 2. For each arm
+# reviewers.diff-bugs.passes to 1. The second sets it to 2. Both also set
+# enabled to false for the six other built-in reviewers. So every posted
+# finding comes from diff-bugs. For each arm
 # the script runs "pr-review run --base <sha> --head <sha> --format json"
 # <runs> times inside the fixture, and then prints one line:
 #
 #   passes=<n>: runs=<ok> failed=<bad> covered=<k> mean_cost_usd=<c> mean_findings=<f>
 #
 # covered is the number of runs whose posted findings cover the planted
-# line. The means are over the runs that finished. A run that exits with
+# line. Only diff-bugs runs, so covered measures diff-bugs alone. The means are over the runs that finished. A run that exits with
 # an error counts as failed and is left out of the counts and the means.
 set -euo pipefail
 
@@ -50,12 +52,20 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# The built-in reviewers other than diff-bugs. The config turns them off.
+other_reviewers=(conventions tests security history description-drift docs-and-comments)
+
 for passes in 1 2; do
   # The config goes to the base commit of the fixture.
   config_dir="$work/config-$passes"
   out_dir="$work/out-$passes"
   mkdir -p "$config_dir" "$out_dir"
-  printf 'reviewers:\n  diff-bugs:\n    passes: %s\n' "$passes" > "$config_dir/config.yaml"
+  {
+    printf 'reviewers:\n  diff-bugs:\n    passes: %s\n' "$passes"
+    for other in "${other_reviewers[@]}"; do
+      printf '  %s:\n    enabled: false\n' "$other"
+    done
+  } > "$config_dir/config.yaml"
 
   fixture_output="$(bash "$root/scripts/make-fixture.sh" --pr-review-dir "$config_dir")"
   value() { printf '%s\n' "$fixture_output" | sed -n "s/^$1=//p"; }

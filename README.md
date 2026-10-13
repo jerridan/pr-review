@@ -81,7 +81,7 @@ The verdict is one of `skipped`, `incomplete`, `would request changes` and `woul
 
 ## The `.pr-review/` directory
 
-A target repo shapes the review with a `.pr-review/` directory. The run reads the directory from the base commit. It reads the git objects, not a working tree. A change to `.pr-review/` in the PR has no effect on the review of that PR.
+A target repo shapes the review with a `.pr-review/` directory. The run reads the directory from the base commit. It reads the git objects, not a working tree. A change to `.pr-review/` in the PR has no effect on the review of that PR. Each of `config.yaml`, `rules.md` and the reviewer files must be a regular file at the base commit. A symlink or a submodule there stops the run with a config error.
 
 The directory holds three kinds of file. All of them are optional.
 
@@ -134,7 +134,7 @@ Notes on the keys:
 
 ### Suppressions
 
-A suppression removes a verified finding before the merge groups form. Each item has `reviewer`, `category`, `path` and `reason`. The item needs `reason` and at least one of the other three keys. A finding matches an item when it matches every key that the item gives.
+A suppression removes a verified finding before the merge groups form. Each item has `reviewer`, `category`, `path` and `reason`. The item needs `reason` and at least one of the other three keys. A finding matches an item when it matches every key that the item gives. The `reviewer` key must name a built-in or a custom reviewer. Any other name stops the run with a config error.
 
 | Key | Matches |
 |-----|---------|
@@ -225,7 +225,7 @@ The JSON output holds `reviewers_skipped`, `reviewers_without_bash` and `sensiti
 
 ## Measure the passes
 
-`scripts/measure-passes.sh` measures the recall of `diff-bugs` with one pass against two passes. It builds the fixture repo twice. The base commit of the first fixture sets `reviewers.diff-bugs.passes` to 1. The base commit of the second sets it to 2. For each arm, the script runs `pr-review run --format json` the given number of times, with the `pr-review` command on your PATH.
+`scripts/measure-passes.sh` measures the recall of `diff-bugs` with one pass against two passes. It builds the fixture repo twice. The base commit of the first fixture sets `reviewers.diff-bugs.passes` to 1. The base commit of the second sets it to 2. Both configs also set `enabled: false` for the six other built-in reviewers: `conventions`, `tests`, `security`, `history`, `description-drift` and `docs-and-comments`. Only `diff-bugs` runs. Every posted finding comes from `diff-bugs`. So `covered` measures `diff-bugs` alone. For each arm, the script runs `pr-review run --format json` the given number of times, with the `pr-review` command on your PATH.
 
 ```bash
 scripts/measure-passes.sh 5

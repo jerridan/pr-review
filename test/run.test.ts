@@ -17,6 +17,7 @@ import { CommanderError } from "commander";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_REPO_CONFIG } from "../src/config/repo-config.js";
 import { createProgram } from "../src/cli.js";
+import type * as History from "../src/gather/history.js";
 import type * as PromptLoad from "../src/prompts/load.js";
 import type * as ReviewerLoader from "../src/reviewers/loader.js";
 import type { ReviewerDefinition } from "../src/reviewers/loader.js";
@@ -34,6 +35,7 @@ import { UNTRUSTED_SYSTEM_LINE } from "../src/untrusted.js";
 // sets them.
 const mocks = vi.hoisted(() => ({
   failVerifierPrompt: false,
+  failHistory: false,
   reviewerPasses: undefined as number | undefined,
 }));
 
@@ -47,6 +49,17 @@ vi.mock("../src/prompts/load.js", async (importOriginal) => {
       }
       return original.loadPrompt(relativePath);
     },
+  };
+});
+
+vi.mock("../src/gather/history.js", async (importOriginal) => {
+  const original = await importOriginal<typeof History>();
+  return {
+    ...original,
+    gatherHistory: (...args: Parameters<typeof original.gatherHistory>) =>
+      mocks.failHistory
+        ? Promise.reject(new Error("git blame failed"))
+        : original.gatherHistory(...args),
   };
 });
 
@@ -1304,4 +1317,54 @@ describe("the token ceiling (R8)", () => {
     expect(record.stages.reviewers.map((r) => r.pass).sort()).toEqual([1, 2]);
     expect(record.posted.verdict).toBe("would request changes");
   }, 30_000);
+});
+
+describe("the history block and the history reviewer config", () => {
+  const fixtures: Fixture[] = [];
+  let enabled: Fixture;
+  let disabled: Fixture;
+  beforeAll(async () => {
+    enabled = await fixtureWithFiles({ "config.yaml": "thresholds:\n  default: 80\n" });
+    disabled = await fixtureWithFiles({
+      "config.yaml": "reviewers:\n  history:\n    enabled: false\n",
+    });
+    fixtures.push(enabled, disabled);
+  }, 30_000);
+  afterAll(() => {
+    mocks.failHistory = false;
+    for (const f of fixtures) rmSync(f.repo, { recursive: true, force: true });
+  });
+  afterEach(() => {
+    mocks.failHistory = false;
+  });
+
+  async function review(f: Fixture, out: string) {
+    const { record } = await runReview({
+      repo: f.repo,
+      base: f.base,
+      head: f.head,
+      tierOverride: "fast",
+      outDir: join(outRoot, out),
+      allowApiKey: false,
+      client: createFakeSdkClient(script(f)),
+    });
+    return record;
+  }
+
+  it("builds the history block when the history reviewer is enabled", async () => {
+    const record = await review(enabled, "history-on");
+    expect(record.identity.history.built).toBe(true);
+  });
+
+  it("builds no history block when reviewers.history.enabled is false", async () => {
+    const record = await review(disabled, "history-off");
+    expect(record.identity.history).toEqual({ built: false, truncated: false });
+  });
+
+  it("completes the run, with no history block, when the history gather fails", async () => {
+    mocks.failHistory = true;
+    const record = await review(enabled, "history-fails");
+    expect(record.identity.history).toEqual({ built: false, truncated: false });
+    expect(record.identity.selected_reviewers.map((r) => r.name)).toContain("diff-bugs");
+  });
 });

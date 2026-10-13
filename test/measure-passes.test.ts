@@ -22,7 +22,9 @@ while [ "$#" -gt 0 ]; do
   if [ "$1" = "--base" ]; then base="$2"; fi
   shift
 done
-passes="$(git show "$base:.pr-review/config.yaml" | sed -n 's/^ *passes: *//p')"
+git show "$base:.pr-review/config.yaml" > "$STUB_DIR/config.yaml"
+passes="$(sed -n 's/^ *passes: *//p' "$STUB_DIR/config.yaml")"
+cp "$STUB_DIR/config.yaml" "$STUB_DIR/config-arm-$passes.yaml"
 count_file="$STUB_DIR/count-$passes"
 n=0
 if [ -f "$count_file" ]; then n="$(cat "$count_file")"; fi
@@ -78,6 +80,26 @@ describe("scripts/measure-passes.sh (R6)", () => {
     expect(calls).toHaveLength(10);
     for (const call of calls) {
       expect(call).toMatch(/^run --base [0-9a-f]{40} --head [0-9a-f]{40} --format json$/);
+    }
+  });
+
+  it("turns off the six other built-in reviewers in both arms, so only diff-bugs posts findings", () => {
+    const others = [
+      "conventions",
+      "tests",
+      "security",
+      "history",
+      "description-drift",
+      "docs-and-comments",
+    ];
+    for (const passes of [1, 2]) {
+      const text = readFileSync(join(stubDir, `config-arm-${passes}.yaml`), "utf8");
+      expect(text).toContain(`passes: ${passes}`);
+      for (const name of others) {
+        expect(text).toMatch(new RegExp(`^  ${name}:\\n    enabled: false$`, "m"));
+      }
+      expect(text).not.toMatch(/diff-bugs:\n {4}enabled/);
+      expect(text.match(/enabled: false/g)).toHaveLength(6);
     }
   });
 
