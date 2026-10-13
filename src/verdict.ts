@@ -53,10 +53,10 @@ function failureOf(value: VerifierCall | undefined): QueryFailure | null {
 }
 
 /**
- * Count from the stage outputs: the findings dropped because the first
- * verifier call failed (for coverage), every failed verifier call with
- * the escalation calls (for the verdict), and every reviewer or verifier
- * call that ended in a refusal.
+ * Count from the stage outputs: the findings dropped because their first
+ * verifier call or their escalation call failed (for coverage), every
+ * failed verifier call, first or escalation (for the verdict), and every
+ * reviewer or verifier call that ended in a refusal.
  */
 export function verificationCounts(
   reviewerRuns: ReviewerRun[],
@@ -66,16 +66,14 @@ export function verificationCounts(
   let failedVerifierCalls = 0;
   let refusals = reviewerRuns.filter((r) => r.failure?.kind === "refusal").length;
   for (const v of verifications) {
-    for (const [call, isFirst] of [
-      [v.first, true],
-      [v.escalated, false],
-    ] as const) {
-      const failure = failureOf(call);
-      if (!failure) continue;
-      failedVerifierCalls += 1;
-      if (isFirst) droppedByFailedVerifier += 1;
-      if (failure.kind === "refusal") refusals += 1;
-    }
+    // A failed first call stops the verification, so at most one call of
+    // a finding fails, and the finding is dropped.
+    const failures = [failureOf(v.first), failureOf(v.escalated)].filter(
+      (f): f is QueryFailure => f !== null,
+    );
+    if (failures.length > 0) droppedByFailedVerifier += 1;
+    failedVerifierCalls += failures.length;
+    refusals += failures.filter((f) => f.kind === "refusal").length;
   }
   return { droppedByFailedVerifier, failedVerifierCalls, refusals };
 }

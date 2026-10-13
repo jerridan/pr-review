@@ -7,6 +7,7 @@ export function formatJson(record: RunRecord, recordPath: string): string {
     tier: record.identity.tier,
     verdict: record.posted.verdict,
     coverage: record.posted.coverage,
+    excluded_files: record.identity.excluded_files,
     findings: record.posted.findings,
   };
   return `${JSON.stringify(doc, null, 2)}\n`;

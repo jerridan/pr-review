@@ -41,9 +41,15 @@ function posted(
   };
 }
 
+const EXCLUDED: RunRecord["identity"]["excluded_files"] = [
+  { path: "package-lock.json", reason: "generated" },
+  { path: "src/old-name.ts", reason: "rename-only" },
+];
+
 function record(
   findings: PostedFinding[],
   overrides: Partial<RunRecord["posted"]> = {},
+  excluded: RunRecord["identity"]["excluded_files"] = EXCLUDED,
 ): RunRecord {
   return {
     identity: {
@@ -55,13 +61,18 @@ function record(
       tool_version: "0.1.0",
       config_hash: null,
       changed_files: [{ path: "src/stats.ts", hunks: 1 }],
-      excluded_files: [],
+      excluded_files: excluded,
       sensitive_files: [],
       triage: null,
       tier: "full",
       tier_reason: "Triage: New logic in a public function.",
       selected_reviewers: [
-        { name: "diff-bugs", trigger: "min_tier fast <= full; paths: any; categories: any" },
+        {
+          name: "diff-bugs",
+          trigger: "min_tier fast <= full; paths: any; categories: any",
+          model: "claude-opus-5-5",
+          effort: "low",
+        },
       ],
       models: {
         triage: { model: "claude-sonnet-5-5", effort: "medium" },
@@ -133,6 +144,13 @@ describe("table output (A10)", () => {
     expect(text).toContain("src/format.ts:3-7");
     expect(text).not.toContain("overflow");
   });
+
+  it("shows each excluded file with its reason", () => {
+    expect(formatTable(WITH_FINDINGS)).toContain(
+      "Excluded files: package-lock.json (generated), src/old-name.ts (rename-only)\n",
+    );
+    expect(formatTable(record([], {}, []))).toContain("Excluded files: none\n");
+  });
 });
 
 describe("json output", () => {
@@ -140,5 +158,10 @@ describe("json output", () => {
     const text = formatJson(WITH_FINDINGS, "/out/r.json");
     expect(text.endsWith("\n")).toBe(true);
     expect(JSON.parse(text).findings).toHaveLength(3);
+  });
+
+  it("holds the excluded files with their reasons", () => {
+    expect(JSON.parse(formatJson(WITH_FINDINGS, "/out/r.json")).excluded_files).toEqual(EXCLUDED);
+    expect(JSON.parse(formatJson(record([], {}, []), "/out/r.json")).excluded_files).toEqual([]);
   });
 });

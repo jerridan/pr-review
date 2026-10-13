@@ -112,7 +112,9 @@ function makeRecord(): RunRecord {
       },
       tier: "full",
       tier_reason: "triage",
-      selected_reviewers: [{ name: "diff-bugs", trigger: "always" }],
+      selected_reviewers: [
+        { name: "diff-bugs", trigger: "always", model: "claude-opus-5-5", effort: "low" },
+      ],
       models: {
         triage: { model: "claude-sonnet-5-5", effort: "medium" },
         reviewer: { model: "claude-opus-5-5", effort: "low" },
@@ -147,6 +149,13 @@ function makeRecord(): RunRecord {
           first: { kind: "thrown", message: "boom" },
           final: null,
           passed: false,
+        },
+        {
+          finding,
+          first: { ...verifierResult, quotes: [] },
+          final: { ...verifierResult, quotes: [] },
+          passed: false,
+          rejected: "No quote of the verifier is in the head file.",
         },
       ],
       merges: [],
@@ -352,6 +361,26 @@ describe("RecordSchema", () => {
     expect(
       RecordSchema.safeParse({ ...record, identity: { ...record.identity, config_hash: "x" } })
         .success,
+    ).toBe(false);
+  });
+
+  it("requires the resolved model and effort of each selected reviewer", () => {
+    const record = makeRecord();
+    const entry = { name: "diff-bugs", trigger: "always" };
+    expect(
+      RecordSchema.safeParse({
+        ...record,
+        identity: { ...record.identity, selected_reviewers: [entry] },
+      }).success,
+    ).toBe(false);
+    expect(
+      RecordSchema.safeParse({
+        ...record,
+        identity: {
+          ...record.identity,
+          selected_reviewers: [{ ...entry, model: "claude-sonnet-5-5", effort: "huge" }],
+        },
+      }).success,
     ).toBe(false);
   });
 

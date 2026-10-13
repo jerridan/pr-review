@@ -195,7 +195,12 @@ describe("the record parts", () => {
     expect(id.tier_reason).toMatch(/sensitive/i);
     expect(id.triage?.summary).toBe("s");
     expect(id.selected_reviewers).toEqual([
-      { name: "diff-bugs", trigger: expect.stringContaining("min_tier fast") },
+      {
+        name: "diff-bugs",
+        trigger: expect.stringContaining("min_tier fast"),
+        model: "claude-opus-5-5",
+        effort: "low",
+      },
     ]);
     expect(id.models).toEqual({
       triage: { model: "claude-sonnet-5-5", effort: "medium" },
@@ -220,7 +225,7 @@ describe("the record parts", () => {
         finding: plantedFinding(fx),
         first: result(70),
         escalated: { kind: "thrown", message: "x" },
-        final: result(70),
+        final: null,
         passed: false,
       },
     ]);
@@ -228,13 +233,13 @@ describe("the record parts", () => {
     expect(record.stages.capped).toEqual([]);
   });
 
-  it("holds what was posted: a failed escalation leaves the verdict complete", () => {
+  it("holds what was posted: a failed escalation drops the finding and makes the verdict incomplete", () => {
     expect(record.posted.findings).toEqual([]);
-    expect(record.posted.verdict).toBe("would approve");
+    expect(record.posted.verdict).toBe("incomplete");
     expect(record.posted.coverage).toEqual({
       reviewers_ran: ["diff-bugs"],
       reviewers_failed: [],
-      findings_dropped_by_failed_verifier: 0,
+      findings_dropped_by_failed_verifier: 1,
     });
   });
 
@@ -268,10 +273,11 @@ describe("the record parts", () => {
 });
 
 describe("--format json output (A9)", () => {
-  it("prints one document with the five keys, and findings is posted.findings", () => {
+  it("prints one document with the six keys, and findings is posted.findings", () => {
     const doc = JSON.parse(formatJson(record, recordPath));
     expect(Object.keys(doc).sort()).toEqual([
       "coverage",
+      "excluded_files",
       "findings",
       "record_path",
       "tier",
@@ -282,7 +288,9 @@ describe("--format json output (A9)", () => {
       tier: record.identity.tier,
       verdict: record.posted.verdict,
       coverage: record.posted.coverage,
+      excluded_files: record.identity.excluded_files,
       findings: record.posted.findings,
     });
+    expect(doc.excluded_files).toContainEqual({ path: "package-lock.json", reason: "generated" });
   });
 });

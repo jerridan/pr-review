@@ -7,6 +7,19 @@ user_message: |
   {{diff}}
 
   The blocks above hold the facts about a code change and its diff. Decide the review tier for this change. Return the brief that the output schema asks for.
+files_text: |-
+  Changed files (hunks after exclusions):
+  {{changed}}
+
+  Sensitive files:
+  {{sensitive}}
+
+  Excluded files (not in the diff):
+  {{excluded}}
+changed_file_line: "- {{path}}: {{hunks}}"
+file_line: "- {{path}}"
+excluded_file_line: "- {{path}} ({{reason}})"
+empty_list_text: "- none"
 ---
 You triage a code change before other agents review it. You decide how much review the change needs. You do not review the code.
 

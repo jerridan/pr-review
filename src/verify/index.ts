@@ -1,8 +1,8 @@
 // Verify: one verifier query per finding, with escalation to a second
 // verifier on a middle-band score or when the finding needs context.
-import { readHeadFile } from "../find/evidence.js";
+import { normalizeWs, readHeadFile } from "../find/evidence.js";
 import { filterDiff } from "../gather/diff.js";
-import { loadPrompt, render } from "../prompts/load.js";
+import { loadPrompt, render, type PromptFile } from "../prompts/load.js";
 import type { Finding } from "../schemas/finding.js";
 import type { QueryFailure } from "../schemas/record.js";
 import { VerifierResultSchema, type VerifierResult } from "../schemas/verifier.js";
@@ -26,7 +26,22 @@ export type Verification = {
   escalated?: VerifierResult | QueryFailure;
   final: VerifierResult | null;
   passed: boolean;
+  /** Why code failed a final result that the model passed. */
+  rejected?: string;
 };
+
+/**
+ * Return true when at least one quote is a substring of the head file,
+ * after whitespace collapse in both. An empty quote never matches.
+ */
+export function quoteMatches(quotes: string[], headFileText: string | null): boolean {
+  if (headFileText === null) return false;
+  const file = normalizeWs(headFileText);
+  return quotes.some((q) => {
+    const quote = normalizeWs(q);
+    return quote !== "" && file.includes(quote);
+  });
+}
 
 /** True when the value is a failed query, not a verifier result. */
 export function isQueryFailure(value: VerifierResult | QueryFailure): value is QueryFailure {
@@ -56,9 +71,29 @@ function numberLines(text: string): string {
   return lines.map((line, i) => `${String(i + 1).padStart(width)}| ${line}`).join("\n");
 }
 
+/** The texts of prompts/verifier.md that the user message uses. */
+export type VerifierTexts = { template: string; noFileText: string; noDiffText: string };
+
+function field(prompt: PromptFile, name: string): string {
+  const value = prompt.frontmatter[name];
+  if (typeof value !== "string") {
+    throw new Error(`prompts/verifier.md has no "${name}" string in its frontmatter.`);
+  }
+  return value;
+}
+
+/** Read the user message texts from the frontmatter of the verifier prompt. */
+export function verifierTexts(prompt: PromptFile): VerifierTexts {
+  return {
+    template: field(prompt, "user_message"),
+    noFileText: field(prompt, "no_file_text"),
+    noDiffText: field(prompt, "no_diff_text"),
+  };
+}
+
 /** Build the verifier user message: the finding, the head file and its diff. */
 export function buildVerifierMessage(
-  template: string,
+  texts: VerifierTexts,
   finding: Finding,
   ctx: VerifyContext,
 ): string {
@@ -66,16 +101,10 @@ export function buildVerifierMessage(
   const fileDiff = filterDiff(ctx.diff, (path) => path === finding.file);
   const blocks = {
     finding: wrapUntrusted("finding", describeFinding(finding)).block,
-    file: wrapUntrusted(
-      "head_file",
-      text === null ? "The head commit has no file at this path." : numberLines(text),
-    ).block,
-    diff: wrapUntrusted(
-      "diff",
-      fileDiff.trim() === "" ? "The diff has no change to this file." : fileDiff,
-    ).block,
+    file: wrapUntrusted("head_file", text === null ? texts.noFileText : numberLines(text)).block,
+    diff: wrapUntrusted("diff", fileDiff.trim() === "" ? texts.noDiffText : fileDiff).block,
   };
-  return render(template, blocks);
+  return render(texts.template, blocks);
 }
 
 function checkRanges(result: VerifierResult): QueryFailure | null {
@@ -92,15 +121,12 @@ export async function verifyFinding(
   ctx: VerifyContext,
 ): Promise<Verification> {
   const prompt = loadPrompt("verifier.md");
-  const template = prompt.frontmatter.user_message;
-  if (typeof template !== "string") {
-    throw new Error('prompts/verifier.md has no "user_message" string in its frontmatter.');
-  }
+  const texts = verifierTexts(prompt);
 
   const ask = async (
     role: "verifier" | "verifier-escalation",
   ): Promise<VerifierResult | QueryFailure> => {
-    const userMessage = buildVerifierMessage(template, finding, ctx);
+    const userMessage = buildVerifierMessage(texts, finding, ctx);
     try {
       const outcome = await ctx.semaphore(() =>
         client.query<VerifierResult>(
@@ -122,7 +148,18 @@ export async function verifyFinding(
   };
 
   const { threshold, bandLow, bandHigh } = ctx.config;
-  const passes = (r: VerifierResult) => r.in_scope && r.claim_holds && r.score >= threshold;
+  // The verifier must quote the code that supports the claim. A result
+  // that passes on the model's own fields fails when no quote is real.
+  const decide = (r: VerifierResult): { passed: boolean; rejected?: string } => {
+    if (!(r.in_scope && r.claim_holds && r.score >= threshold)) return { passed: false };
+    if (!quoteMatches(r.quotes, readHeadFile(ctx.cwd, finding.file))) {
+      return {
+        passed: false,
+        rejected: "No quote of the verifier is in the head file of the finding.",
+      };
+    }
+    return { passed: true };
+  };
 
   const first = await ask("verifier");
   if (isQueryFailure(first)) return { first, final: null, passed: false };
@@ -131,10 +168,11 @@ export async function verifyFinding(
   if (!first.in_scope) return { first, final: first, passed: false };
 
   const inBand = first.score >= bandLow && first.score <= bandHigh;
-  if (!inBand && !finding.needs_context) return { first, final: first, passed: passes(first) };
+  if (!inBand && !finding.needs_context) return { first, final: first, ...decide(first) };
 
   const escalated = await ask("verifier-escalation");
-  // A failed escalation leaves the first result standing.
-  const final = isQueryFailure(escalated) ? first : escalated;
-  return { first, escalated, final, passed: passes(final) };
+  // The second check did not occur, so the finding has no final result
+  // and is not posted. The verdict counts this as a failed verifier call.
+  if (isQueryFailure(escalated)) return { first, escalated, final: null, passed: false };
+  return { first, escalated, final: escalated, ...decide(escalated) };
 }

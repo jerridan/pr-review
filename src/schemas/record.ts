@@ -45,7 +45,7 @@ export type RunRecord = {
     triage: TriageBrief | null;
     tier: "skip" | "fast" | "full";
     tier_reason: string;
-    selected_reviewers: { name: string; trigger: string }[];
+    selected_reviewers: { name: string; trigger: string; model: string; effort: Effort }[];
     models: Record<Role, { model: string; effort: Effort }>;
   };
   stages: {
@@ -64,6 +64,7 @@ export type RunRecord = {
       escalated?: VerifierResult | QueryFailure;
       final: VerifierResult | null;
       passed: boolean;
+      rejected?: string;
     }[];
     merges: { group: number[]; result: MergeOutput | QueryFailure; rejected?: string }[];
     capped: PostedFinding[];
@@ -146,7 +147,14 @@ const IdentitySchema = z.strictObject({
   triage: TriageBriefSchema.nullable(),
   tier: z.enum(TIERS),
   tier_reason: z.string(),
-  selected_reviewers: z.array(z.strictObject({ name: z.string(), trigger: z.string() })),
+  selected_reviewers: z.array(
+    z.strictObject({
+      name: z.string(),
+      trigger: z.string(),
+      model: z.string(),
+      effort: effortEnum,
+    }),
+  ),
   models: z.record(roleEnum, z.strictObject({ model: z.string(), effort: effortEnum })),
 });
 
@@ -174,6 +182,7 @@ const StagesSchema = z.strictObject({
       escalated: verifierOrFailure.optional(),
       final: VerifierResultSchema.nullable(),
       passed: z.boolean(),
+      rejected: z.string().optional(),
     }),
   ),
   merges: z.array(

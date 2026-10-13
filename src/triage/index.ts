@@ -1,36 +1,66 @@
 // Run the triage query: one SDK query with the diff inline and no tools.
 import type { GatherResult } from "../gather/index.js";
-import { loadPrompt, render } from "../prompts/load.js";
+import { loadPrompt, render, type PromptFile } from "../prompts/load.js";
 import type { QueryFailure } from "../schemas/record.js";
 import { TriageBriefSchema, type TriageBrief } from "../schemas/triage.js";
 import type { QueryMeta, SdkClient } from "../sdk/client.js";
 import type { RunOptions } from "../sdk/options.js";
 import { wrapUntrusted } from "../untrusted.js";
 
-function describeFiles(gathered: GatherResult): string {
-  const lines = ["Changed files (hunks after exclusions):"];
-  for (const file of gathered.changedFiles) {
-    lines.push(`- ${file.path} (${file.hunks} ${file.hunks === 1 ? "hunk" : "hunks"})`);
+/** The texts of prompts/triage.md that the user message uses. */
+export type TriageTexts = {
+  template: string;
+  filesText: string;
+  changedFileLine: string;
+  fileLine: string;
+  excludedFileLine: string;
+  emptyListText: string;
+};
+
+function field(prompt: PromptFile, name: string): string {
+  const value = prompt.frontmatter[name];
+  if (typeof value !== "string") {
+    throw new Error(`prompts/triage.md has no "${name}" string in its frontmatter.`);
   }
-  lines.push("", "Sensitive files:");
-  lines.push(
-    ...(gathered.sensitive.length > 0 ? gathered.sensitive.map((p) => `- ${p}`) : ["- none"]),
-  );
-  lines.push("", "Excluded files (not in the diff):");
-  lines.push(
-    ...(gathered.excluded.length > 0
-      ? gathered.excluded.map((e) => `- ${e.path} (${e.reason})`)
-      : ["- none"]),
-  );
-  return lines.join("\n");
+  return value;
 }
 
-/** Build the triage user message from the prompt file template. */
-export function buildTriageMessage(template: string, gathered: GatherResult): string {
+/** Read the user message texts from the frontmatter of the triage prompt. */
+export function triageTexts(prompt: PromptFile): TriageTexts {
+  return {
+    template: field(prompt, "user_message"),
+    filesText: field(prompt, "files_text"),
+    changedFileLine: field(prompt, "changed_file_line"),
+    fileLine: field(prompt, "file_line"),
+    excludedFileLine: field(prompt, "excluded_file_line"),
+    emptyListText: field(prompt, "empty_list_text"),
+  };
+}
+
+function describeFiles(texts: TriageTexts, gathered: GatherResult): string {
+  const list = (lines: string[]): string =>
+    lines.length > 0 ? lines.join("\n") : texts.emptyListText;
+  return render(texts.filesText, {
+    changed: list(
+      gathered.changedFiles.map((f) =>
+        render(texts.changedFileLine, { path: f.path, hunks: String(f.hunks) }),
+      ),
+    ),
+    sensitive: list(gathered.sensitive.map((path) => render(texts.fileLine, { path }))),
+    excluded: list(
+      gathered.excluded.map((e) =>
+        render(texts.excludedFileLine, { path: e.path, reason: e.reason }),
+      ),
+    ),
+  });
+}
+
+/** Build the triage user message from the prompt file texts. */
+export function buildTriageMessage(texts: TriageTexts, gathered: GatherResult): string {
   // File paths come from the change too, so they go in a block as well.
-  const files = wrapUntrusted("files", describeFiles(gathered));
+  const files = wrapUntrusted("files", describeFiles(texts, gathered));
   const diff = wrapUntrusted("diff", gathered.diff);
-  return render(template, { files: files.block, diff: diff.block });
+  return render(texts.template, { files: files.block, diff: diff.block });
 }
 
 export async function runTriage(
@@ -40,11 +70,7 @@ export async function runTriage(
   cwd: string,
 ): Promise<{ brief: TriageBrief | null; failure: QueryFailure | null; meta: QueryMeta | null }> {
   const prompt = loadPrompt("triage.md");
-  const template = prompt.frontmatter.user_message;
-  if (typeof template !== "string") {
-    throw new Error('prompts/triage.md has no "user_message" string in its frontmatter.');
-  }
-  const userMessage = buildTriageMessage(template, gathered);
+  const userMessage = buildTriageMessage(triageTexts(prompt), gathered);
   try {
     const outcome = await client.query<TriageBrief>(
       { role: "triage", systemPrompt: prompt.body, userMessage, schema: TriageBriefSchema, cwd },

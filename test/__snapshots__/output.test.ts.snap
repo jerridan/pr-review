@@ -5,6 +5,7 @@ exports[`table output (A10) > matches the snapshot for a run with findings 1`] =
 Reason: Triage: New logic in a public function.
 Verdict: would request changes
 Coverage: reviewers ran: diff-bugs; reviewers failed: none; findings dropped by failed verifier calls: 0
+Excluded files: package-lock.json (generated), src/old-name.ts (rename-only)
 Cost: $0.4321
 
 Findings (3):
@@ -20,6 +21,7 @@ exports[`table output (A10) > matches the snapshot for a run with no findings 1`
 Reason: Triage: New logic in a public function.
 Verdict: would approve
 Coverage: reviewers ran: diff-bugs; reviewers failed: none; findings dropped by failed verifier calls: 0
+Excluded files: package-lock.json (generated), src/old-name.ts (rename-only)
 Cost: $0.4321
 
 Findings: none posted.
@@ -31,6 +33,7 @@ exports[`table output (A10) > matches the snapshot for an incomplete run with a 
 Reason: Triage: New logic in a public function.
 Verdict: incomplete
 Coverage: reviewers ran: none; reviewers failed: diff-bugs; findings dropped by failed verifier calls: 2
+Excluded files: package-lock.json (generated), src/old-name.ts (rename-only)
 Cost: unknown
 
 Findings: none posted.

@@ -84,6 +84,18 @@ const WRITE_AND_NET_TOOLS = [
   "Agent",
 ];
 const READ_TOOLS = ["Read", "Grep", "Glob"];
+// Each rule approves its tool only for paths in the head checkout (the cwd).
+const SCOPED_READ_RULES = ["Read(./**)", "Grep(./**)", "Glob(./**)"];
+// Variables that send the subprocess to a credential or an endpoint that
+// is not the subscription login.
+const PROVIDER_VARS = [
+  "ANTHROPIC_API_KEY",
+  "ANTHROPIC_AUTH_TOKEN",
+  "ANTHROPIC_BASE_URL",
+  "CLAUDE_CODE_USE_BEDROCK",
+  "CLAUDE_CODE_USE_VERTEX",
+  "CLAUDE_CODE_USE_FOUNDRY",
+];
 const HEAD_WORKTREE = "/tmp/pr-review-head-abc1234";
 
 function request(role: Role, extra: Partial<QueryRequest> = {}): QueryRequest {
@@ -104,9 +116,20 @@ function runOptions(allowApiKey: boolean): RunOptions {
       PATH: "/usr/bin:/bin",
       HOME: "/home/u",
       ANTHROPIC_API_KEY: "sk-test-not-real",
+      ANTHROPIC_AUTH_TOKEN: "auth-test-not-real",
+      ANTHROPIC_BASE_URL: "https://proxy.invalid",
+      CLAUDE_CODE_USE_BEDROCK: "1",
+      CLAUDE_CODE_USE_VERTEX: "1",
+      CLAUDE_CODE_USE_FOUNDRY: "1",
       CLAUDE_CODE_OAUTH_TOKEN: "oauth-test-not-real",
     },
   };
+}
+
+// A rule with no "(specifier)" matches every use of the tool, so it
+// approves a read of any path on the machine.
+function bareRules(rules: string[]): string[] {
+  return rules.filter((rule) => !/^[A-Za-z]+\(.+\)$/.test(rule));
 }
 
 describe("A13: query options for every role", () => {
@@ -135,15 +158,18 @@ describe("A13: query options for every role", () => {
       const disallowed = opts.disallowedTools as string[];
       expect(disallowed).toEqual(expect.arrayContaining(WRITE_AND_NET_TOOLS));
       if (want.tools === "read-only") {
-        expect(opts.allowedTools).toEqual(READ_TOOLS);
+        expect(opts.tools).toEqual(READ_TOOLS);
+        expect(opts.allowedTools).toEqual(SCOPED_READ_RULES);
         for (const tool of READ_TOOLS) expect(disallowed).not.toContain(tool);
       } else {
+        expect(opts.tools).toEqual([]);
         expect(opts.allowedTools).toEqual([]);
         expect(disallowed).toEqual(expect.arrayContaining(READ_TOOLS));
       }
+      expect(bareRules(opts.allowedTools as string[])).toEqual([]);
 
       const env = opts.env as Record<string, string | undefined>;
-      expect(env).not.toHaveProperty("ANTHROPIC_API_KEY");
+      for (const name of PROVIDER_VARS) expect(env).not.toHaveProperty(name);
       expect(env.CLAUDE_CODE_DISABLE_AUTO_MEMORY).toBe("1");
       expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBe("oauth-test-not-real");
       expect(env.PATH).toBe("/usr/bin:/bin");
@@ -158,10 +184,24 @@ describe("A13: query options for every role", () => {
     }
   });
 
-  it("keeps ANTHROPIC_API_KEY with allowApiKey", () => {
+  it("rejects a read rule with no path specifier", () => {
+    expect(bareRules(["Read", "Grep(./**)", "Glob"])).toEqual(["Read", "Glob"]);
+    expect(bareRules(["Read()", "Read(./**)"])).toEqual(["Read()"]);
+    for (const role of Object.keys(EXPECTED) as Role[]) {
+      const opts = buildQueryOptions(request(role), runOptions(false));
+      expect(bareRules(opts.allowedTools as string[]), role).toEqual([]);
+    }
+  });
+
+  it("keeps ANTHROPIC_API_KEY and the other provider variables with allowApiKey", () => {
     const opts = buildQueryOptions(request("reviewer"), runOptions(true));
     const env = opts.env as Record<string, string | undefined>;
     expect(env.ANTHROPIC_API_KEY).toBe("sk-test-not-real");
+    expect(env.ANTHROPIC_AUTH_TOKEN).toBe("auth-test-not-real");
+    expect(env.ANTHROPIC_BASE_URL).toBe("https://proxy.invalid");
+    expect(env.CLAUDE_CODE_USE_BEDROCK).toBe("1");
+    expect(env.CLAUDE_CODE_USE_VERTEX).toBe("1");
+    expect(env.CLAUDE_CODE_USE_FOUNDRY).toBe("1");
     expect(env.CLAUDE_CODE_DISABLE_AUTO_MEMORY).toBe("1");
   });
 
@@ -169,6 +209,7 @@ describe("A13: query options for every role", () => {
     const options = runOptions(false);
     buildQueryOptions(request("reviewer"), options);
     expect(options.env.ANTHROPIC_API_KEY).toBe("sk-test-not-real");
+    expect(options.env.ANTHROPIC_BASE_URL).toBe("https://proxy.invalid");
     expect(options.env).not.toHaveProperty("CLAUDE_CODE_DISABLE_AUTO_MEMORY");
   });
 

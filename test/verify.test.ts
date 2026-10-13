@@ -249,7 +249,7 @@ describe("verifyFinding (A6)", () => {
     expect(out.passed).toBe(false);
   });
 
-  it("leaves the first result standing when the escalation fails", async () => {
+  it("drops the finding when the escalation fails or is refused", async () => {
     const failure = { kind: "refusal" as const, message: "The stop reason is refusal." };
     const out = await verifyFinding(
       createFakeSdkClient(script(result(82), { ok: false, failure, raw: META })),
@@ -257,7 +257,8 @@ describe("verifyFinding (A6)", () => {
       finding(),
       ctx(),
     );
-    expect(out).toEqual({ first: result(82), escalated: failure, final: result(82), passed: true });
+    // A first score of 82 passes the threshold, but the second check did not occur.
+    expect(out).toEqual({ first: result(82), escalated: failure, final: null, passed: false });
     const oor = await verifyFinding(
       createFakeSdkClient(script(result(70), result(200))),
       OPTIONS,
@@ -265,8 +266,58 @@ describe("verifyFinding (A6)", () => {
       ctx(),
     );
     expect(oor.escalated).toMatchObject({ kind: "out-of-range" });
-    expect(oor.final).toEqual(result(70));
+    expect(oor.final).toBeNull();
     expect(oor.passed).toBe(false);
+  });
+
+  it("passes a result only when one of its quotes is in the head file", async () => {
+    const noBand = { ...DEFAULT_VERIFY_CONFIG, bandLow: 101, bandHigh: 101 };
+    const verify = (r: VerifierResult) =>
+      verifyFinding(createFakeSdkClient(script(r)), OPTIONS, finding(), ctx(noBand));
+
+    const none = await verify(result(95, { quotes: [] }));
+    expect(none.passed).toBe(false);
+    expect(none.final).toEqual(result(95, { quotes: [] }));
+    expect(none.rejected).toMatch(/quote/i);
+
+    const wrong = await verify(result(95, { quotes: ["this text is not in the file"] }));
+    expect(wrong.passed).toBe(false);
+    expect(wrong.rejected).toMatch(/quote/i);
+
+    // A quote that is only in the diff of another file does not count.
+    const diffOnly = await verify(result(95, { quotes: ["OTHER-NEW"] }));
+    expect(diffOnly.passed).toBe(false);
+
+    const blank = await verify(result(95, { quotes: ["   "] }));
+    expect(blank.passed).toBe(false);
+
+    // One good quote is sufficient, and whitespace runs collapse.
+    const good = await verify(result(95, { quotes: ["not here", "i   <=\n  values.length"] }));
+    expect(good.passed).toBe(true);
+    expect(good.rejected).toBeUndefined();
+  });
+
+  it("applies the quote check to the escalated result", async () => {
+    const out = await verifyFinding(
+      createFakeSdkClient(script(result(70), result(95, { quotes: ["not in the file"] }))),
+      OPTIONS,
+      finding(),
+      ctx(),
+    );
+    expect(out.passed).toBe(false);
+    expect(out.final).toEqual(result(95, { quotes: ["not in the file"] }));
+    expect(out.rejected).toMatch(/quote/i);
+  });
+
+  it("records no quote reason when the result fails for another reason", async () => {
+    const out = await verifyFinding(
+      createFakeSdkClient(script(result(20, { quotes: [] }))),
+      OPTIONS,
+      finding(),
+      ctx(),
+    );
+    expect(out.passed).toBe(false);
+    expect(out.rejected).toBeUndefined();
   });
 
   it("fails a finding whose claim does not hold", async () => {

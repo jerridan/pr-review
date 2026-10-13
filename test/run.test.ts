@@ -15,7 +15,8 @@ import { promisify } from "node:util";
 import { CommanderError } from "commander";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createProgram } from "../src/cli.js";
-import { runReview } from "../src/run.js";
+import type { ReviewerDefinition } from "../src/reviewers/loader.js";
+import { describeSelected, runReview } from "../src/run.js";
 import type { Finding } from "../src/schemas/finding.js";
 import type { RunRecord } from "../src/schemas/record.js";
 import type { TriageBrief } from "../src/schemas/triage.js";
@@ -374,7 +375,7 @@ describe("refusals and the verdict", () => {
     };
   }
 
-  it("leaves the verdict alone when an escalation call is refused", async () => {
+  it("drops the finding and makes the verdict incomplete when an escalation call is refused", async () => {
     const fake = createFakeSdkClient(refusingScript("verifier-escalation", 84));
     const { record } = await runReview({
       repo: fx.repo,
@@ -385,8 +386,10 @@ describe("refusals and the verdict", () => {
       client: fake,
     });
     expect(record.stages.verifications[0]?.escalated).toMatchObject({ kind: "refusal" });
-    expect(record.posted.findings).toHaveLength(1);
-    expect(record.posted.verdict).toBe("would request changes");
+    expect(record.stages.verifications[0]?.passed).toBe(false);
+    expect(record.posted.findings).toHaveLength(0);
+    expect(record.posted.verdict).toBe("incomplete");
+    expect(record.posted.coverage.findings_dropped_by_failed_verifier).toBe(1);
   });
 
   it("makes the verdict incomplete when a first verifier call is refused", async () => {
@@ -418,5 +421,37 @@ describe("refusals and the verdict", () => {
       client: fake,
     });
     expect(record.posted.verdict).toBe("incomplete");
+  });
+});
+
+describe("the selected reviewers in the record", () => {
+  function def(name: string, model: string, effort: "low" | "high"): ReviewerDefinition {
+    return {
+      path: `/x/${name}.md`,
+      systemPrompt: "s",
+      frontmatter: {
+        name,
+        description: "d",
+        model,
+        effort,
+        tools: [],
+        triggers: { paths: [], categories: [], min_tier: "fast" },
+        passes: 1,
+        threshold: 80,
+        trusted: true,
+      },
+    };
+  }
+
+  it("holds the model and effort that each reviewer uses, after its frontmatter override", () => {
+    expect(
+      describeSelected([
+        { def: def("a", "sonnet", "high"), trigger: "t1" },
+        { def: def("b", "claude-opus-4-1", "low"), trigger: "t2" },
+      ]),
+    ).toEqual([
+      { name: "a", trigger: "t1", model: "claude-sonnet-5-5", effort: "high" },
+      { name: "b", trigger: "t2", model: "claude-opus-4-1", effort: "low" },
+    ]);
   });
 });

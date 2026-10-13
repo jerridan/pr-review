@@ -9,6 +9,8 @@ user_message: |
   {{diff}}
 
   The first block holds one finding from a code review. The second block holds the file that the finding names, from the head commit, with line numbers. The third block holds the diff of that file. Check the finding as your instructions tell you. Return the result that the output schema asks for.
+no_file_text: The head commit has no file at this path.
+no_diff_text: The diff has no change to this file.
 ---
 You check one finding from a code review of a change. You decide if the finding is true, in scope and worth posting. You did not write the finding.
 

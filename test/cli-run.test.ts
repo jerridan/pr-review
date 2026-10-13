@@ -78,7 +78,7 @@ function script(fx: Fixture) {
       in_scope: true,
       claim_holds: true,
       introduced_by_pr: true,
-      quotes: [],
+      quotes: ["i <= values.length"],
       rationale: "r",
       score: 95,
       severity: "blocking",
@@ -167,6 +167,7 @@ describe("pr-review run through the CLI", () => {
     const doc = JSON.parse(stdout);
     expect(Object.keys(doc).sort()).toEqual([
       "coverage",
+      "excluded_files",
       "findings",
       "record_path",
       "tier",

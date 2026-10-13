@@ -8,7 +8,11 @@ import { gather, type GatherResult } from "./gather/index.js";
 import { withHeadWorktree } from "./gather/worktree.js";
 import { mergeFindings } from "./merge/index.js";
 import { writeRecord } from "./record/write.js";
-import { loadBuiltinReviewers } from "./reviewers/loader.js";
+import {
+  loadBuiltinReviewers,
+  reviewerOverrides,
+  type ReviewerDefinition,
+} from "./reviewers/loader.js";
 import { selectReviewers } from "./reviewers/select.js";
 import type { Finding } from "./schemas/finding.js";
 import type { QueryFailure, RunRecord } from "./schemas/record.js";
@@ -56,6 +60,20 @@ function defaultModels(): Record<Role, { model: string; effort: Effort }> {
     };
   }
   return models;
+}
+
+/**
+ * The record entry of each selected reviewer, with the model and effort
+ * that its queries use after its frontmatter override.
+ */
+export function describeSelected(
+  selected: { def: ReviewerDefinition; trigger: string }[],
+): RunRecord["identity"]["selected_reviewers"] {
+  return selected.map((s) => ({
+    name: s.def.frontmatter.name,
+    trigger: s.trigger,
+    ...reviewerOverrides(s.def),
+  }));
 }
 
 // Wrap the client so that each query gives one cost entry, also a query
@@ -249,17 +267,14 @@ export async function runReview(
       mergeFindings(client, options, verified, { cwd, totalHunks: gathered.totalHunks, semaphore }),
     );
 
+    // A failed or refused verifier call, first or escalation, drops its
+    // finding and makes the verdict incomplete.
     const counts = verificationCounts(runs, verifications);
-    // A failed or refused escalation leaves the first result standing, so
-    // only a reviewer pass or a first verifier call counts against the verdict.
     const verdict = decideVerdict({
       tier: decision.tier,
       reviewerRuns: runs,
-      verifierFailures: counts.droppedByFailedVerifier,
-      refusals:
-        counts.refusals -
-        verifications.filter((v) => isFailure(v.escalated) && v.escalated.kind === "refusal")
-          .length,
+      verifierFailures: counts.failedVerifierCalls,
+      refusals: counts.refusals,
       posted: merged.posted,
     });
 
@@ -278,10 +293,7 @@ export async function runReview(
         triage: brief,
         tier: decision.tier,
         tier_reason: decision.reason,
-        selected_reviewers: selected.map((s) => ({
-          name: s.def.frontmatter.name,
-          trigger: s.trigger,
-        })),
+        selected_reviewers: describeSelected(selected),
         models: defaultModels(),
       },
       stages: {

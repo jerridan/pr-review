@@ -188,7 +188,8 @@ describe("coverage (A8)", () => {
         { first: vresult(70), escalated: refusal, final: vresult(70), passed: false },
       ],
     );
-    expect(counts).toEqual({ droppedByFailedVerifier: 2, failedVerifierCalls: 4, refusals: 3 });
+    // A failed or refused escalation drops its finding too.
+    expect(counts).toEqual({ droppedByFailedVerifier: 4, failedVerifierCalls: 4, refusals: 3 });
   });
 });
 
@@ -300,7 +301,7 @@ describe("the query failure rule: each condition and each stage outcome (A8)", (
       ).toBe("incomplete");
     });
 
-    it(`${kind}: a failed escalation leaves the first result standing`, async () => {
+    it(`${kind}: a failed escalation drops the finding and the verdict is incomplete`, async () => {
       const fake = createFakeSdkClient((req) =>
         req.role === "verifier" ? { ok: true, output: vresult(84), raw: META } : failed,
       );
@@ -313,10 +314,25 @@ describe("the query failure rule: each condition and each stage outcome (A8)", (
       expect(out).toEqual({
         first: vresult(84),
         escalated: failure,
-        final: vresult(84),
-        passed: true,
+        final: null,
+        passed: false,
       });
-      expect(verificationCounts([], [out]).droppedByFailedVerifier).toBe(0);
+      const runs = [run("diff-bugs", "ok")];
+      const counts = verificationCounts(runs, [out]);
+      expect(counts.droppedByFailedVerifier).toBe(1);
+      expect(counts.failedVerifierCalls).toBe(1);
+      expect(
+        coverage(runs, counts.droppedByFailedVerifier).findings_dropped_by_failed_verifier,
+      ).toBe(1);
+      expect(
+        decideVerdict({
+          tier: "full",
+          reviewerRuns: runs,
+          verifierFailures: counts.failedVerifierCalls,
+          refusals: counts.refusals,
+          posted: [],
+        }),
+      ).toBe("incomplete");
     });
 
     it(`${kind}: a failed merge posts the group unmerged`, async () => {

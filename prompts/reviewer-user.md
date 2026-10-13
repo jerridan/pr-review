@@ -1,6 +1,14 @@
 ---
 role: reviewer
 kind: user
+no_brief_text: No triage brief is available for this change.
+brief_text: |-
+  Summary: {{summary}}
+
+  Hotspots:
+  {{hotspots}}
+hotspot_line: "- {{hotspot}}"
+empty_list_text: "- none"
 ---
 {{brief}}
 

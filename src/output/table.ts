@@ -26,6 +26,11 @@ function table(rows: string[][], rightAligned: Set<number>): string[] {
   );
 }
 
+// The files that the diff does not hold, so no reviewer saw them.
+function excluded(files: RunRecord["identity"]["excluded_files"]): string {
+  return list(files.map((f) => `${f.path} (${f.reason})`));
+}
+
 export function formatTable(record: RunRecord): string {
   const { identity, posted, cost } = record;
   const coverage = posted.coverage;
@@ -34,6 +39,7 @@ export function formatTable(record: RunRecord): string {
     `Reason: ${identity.tier_reason}`,
     `Verdict: ${posted.verdict}`,
     `Coverage: reviewers ran: ${list(coverage.reviewers_ran)}; reviewers failed: ${list(coverage.reviewers_failed)}; findings dropped by failed verifier calls: ${coverage.findings_dropped_by_failed_verifier}`,
+    `Excluded files: ${excluded(identity.excluded_files)}`,
     `Cost: ${cost.total_cost_usd === null ? "unknown" : `$${cost.total_cost_usd.toFixed(4)}`}`,
     "",
   ];
