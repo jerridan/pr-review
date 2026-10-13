@@ -54,6 +54,9 @@ const GATHERED: GatherResult = {
   sensitive: [],
   diff: DIFF,
   totalHunks: 1,
+  mergeBase: "c".repeat(40),
+  description: "",
+  history: null,
 };
 
 function finding(line: number): Finding {

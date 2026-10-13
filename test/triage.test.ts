@@ -150,6 +150,9 @@ const GATHERED: GatherResult = {
   sensitive: [".github/workflows/ci.yml"],
   diff: DIFF,
   totalHunks: 2,
+  mergeBase: "c".repeat(40),
+  description: "",
+  history: null,
 };
 
 const OPTIONS: RunOptions = { allowApiKey: false, env: {} };

@@ -187,6 +187,17 @@ describe("the record file (A9)", () => {
     expect(record.identity.config_hash).toBeNull();
   });
 
+  it("holds the description, the history flags and no injected file (R9)", () => {
+    expect(record.identity.description).toBe(
+      "Head: add average, move format helpers, bump lockfile, add CI",
+    );
+    expect(record.identity.history).toEqual({ built: true, truncated: false });
+    expect(record.identity.injected).toEqual([]);
+    // The reviewer got the body alone, with no rules block.
+    const reviewer = calls.find((c) => c.role === "reviewer");
+    expect(reviewer?.systemPrompt).not.toContain("CLAUDE.md");
+  });
+
   it("holds the default config, no loaded files and no custom reviewers", () => {
     expect(record.identity.config).toEqual({
       files: [],
@@ -265,6 +276,13 @@ describe("the config hash of a fixture with config (R4)", () => {
       concurrency: 2,
     });
     expect(configRecord.identity.config.custom_reviewers).toEqual([]);
+  });
+
+  it("lists the injected files: the base commit's CLAUDE.md, then rules.md (R5)", () => {
+    expect(configRecord.identity.injected).toEqual([
+      { path: "CLAUDE.md", truncated: false },
+      { path: ".pr-review/rules.md", truncated: false },
+    ]);
   });
 
   it("writes a record that validates", () => {

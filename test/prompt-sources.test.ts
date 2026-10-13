@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,6 +18,7 @@ import type { Finding } from "../src/schemas/finding.js";
 import type { TriageBrief } from "../src/schemas/triage.js";
 import type { QueryMeta, QueryOutcome, QueryRequest } from "../src/sdk/client.js";
 import { createFakeSdkClient } from "../src/sdk/fake.js";
+import { buildQueryOptions } from "../src/sdk/options.js";
 import { createSemaphore } from "../src/semaphore.js";
 import { runTriage } from "../src/triage/index.js";
 import { DEFAULT_VERIFY_CONFIG, verifyFinding } from "../src/verify/index.js";
@@ -76,8 +77,12 @@ function promptSources(): PromptSources {
     const text = body.replace(/^(?:\r?\n)+/, "");
     if (frontmatter.kind === "user") templates.add(text.replace(TOKEN, MARK));
     else systems.add(text);
-    if (typeof frontmatter.user_message === "string") {
-      templates.add(frontmatter.user_message.replace(TOKEN, MARK));
+    // A template of a whole user message is in a frontmatter key that
+    // ends with "user_message".
+    for (const [key, value] of Object.entries(frontmatter)) {
+      if (key.endsWith("user_message") && typeof value === "string") {
+        templates.add(value.replace(TOKEN, MARK));
+      }
     }
   }
   return { systems, templates };
@@ -116,12 +121,42 @@ const META: QueryMeta = {
   costUsd: 0,
 };
 
+// The texts that the fixture puts on its base commit, for injection (R5).
+const CLAUDE_TEXT = "CLAUDE-base-rule: name each test after its behaviour.\n";
+const RULES_TEXT = "RULES-base-rule: keep functions short.\n";
+const HEAD_MESSAGE = "Head: add average, move format helpers, bump lockfile, add CI";
+
+// The rules template: the fixed text that follows the reviewer body.
+function rulesTemplate(): { body: string; afterBody: string } {
+  const body = loadPrompt("reviewer-rules.md").body;
+  const parts = body.split(TOKEN);
+  expect(parts[0]?.trim(), "reviewer-rules.md starts with the body token").toBe("");
+  return { body, afterBody: parts[1] ?? "" };
+}
+
 describe("A13: every query takes its prompts from the prompt files", () => {
   let fixture = "";
   const calls: QueryRequest[] = [];
 
   beforeAll(async () => {
-    const { stdout } = await run("bash", [SCRIPT]);
+    const source = mkdtempSync(join(tmpdir(), "pr-review-sources-in-"));
+    let stdout = "";
+    try {
+      mkdirSync(join(source, "dir"));
+      writeFileSync(join(source, "dir", "rules.md"), RULES_TEXT);
+      writeFileSync(join(source, "claude.md"), CLAUDE_TEXT);
+      stdout = (
+        await run("bash", [
+          SCRIPT,
+          "--pr-review-dir",
+          join(source, "dir"),
+          "--claude-md",
+          join(source, "claude.md"),
+        ])
+      ).stdout;
+    } finally {
+      rmSync(source, { recursive: true, force: true });
+    }
     const value = (key: string) =>
       stdout
         .split("\n")
@@ -226,10 +261,55 @@ describe("A13: every query takes its prompts from the prompt files", () => {
     expect(new Set(calls.map((c) => c.role))).toEqual(new Set(roles));
   });
 
-  it("sends a system prompt that is the body of a prompt file", () => {
+  it("sends a system prompt that is the body of a prompt file; for a reviewer, the body before the injected block", () => {
     const { systems } = promptSources();
+    const bodies = new Set([...systems].map((text) => text.trimEnd()));
+    const { afterBody } = rulesTemplate();
+    expect(afterBody.trim()).not.toBe("");
     for (const call of calls) {
-      expect(systems.has(call.systemPrompt), `${call.role} system prompt`).toBe(true);
+      if (call.role === "reviewer") {
+        const cut = call.systemPrompt.indexOf(afterBody);
+        expect(cut, "the reviewer system prompt holds the rules block").toBeGreaterThan(0);
+        const body = call.systemPrompt.slice(0, cut);
+        expect(bodies.has(body.trimEnd()), `${call.reviewerName} body`).toBe(true);
+      } else {
+        expect(systems.has(call.systemPrompt), `${call.role} system prompt`).toBe(true);
+      }
+    }
+  });
+
+  it("ends each reviewer system prompt with the rules block of the base commit's CLAUDE.md and rules.md (R5)", () => {
+    const { body: template, afterBody } = rulesTemplate();
+    const reviewers = calls.filter((c) => c.role === "reviewer");
+    expect(reviewers.length).toBeGreaterThan(0);
+    for (const call of reviewers) {
+      const block = call.systemPrompt.slice(call.systemPrompt.indexOf(afterBody));
+      expect(block).toContain(CLAUDE_TEXT.trim());
+      expect(block).toContain(RULES_TEXT.trim());
+      expect(call.systemPrompt.trimEnd().endsWith(RULES_TEXT.trim())).toBe(true);
+      const data = [CLAUDE_TEXT.trim(), RULES_TEXT.trim(), "CLAUDE.md", ".pr-review/rules.md"];
+      expect(leftover(block, data, [template, field("reviewer-rules.md", "file_text")])).toBe("");
+    }
+  });
+
+  it("keeps settingSources an empty list on every query", () => {
+    expect(calls.length).toBeGreaterThan(0);
+    for (const call of calls) {
+      const options = buildQueryOptions(call, { allowApiKey: false, env: {} });
+      expect(options.settingSources, `${call.role} settingSources`).toEqual([]);
+    }
+  });
+
+  it("sends the description block, with the head commit message, to every verifier query (R2)", () => {
+    const verifiers = calls.filter(
+      (c) => c.role === "verifier" || c.role === "verifier-escalation",
+    );
+    expect(verifiers.length).toBeGreaterThan(0);
+    for (const call of verifiers) {
+      expect(blocks(call.userMessage).get("description")).toBe(HEAD_MESSAGE);
+    }
+    for (const call of calls.filter((c) => c.role === "reviewer")) {
+      expect(blocks(call.userMessage).get("description")).toBe(HEAD_MESSAGE);
     }
   });
 
@@ -376,6 +456,9 @@ describe("A13: placeholder and list text in a block comes from the prompt files"
     sensitive: ["ci.yml"],
     diff: "diff --git a/a.ts b/a.ts\n+const a = 1;\n",
     totalHunks: 4,
+    mergeBase: "c".repeat(40),
+    description: "",
+    history: null,
   };
 
   it("verifier: the text for a missing head file and for a file with no diff", async () => {

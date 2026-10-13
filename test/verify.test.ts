@@ -496,6 +496,9 @@ describe("verification starts per finding", () => {
     sensitive: [],
     diff: DIFF,
     totalHunks: 1,
+    mergeBase: "c".repeat(40),
+    description: "",
+    history: null,
   };
 
   function def(name: string): ReviewerDefinition {
@@ -645,5 +648,40 @@ describe("verification starts per finding", () => {
     });
     expect(merged.posted.map((p) => p.claim)).toEqual(["CLAIM-loop-reads-past-end"]);
     expect(merged.capped).toEqual([]);
+  });
+});
+
+describe("the description block in the verifier message (R2)", () => {
+  const blockOrder = (message: string) =>
+    [...message.matchAll(/<([a-z][a-z0-9_]*)_[0-9a-f]{16}>\n([\s\S]*?)\n<\/\1_[0-9a-f]{16}>/g)].map(
+      (m) => ({ label: m[1] ?? "", text: m[2] ?? "" }),
+    );
+
+  it("holds the description of the change for every finding, before the diff", async () => {
+    const fake = createFakeSdkClient(script(result(70), result(95)));
+    await verifyFinding(fake, OPTIONS, finding(), { ...ctx(), description: "DESC-of-change" });
+    expect(roles(fake.calls)).toEqual(["verifier", "verifier-escalation"]);
+    for (const call of fake.calls) {
+      const order = blockOrder(call.userMessage);
+      expect(order.map((b) => b.label)).toEqual(["finding", "head_file", "description", "diff"]);
+      expect(order.find((b) => b.label === "description")?.text).toBe("DESC-of-change");
+    }
+  });
+
+  it("uses the prompt-file text when the description is empty", async () => {
+    const fake = createFakeSdkClient(script(result(95)));
+    await verifyFinding(fake, OPTIONS, finding(), { ...ctx(), description: "" });
+    const text = loadPrompt("verifier.md").frontmatter.no_description_text;
+    expect(typeof text).toBe("string");
+    expect(
+      blockOrder(fake.calls[0]?.userMessage ?? "").find((b) => b.label === "description")?.text,
+    ).toBe((text as string).trim());
+  });
+
+  it("does not tell the verifier which reviewer gave the finding", async () => {
+    const fake = createFakeSdkClient(script(result(95)));
+    await verifyFinding(fake, OPTIONS, finding(), { ...ctx(), description: "d" });
+    expect(fake.calls[0]?.reviewerName).toBeUndefined();
+    expect(fake.calls[0]?.userMessage).not.toContain("diff-bugs");
   });
 });

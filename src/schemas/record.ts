@@ -59,6 +59,12 @@ export type RunRecord = {
       values: RepoConfig;
       custom_reviewers: CustomReviewerEntry[];
     };
+    /** The description of the change that every reviewer and verifier got. */
+    description: string;
+    /** Whether gather built the history block, and whether it cut the block to fit. */
+    history: { built: boolean; truncated: boolean };
+    /** The files in each reviewer's rules block, and whether each was cut to fit. */
+    injected: { path: string; truncated: boolean }[];
     changed_files: { path: string; hunks: number }[];
     excluded_files: { path: string; reason: "rename-only" | "generated" }[];
     sensitive_files: string[];
@@ -188,6 +194,9 @@ const IdentitySchema = z.strictObject({
       }),
     ),
   }),
+  description: z.string(),
+  history: z.strictObject({ built: z.boolean(), truncated: z.boolean() }),
+  injected: z.array(z.strictObject({ path: z.string(), truncated: z.boolean() })),
   changed_files: z.array(z.strictObject({ path: z.string(), hunks: integer() })),
   excluded_files: z.array(
     z.strictObject({ path: z.string(), reason: z.enum(["rename-only", "generated"]) }),

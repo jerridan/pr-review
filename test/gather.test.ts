@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -7,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DEFAULT_GLOBS, withRepoGlobs } from "../src/config/globs.js";
 import { countHunks, diffSections, filterDiff, parseNameStatus } from "../src/gather/diff.js";
 import { applyExclusions } from "../src/gather/exclusions.js";
+import { gatherHistory, HISTORY_CAP_BYTES, oldSideRanges } from "../src/gather/history.js";
 import { gather, type GatherResult } from "../src/gather/index.js";
 import { withHeadWorktree } from "../src/gather/worktree.js";
 
@@ -314,6 +316,40 @@ describe("gather on the fixture repo (A2)", () => {
     expect(result.diff).toContain("+++ b/.github/workflows/ci.yml");
   });
 
+  it("gives the merge base of base and head", async () => {
+    const { stdout: mergeBase } = await run("git", [
+      "-C",
+      fixture.repo,
+      "merge-base",
+      fixture.base,
+      fixture.head,
+    ]);
+    expect(result.mergeBase).toBe(mergeBase.trim());
+    expect(result.mergeBase).not.toBe(fixture.base);
+  });
+
+  it("gives the description: the head commit message (R2)", () => {
+    expect(result.description).toBe(
+      "Head: add average, move format helpers, bump lockfile, add CI",
+    );
+  });
+
+  it("gives a history block that names the planted file and holds a blame line for it (R2)", () => {
+    expect(result.history).not.toBeNull();
+    const text = result.history?.text ?? "";
+    expect(text).toContain("src/stats.ts");
+    // A blame line: the commit, the author and date, the line number, the code.
+    expect(text).toMatch(/^\^?[0-9a-f]{7,} \(Fixture\s+2026-01-01\s+\d+\) /m);
+    expect(text).toContain("  return total;");
+    // The log line of the commit that last changed those lines.
+    expect(text).toMatch(/^[0-9a-f]{7,} 2026-01-01 Fixture Base: sum, format helpers, lockfile$/m);
+    expect(result.history?.truncated).toBe(false);
+  });
+
+  it("gives no history for a file that the merge base does not have", () => {
+    expect(result.history?.text ?? "").not.toContain("ci.yml");
+  });
+
   it("throws on a SHA that does not exist", async () => {
     await expect(
       gather(fixture.repo, "0".repeat(40), fixture.head, DEFAULT_GLOBS),
@@ -384,5 +420,99 @@ describe("withHeadWorktree", () => {
 
   it("throws on a head that does not exist", async () => {
     await expect(withHeadWorktree(fixture.repo, "f".repeat(40), async () => 1)).rejects.toThrow();
+  });
+});
+
+describe("oldSideRanges", () => {
+  it("takes the old side of each hunk, context lines included", () => {
+    const section = [
+      "diff --git a/src/x.ts b/src/x.ts",
+      "--- a/src/x.ts",
+      "+++ b/src/x.ts",
+      "@@ -5,7 +5,9 @@ function f() {",
+      " a",
+      "@@ -40 +42,2 @@",
+      " b",
+      "@@ -12,0 +15,3 @@",
+      "+c",
+      "@@ -0,0 +1,2 @@",
+      "+d",
+      "",
+    ].join("\n");
+    expect(oldSideRanges(section)).toEqual([
+      { start: 5, end: 11 },
+      { start: 40, end: 40 },
+      { start: 12, end: 12 },
+    ]);
+  });
+
+  it("ignores a line in a hunk body that only looks like a header", () => {
+    const section = ["@@ -1,2 +1,2 @@", "-@@ -9,9 +9,9 @@", "+x", " y", ""].join("\n");
+    expect(oldSideRanges(section)).toEqual([{ start: 1, end: 2 }]);
+  });
+
+  it("gives no range for a section with no hunk", () => {
+    expect(oldSideRanges("diff --git a/x b/x\nold mode 100644\nnew mode 100755\n")).toEqual([]);
+  });
+});
+
+describe("gatherHistory", () => {
+  const GIT_ENV = {
+    ...process.env,
+    GIT_CONFIG_NOSYSTEM: "1",
+    GIT_CONFIG_GLOBAL: "/dev/null",
+    GIT_AUTHOR_NAME: "Hist",
+    GIT_AUTHOR_EMAIL: "hist@example.invalid",
+    GIT_COMMITTER_NAME: "Hist",
+    GIT_COMMITTER_EMAIL: "hist@example.invalid",
+    GIT_AUTHOR_DATE: "2026-02-03T00:00:00Z",
+    GIT_COMMITTER_DATE: "2026-02-03T00:00:00Z",
+  };
+  let repo = "";
+  let sha = "";
+
+  beforeAll(async () => {
+    repo = mkdtempSync(join(tmpdir(), "pr-review-history-"));
+    const git = (...args: string[]) => run("git", ["-C", repo, ...args], { env: GIT_ENV });
+    await git("init", "--quiet", "--initial-branch=main");
+    const big = Array.from({ length: 3000 }, (_, i) => `const line${i} = "${"x".repeat(40)}";`);
+    writeFileSync(join(repo, "big.ts"), `${big.join("\n")}\n`);
+    writeFileSync(join(repo, "small.ts"), "one\ntwo\nthree\n");
+    await git("add", "-A");
+    await git("commit", "--quiet", "--no-gpg-sign", "-m", "Add files");
+    sha = (await git("rev-parse", "HEAD")).stdout.trim();
+  }, 30_000);
+
+  afterAll(() => {
+    if (repo) rmSync(repo, { recursive: true, force: true });
+  });
+
+  it("gives null when no file exists at the merge base", async () => {
+    expect(await gatherHistory(repo, sha, [])).toBeNull();
+    expect(
+      await gatherHistory(repo, sha, [{ path: "absent.ts", ranges: [{ start: 1, end: 2 }] }]),
+    ).toBeNull();
+  });
+
+  it("limits the blame to the ranges, and clamps a range to the file", async () => {
+    const out = await gatherHistory(repo, sha, [
+      { path: "small.ts", ranges: [{ start: 2, end: 9 }] },
+    ]);
+    expect(out?.truncated).toBe(false);
+    expect(out?.text).toMatch(/\(Hist\s+2026-02-03\s+2\) two$/m);
+    expect(out?.text).toMatch(/\(Hist\s+2026-02-03\s+3\) three$/m);
+    expect(out?.text).not.toMatch(/\) one$/m);
+    expect(out?.text).toMatch(/^[0-9a-f]{7,} 2026-02-03 Hist Add files$/m);
+  });
+
+  it("cuts the block at a line end to fit the cap, and notes the cut", async () => {
+    const out = await gatherHistory(repo, sha, [
+      { path: "big.ts", ranges: [{ start: 1, end: 3000 }] },
+    ]);
+    expect(out?.truncated).toBe(true);
+    expect(Buffer.byteLength(out?.text ?? "", "utf8")).toBeLessThanOrEqual(HISTORY_CAP_BYTES);
+    expect(Buffer.byteLength(out?.text ?? "", "utf8")).toBeGreaterThan(HISTORY_CAP_BYTES - 200);
+    expect(HISTORY_CAP_BYTES).toBe(65536);
+    expect(out?.text.endsWith(";")).toBe(true);
   });
 });

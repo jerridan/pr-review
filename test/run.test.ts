@@ -815,6 +815,49 @@ describe("the repo config in a run (R3)", () => {
     expect(record.posted.findings.length).toBeGreaterThan(0);
   }, 30_000);
 
+  it("injects the base CLAUDE.md into each reviewer prompt, and a skip run injects nothing", async () => {
+    const source = mkdtempSync(join(tmpdir(), "pr-review-run-claude-"));
+    let cfx: Fixture;
+    try {
+      writeFileSync(join(source, "claude.md"), "CLAUDE-RUN-RULE: keep it small.\n");
+      cfx = await makeFixture("--claude-md", join(source, "claude.md"));
+      fixtures.push(cfx);
+    } finally {
+      rmSync(source, { recursive: true, force: true });
+    }
+    const fake = createFakeSdkClient(script(cfx));
+    const { record } = await runReview({
+      repo: cfx.repo,
+      base: cfx.base,
+      head: cfx.head,
+      outDir: join(outRoot, "claude-run"),
+      allowApiKey: false,
+      client: fake,
+    });
+    const reviewers = fake.calls.filter((c) => c.role === "reviewer");
+    expect(reviewers.length).toBeGreaterThan(0);
+    for (const call of reviewers) {
+      expect(call.systemPrompt.trimEnd().endsWith("CLAUDE-RUN-RULE: keep it small.")).toBe(true);
+    }
+    for (const call of fake.calls.filter((c) => c.role !== "reviewer")) {
+      expect(call.systemPrompt).not.toContain("CLAUDE-RUN-RULE");
+    }
+    expect(record.identity.injected).toEqual([{ path: "CLAUDE.md", truncated: false }]);
+    // The config hash does not include CLAUDE.md.
+    expect(record.identity.config_hash).toBeNull();
+
+    const skipped = await runReview({
+      repo: cfx.repo,
+      base: cfx.base,
+      head: cfx.head,
+      tierOverride: "skip",
+      outDir: join(outRoot, "claude-skip"),
+      allowApiKey: false,
+      client: createFakeSdkClient(script(cfx)),
+    });
+    expect(skipped.record.identity.injected).toEqual([]);
+  }, 30_000);
+
   it("runs with the defaults when the base commit has no .pr-review/", async () => {
     const fake = createFakeSdkClient(script(fx));
     const { record } = await runReview({

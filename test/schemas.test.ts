@@ -100,6 +100,9 @@ function makeRecord(): RunRecord {
       tool_version: "0.1.0",
       config_hash: null,
       config: { files: [], values: DEFAULT_REPO_CONFIG, custom_reviewers: [] },
+      description: "Fix the loop bound.",
+      history: { built: true, truncated: false },
+      injected: [{ path: "CLAUDE.md", truncated: false }],
       changed_files: [{ path: "src/a.ts", hunks: 1 }],
       excluded_files: [{ path: "package-lock.json", reason: "generated" }],
       sensitive_files: [],
@@ -404,6 +407,21 @@ describe("RecordSchema", () => {
     expect(
       withConfig({ files: [], values: DEFAULT_REPO_CONFIG, custom_reviewers: [], hash: "x" }),
     ).toBe(false);
+  });
+
+  it("requires the description, the history flags and the injected files", () => {
+    const record = makeRecord();
+    const withIdentity = (patch: Record<string, unknown>) =>
+      RecordSchema.safeParse({ ...record, identity: { ...record.identity, ...patch } }).success;
+    expect(withIdentity({ description: "", history: { built: false, truncated: false } })).toBe(
+      true,
+    );
+    expect(withIdentity({ injected: [] })).toBe(true);
+    expect(withIdentity({ description: undefined })).toBe(false);
+    expect(withIdentity({ history: { built: true } })).toBe(false);
+    expect(withIdentity({ history: { built: true, truncated: false, bytes: 1 } })).toBe(false);
+    expect(withIdentity({ injected: [{ path: "CLAUDE.md" }] })).toBe(false);
+    expect(withIdentity({ injected: undefined })).toBe(false);
   });
 
   it("requires coverage.reviewers_skipped, with a known reason", () => {

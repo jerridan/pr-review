@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { withRepoGlobs } from "./config/globs.js";
 import { ROLE_DEFAULTS, ROLES, resolveModel, type Effort, type Role } from "./config/models.js";
 import { loadRepoConfig, type ConfigRole, type RepoConfig } from "./config/repo-config.js";
-import { runReviewers, type ReviewerRun } from "./find/index.js";
+import { injectedRuleFiles, runReviewers, type ReviewerRun } from "./find/index.js";
 import { diffSections } from "./gather/diff.js";
 import { gather, resolveCommit, type GatherResult } from "./gather/index.js";
 import { withHeadWorktree } from "./gather/worktree.js";
@@ -304,6 +304,9 @@ export async function runReview(
       }
       return true;
     });
+    // The rules block of every reviewer holds the base commit's CLAUDE.md
+    // and rules.md, which the config loader already read.
+    const rules = { claudeMd: loaded.claudeMd, rulesMd: loaded.rulesMd };
     const thresholds = new Map(
       selected.map((s) => [s.def.frontmatter.name, effectiveThreshold(s.def, config)]),
     );
@@ -336,6 +339,7 @@ export async function runReview(
             prompt: verifierPrompt,
             semaphore,
             config: verifyConfig,
+            description: gathered.description,
           });
         })
         .then(
@@ -356,7 +360,7 @@ export async function runReview(
           client,
           options,
           selected,
-          { gathered, brief, cwd, semaphore, sections, config },
+          { gathered, brief, cwd, semaphore, sections, config, rules },
           onFinding,
         );
       } catch (err) {
@@ -401,6 +405,16 @@ export async function runReview(
         tool_version: toolVersion(),
         config_hash: loaded.hash,
         config: { files: loaded.files, values: config, custom_reviewers: [] },
+        description: gathered.description,
+        history: {
+          built: gathered.history !== null,
+          truncated: gathered.history?.truncated ?? false,
+        },
+        // A skip run starts no reviewer, so it injects no file.
+        injected:
+          selected.length > 0
+            ? injectedRuleFiles(rules).map((f) => ({ path: f.path, truncated: f.truncated }))
+            : [],
         changed_files: gathered.changedFiles,
         excluded_files: gathered.excluded,
         sensitive_files: gathered.sensitive,
