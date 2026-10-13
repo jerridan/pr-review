@@ -83,8 +83,12 @@ const hit = record.posted.findings.find(
 const verified = record.stages.verifications.some(
   (v) => v.passed && v.finding.file === file && v.finding.start_line <= line && v.finding.end_line >= line,
 );
+// The total is a lower bound when a query has no cost, as in the table output.
 const cost = record.cost.total_cost_usd;
-console.log(`Total cost: ${cost === null ? "unknown" : `$${cost.toFixed(4)}`}`);
+const missing = record.cost.queries_without_cost;
+const note = missing > 0 ? ` (${missing} ${missing === 1 ? "query" : "queries"} without a cost)` : "";
+const total = cost === null ? "unknown" : `${missing > 0 ? "at least " : ""}$${cost.toFixed(4)}`;
+console.log(`Total cost: ${total}${note}`);
 
 mkdirSync("pr-review-records", { recursive: true });
 const kept = join("pr-review-records", `acceptance-${basename(doc.record_path)}`);

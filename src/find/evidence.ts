@@ -46,6 +46,8 @@ export function evidenceMatches(
   const quote = normalizeWs(evidence);
   if (quote === "") return false;
   if (normalizedHeadFile !== null && normalizedHeadFile.includes(quote)) return true;
+  // Every added and context line is also in the head file, so the diff
+  // text only matters for a quote that keeps a diff marker ("+" or " ").
   return normalizedFileDiff.includes(quote);
 }
 

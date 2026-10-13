@@ -30,7 +30,7 @@ When you find no issue, return an empty findings list.
 
 ## Fields of a finding
 
-- file: the path from the repo root, as the diff shows it.
+- file: the path from the repo root, without the a/ or b/ prefix of the diff and without a leading /.
 - start_line and end_line: the line numbers in the head version of the file. Read the file to get them.
 - category: bug, security, test, convention, docs, performance or other.
 - severity_estimate: blocking (causes a real bug or an incident if merged), suggestion (makes the code safer or clearer) or nit.

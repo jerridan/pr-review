@@ -88,6 +88,13 @@ describe("built-in reviewers (A4)", () => {
     expect(prompt).toMatch(/subagent/i);
     expect(prompt.split("\n").length).toBeLessThan(80);
   });
+
+  it("tells the reviewer to give the file path without the diff prefix or a leading /", () => {
+    const def = loadBuiltinReviewers()[0] as ReviewerDefinition;
+    expect(def.systemPrompt).toContain(
+      "the path from the repo root, without the a/ or b/ prefix of the diff and without a leading /",
+    );
+  });
 });
 
 describe("loadReviewer", () => {
