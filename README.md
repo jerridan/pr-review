@@ -41,7 +41,7 @@ The tool uses your Claude subscription. It never reads or stores credentials. Pi
 
 When `CLAUDE_CODE_OAUTH_TOKEN` is set, it wins over the saved login.
 
-The tool removes `ANTHROPIC_API_KEY` from the environment of every query. To keep it, pass `--allow-api-key`.
+The tool removes `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL` and the Bedrock, Vertex and Foundry switches from the environment of every query, so the subscription login is the only route. To keep them, pass `--allow-api-key`.
 
 ## Run
 

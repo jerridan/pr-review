@@ -41,4 +41,5 @@ Goal: measure a change to a prompt, a threshold or a model before it ships (sect
 - The verifier prompt and the merge prompt have not been tuned on real findings. Review them against the first ten records.
 - `pr-review smoke` uses Sonnet 5.5; consider Haiku 5.5 to make the check cheaper.
 - The fixture's head commit touches `.github/workflows/`, so every acceptance run takes the full tier by the sensitive floor. Add a second fixture without a sensitive path to exercise triage.
+- The default record directory `./pr-review-records` sits inside the repo under review (skeptical review nit, declined for D1); D3 moves records to workflow artifacts and a branch.
 - The acceptance run on 2026-10-13 cost about $0.61 for one reviewer pass and one verification on a 2-file fixture. Track this per run in D4.

@@ -140,7 +140,10 @@ export function createProgram(deps: { client?: SdkClient }): Command {
         "skip",
       ]),
     )
-    .option("--allow-api-key", "keep ANTHROPIC_API_KEY in the SDK environment")
+    .option(
+      "--allow-api-key",
+      "keep ANTHROPIC_API_KEY and the other provider variables in the SDK environment",
+    )
     .action(async (options: RunCliOptions) => {
       await runCommand(deps, options);
     });
@@ -148,7 +151,10 @@ export function createProgram(deps: { client?: SdkClient }): Command {
   program
     .command("smoke")
     .description("Make one structured-output query and show the model, the cost and the result.")
-    .option("--allow-api-key", "keep ANTHROPIC_API_KEY in the SDK environment")
+    .option(
+      "--allow-api-key",
+      "keep ANTHROPIC_API_KEY and the other provider variables in the SDK environment",
+    )
     .action(async (options: { allowApiKey?: boolean }) => {
       await runSmoke(deps, options.allowApiKey === true);
     });
