@@ -387,6 +387,7 @@ describe("the record parts", () => {
       reviewers_ran: expect.arrayContaining(SEVEN),
       reviewers_failed: [],
       reviewers_skipped: [],
+      reviewers_without_bash: [],
       findings_dropped_by_failed_verifier: 1,
     });
   });

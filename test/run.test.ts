@@ -27,6 +27,8 @@ import type { TriageBrief } from "../src/schemas/triage.js";
 import type { VerifierResult } from "../src/schemas/verifier.js";
 import type { QueryMeta, QueryOutcome, QueryRequest } from "../src/sdk/client.js";
 import { createFakeSdkClient } from "../src/sdk/fake.js";
+import { buildQueryOptions } from "../src/sdk/options.js";
+import { UNTRUSTED_SYSTEM_LINE } from "../src/untrusted.js";
 
 // Test switches for the module mocks below. They are off unless a test
 // sets them.
@@ -1056,5 +1058,250 @@ describe("the seven built-in reviewers in a run (R1, R6)", () => {
     const full = await review(f, "seven-passes-full", "full");
     expect(passesOf(full.record, "diff-bugs").sort()).toEqual([1, 2, 3]);
     expect(passesOf(full.record, "conventions").sort()).toEqual([1, 2]);
+  }, 30_000);
+});
+
+// A custom reviewer file for .pr-review/reviewers/. Its body does not hold
+// the untrusted-data line or the other prompt rules.
+function customReviewer(trusted: boolean | null): string {
+  return [
+    "---",
+    "name: shell-check",
+    "description: Checks shell use.",
+    "model: sonnet",
+    "effort: medium",
+    "tools: [Read, Bash]",
+    "triggers:",
+    "  paths: []",
+    "  categories: []",
+    "  min_tier: fast",
+    "passes: 1",
+    "threshold: 80",
+    ...(trusted === null ? [] : [`trusted: ${trusted}`]),
+    "---",
+    "SHELL-BODY: you check the shell use of the change.",
+    "",
+  ].join("\n");
+}
+
+async function fixtureWithFiles(files: Record<string, string>): Promise<Fixture> {
+  const source = mkdtempSync(join(tmpdir(), "pr-review-run-files-"));
+  try {
+    for (const [path, text] of Object.entries(files)) {
+      mkdirSync(join(source, "dir", path, ".."), { recursive: true });
+      writeFileSync(join(source, "dir", path), text);
+    }
+    return await makeFixture("--pr-review-dir", join(source, "dir"));
+  } finally {
+    rmSync(source, { recursive: true, force: true });
+  }
+}
+
+describe("custom reviewers and the Bash policy (R7)", () => {
+  const fixtures: Fixture[] = [];
+  let trusted: Fixture;
+  let untrusted: Fixture;
+  beforeAll(async () => {
+    trusted = await fixtureWithFiles({ "reviewers/shell-check.md": customReviewer(true) });
+    untrusted = await fixtureWithFiles({ "reviewers/shell-check.md": customReviewer(null) });
+    fixtures.push(trusted, untrusted);
+  }, 30_000);
+  afterAll(() => {
+    for (const f of fixtures) rmSync(f.repo, { recursive: true, force: true });
+  });
+
+  async function review(f: Fixture, authorWriteAccess: boolean | undefined, out: string) {
+    const fake = createFakeSdkClient(script(f));
+    const { record } = await runReview({
+      repo: f.repo,
+      base: f.base,
+      head: f.head,
+      tierOverride: "fast",
+      outDir: join(outRoot, out),
+      allowApiKey: false,
+      client: fake,
+      ...(authorWriteAccess === undefined ? {} : { authorWriteAccess }),
+    });
+    return { record, fake };
+  }
+
+  const cases: {
+    label: string;
+    fixture: () => Fixture;
+    write: boolean | undefined;
+    reason: string | null;
+  }[] = [
+    { label: "trusted, with write access", fixture: () => trusted, write: true, reason: null },
+    {
+      label: "not trusted, with write access",
+      fixture: () => untrusted,
+      write: true,
+      reason: "not trusted",
+    },
+    {
+      label: "trusted, no write access",
+      fixture: () => trusted,
+      write: false,
+      reason: "author has no write access",
+    },
+    {
+      label: "not trusted, write access absent (false)",
+      fixture: () => untrusted,
+      write: undefined,
+      reason: "not trusted and author has no write access",
+    },
+  ];
+  for (const c of cases) {
+    it(`${c.reason === null ? "grants" : "does not grant"} Bash: ${c.label}`, async () => {
+      const granted = c.reason === null;
+      const { record, fake } = await review(c.fixture(), c.write, `bash-${c.label}`);
+      const custom = fake.calls.filter((call) => call.reviewerName === "shell-check");
+      expect(custom).toHaveLength(1);
+      const call = custom[0] as QueryRequest;
+      expect(call.bash === true).toBe(granted);
+      const opts = buildQueryOptions(call, { allowApiKey: false, env: {} });
+      expect((opts.tools as string[]).includes("Bash")).toBe(granted);
+      expect((opts.allowedTools as string[]).includes("Bash")).toBe(granted);
+      expect((opts.disallowedTools as string[]).includes("Bash")).toBe(!granted);
+      expect(opts.disallowedTools).toEqual(expect.arrayContaining(["Write", "Edit"]));
+      expect(opts.permissionMode).toBe("dontAsk");
+      // A built-in reviewer never gets Bash.
+      for (const other of fake.calls.filter((x) => x.role === "reviewer" && x !== call)) {
+        expect(other.bash).not.toBe(true);
+      }
+      expect(record.identity.config.custom_reviewers).toEqual([
+        { name: "shell-check", bash_granted: granted, reason: c.reason },
+      ]);
+      expect(record.posted.coverage.reviewers_without_bash).toEqual(
+        granted ? [] : [{ name: "shell-check", reason: c.reason }],
+      );
+      expect(
+        record.identity.selected_reviewers.find((r) => r.name === "shell-check")?.tools_ignored,
+      ).toEqual(granted ? [] : ["Bash"]);
+      expect(record.posted.coverage.reviewers_ran).toContain("shell-check");
+    }, 30_000);
+  }
+
+  it("runs a custom reviewer through the fake, with its body first and the prompt rules after it", async () => {
+    const { fake } = await review(untrusted, false, "custom-prompt");
+    const call = fake.calls.find((c) => c.reviewerName === "shell-check");
+    const prompt = call?.systemPrompt ?? "";
+    expect(prompt.startsWith("SHELL-BODY: you check the shell use of the change.")).toBe(true);
+    expect(prompt).toContain(UNTRUSTED_SYSTEM_LINE);
+    expect(prompt).toMatch(/subagent/i);
+    expect(prompt).toContain(
+      "the path from the repo root, without the a/ or b/ prefix of the diff and without a leading /",
+    );
+    expect(prompt).toMatch(/confidence/i);
+    expect(prompt).toMatch(/every issue/i);
+    expect(call?.overrides).toEqual({ model: "claude-sonnet-5-5", effort: "medium" });
+  }, 30_000);
+
+  it("puts the custom rules block before the repo rules block", async () => {
+    const source = mkdtempSync(join(tmpdir(), "pr-review-run-custom-rules-"));
+    let f: Fixture;
+    try {
+      mkdirSync(join(source, "dir", "reviewers"), { recursive: true });
+      writeFileSync(join(source, "dir", "reviewers", "shell-check.md"), customReviewer(false));
+      writeFileSync(join(source, "dir", "rules.md"), "REPO-RULE-TEXT\n");
+      f = await makeFixture("--pr-review-dir", join(source, "dir"));
+      fixtures.push(f);
+    } finally {
+      rmSync(source, { recursive: true, force: true });
+    }
+    const { fake } = await review(f, false, "custom-and-repo-rules");
+    const prompt = fake.calls.find((c) => c.reviewerName === "shell-check")?.systemPrompt ?? "";
+    expect(prompt.indexOf(UNTRUSTED_SYSTEM_LINE)).toBeGreaterThan(0);
+    expect(prompt.indexOf(UNTRUSTED_SYSTEM_LINE)).toBeLessThan(prompt.indexOf("REPO-RULE-TEXT"));
+    expect(prompt.trimEnd().endsWith("REPO-RULE-TEXT")).toBe(true);
+    // A built-in body keeps its rules inline and gets no custom block.
+    const builtin = fake.calls.find((c) => c.reviewerName === "diff-bugs")?.systemPrompt ?? "";
+    expect(builtin.split(UNTRUSTED_SYSTEM_LINE)).toHaveLength(2);
+  }, 30_000);
+});
+
+describe("the token ceiling (R8)", () => {
+  const fixtures: Fixture[] = [];
+  afterAll(() => {
+    for (const f of fixtures) rmSync(f.repo, { recursive: true, force: true });
+  });
+
+  const ONLY_DIFF_BUGS = [
+    "conventions",
+    "description-drift",
+    "docs-and-comments",
+    "history",
+    "security",
+    "tests",
+  ]
+    .map((n) => `  ${n}:\n    enabled: false\n`)
+    .join("");
+
+  // 300 + 200 + 50 + 50 = 600 tokens for each reviewer query.
+  const USAGE = {
+    "claude-opus-5-5": {
+      inputTokens: 300,
+      outputTokens: 200,
+      cacheReadInputTokens: 50,
+      cacheCreationInputTokens: 50,
+      webSearchRequests: 9999,
+      costUSD: 0.5,
+    },
+  };
+
+  async function review(concurrency: number, ceiling: number, out: string) {
+    const f = await fixtureWithFiles({
+      "config.yaml": `reviewers:\n${ONLY_DIFF_BUGS}concurrency: ${concurrency}\ntoken_ceiling: ${ceiling}\n`,
+    });
+    fixtures.push(f);
+    const base = script(f);
+    const fake = createFakeSdkClient(async (req) => {
+      const outcome = base(req);
+      if (req.role !== "reviewer" || !outcome.ok) return outcome;
+      // Both passes are in flight before the first one ends.
+      await new Promise((r) => setTimeout(r, 10));
+      return { ...outcome, raw: { ...META, usage: USAGE } };
+    });
+    const { record } = await runReview({
+      repo: f.repo,
+      base: f.base,
+      head: f.head,
+      tierOverride: "full",
+      outDir: join(outRoot, out),
+      allowApiKey: false,
+      client: fake,
+    });
+    return { record, fake };
+  }
+
+  it("starts no new reviewer pass once the sum reaches the ceiling, lists it and makes the verdict incomplete", async () => {
+    const { record, fake } = await review(1, 500, "ceiling-hit");
+    expect(fake.calls.filter((c) => c.role === "reviewer")).toHaveLength(1);
+    expect(record.stages.reviewers.map((r) => [r.name, r.pass])).toEqual([["diff-bugs", 1]]);
+    expect(record.posted.coverage.reviewers_skipped).toContainEqual({
+      name: "diff-bugs",
+      reason: "token ceiling",
+      pass: 2,
+    });
+    expect(record.posted.verdict).toBe("incomplete");
+    // The finding of the first pass is still verified.
+    expect(record.stages.verifications).toHaveLength(1);
+    expect(record.stages.verifications[0]?.passed).toBe(true);
+    expect(record.posted.findings).toHaveLength(1);
+  }, 30_000);
+
+  it("changes nothing when the ceiling is reached after every pass started", async () => {
+    const { record, fake } = await review(5, 500, "ceiling-late");
+    expect(fake.calls.filter((c) => c.role === "reviewer")).toHaveLength(2);
+    expect(record.posted.coverage.reviewers_skipped.map((s) => s.reason)).not.toContain(
+      "token ceiling",
+    );
+    expect(record.posted.verdict).toBe("would request changes");
+  }, 30_000);
+
+  it("changes nothing when the sum stays below the ceiling", async () => {
+    const { record } = await review(1, 100000, "ceiling-high");
+    expect(record.stages.reviewers.map((r) => r.pass).sort()).toEqual([1, 2]);
+    expect(record.posted.verdict).toBe("would request changes");
   }, 30_000);
 });

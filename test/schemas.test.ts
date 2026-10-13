@@ -178,6 +178,7 @@ function makeRecord(): RunRecord {
         reviewers_ran: ["diff-bugs"],
         reviewers_failed: [],
         reviewers_skipped: [],
+        reviewers_without_bash: [],
         findings_dropped_by_failed_verifier: 1,
       },
       findings: [
@@ -422,6 +423,22 @@ describe("RecordSchema", () => {
     expect(withIdentity({ history: { built: true, truncated: false, bytes: 1 } })).toBe(false);
     expect(withIdentity({ injected: [{ path: "CLAUDE.md" }] })).toBe(false);
     expect(withIdentity({ injected: undefined })).toBe(false);
+  });
+
+  it("requires coverage.reviewers_without_bash, each with a name and a reason", () => {
+    const record = makeRecord();
+    const withList = (list: unknown) =>
+      RecordSchema.safeParse({
+        ...record,
+        posted: {
+          ...record.posted,
+          coverage: { ...record.posted.coverage, reviewers_without_bash: list },
+        },
+      }).success;
+    expect(withList([{ name: "shell-check", reason: "not trusted" }])).toBe(true);
+    expect(withList([{ name: "shell-check" }])).toBe(false);
+    expect(withList([{ name: "shell-check", reason: "r", extra: 1 }])).toBe(false);
+    expect(withList(undefined)).toBe(false);
   });
 
   it("requires coverage.reviewers_skipped, with a known reason", () => {

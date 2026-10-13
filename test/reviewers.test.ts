@@ -300,22 +300,94 @@ describe("the tools of a reviewer", () => {
     return { ...def, frontmatter: { ...def.frontmatter, tools } };
   }
 
+  const noBash = { bashGranted: false, bashReason: null };
+
   it("grants the read-only tools that the reviewer names, in canonical form", () => {
-    expect(reviewerTools(withTools(["Read", "Grep", "Glob"]))).toEqual({
+    expect(reviewerTools(withTools(["Read", "Grep", "Glob"]), false)).toEqual({
       granted: ["Read", "Grep", "Glob"],
       ignored: [],
+      ...noBash,
     });
-    expect(reviewerTools(withTools(["glob", "READ"]))).toEqual({
+    expect(reviewerTools(withTools(["glob", "READ"]), true)).toEqual({
       granted: ["Read", "Glob"],
       ignored: [],
+      ...noBash,
     });
-    expect(reviewerTools(withTools([]))).toEqual({ granted: [], ignored: [] });
+    expect(reviewerTools(withTools([]), false)).toEqual({ granted: [], ignored: [], ...noBash });
   });
 
   it("ignores a tool outside the read-only set and never grants it", () => {
-    expect(reviewerTools(withTools(["Bash", "Read", "WebFetch", "Write"]))).toEqual({
+    expect(reviewerTools(withTools(["Bash", "Read", "WebFetch", "Write"]), false)).toEqual({
       granted: ["Read"],
       ignored: ["Bash", "WebFetch", "Write"],
+      ...noBash,
+    });
+  });
+
+  describe("the Bash policy (R7)", () => {
+    function custom(trusted: boolean, tools = ["Read", "Bash", "Write"]): ReviewerDefinition {
+      const def = withTools(tools);
+      return { ...def, source: "custom", frontmatter: { ...def.frontmatter, trusted } };
+    }
+
+    it("grants Bash to a trusted custom reviewer when the author has write access", () => {
+      expect(reviewerTools(custom(true), true)).toEqual({
+        granted: ["Read", "Bash"],
+        ignored: ["Write"],
+        bashGranted: true,
+        bashReason: null,
+      });
+    });
+
+    it("does not grant Bash to a custom reviewer that is not trusted", () => {
+      expect(reviewerTools(custom(false), true)).toEqual({
+        granted: ["Read"],
+        ignored: ["Bash", "Write"],
+        bashGranted: false,
+        bashReason: "not trusted",
+      });
+    });
+
+    it("does not grant Bash when the author has no write access", () => {
+      expect(reviewerTools(custom(true), false)).toMatchObject({
+        granted: ["Read"],
+        bashGranted: false,
+        bashReason: "author has no write access",
+      });
+    });
+
+    it("joins both reasons with and", () => {
+      expect(reviewerTools(custom(false), false)).toMatchObject({
+        bashGranted: false,
+        bashReason: "not trusted and author has no write access",
+      });
+    });
+
+    it("matches the Bash name without regard to case", () => {
+      expect(reviewerTools(custom(true, ["bash"]), true)).toMatchObject({
+        granted: ["Bash"],
+        ignored: [],
+        bashGranted: true,
+      });
+    });
+
+    it("gives no reason for a custom reviewer whose tools do not name Bash", () => {
+      expect(reviewerTools(custom(false, ["Read"]), false)).toEqual({
+        granted: ["Read"],
+        ignored: [],
+        bashGranted: false,
+        bashReason: null,
+      });
+    });
+
+    it("never grants Bash to a built-in reviewer, whatever trusted says", () => {
+      const builtinDef = { ...custom(true), source: "builtin" as const };
+      expect(reviewerTools(builtinDef, true)).toEqual({
+        granted: ["Read"],
+        ignored: ["Bash", "Write"],
+        bashGranted: false,
+        bashReason: null,
+      });
     });
   });
 

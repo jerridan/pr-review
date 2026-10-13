@@ -98,6 +98,7 @@ function record(
         reviewers_ran: ["diff-bugs"],
         reviewers_failed: [],
         reviewers_skipped: [],
+        reviewers_without_bash: [],
         findings_dropped_by_failed_verifier: 0,
       },
       findings,
@@ -142,6 +143,7 @@ describe("table output (A10)", () => {
         reviewers_ran: [],
         reviewers_failed: ["diff-bugs"],
         reviewers_skipped: [],
+        reviewers_without_bash: [],
         findings_dropped_by_failed_verifier: 2,
       },
     });
@@ -217,6 +219,14 @@ describe("json output", () => {
       ),
     );
     expect(doc.coverage.reviewers_skipped).toEqual(skipped);
+  });
+
+  it("holds the custom reviewers that ran without Bash in its coverage", () => {
+    const r = record([]);
+    const withoutBash = [{ name: "shell-check", reason: "not trusted" }];
+    const coverage = { ...r.posted.coverage, reviewers_without_bash: withoutBash };
+    const doc = JSON.parse(formatJson({ ...r, posted: { ...r.posted, coverage } }, "/out/r.json"));
+    expect(doc.coverage.reviewers_without_bash).toEqual(withoutBash);
   });
 
   it("holds the excluded files with their reasons", () => {

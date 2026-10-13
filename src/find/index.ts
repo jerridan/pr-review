@@ -5,7 +5,12 @@ import { CLAUDE_FILE, RULES_FILE, type RepoConfig } from "../config/repo-config.
 import type { GatherResult } from "../gather/index.js";
 import { loadPrompt, render, type PromptFile } from "../prompts/load.js";
 import { fingerprint } from "../merge/fingerprint.js";
-import { effectiveModel, effectivePasses, type ReviewerDefinition } from "../reviewers/loader.js";
+import {
+  effectiveModel,
+  effectivePasses,
+  reviewerTools,
+  type ReviewerDefinition,
+} from "../reviewers/loader.js";
 import { FindingsOutputSchema, type Finding, type FindingsOutput } from "../schemas/finding.js";
 import type { QueryFailure } from "../schemas/record.js";
 import type { TriageBrief } from "../schemas/triage.js";
@@ -46,6 +51,15 @@ type FindContext = {
    * Absent means full: the passes of the config or the frontmatter.
    */
   tier?: Tier;
+  /** True when the PR author has write access. Absent means false. */
+  authorWriteAccess?: boolean;
+  /**
+   * Asked when a pass gets its semaphore slot, just before its query. A
+   * pass for which it gives false does not start (the token ceiling).
+   */
+  canStartPass?: () => boolean;
+  /** Told of each pass that did not start. Such a pass is not in the result. */
+  onPassSkipped?: (name: string, pass: number) => void;
   /**
    * The base commit's CLAUDE.md and .pr-review/rules.md, for the rules
    * block of each reviewer's system prompt. Absent means neither file.
@@ -132,6 +146,16 @@ export function injectedRuleFiles(
   return files.flatMap((f) =>
     f.text === null ? [] : [{ path: f.path, ...capUtf8(f.text, RULE_FILE_CAP_BYTES) }],
   );
+}
+
+/**
+ * The body of a custom reviewer, then the fixed block of
+ * prompts/reviewer-custom-rules.md: the untrusted-data line, the line that
+ * forbids subagents, the path rule and the finding field rules. A built-in
+ * body holds these rules itself.
+ */
+export function customReviewerBody(body: string): string {
+  return render(loadPrompt("reviewer-custom-rules.md").body, { body: body.trimEnd() });
 }
 
 /**
@@ -237,7 +261,7 @@ export async function runReviewers(
     def: ReviewerDefinition,
     pass: number,
     seen: Set<string>,
-  ): Promise<ReviewerRun> => {
+  ): Promise<ReviewerRun | null> => {
     const name = def.frontmatter.name;
     const userMessage = buildReviewerMessage(
       texts,
@@ -247,8 +271,11 @@ export async function runReviewers(
     );
     let outcome;
     try {
-      outcome = await ctx.semaphore(() =>
-        client.query<FindingsOutput>(
+      // The ceiling check runs in the slot, at the time the pass would
+      // start, so it sees every query that ended before it.
+      outcome = await ctx.semaphore(async () => {
+        if (ctx.canStartPass && !ctx.canStartPass()) return null;
+        return client.query<FindingsOutput>(
           {
             role: "reviewer",
             reviewerName: name,
@@ -258,13 +285,18 @@ export async function runReviewers(
             cwd: ctx.cwd,
             overrides: effectiveModel(def, ctx.config),
             tools: def.frontmatter.tools,
+            ...(tools.get(def)?.bashGranted ? { bash: true } : {}),
           },
           options,
-        ),
-      );
+        );
+      });
     } catch (err) {
       const failure: QueryFailure = { kind: "thrown", message: messageOf(err) };
       return { name, pass, status: "failed", failure, findings: [], dropped: [], meta: null };
+    }
+    if (outcome === null) {
+      ctx.onPassSkipped?.(name, pass);
+      return null;
     }
     if (!outcome.ok) {
       return {
@@ -310,14 +342,21 @@ export async function runReviewers(
     return { name, pass, status: "ok", findings, dropped, meta: outcome.raw };
   };
 
-  // Each reviewer's system prompt is built once, for all of its passes.
+  // Each reviewer's system prompt and tools are set once, for all of its
+  // passes. A custom body gets the fixed rules block before the repo rules.
   const systemPrompts = new Map(
     selected.map(({ def }) => [
       def,
-      buildReviewerSystemPrompt(def.systemPrompt, ctx.rules ?? NO_RULES).prompt,
+      buildReviewerSystemPrompt(
+        def.source === "custom" ? customReviewerBody(def.systemPrompt) : def.systemPrompt,
+        ctx.rules ?? NO_RULES,
+      ).prompt,
     ]),
   );
-  const tasks: Promise<ReviewerRun>[] = [];
+  const tools = new Map(
+    selected.map(({ def }) => [def, reviewerTools(def, ctx.authorWriteAccess === true)]),
+  );
+  const tasks: Promise<ReviewerRun | null>[] = [];
   for (const { def } of selected) {
     const seen = new Set<string>();
     const passes = effectivePasses(def, ctx.config, ctx.tier ?? "full");
@@ -325,5 +364,5 @@ export async function runReviewers(
       tasks.push(runPass(def, pass, seen));
     }
   }
-  return Promise.all(tasks);
+  return (await Promise.all(tasks)).filter((run): run is ReviewerRun => run !== null);
 }

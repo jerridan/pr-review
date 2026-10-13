@@ -138,6 +138,15 @@ describe("decideVerdict (A8)", () => {
     expect(decideVerdict({ ...base, refusals: 1 })).toBe("incomplete");
   });
 
+  it("is incomplete when the token ceiling stopped a reviewer pass (R8)", () => {
+    expect(decideVerdict({ ...base, ceilingSkips: 1 })).toBe("incomplete");
+    expect(decideVerdict({ ...base, ceilingSkips: 1, posted: [posted("blocking")] })).toBe(
+      "incomplete",
+    );
+    expect(decideVerdict({ ...base, ceilingSkips: 0 })).toBe("would approve");
+    expect(decideVerdict({ ...base, tier: "skip", ceilingSkips: 1 })).toBe("skipped");
+  });
+
   it("puts incomplete before would request changes", () => {
     expect(decideVerdict({ ...base, verifierFailures: 1, posted: [posted("blocking")] })).toBe(
       "incomplete",
@@ -172,16 +181,20 @@ describe("coverage (A8)", () => {
       reviewers_ran: ["diff-bugs"],
       reviewers_failed: ["security", "tests"],
       reviewers_skipped: [],
+      reviewers_without_bash: [],
       findings_dropped_by_failed_verifier: 3,
     });
     expect(coverage([], 0)).toEqual({
       reviewers_ran: [],
       reviewers_failed: [],
       reviewers_skipped: [],
+      reviewers_without_bash: [],
       findings_dropped_by_failed_verifier: 0,
     });
     const skipped = [{ name: "docs", reason: "disabled by config" as const }];
     expect(coverage(runs, 0, skipped).reviewers_skipped).toEqual(skipped);
+    const withoutBash = [{ name: "shell-check", reason: "not trusted" }];
+    expect(coverage(runs, 0, [], withoutBash).reviewers_without_bash).toEqual(withoutBash);
   });
 
   it("counts verifier failures and refusals from the verifications", () => {

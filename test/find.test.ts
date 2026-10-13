@@ -12,7 +12,7 @@ import {
   normalizeWs,
   readHeadFile,
 } from "../src/find/evidence.js";
-import { buildReviewerSystemPrompt, runReviewers } from "../src/find/index.js";
+import { buildReviewerSystemPrompt, customReviewerBody, runReviewers } from "../src/find/index.js";
 import type { GatherResult } from "../src/gather/index.js";
 import { loadPrompt } from "../src/prompts/load.js";
 import type { ReviewerDefinition } from "../src/reviewers/loader.js";
@@ -757,5 +757,64 @@ describe("buildReviewerSystemPrompt (R5)", () => {
       buildReviewerSystemPrompt("SYSTEM diff-bugs", rules).prompt,
     );
     expect(fake.calls[0]?.systemPrompt.trimEnd().endsWith("CLAUDE-sent")).toBe(true);
+  });
+});
+
+describe("the pass gate and custom reviewers in find (R7, R8)", () => {
+  it("does not start a pass when canStartPass gives false, and reports it", async () => {
+    let allowed = 1;
+    const fake = createFakeSdkClient(() => ok([]));
+    const skipped: [string, number][] = [];
+    const runs = await runReviewers(
+      fake,
+      OPTIONS,
+      [{ def: def("diff-bugs", 3), trigger: "t" }],
+      {
+        ...ctx(createSemaphore(1)),
+        canStartPass: () => allowed-- > 0,
+        onPassSkipped: (name, pass) => skipped.push([name, pass]),
+      },
+      () => {},
+    );
+    expect(fake.calls).toHaveLength(1);
+    expect(runs.map((r) => r.pass)).toEqual([1]);
+    expect(skipped).toEqual([
+      ["diff-bugs", 2],
+      ["diff-bugs", 3],
+    ]);
+  });
+
+  it("gives a custom reviewer the fixed rules block, and Bash only when granted", async () => {
+    const custom = (trusted: boolean): ReviewerDefinition => {
+      const d = def("shell");
+      return {
+        ...d,
+        source: "custom",
+        systemPrompt: "CUSTOM-BODY\n",
+        frontmatter: { ...d.frontmatter, tools: ["Read", "Bash"], trusted },
+      };
+    };
+    const sent = async (trusted: boolean, authorWriteAccess: boolean) => {
+      const fake = createFakeSdkClient(() => ok([]));
+      await runReviewers(
+        fake,
+        OPTIONS,
+        [{ def: custom(trusted), trigger: "t" }],
+        { ...ctx(), authorWriteAccess },
+        () => {},
+      );
+      return fake.calls[0] as QueryRequest;
+    };
+    const granted = await sent(true, true);
+    expect(granted.bash).toBe(true);
+    expect(granted.systemPrompt).toBe(customReviewerBody("CUSTOM-BODY\n"));
+    expect(granted.systemPrompt.startsWith("CUSTOM-BODY")).toBe(true);
+    expect((await sent(true, false)).bash).toBeUndefined();
+    expect((await sent(false, true)).bash).toBeUndefined();
+    // A built-in reviewer keeps its body as written.
+    const fake = createFakeSdkClient(() => ok([]));
+    await runReviewers(fake, OPTIONS, [{ def: def("diff-bugs"), trigger: "t" }], ctx(), () => {});
+    expect(fake.calls[0]?.systemPrompt).toBe("SYSTEM diff-bugs");
+    expect(fake.calls[0]?.bash).toBeUndefined();
   });
 });

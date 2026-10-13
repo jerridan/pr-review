@@ -133,13 +133,38 @@ export function reviewerOverrides(def: ReviewerDefinition): { model: string; eff
   return { model: resolveModel(def.frontmatter.model), effort: def.frontmatter.effort };
 }
 
+/** The one tool beyond the read-only set that a reviewer can get. */
+export const BASH_TOOL = "Bash";
+
 /**
  * The tools of a reviewer: the read-only tools that its frontmatter names,
- * and the names that are not read-only tools. The query never gets an
- * ignored tool. The "trusted" field is parsed but not used in D1.
+ * Bash when the run grants it, and the names that the query does not get.
+ * The run grants Bash only to a custom reviewer whose tools name Bash, that
+ * sets "trusted: true", and whose PR author has write access. A built-in
+ * reviewer never gets Bash. "bashReason" tells why a custom reviewer that
+ * names Bash did not get it, and is null in every other case.
  */
-export function reviewerTools(def: ReviewerDefinition): { granted: string[]; ignored: string[] } {
-  return narrowReadOnlyTools(def.frontmatter.tools);
+export function reviewerTools(
+  def: ReviewerDefinition,
+  authorWriteAccess: boolean,
+): { granted: string[]; ignored: string[]; bashGranted: boolean; bashReason: string | null } {
+  const { granted, ignored } = narrowReadOnlyTools(def.frontmatter.tools);
+  const isBash = (tool: string) => tool.trim().toLowerCase() === BASH_TOOL.toLowerCase();
+  if (def.source !== "custom" || !def.frontmatter.tools.some(isBash)) {
+    return { granted, ignored, bashGranted: false, bashReason: null };
+  }
+  const reasons: string[] = [];
+  if (def.frontmatter.trusted !== true) reasons.push("not trusted");
+  if (!authorWriteAccess) reasons.push("author has no write access");
+  if (reasons.length > 0) {
+    return { granted, ignored, bashGranted: false, bashReason: reasons.join(" and ") };
+  }
+  return {
+    granted: [...granted, BASH_TOOL],
+    ignored: ignored.filter((tool) => !isBash(tool)),
+    bashGranted: true,
+    bashReason: null,
+  };
 }
 
 /**

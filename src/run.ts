@@ -20,10 +20,10 @@ import {
 } from "./reviewers/loader.js";
 import { selectReviewers, skipSelected } from "./reviewers/select.js";
 import type { Finding } from "./schemas/finding.js";
-import type { QueryFailure, RunRecord } from "./schemas/record.js";
+import type { QueryFailure, RunRecord, SkippedReviewer } from "./schemas/record.js";
 import type { TriageBrief } from "./schemas/triage.js";
 import type { VerifierResult } from "./schemas/verifier.js";
-import type { QueryOutcome, QueryRequest, SdkClient } from "./sdk/client.js";
+import { usageTokens, type QueryOutcome, type QueryRequest, type SdkClient } from "./sdk/client.js";
 import type { RunOptions } from "./sdk/options.js";
 import { createSemaphore } from "./semaphore.js";
 import { runTriage } from "./triage/index.js";
@@ -44,6 +44,11 @@ export interface RunInput {
   tierOverride?: Tier;
   outDir: string;
   allowApiKey: boolean;
+  /**
+   * True when the PR author has write access. With "trusted: true", a
+   * custom reviewer then gets Bash. Absent means false.
+   */
+  authorWriteAccess?: boolean;
   client?: SdkClient;
   now?: () => Date;
 }
@@ -90,12 +95,13 @@ export function roleModels(config: RepoConfig): Record<Role, { model: string; ef
 export function describeSelected(
   selected: { def: ReviewerDefinition; trigger: string }[],
   config: RepoConfig,
+  authorWriteAccess = false,
 ): RunRecord["identity"]["selected_reviewers"] {
   return selected.map((s) => ({
     name: s.def.frontmatter.name,
     trigger: s.trigger,
     ...effectiveModel(s.def, config),
-    tools_ignored: reviewerTools(s.def).ignored,
+    tools_ignored: reviewerTools(s.def, authorWriteAccess).ignored,
   }));
 }
 
@@ -128,7 +134,15 @@ function withRoleOverrides(req: QueryRequest, config: RepoConfig): QueryRequest 
 // Wrap the client so that each query gives one cost entry, also a query
 // that fails or throws. The wrapper also applies the role overrides of
 // the repo config.
-function recordingClient(inner: SdkClient, entries: CostEntry[], config: RepoConfig): SdkClient {
+// The tokens of every finished query of the run, for the token ceiling.
+type TokenCounter = { tokens: number };
+
+function recordingClient(
+  inner: SdkClient,
+  entries: CostEntry[],
+  config: RepoConfig,
+  counter: TokenCounter,
+): SdkClient {
   return {
     async query<T>(original: QueryRequest, options: RunOptions): Promise<QueryOutcome<T>> {
       const req = withRoleOverrides(original, config);
@@ -140,6 +154,9 @@ function recordingClient(inner: SdkClient, entries: CostEntry[], config: RepoCon
       } finally {
         const raw = outcome?.raw ?? null;
         const subtype = raw?.subtype ?? (outcome && !outcome.ok ? outcome.failure.kind : "thrown");
+        // The count goes up before the query's promise resolves, so before
+        // its semaphore slot is free for the next query.
+        counter.tokens += usageTokens(raw?.usage);
         entries.push({
           role: req.role,
           ...(req.reviewerName !== undefined ? { reviewer: req.reviewerName } : {}),
@@ -256,7 +273,9 @@ export async function runReview(
 
   const inner = input.client ?? (await import("./sdk/client.js")).createSdkClient();
   const queries: CostEntry[] = [];
-  const client = recordingClient(inner, queries, config);
+  const counter: TokenCounter = { tokens: 0 };
+  const client = recordingClient(inner, queries, config, counter);
+  const authorWriteAccess = input.authorWriteAccess === true;
   const options: RunOptions = { allowApiKey: input.allowApiKey, env: process.env };
   // One semaphore bounds every SDK query of the run.
   const semaphore = createSemaphore(config.concurrency);
@@ -299,6 +318,17 @@ export async function runReview(
       config,
       description: gathered.description,
     });
+    // A selected custom reviewer whose tools name Bash, and that does not
+    // get it, runs with read-only tools. Coverage names it with the reason.
+    const withoutBash = selected.flatMap(({ def }) => {
+      const reason = reviewerTools(def, authorWriteAccess).bashReason;
+      return reason === null ? [] : [{ name: def.frontmatter.name, reason }];
+    });
+    // No new reviewer pass starts once the tokens of the finished queries
+    // reach the ceiling. Verification of returned findings still runs.
+    const ceiling = config.token_ceiling;
+    const canStartPass = (): boolean => ceiling === null || counter.tokens < ceiling;
+    const ceilingSkipped: SkippedReviewer[] = [];
     // The rules block of every reviewer holds the base commit's CLAUDE.md
     // and rules.md, which the config loader already read.
     const rules = { claudeMd: loaded.claudeMd, rulesMd: loaded.rulesMd };
@@ -355,7 +385,20 @@ export async function runReview(
           client,
           options,
           selected,
-          { gathered, brief, cwd, semaphore, sections, config, rules, tier: decision.tier },
+          {
+            gathered,
+            brief,
+            cwd,
+            semaphore,
+            sections,
+            config,
+            rules,
+            tier: decision.tier,
+            authorWriteAccess,
+            canStartPass,
+            onPassSkipped: (name, pass) =>
+              ceilingSkipped.push({ name, reason: "token ceiling", pass }),
+          },
           onFinding,
         );
       } catch (err) {
@@ -388,7 +431,16 @@ export async function runReview(
       verifierFailures: counts.failedVerifierCalls + counts.rejectedResults,
       refusals: counts.refusals,
       posted: merged.posted,
+      ceilingSkips: ceilingSkipped.length,
     });
+    // The ceiling skips come in the order the passes reached their slots,
+    // so they are sorted for a stable record.
+    const allSkipped = [
+      ...skipped,
+      ...[...ceilingSkipped].sort(
+        (a, b) => a.name.localeCompare(b.name) || (a.pass ?? 0) - (b.pass ?? 0),
+      ),
+    ];
 
     return {
       identity: {
@@ -399,7 +451,18 @@ export async function runReview(
         started_at: startedAt.toISOString(),
         tool_version: toolVersion(),
         config_hash: loaded.hash,
-        config: { files: loaded.files, values: config, custom_reviewers: [] },
+        config: {
+          files: loaded.files,
+          values: config,
+          custom_reviewers: loaded.customReviewers.map((def) => {
+            const tools = reviewerTools(def, authorWriteAccess);
+            return {
+              name: def.frontmatter.name,
+              bash_granted: tools.bashGranted,
+              reason: tools.bashReason,
+            };
+          }),
+        },
         description: gathered.description,
         history: {
           built: gathered.history !== null,
@@ -416,7 +479,7 @@ export async function runReview(
         triage: brief,
         tier: decision.tier,
         tier_reason: decision.reason,
-        selected_reviewers: describeSelected(selected, config),
+        selected_reviewers: describeSelected(selected, config, authorWriteAccess),
         models: roleModels(config),
       },
       stages: {
@@ -427,7 +490,7 @@ export async function runReview(
       },
       posted: {
         verdict,
-        coverage: coverage(runs, counts.droppedByFailedVerifier, skipped),
+        coverage: coverage(runs, counts.droppedByFailedVerifier, allSkipped, withoutBash),
         findings: merged.posted,
       },
       cost: {

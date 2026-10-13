@@ -108,6 +108,8 @@ export type RunRecord = {
       reviewers_ran: string[];
       reviewers_failed: string[];
       reviewers_skipped: SkippedReviewer[];
+      /** Custom reviewers whose tools name Bash and that ran without it, with the reason. */
+      reviewers_without_bash: { name: string; reason: string }[];
       findings_dropped_by_failed_verifier: number;
     };
     findings: PostedFinding[];
@@ -266,6 +268,7 @@ const PostedSchema = z.strictObject({
     reviewers_ran: z.array(z.string()),
     reviewers_failed: z.array(z.string()),
     reviewers_skipped: z.array(SkippedReviewerSchema),
+    reviewers_without_bash: z.array(z.strictObject({ name: z.string(), reason: z.string() })),
     findings_dropped_by_failed_verifier: integer(),
   }),
   findings: z.array(PostedFindingSchema),

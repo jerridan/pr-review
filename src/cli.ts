@@ -28,6 +28,7 @@ interface RunCliOptions {
   out?: string;
   tier?: "full" | "fast" | "skip";
   allowApiKey?: boolean;
+  authorWriteAccess?: boolean;
 }
 
 // Commander exits with 1 on a usage error. This makes it 2. Help and
@@ -94,6 +95,7 @@ async function runCommand(deps: { client?: SdkClient }, options: RunCliOptions):
       ...(options.tier ? { tierOverride: options.tier } : {}),
       outDir: options.out ?? DEFAULT_OUT_DIR,
       allowApiKey: options.allowApiKey === true,
+      authorWriteAccess: options.authorWriteAccess === true,
       ...(deps.client ? { client: deps.client } : {}),
     });
     if (options.format === "json") {
@@ -143,6 +145,10 @@ export function createProgram(deps: { client?: SdkClient }): Command {
     .option(
       "--allow-api-key",
       "keep ANTHROPIC_API_KEY and the other provider variables in the SDK environment",
+    )
+    .option(
+      "--author-write-access",
+      "the PR author has write access, so a trusted custom reviewer may use Bash",
     )
     .action(async (options: RunCliOptions) => {
       await runCommand(deps, options);

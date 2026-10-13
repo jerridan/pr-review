@@ -338,3 +338,72 @@ describe("the repo config on the base commit (R3)", () => {
     expect(record.identity.config_hash).toMatch(/^[0-9a-f]{64}$/);
   }, 30_000);
 });
+
+describe("--author-write-access (R7)", () => {
+  let trustedFx: Fixture;
+  beforeAll(async () => {
+    const source = mkdtempSync(join(tmpdir(), "pr-review-cli-bash-"));
+    try {
+      mkdirSync(join(source, "dir", "reviewers"), { recursive: true });
+      writeFileSync(
+        join(source, "dir", "reviewers", "shell-check.md"),
+        [
+          "---",
+          "name: shell-check",
+          "description: Checks shell use.",
+          "model: sonnet",
+          "effort: medium",
+          "tools: [Read, Bash]",
+          "triggers:",
+          "  paths: []",
+          "  categories: []",
+          "  min_tier: fast",
+          "passes: 1",
+          "threshold: 80",
+          "trusted: true",
+          "---",
+          "You check shell use.",
+          "",
+        ].join("\n"),
+      );
+      trustedFx = await makeFixture("--pr-review-dir", join(source, "dir"));
+    } finally {
+      rmSync(source, { recursive: true, force: true });
+    }
+  }, 30_000);
+  afterAll(() => {
+    if (trustedFx) rmSync(trustedFx.repo, { recursive: true, force: true });
+  });
+
+  async function shellCall(...extra: string[]) {
+    const fake = createFakeSdkClient(script(trustedFx));
+    const code = await exitCodeOf(
+      createProgram({ client: fake }).parseAsync(
+        argsFor(
+          trustedFx,
+          join(outRoot, `bash-${extra.length}`),
+          "--format",
+          "json",
+          "--tier",
+          "fast",
+          ...extra,
+        ),
+      ),
+    );
+    expect(code).toBe(0);
+    const doc = JSON.parse(stdout);
+    stdout = "";
+    return { call: fake.calls.find((c) => c.reviewerName === "shell-check"), doc };
+  }
+
+  it("grants Bash to a trusted custom reviewer only with the option", async () => {
+    const without = await shellCall();
+    expect(without.call?.bash).not.toBe(true);
+    expect(without.doc.coverage.reviewers_without_bash).toEqual([
+      { name: "shell-check", reason: "author has no write access" },
+    ]);
+    const withOption = await shellCall("--author-write-access");
+    expect(withOption.call?.bash).toBe(true);
+    expect(withOption.doc.coverage.reviewers_without_bash).toEqual([]);
+  }, 30_000);
+});
