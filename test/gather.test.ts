@@ -381,6 +381,7 @@ describe("gather on the fixture repo (A2)", () => {
         history: true,
       });
       expect(on.history).not.toBeNull();
+      expect(on.historyError).toBeNull();
       expect(mocks.historyCalls).toBe(1);
     });
 
@@ -390,6 +391,7 @@ describe("gather on the fixture repo (A2)", () => {
         history: false,
       });
       expect(off.history).toBeNull();
+      expect(off.historyError).toBeNull();
       expect(mocks.historyCalls).toBe(0);
       expect(off.changedFiles).toEqual(result.changedFiles);
       expect(off.description).toBe(result.description);
@@ -400,6 +402,7 @@ describe("gather on the fixture repo (A2)", () => {
       const out = await gather(fixture.repo, fixture.base, fixture.head, DEFAULT_GLOBS);
       expect(mocks.historyCalls).toBe(1);
       expect(out.history).toBeNull();
+      expect(out.historyError).toBe("git blame failed");
       expect(out.diff).toBe(result.diff);
       expect(out.description).toBe(result.description);
     });

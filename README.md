@@ -81,7 +81,7 @@ The verdict is one of `skipped`, `incomplete`, `would request changes` and `woul
 
 ## The `.pr-review/` directory
 
-A target repo shapes the review with a `.pr-review/` directory. The run reads the directory from the base commit. It reads the git objects, not a working tree. A change to `.pr-review/` in the PR has no effect on the review of that PR. Each of `config.yaml`, `rules.md` and the reviewer files must be a regular file at the base commit. A symlink or a submodule there stops the run with a config error.
+A target repo shapes the review with a `.pr-review/` directory. The run reads the directory from the base commit. It reads the git objects, not a working tree. A change to `.pr-review/` in the PR has no effect on the review of that PR. Each of `config.yaml`, `rules.md` and the reviewer files must be a regular file at the base commit. A symlink or a submodule there stops the run with a config error. The `.pr-review/` directory and the `reviewers/` directory must be real directories. A symlink or a submodule in their place also stops the run.
 
 The directory holds three kinds of file. All of them are optional.
 
@@ -91,7 +91,7 @@ The directory holds three kinds of file. All of them are optional.
 | `.pr-review/rules.md` | Rules in plain text. The run adds them to the system prompt of every reviewer. |
 | `.pr-review/reviewers/*.md` | Custom reviewers. Each file has the same frontmatter as a file in `prompts/reviewers/`. |
 
-When the directory is absent, the run uses the defaults. The run also adds the `CLAUDE.md` at the root of the base commit to the system prompt of every reviewer. Each of these files has a cap of 16384 bytes. The record notes a file that the run cut to fit the cap.
+When the directory is absent, the run uses the defaults. The run also adds the `CLAUDE.md` at the root of the base commit to the system prompt of every reviewer. Each of these files has a cap of 16384 bytes. The record notes a file that the run cut to fit the cap. The root `CLAUDE.md` may be a symlink. The run follows it one level, to a regular file inside the base tree. When the target is outside the tree, is absolute, or is not a regular file, the run injects no `CLAUDE.md` and adds a `config` entry to the record errors.
 
 A config file that does not parse or validate stops the run. An unknown key is an error. See the exit code table above.
 

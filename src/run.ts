@@ -528,7 +528,14 @@ export async function runReview(
         total_cost_usd: totalCost(queries),
         queries_without_cost: queries.filter((q) => q.cost_usd === null).length,
         stage_ms: stageMs,
-        errors: collectErrors(triageFailure, runs, verifications, merged.merges),
+        errors: [
+          // Config and gather run first, so their errors come first.
+          ...loaded.warnings.map((message) => ({ stage: "config", message })),
+          ...(gathered.historyError
+            ? [{ stage: "gather", message: `history: ${gathered.historyError}` }]
+            : []),
+          ...collectErrors(triageFailure, runs, verifications, merged.merges),
+        ],
       },
     };
   });

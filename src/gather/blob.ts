@@ -95,6 +95,24 @@ export async function readEntryModeAt(
 }
 
 /**
+ * Give the target path that the symlink at "path" in "commit" holds, or
+ * null when the entry is absent or is not a symlink. A symlink is a blob
+ * whose content is the target path. The function does not follow the link.
+ */
+export async function readSymlinkTargetAt(
+  repo: string,
+  commit: string,
+  path: string,
+): Promise<string | null> {
+  const entries = parseTree(
+    await gitBytes(repo, ["ls-tree", "-z", "--full-tree", `${commit}^{commit}`, "--", path]),
+  );
+  const entry = entries.find((e) => e.path === path);
+  if (!entry || entry.type !== "blob" || entry.mode !== "120000") return null;
+  return (await gitBytes(repo, ["cat-file", "blob", entry.oid])).toString("utf8");
+}
+
+/**
  * Give the text of the file at "path" in "commit", or null when the
  * commit has no regular file at that path.
  */

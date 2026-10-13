@@ -4,7 +4,12 @@
 import { createHash } from "node:crypto";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
-import { listFilesAt, readBlobBytesAt, readEntryModeAt } from "../gather/blob.js";
+import {
+  listFilesAt,
+  readBlobBytesAt,
+  readEntryModeAt,
+  readSymlinkTargetAt,
+} from "../gather/blob.js";
 import {
   loadBuiltinReviewers,
   parseReviewer,
@@ -55,6 +60,8 @@ export type LoadedRepoConfig = {
   rulesMd: string | null;
   claudeMd: string | null;
   customReviewers: ReviewerDefinition[];
+  /** Messages about input that the loader skipped. The run copies them into the record. */
+  warnings: string[];
 };
 
 export const CONFIG_DIR = ".pr-review";
@@ -305,6 +312,70 @@ async function readConfigFile(repo: string, commit: string, path: string): Promi
   return readBlobBytesAt(repo, commit, path);
 }
 
+// The mode that git gives to a directory (a tree).
+const TREE_MODE = "040000";
+
+/**
+ * Check that "path" is a directory at the commit, or absent. A symlink or a
+ * submodule there would hide the files below it: git does not follow the
+ * link, so the loader would see an absent directory and use the defaults.
+ */
+async function assertDirectoryAt(repo: string, commit: string, path: string): Promise<void> {
+  const mode = await readEntryModeAt(repo, commit, path);
+  if (mode === null || mode === TREE_MODE) return;
+  const kind = mode === "120000" ? "a symlink" : mode === "160000" ? "a submodule" : "not a tree";
+  throw new RepoConfigError(
+    path,
+    ROOT_FIELD,
+    `is ${kind} (mode ${mode}) at the base commit. The entry must be a directory.`,
+  );
+}
+
+/**
+ * Resolve the target of a root symlink against the repo root. Give the
+ * repo-relative path, or null when the target is empty, is absolute, ends
+ * in a slash or has a ".." that leaves the root.
+ */
+export function resolveRootLinkTarget(target: string): string | null {
+  if (target === "" || target.includes("\0") || target.startsWith("/") || target.endsWith("/")) {
+    return null;
+  }
+  const parts: string[] = [];
+  for (const part of target.split("/")) {
+    if (part === "" || part === ".") continue;
+    if (part === "..") {
+      if (parts.pop() === undefined) return null;
+    } else {
+      parts.push(part);
+    }
+  }
+  return parts.length > 0 ? parts.join("/") : null;
+}
+
+/**
+ * Read the root CLAUDE.md at the commit. A symlink resolves one level
+ * inside the tree. Give null, and add a warning, when the link does not
+ * lead to a regular file in the tree.
+ */
+async function readClaudeMd(
+  repo: string,
+  commit: string,
+  warnings: string[],
+): Promise<Buffer | null> {
+  const mode = await readEntryModeAt(repo, commit, CLAUDE_FILE);
+  if (mode !== "120000") return readBlobBytesAt(repo, commit, CLAUDE_FILE);
+  const target = (await readSymlinkTargetAt(repo, commit, CLAUDE_FILE)) ?? "";
+  const path = resolveRootLinkTarget(target);
+  // A second link is not followed: readBlobBytesAt gives null for it.
+  const bytes = path === null ? null : await readBlobBytesAt(repo, commit, path);
+  if (bytes === null) {
+    warnings.push(
+      `${CLAUDE_FILE} is a symlink to ${target}. The target is not a regular file in the base tree, so the run does not inject it.`,
+    );
+  }
+  return bytes;
+}
+
 /**
  * Load the repo config from the git objects of "commit": config.yaml,
  * rules.md and reviewers/*.md under .pr-review/, and the root CLAUDE.md.
@@ -313,6 +384,10 @@ async function readConfigFile(repo: string, commit: string, path: string): Promi
  */
 export async function loadRepoConfig(repo: string, commit: string): Promise<LoadedRepoConfig> {
   const loaded = new Map<string, Buffer>();
+
+  // Check the two directories before any file read.
+  await assertDirectoryAt(repo, commit, CONFIG_DIR);
+  await assertDirectoryAt(repo, commit, REVIEWERS_DIR);
 
   const builtinNames = loadBuiltinReviewers().map((d) => d.frontmatter.name);
   const builtins = new Set(builtinNames);
@@ -352,7 +427,8 @@ export async function loadRepoConfig(repo: string, commit: string): Promise<Load
   if (rulesBytes !== null) loaded.set(RULES_FILE, rulesBytes);
 
   // CLAUDE.md is injected into the prompts, but it is not part of the hash.
-  const claudeBytes = await readBlobBytesAt(repo, commit, CLAUDE_FILE);
+  const warnings: string[] = [];
+  const claudeBytes = await readClaudeMd(repo, commit, warnings);
 
   return {
     config,
@@ -361,5 +437,6 @@ export async function loadRepoConfig(repo: string, commit: string): Promise<Load
     rulesMd: rulesBytes === null ? null : rulesBytes.toString("utf8"),
     claudeMd: claudeBytes === null ? null : claudeBytes.toString("utf8"),
     customReviewers,
+    warnings,
   };
 }

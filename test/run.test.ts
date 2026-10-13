@@ -7,6 +7,7 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -1366,5 +1367,102 @@ describe("the history block and the history reviewer config", () => {
     const record = await review(enabled, "history-fails");
     expect(record.identity.history).toEqual({ built: false, truncated: false });
     expect(record.identity.selected_reviewers.map((r) => r.name)).toContain("diff-bugs");
+    expect(record.cost.errors).toContainEqual({
+      stage: "gather",
+      message: "history: git blame failed",
+    });
+    // The failure does not change the verdict.
+    mocks.failHistory = false;
+    const clean = await review(enabled, "history-fails-control");
+    expect(record.posted.verdict).toEqual(clean.posted.verdict);
+  });
+
+  it("records no gather error when the history block is built or not wanted", async () => {
+    const built = await review(enabled, "history-no-error-on");
+    const off = await review(disabled, "history-no-error-off");
+    expect(built.cost.errors.filter((e) => e.stage === "gather")).toEqual([]);
+    expect(off.cost.errors.filter((e) => e.stage === "gather")).toEqual([]);
+  });
+});
+
+describe("a symlinked root CLAUDE.md", () => {
+  const roots: string[] = [];
+  afterAll(() => {
+    for (const r of roots) rmSync(r, { recursive: true, force: true });
+  });
+
+  /** Make a repo whose base commit holds the link, then a head commit that edits a file. */
+  async function repoWithLink(
+    target: string,
+    files: Record<string, string>,
+  ): Promise<{ repo: string; base: string; head: string }> {
+    const repo = mkdtempSync(join(tmpdir(), "pr-review-run-link-"));
+    roots.push(repo);
+    const git = async (...args: string[]) =>
+      (
+        await run("git", ["-C", repo, ...args], {
+          env: {
+            ...process.env,
+            GIT_CONFIG_NOSYSTEM: "1",
+            GIT_CONFIG_GLOBAL: "/dev/null",
+            GIT_AUTHOR_NAME: "Test",
+            GIT_AUTHOR_EMAIL: "test@example.invalid",
+            GIT_COMMITTER_NAME: "Test",
+            GIT_COMMITTER_EMAIL: "test@example.invalid",
+          },
+        })
+      ).stdout.trim();
+    await git("init", "--quiet", "--initial-branch=main");
+    writeFileSync(join(repo, "a.txt"), "one\n");
+    for (const [path, text] of Object.entries(files)) writeFileSync(join(repo, path), text);
+    symlinkSync(target, join(repo, "CLAUDE.md"));
+    await git("add", "-A");
+    await git("commit", "--quiet", "--no-gpg-sign", "-m", "base");
+    const base = await git("rev-parse", "HEAD");
+    writeFileSync(join(repo, "a.txt"), "one\ntwo\n");
+    await git("commit", "--quiet", "--no-gpg-sign", "-am", "head");
+    return { repo, base, head: await git("rev-parse", "HEAD") };
+  }
+
+  function emptyScript(req: QueryRequest): QueryOutcome<unknown> {
+    const out = (output: unknown): QueryOutcome<unknown> => ({ ok: true, output, raw: META });
+    if (req.role === "triage") return out(BRIEF);
+    if (req.role === "reviewer") return out({ findings: [] });
+    throw new Error(`unexpected role ${req.role}`);
+  }
+
+  async function review(f: { repo: string; base: string; head: string }, name: string) {
+    const fake = createFakeSdkClient(emptyScript);
+    const { record } = await runReview({
+      repo: f.repo,
+      base: f.base,
+      head: f.head,
+      tierOverride: "fast",
+      outDir: join(outRoot, name),
+      allowApiKey: false,
+      client: fake,
+    });
+    return { record, fake };
+  }
+
+  it("injects the target text when the link leads to a file in the tree", async () => {
+    const f = await repoWithLink("AGENTS.md", { "AGENTS.md": "LINKED-RULE: be brief.\n" });
+    const { record, fake } = await review(f, "claude-link-ok");
+    expect(record.identity.injected).toEqual([{ path: "CLAUDE.md", truncated: false }]);
+    expect(record.cost.errors.filter((e) => e.stage === "config")).toEqual([]);
+    const reviewers = fake.calls.filter((c) => c.role === "reviewer");
+    expect(reviewers.length).toBeGreaterThan(0);
+    for (const call of reviewers) expect(call.systemPrompt).toContain("LINKED-RULE: be brief.");
+  });
+
+  it("records a config-stage error, and injects nothing, when the link cannot be resolved", async () => {
+    const f = await repoWithLink("../outside", {});
+    const { record, fake } = await review(f, "claude-link-bad");
+    expect(record.identity.injected).toEqual([]);
+    const errors = record.cost.errors.filter((e) => e.stage === "config");
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.message).toContain("CLAUDE.md is a symlink to ../outside");
+    expect(errors[0]?.message).toContain("not a regular file in the base tree");
+    for (const call of fake.calls) expect(call.systemPrompt).not.toContain("outside");
   });
 });

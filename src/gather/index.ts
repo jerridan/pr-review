@@ -23,6 +23,12 @@ export interface GatherResult {
   description: string;
   /** Blame and log at the merge base for the changed lines, or null when none. */
   history: { text: string; truncated: boolean } | null;
+  /**
+   * The message of the error that stopped the history block, or null when
+   * the block was built or was not wanted. The field is optional so a test
+   * literal of a GatherResult may omit it. Gather always sets it.
+   */
+  historyError?: string | null;
 }
 
 /** Give the full sha of the commit that "rev" names. Throw when it is not a commit. */
@@ -84,26 +90,32 @@ export async function gather(
     .map((e) => ({ path: e.oldPath ?? e.path, ranges: oldSideRanges(sections.get(e.path) ?? "") }))
     .filter((h) => h.ranges.length > 0);
 
+  const built = wantHistory
+    ? await tryGatherHistory(repo, mergeBase, hunks)
+    : { history: null, error: null };
+
   return {
     base: baseSha,
     head: headSha,
     ...result,
     mergeBase,
     description: await describeChange(repo, baseSha, headSha),
-    history: wantHistory ? await tryGatherHistory(repo, mergeBase, hunks) : null,
+    history: built.history,
+    historyError: built.error,
   };
 }
 
-// The history block is extra context. A git failure gives no block.
+// The history block is extra context. A git failure gives no block. The
+// caller gets the error message, so the run can show it in the record.
 async function tryGatherHistory(
   repo: string,
   mergeBase: string,
   hunks: Parameters<typeof gatherHistory>[2],
-): Promise<GatherResult["history"]> {
+): Promise<{ history: GatherResult["history"]; error: string | null }> {
   try {
-    return await gatherHistory(repo, mergeBase, hunks);
-  } catch {
-    return null;
+    return { history: await gatherHistory(repo, mergeBase, hunks), error: null };
+  } catch (err) {
+    return { history: null, error: err instanceof Error ? err.message : String(err) };
   }
 }
 

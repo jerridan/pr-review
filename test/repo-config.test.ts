@@ -63,6 +63,24 @@ async function repoWith(files: Record<string, string>): Promise<{ repo: string; 
   return { repo, sha: await git(repo, "rev-parse", "HEAD") };
 }
 
+/** Make a repo whose one commit holds the files and the symlinks (path to target). */
+async function repoWithLinks(
+  files: Record<string, string>,
+  links: Record<string, string>,
+): Promise<{ repo: string; sha: string }> {
+  const repo = mkdtempSync(join(tmpdir(), "pr-review-config-"));
+  roots.push(repo);
+  await git(repo, "init", "--quiet", "--initial-branch=main");
+  writeFiles(repo, { "README.md": "# r\n", ...files });
+  for (const [path, target] of Object.entries(links)) {
+    mkdirSync(dirname(join(repo, path)), { recursive: true });
+    symlinkSync(target, join(repo, path));
+  }
+  await git(repo, "add", "-A");
+  await git(repo, "commit", "--quiet", "--no-gpg-sign", "-m", "one");
+  return { repo, sha: await git(repo, "rev-parse", "HEAD") };
+}
+
 async function loadError(files: Record<string, string>): Promise<RepoConfigError> {
   const { repo, sha } = await repoWith(files);
   try {
@@ -180,6 +198,7 @@ describe("loadRepoConfig: defaults and files", () => {
       rulesMd: null,
       claudeMd: null,
       customReviewers: [],
+      warnings: [],
     });
   });
 
@@ -533,24 +552,6 @@ describe("loadRepoConfig: suppressions name a known reviewer", () => {
 });
 
 describe("loadRepoConfig: a config path that is not a regular file", () => {
-  /** Make a repo whose one commit holds the files and the symlinks (path to target). */
-  async function repoWithLinks(
-    files: Record<string, string>,
-    links: Record<string, string>,
-  ): Promise<{ repo: string; sha: string }> {
-    const repo = mkdtempSync(join(tmpdir(), "pr-review-config-"));
-    roots.push(repo);
-    await git(repo, "init", "--quiet", "--initial-branch=main");
-    writeFiles(repo, { "README.md": "# r\n", ...files });
-    for (const [path, target] of Object.entries(links)) {
-      mkdirSync(dirname(join(repo, path)), { recursive: true });
-      symlinkSync(target, join(repo, path));
-    }
-    await git(repo, "add", "-A");
-    await git(repo, "commit", "--quiet", "--no-gpg-sign", "-m", "one");
-    return { repo, sha: await git(repo, "rev-parse", "HEAD") };
-  }
-
   async function errorOf(repo: string, sha: string): Promise<RepoConfigError> {
     try {
       await loadRepoConfig(repo, sha);
@@ -611,9 +612,107 @@ describe("loadRepoConfig: a config path that is not a regular file", () => {
     expect(err.message).toContain("160000");
   });
 
+  it("fails on a symlinked .pr-review directory, also when the target holds an invalid config", async () => {
+    const { repo, sha } = await repoWithLinks(
+      { "real/config.yaml": "concurrency: 0\n" },
+      { ".pr-review": "real" },
+    );
+    const err = await errorOf(repo, sha);
+    expect(err.file).toBe(".pr-review");
+    expect(err.field).toBe("(root)");
+    expect(err.message).toContain("120000");
+    expect(err.message).toContain("must be a directory");
+  });
+
+  it("fails on a submodule entry at .pr-review", async () => {
+    const { repo } = await repoWith({});
+    const oid = "1".repeat(40);
+    await git(repo, "update-index", "--add", "--cacheinfo", `160000,${oid},.pr-review`);
+    await git(repo, "commit", "--quiet", "--no-gpg-sign", "-m", "two");
+    const err = await errorOf(repo, await git(repo, "rev-parse", "HEAD"));
+    expect(err.file).toBe(".pr-review");
+    expect(err.field).toBe("(root)");
+    expect(err.message).toContain("160000");
+    expect(err.message).toContain("must be a directory");
+  });
+
+  it("fails on a symlinked .pr-review/reviewers directory", async () => {
+    const { repo, sha } = await repoWithLinks(
+      { "real/linked.md": CUSTOM_REVIEWER, ".pr-review/config.yaml": "caps: {}\n" },
+      { ".pr-review/reviewers": "../real" },
+    );
+    const err = await errorOf(repo, sha);
+    expect(err.file).toBe(".pr-review/reviewers");
+    expect(err.field).toBe("(root)");
+    expect(err.message).toContain("120000");
+    expect(err.message).toContain("must be a directory");
+  });
+
   it("still gives the defaults when the paths are absent", async () => {
     const { repo, sha } = await repoWithLinks({}, {});
     const loaded = await loadRepoConfig(repo, sha);
     expect(loaded.config).toEqual(DEFAULT_REPO_CONFIG);
+  });
+});
+
+describe("loadRepoConfig: a symlinked root CLAUDE.md", () => {
+  it("reads the target when the link points at a file in the tree", async () => {
+    const { repo, sha } = await repoWithLinks(
+      { "AGENTS.md": "Agents text.\n" },
+      { "CLAUDE.md": "AGENTS.md" },
+    );
+    const loaded = await loadRepoConfig(repo, sha);
+    expect(loaded.claudeMd).toBe("Agents text.\n");
+    expect(loaded.warnings).toEqual([]);
+  });
+
+  it("resolves a ./ target and a target in a subdirectory", async () => {
+    const dot = await repoWithLinks({ "AGENTS.md": "Dot.\n" }, { "CLAUDE.md": "./AGENTS.md" });
+    expect((await loadRepoConfig(dot.repo, dot.sha)).claudeMd).toBe("Dot.\n");
+    const sub = await repoWithLinks(
+      { "docs/a.md": "Sub.\n" },
+      { "CLAUDE.md": "docs/../docs/a.md" },
+    );
+    expect((await loadRepoConfig(sub.repo, sub.sha)).claudeMd).toBe("Sub.\n");
+  });
+
+  it("gives null and one warning when the target leaves the repo root", async () => {
+    const { repo, sha } = await repoWithLinks({}, { "CLAUDE.md": "../outside" });
+    const loaded = await loadRepoConfig(repo, sha);
+    expect(loaded.claudeMd).toBeNull();
+    expect(loaded.warnings).toHaveLength(1);
+    expect(loaded.warnings[0]).toContain("CLAUDE.md is a symlink to ../outside");
+    expect(loaded.warnings[0]).toContain("not a regular file in the base tree");
+  });
+
+  it("gives null and one warning for an absolute target", async () => {
+    const { repo, sha } = await repoWithLinks({}, { "CLAUDE.md": "/etc/passwd" });
+    const loaded = await loadRepoConfig(repo, sha);
+    expect(loaded.claudeMd).toBeNull();
+    expect(loaded.warnings).toHaveLength(1);
+    expect(loaded.warnings[0]).toContain("/etc/passwd");
+  });
+
+  it("gives null and one warning when the target is absent, a directory or a second link", async () => {
+    const missing = await repoWithLinks({}, { "CLAUDE.md": "NOPE.md" });
+    const dir = await repoWithLinks({ "docs/a.md": "x\n" }, { "CLAUDE.md": "docs" });
+    const chain = await repoWithLinks(
+      { "AGENTS.md": "x\n" },
+      { "CLAUDE.md": "MID.md", "MID.md": "AGENTS.md" },
+    );
+    for (const { repo, sha } of [missing, dir, chain]) {
+      const loaded = await loadRepoConfig(repo, sha);
+      expect(loaded.claudeMd).toBeNull();
+      expect(loaded.warnings).toHaveLength(1);
+    }
+  });
+
+  it("gives no warning when CLAUDE.md is absent or a regular file", async () => {
+    const absent = await repoWith({});
+    expect((await loadRepoConfig(absent.repo, absent.sha)).warnings).toEqual([]);
+    const plain = await repoWith({ "CLAUDE.md": "Plain.\n" });
+    const loaded = await loadRepoConfig(plain.repo, plain.sha);
+    expect(loaded.claudeMd).toBe("Plain.\n");
+    expect(loaded.warnings).toEqual([]);
   });
 });
