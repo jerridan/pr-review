@@ -1,0 +1,313 @@
+# PR review tool: high-level design (first pass)
+
+Status: draft for discussion, revised 2026-10-13 after first review. Builds on `docs/research/`.
+
+## 1. Goals and constraints
+
+- Review pull requests in all of the user's repos, in CI and locally, with one tool.
+- Many small specialist reviewers run in parallel. This choice is settled.
+- A repo can add its own reviewers and rules without changes to the tool.
+- Low noise is the first quality target. A finding that is wrong costs more than a finding that is missed.
+- The review covers only what the PR adds, changes or aggravates. Pre-existing issues are out of scope.
+- Very small or trivial PRs take a cheaper path.
+- Claude models only, for now.
+- Every run writes a record that the evaluation harness can replay.
+
+Non-goals for v1: auto-fix commits, chat with the reviewer in PR threads, multi-provider support.
+
+## 2. Shape of the system
+
+Two layers:
+
+1. **Orchestrator** (code, deterministic). Collects inputs, routes, selects reviewers, runs the stages below, merges, posts, records. No LLM decides control flow here.
+2. **Agents** (markdown definitions, one file per agent). Reviewers, the verifier, the triage agent, the summarizer. Built-in agents ship with the tool. Custom reviewers live in the repo.
+
+Recommended runtime: the Claude Agent SDK (TypeScript) with each reviewer passed as a programmatic subagent. The agent files use the Claude Code subagent frontmatter (`name`, `description`, `tools`, `model`) plus a small set of review-only fields. This gives the same files in three places: the CI run, the local CLI run, and interactive use inside Claude Code.
+
+Alternative considered: a Claude Code slash command that spawns subagents through the Agent tool. Rejected for the main path because the merge, threshold, dedupe and post steps must be deterministic and testable. Kept as a thin `/review` command that calls the CLI.
+
+## 3. Pipeline
+
+```
+ gather -> triage -> select -> find -> verify -> merge -> report -> record
+   |        |         |         |        |         |        |
+  code    Sonnet    code     Sonnet   Sonnet    code+    code    JSON
+                             /Opus    /Opus     1 call
+```
+
+### 3.1 Gather (code)
+
+- Base and head SHAs, three-dot diff, list of changed files with hunk counts.
+- PR title, body, labels, author, draft flag, author permission level.
+- Existing review threads posted by this tool, with their fingerprints and state.
+- Repo config and custom reviewers, read from the **base branch** only (see section 6).
+- Sanitize PR title and body: strip HTML comments and invisible characters, wrap in a data block.
+
+### 3.2 Triage (facts in code, then one Sonnet call)
+
+Three tiers: `skip`, `fast`, `full`.
+
+Code first computes what it can without judgment: renames and moves via git rename detection, generated and lockfile paths, per-file hunk counts, sensitive-path hits, and PR metadata. Moved files with no content change leave the diff here.
+
+Then a triage agent always runs on the remaining diff and returns a brief:
+
+- the tier with its reason
+- which reviewer categories apply
+- hotspots to focus on
+- per-file notes such as pure refactor or mechanical rename
+- a short summary of what the PR does
+
+The brief goes to Select and to every reviewer as context. Size is not a signal on its own: a 3-line auth change is full, a 40-file mechanical rename is fast. Uncertainty routes to `full`, and a triage error routes to `full`. This follows Qodo's router, where diff size scored worse than no router, and Anthropic's plugin, which runs cheap gates and a summary before the finders.
+
+Order of precedence:
+
+1. Overrides: labels `review:full`, `review:fast`, `review:skip`, a maintainer comment `@pr-review full`, or `--tier` on the CLI.
+2. Skip rules on metadata only: draft, title keyword, label, bot author, zero hunks after moves and generated paths are removed.
+3. Sensitive globs (auth, crypto, payments, migrations, CI config, the tool's own config) set a floor of `full`. Triage can raise a tier, never lower it past this floor.
+4. Triage decides everything else.
+
+Tier effects:
+
+| Tier | Reviewers | Verifier | Budget target |
+|------|-----------|----------|---------------|
+| skip | none, post a one-line note | no | ~0 |
+| fast | diff-only bug scan, convention check, custom reviewers that opt in | yes | small |
+| full | all matched built-in reviewers plus all matched custom reviewers | yes | normal |
+
+The fast tier runs one pass of diff-bugs, conventions and custom reviewers with `min_tier: fast`, then the same verifier, merge and single review. The review body states the tier and the triage reason, for example "Fast review: mechanical rename across 40 files, no logic change", so a wrong call is visible. Each push re-triages on the cumulative PR diff, and the tier only moves up, never down.
+
+### 3.3 Select (code)
+
+Each reviewer declares triggers in frontmatter: path globs, languages, categories from the triage brief, minimum tier. The orchestrator builds the run list from triggers. A reviewer with no triggers always runs in `full`.
+
+### 3.4 Find (parallel reviewer agents)
+
+Each reviewer gets: the diff, the sanitized PR description, the repo rules file, read-only tools over the checkout, and a per-reviewer token budget. Each returns structured findings:
+
+```
+file, start_line, end_line, category, severity, claim,
+evidence (code the reviewer read, quoted), suggested_fix, confidence
+```
+
+Reviewer prompts follow the patterns that worked in the research: one evidence source per reviewer, an explicit do-not-flag list, leave lint and formatting to linters, no finding without quoted evidence, and no finding on code the PR did not add, change or aggravate.
+
+Each reviewer sets its own model. Sonnet is the default. Reviewers that need strong judgment (security, history, tests) run on Opus. Findings come back as structured output validated against a schema. The orchestrator is code, so no LLM retypes a finding on the way to the record.
+
+Built-in reviewers for v1, split by evidence source:
+
+| Reviewer | Evidence | Tier |
+|----------|----------|------|
+| diff-bugs | the diff alone, logic and edge cases | fast |
+| conventions | CLAUDE.md, rules file, nearby code style | fast |
+| tests | changed behavior vs changed tests, silent failures | full |
+| security | input handling, secrets, authz on changed paths | full |
+| history | git blame and log on changed lines, prior fixes | full |
+| description-drift | PR text vs what the code does | full |
+| docs-and-comments | stale comments and docs touched by the change | full |
+
+### 3.5 Verify (one Sonnet call per finding)
+
+Each finding goes to a verifier with the finding, the quoted evidence, the full current file, and the diff hunk. The verifier scores 0–100 against a fixed rubric:
+
+- Is the claim true of the code as written?
+- Was the problem introduced or exposed by this PR?
+- Would a careful reviewer on this team post it?
+- Is it outside the do-not-flag list and suppressions?
+
+Scope is a gate before the score: a finding on code the PR did not add, change or aggravate fails verification whatever its score, and is tagged pre-existing in the record. Findings under the threshold are dropped but kept in the record. Default threshold 80, configurable per repo and per reviewer. The verifier never sees which reviewer produced the finding.
+
+Verification starts per finding as soon as its reviewer returns. Merge is the only barrier, so the slowest reviewer delays only its own findings. The verifier runs on Sonnet with the full file in context, and escalates to Opus when the reviewer marks a finding `needs_context: true`. The verifier also assigns severity, because reviewers rate their own findings too high. Merge may downgrade a severity when it sees the full set, never upgrade.
+
+| Severity | Test | Posts on later runs |
+|----------|------|---------------------|
+| blocking | would cause an incident or a real bug if merged | yes |
+| suggestion | makes the change safer or clearer, no bug today | first run only |
+| nit | style, naming, wording not caught by a linter | first run only, if at all |
+
+### 3.6 Merge (code, then one call for semantic dedupe)
+
+1. Fingerprint each finding: file, normalized code span, category.
+2. Drop findings that match an open or dismissed thread from a previous run.
+3. Group by file and overlapping lines. One Sonnet call merges groups that say the same thing and picks the best wording.
+4. Apply repo suppressions by category, path and reviewer.
+5. Rank by severity then verifier score. No cap on blocking findings. Non-blocking findings are capped per run at `3 + ceil(hunks / 4)`, at most 20, suggestions filled before nits. A 4-hunk PR gets 4, a 20-hunk PR gets 8. Overflow goes in the summary as a list. This is a starting formula for the harness to tune.
+
+### 3.7 Report
+
+GitHub: one review per run, posted the way a human posts one.
+
+- A short body and inline comments on the diff lines they refer to. The review event is always `COMMENT`, never approve or request changes.
+- The body states the verdict the tool would give, "would approve" or "would request changes", with the counts behind it.
+- A finding on a line outside the diff goes in the body with a full-SHA permalink.
+- A neutral check run carries the same counts and a severity line in its text.
+- A later run posts a new review scoped to what changed, as a human would, and resolves threads that no longer hold.
+- Fork PRs: see section 6.
+- Failures are visible. The review always posts, and its body carries a coverage line: reviewers that ran, reviewers that failed, findings dropped because a verifier call failed. A run that dies before posting still posts a short review that says so. Unverified findings are never posted.
+- Pre-existing issues never appear in the review and never affect the verdict. A repo can set `pre_existing: comment` to have verified pre-existing issues posted as one separate issue comment titled cleanup opportunities. The default is off.
+
+Local:
+
+- Terminal table by default, `--format json` and `--format markdown` for other uses.
+- Same pipeline and same record, so a local run is a valid eval sample.
+
+### 3.8 Record
+
+One JSON file per run, in four parts:
+
+- **Identity and inputs**: repo, PR, base and head SHAs, timestamp, tool version, config hash, changed files with hunk counts, the triage brief, reviewers selected with the trigger that picked each, model per role.
+- **Raw stage outputs**: every finding each reviewer returned per pass, every verifier call with score, severity and scope gate result, every merge decision (dedupe groups, downgrades, suppressions, cap overflow, prior-thread matches).
+- **What was posted**: review body, verdict, inline comments with fingerprints.
+- **Cost and health**: tokens and wall time per stage and per agent, every error with its stage.
+
+The Action uploads the record as a workflow artifact and pushes it to a `pr-review-records` branch, so it outlives artifact retention.
+
+Uses:
+
+- The harness replays recorded inputs against a new version, so every real PR is a regression case.
+- Records where a human acted on or dismissed a finding become golden cases without labeling.
+- Per-reviewer precision over time drives suppression suggestions and shows which reviewer to cut.
+- `explain` reads a record to show why a finding was kept or dropped.
+- Later runs read the previous record for the last reviewed head and the open fingerprints.
+
+### 3.9 First run and later runs
+
+The first run casts a wide net. Wide means more passes over the PR's own changes, not a wider scope. Every run reviews only what the PR adds, changes or aggravates. Later runs look only at what changed since the last review and only for blocking problems, so the cycle converges.
+
+**First run.** A reviewer with `passes: N` in its frontmatter runs N times with the same inputs. The union of findings goes to the verifier, then fingerprint and semantic dedupe collapse the repeats. Defaults: 2 passes for diff-bugs and security, 1 elsewhere. Five runs of one model on SWR-Bench agreed on only 27 golden hits, so repeats raise recall more than any prompt change.
+
+**Later runs** (a new push on a PR this tool has reviewed):
+
+- Scope is the diff between the last reviewed head and the new head, computed from the merge base so a rebase does not re-review the whole PR.
+- Severity floor is blocking. No new suggestions or nits.
+- Open threads are re-verified against the new head. Threads that no longer hold are resolved.
+- The verdict is recomputed from all open blocking findings, not only new ones.
+- A push with no changed hunks posts nothing.
+
+**Verdict rule.** Incomplete when any reviewer or stage failed. Would request changes when at least one blocking finding is open. Would approve otherwise. The rule is fixed so the verdict is explainable.
+
+**Override.** A maintainer comment `@pr-review full` or a label forces a fresh full run.
+
+## 4. Repo-side configuration
+
+```
+.pr-review/
+  config.yaml        thresholds, suppressions, sensitive globs, skip rules, caps
+  rules.md           short shared rules, injected into every reviewer
+  reviewers/*.md     custom reviewer agents, same frontmatter as built-ins
+```
+
+Two mechanisms on purpose:
+
+- `rules.md` is for cheap team knowledge that every reviewer should know. Keep it short. Research says a long rules file dilutes the rules.
+- `reviewers/*.md` is for a focused reviewer with its own evidence source, tools and do-not-flag list. One file, one agent.
+
+Custom reviewer frontmatter example:
+
+```yaml
+---
+name: migration-safety
+description: Checks Alembic migrations for locks and irreversible steps
+model: sonnet
+tools: [Read, Grep, Glob]
+triggers:
+  paths: ["alembic/versions/**"]
+  min_tier: fast
+threshold: 85
+---
+```
+
+A custom reviewer can also override `threshold` to be stricter, never looser than the repo floor.
+
+## 5. Models and budget
+
+| Role | Default model | Reason |
+|------|---------------|--------|
+| triage | Sonnet | reads the whole diff once and judges risk; failure falls back to full |
+| reviewers | Sonnet, Opus per reviewer | best cost per useful finding; Opus for security, history and tests |
+| verifier | Sonnet, Opus on escalation | few calls per PR, and severity is a judgment call |
+| semantic merge | Sonnet | needs judgment on wording |
+| summarizer | Haiku | formatting only |
+
+Per-repo overrides for any role. A run-level token ceiling stops new reviewer launches when reached and notes it in the summary.
+
+## 6. Trust model
+
+- All configuration and all agent files load from the base branch. PR versions are ignored and the diff of `.pr-review/` is itself reviewed by the security reviewer.
+- The PR head checks out into a separate directory. Reviewers read it as data. No hooks, no project MCP servers, no settings from the head.
+- Built-in and custom reviewers get read-only tools by default. Read-only comes from the tools list, not from permission mode, because subagents inherit the parent mode.
+- A custom reviewer may request `Bash`. The orchestrator grants it only when the PR author has write access to the repo and the reviewer sets `trusted: true`. Otherwise the reviewer runs without Bash and the summary says so.
+- Fork PRs: no automatic run by default. A maintainer applies a label to trigger a run, and that run uses the restricted tool set for every reviewer.
+- The PR title and body are untrusted data in every prompt.
+- Secrets: the API key is the only secret in the job. The GitHub token has `pull-requests: write` and `checks: write` only.
+
+## 7. Idempotency and feedback
+
+- A finding fingerprint is stable across pushes when the code span is unchanged.
+- A thread resolved by a human, or a 👎 reaction on the bot comment, marks the fingerprint dismissed for that PR. Dismissed fingerprints never repost.
+- Repeated dismissals of the same category and reviewer across a repo feed a per-repo suppression suggestion, written to the record and shown in the summary. The tool does not change config on its own.
+
+## 8. Evaluation harness
+
+- Golden set: start with 20 to 50 cases from the user's own repos, taken from real misses and real false positives, plus a ReviewBench subset for breadth. Each case is a frozen checkout, a diff and a list of golden findings with severity and category.
+- Contract: the harness runs the same CLI with `--format json` against the frozen checkout, no network.
+- Scoring: match each finding to a golden item by file and span. One Haiku judge call only for pairs that overlap but do not match exactly. No holistic score.
+- Metrics: grounded recall on golden findings, precision on posted findings, findings per PR, cost per PR. Run each case three times and report the spread.
+- Gate: a change to a prompt or threshold needs the eval run in CI. Fail when recall or precision drops past a set margin.
+- Online: track addressed rate by re-running the verifier on the next push, and reaction counts. Compare to offline before trusting offline alone.
+- With few cases: record every run from day one, local runs included, so the set grows on its own. Seed the first set three ways: ReviewBench and Martian cases for breadth, bug injection into merged PRs of the user's own repos for known-answer recall, and findings dismissed or acted on in real runs for precision. Synthetic cases overstate absolute scores, so use the harness for regression between two versions, not for an absolute number, until the real set reaches about 30 cases.
+
+## 9. Interfaces
+
+```
+pr-review run   --base <sha> --head <sha> [--pr <n>] [--tier full|fast] [--format github|json|md]
+pr-review eval  [--cases <dir>] [--repeat 3]
+pr-review list  (reviewers that would run, with the trigger that selected them)
+pr-review explain <run.json>   (why each finding was kept or dropped)
+```
+
+A GitHub Action wraps `run`. A Claude Code `/review` command wraps `run` for local use.
+
+### 9.1 Auth
+
+Local and CI runs both use the user's Claude subscription.
+
+- Run `claude setup-token` once to mint a one-year token. Store it as the `CLAUDE_CODE_OAUTH_TOKEN` secret in GitHub and pass it to the job as an environment variable. Locally the CLI uses the saved login or the same variable.
+- The Agent SDK runs the Claude Code binary, which reads this variable. The docs state this for `-p` mode and list the SDK beside it. Not yet tested.
+- Keep `ANTHROPIC_API_KEY` unset in the job. It wins over the token when both are present.
+- The token is tied to one person's subscription, so it fits the user's own repos and not a shared org secret. Use an API key for that case.
+- Anthropic's terms allow ordinary individual use of the SDK on a subscription and forbid routing other users through those credentials.
+- Rotation: mint a new token before the year ends and replace the secret. The docs do not say whether re-running the command revokes the old one.
+
+### 9.2 Distribution
+
+No npm package for now. This repo is the GitHub Action and the CLI. Other repos the user owns reference the action by tag once this repo's Actions settings allow access from repositories the user owns. The action installs dependencies and runs from source, so no built bundle is committed. Locally, clone once and link the CLI. Making the repo public later changes nothing, and publishing to npm stays an option.
+
+CI trigger: `pull_request` on opened, synchronize and ready_for_review, `pull_request` labeled for label overrides, and `issue_comment` for the comment override. Fork PRs reach the tool only through the label path, because secrets are absent on fork-triggered runs.
+
+Sources for 9.1: code.claude.com/docs/en/authentication, code.claude.com/docs/en/github-actions, code.claude.com/docs/en/legal-and-compliance, support.claude.com article 15036540.
+
+## 10. Decisions
+
+Settled on 2026-10-13:
+
+1. **Runtime**: Claude Agent SDK in TypeScript.
+2. **Agent file location**: `.pr-review/reviewers/`.
+3. **Fork policy**: label-gated run with restricted tools.
+4. **Review format**: one GitHub review per run, short body with verdict, inline comments on diff lines. Comment event only.
+5. **Verifier threshold**: 80 as the default, tuned by the harness.
+6. **Reviewer models**: per reviewer. Sonnet by default, Opus where judgment matters.
+7. **Severity**: blocking, suggestion, nit, with the tests in section 3.5.
+
+8. **Auth**: the user's Claude subscription, in CI and locally. See section 9.
+
+9. **Verifier model**: Sonnet, with Opus escalation. Severity assigned by the verifier, downgradable at merge.
+10. **Non-blocking cap**: `3 + ceil(hunks / 4)`, at most 20. A starting value for the harness to tune.
+11. **Failures**: always visible in the review, verdict `incomplete`. Never post unverified findings.
+12. **Records**: workflow artifact plus a `pr-review-records` branch.
+13. **Distribution**: private action repo used from the user's own repos, no npm package. Concurrency cap deferred until it is a problem.
+
+## 11. Open risks
+
+- A Sonnet verifier may be too weak for findings that need cross-file reasoning. Mitigation: route a finding to Opus when the reviewer marks it `needs_context: true`.
+- Semantic merge is one more LLM step that can hide a real finding. Mitigation: the record keeps every input and output of the merge, and `explain` shows them.
+- The eval judge is a Claude model and the reviewer is a Claude model. Nobody has measured this bias. Mitigation: match by span first and use the judge only for ambiguous pairs.
