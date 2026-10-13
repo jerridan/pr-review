@@ -171,6 +171,7 @@ function makeRecord(): RunRecord {
       ],
       merges: [],
       capped: [],
+      suppressed: [],
     },
     posted: {
       verdict: "would request changes",
@@ -179,6 +180,7 @@ function makeRecord(): RunRecord {
         reviewers_failed: [],
         reviewers_skipped: [],
         reviewers_without_bash: [],
+        sensitive_without_hunks: [],
         findings_dropped_by_failed_verifier: 1,
       },
       findings: [
@@ -456,6 +458,41 @@ describe("RecordSchema", () => {
     expect(withSkipped([{ name: "description-drift", reason: "no description" }])).toBe(true);
     expect(withSkipped([{ name: "diff-bugs", reason: "bored" }])).toBe(false);
     expect(withSkipped(undefined)).toBe(false);
+  });
+
+  it("requires coverage.sensitive_without_hunks, a list of paths", () => {
+    const record = makeRecord();
+    const withList = (list: unknown) =>
+      RecordSchema.safeParse({
+        ...record,
+        posted: {
+          ...record.posted,
+          coverage: { ...record.posted.coverage, sensitive_without_hunks: list },
+        },
+      }).success;
+    expect(withList([])).toBe(true);
+    expect(withList([".github/workflows/ci.yml"])).toBe(true);
+    expect(withList([1])).toBe(false);
+    expect(withList(undefined)).toBe(false);
+  });
+
+  it("requires stages.suppressed, each item with a finding, a reviewer and a rule", () => {
+    const record = makeRecord();
+    const withList = (list: unknown) =>
+      RecordSchema.safeParse({ ...record, stages: { ...record.stages, suppressed: list } }).success;
+    const rule = { category: "convention", path: "docs/**", reason: "drafts" };
+    expect(withList([{ finding, reviewer: "conventions", rule }])).toBe(true);
+    expect(
+      withList([{ finding, reviewer: "conventions", rule: { reviewer: "a", reason: "r" } }]),
+    ).toBe(true);
+    expect(withList([{ finding, reviewer: "conventions" }])).toBe(false);
+    expect(withList([{ reviewer: "conventions", rule }])).toBe(false);
+    expect(withList([{ finding, reviewer: "conventions", rule: { reviewer: "a" } }])).toBe(false);
+    expect(withList([{ finding, reviewer: "conventions", rule: { ...rule, extra: 1 } }])).toBe(
+      false,
+    );
+    expect(withList([{ finding, reviewer: "conventions", rule, extra: 1 }])).toBe(false);
+    expect(withList(undefined)).toBe(false);
   });
 
   it("requires the resolved model and effort of each selected reviewer", () => {

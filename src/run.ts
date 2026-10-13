@@ -10,6 +10,7 @@ import { diffSections } from "./gather/diff.js";
 import { gather, resolveCommit, type GatherResult } from "./gather/index.js";
 import { withHeadWorktree } from "./gather/worktree.js";
 import { mergeFindings } from "./merge/index.js";
+import { applySuppressions } from "./merge/suppress.js";
 import { writeRecord } from "./record/write.js";
 import {
   effectiveModel,
@@ -170,6 +171,13 @@ function recordingClient(
       }
     },
   };
+}
+
+// The sensitive paths with no text hunk, such as a mode flip or a binary.
+// They stay in sensitive_files, and the tier does not change for them.
+function sensitiveWithoutHunks(gathered: GatherResult): string[] {
+  const hunks = new Map(gathered.changedFiles.map((f) => [f.path, f.hunks]));
+  return gathered.sensitive.filter((path) => (hunks.get(path) ?? 0) === 0);
 }
 
 // Wait for every promise, also when one rejects, then throw the first error.
@@ -345,6 +353,9 @@ export async function runReview(
     // Each finding goes to its verifier as soon as its reviewer pass
     // returns. Merge is the only barrier.
     const pending: Promise<VerificationEntry>[] = [];
+    // The reviewer name of each verification, in the order of "pending".
+    // Suppressions match it, and the verification entry does not hold it.
+    const reviewerNames: string[] = [];
     const onFinding = (finding: Finding, reviewer: string): void => {
       const verifyConfig = verifyConfigFor(
         thresholds.get(reviewer) ?? config.thresholds.default,
@@ -377,6 +388,7 @@ export async function runReview(
           }),
         );
       pending.push(verification);
+      reviewerNames.push(reviewer);
     };
     const { runs, verifications } = await timed("find_verify", async () => {
       let found: ReviewerRun[];
@@ -409,8 +421,15 @@ export async function runReview(
       return { runs: found, verifications: await settleAll(pending) };
     });
 
-    const verified = verifications.flatMap((v) =>
-      v.passed && v.final ? [{ finding: v.finding, result: v.final }] : [],
+    // A suppression removes a verified finding before the merge groups
+    // form. The record keeps the removed finding with its rule.
+    const { kept: verified, suppressed } = applySuppressions(
+      verifications.flatMap((v, i) =>
+        v.passed && v.final
+          ? [{ finding: v.finding, result: v.final, reviewer: reviewerNames[i] ?? "" }]
+          : [],
+      ),
+      config.suppressions,
     );
     const merged = await timed("merge", () =>
       mergeFindings(client, options, verified, {
@@ -487,10 +506,17 @@ export async function runReview(
         verifications,
         merges: merged.merges,
         capped: merged.capped,
+        suppressed: suppressed.map(({ finding, reviewer, rule }) => ({ finding, reviewer, rule })),
       },
       posted: {
         verdict,
-        coverage: coverage(runs, counts.droppedByFailedVerifier, allSkipped, withoutBash),
+        coverage: coverage(
+          runs,
+          counts.droppedByFailedVerifier,
+          allSkipped,
+          withoutBash,
+          sensitiveWithoutHunks(gathered),
+        ),
         findings: merged.posted,
       },
       cost: {

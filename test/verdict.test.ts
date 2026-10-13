@@ -182,6 +182,7 @@ describe("coverage (A8)", () => {
       reviewers_failed: ["security", "tests"],
       reviewers_skipped: [],
       reviewers_without_bash: [],
+      sensitive_without_hunks: [],
       findings_dropped_by_failed_verifier: 3,
     });
     expect(coverage([], 0)).toEqual({
@@ -189,12 +190,16 @@ describe("coverage (A8)", () => {
       reviewers_failed: [],
       reviewers_skipped: [],
       reviewers_without_bash: [],
+      sensitive_without_hunks: [],
       findings_dropped_by_failed_verifier: 0,
     });
     const skipped = [{ name: "docs", reason: "disabled by config" as const }];
     expect(coverage(runs, 0, skipped).reviewers_skipped).toEqual(skipped);
     const withoutBash = [{ name: "shell-check", reason: "not trusted" }];
     expect(coverage(runs, 0, [], withoutBash).reviewers_without_bash).toEqual(withoutBash);
+    expect(coverage(runs, 0, [], [], [".github/workflows/ci.yml"]).sensitive_without_hunks).toEqual(
+      [".github/workflows/ci.yml"],
+    );
   });
 
   it("counts verifier failures and refusals from the verifications", () => {

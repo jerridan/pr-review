@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
@@ -406,4 +407,126 @@ describe("--author-write-access (R7)", () => {
     expect(withOption.call?.bash).toBe(true);
     expect(withOption.doc.coverage.reviewers_without_bash).toEqual([]);
   }, 30_000);
+});
+
+describe("the repo config changes the run (the charter's two runs)", () => {
+  const CONFIG = [
+    "reviewers:",
+    "  history:",
+    "    enabled: false",
+    "suppressions:",
+    "  - reviewer: conventions",
+    "    category: convention",
+    "    reason: The linter owns style.",
+    "",
+  ].join("\n");
+
+  // diff-bugs reports the planted bug. conventions reports a convention
+  // nit on line 1. The other reviewers report nothing.
+  function twoFindingScript(fixture: Fixture) {
+    const base = script(fixture);
+    return (req: QueryRequest): QueryOutcome<unknown> => {
+      if (req.role === "reviewer") {
+        const planted = base(req);
+        if (req.reviewerName === "diff-bugs") return planted;
+        if (req.reviewerName !== "conventions") {
+          return { ok: true, output: { findings: [] }, raw: META };
+        }
+        return {
+          ok: true,
+          output: {
+            findings: [
+              {
+                file: fixture.file,
+                start_line: 1,
+                end_line: 1,
+                category: "convention",
+                severity_estimate: "nit",
+                confidence: "high",
+                claim: "CLAIM-convention",
+                evidence: "export function sum(values: number[]): number {",
+                explanation: "e",
+                needs_context: false,
+              },
+            ],
+          },
+          raw: META,
+        };
+      }
+      if (req.role === "verifier" || req.role === "verifier-escalation") {
+        const verified = base(req) as { output: Record<string, unknown> };
+        return {
+          ok: true,
+          output: {
+            ...verified.output,
+            quotes: ["export function sum", "i <= values.length"],
+            severity: "suggestion",
+          },
+          raw: META,
+        } as QueryOutcome<unknown>;
+      }
+      return base(req);
+    };
+  }
+
+  async function review(fixture: Fixture, name: string) {
+    const fake = createFakeSdkClient(twoFindingScript(fixture));
+    const code = await exitCodeOf(
+      createProgram({ client: fake }).parseAsync(
+        argsFor(fixture, join(outRoot, name), "--format", "json"),
+      ),
+    );
+    expect(code).toBe(0);
+    const doc = JSON.parse(stdout);
+    stdout = "";
+    const record = JSON.parse(readFileSync(doc.record_path, "utf8")) as RunRecord;
+    expect(RecordSchema.safeParse(record).error).toBeUndefined();
+    return { doc, record };
+  }
+
+  it("differs in the reviewers that ran, the posted findings, the suppressed list and the hash", async () => {
+    const configured = await fixtureWithConfig(CONFIG);
+    try {
+      const first = await review(fx, "two-runs-1");
+      const second = await review(configured, "two-runs-2");
+
+      // The reviewers that ran differ: the second run lacks history.
+      expect(first.record.posted.coverage.reviewers_ran).toContain("history");
+      expect(second.record.posted.coverage.reviewers_ran).not.toContain("history");
+      expect(second.record.posted.coverage.reviewers_ran).toHaveLength(
+        first.record.posted.coverage.reviewers_ran.length - 1,
+      );
+      expect(second.doc.coverage.reviewers_skipped).toEqual([
+        { name: "history", reason: "disabled by config" },
+      ]);
+
+      // The first run posts both findings and suppresses none.
+      expect(first.record.posted.findings.map((f) => f.claim).sort()).toEqual([
+        "CLAIM-convention",
+        "CLAIM-off-by-one",
+      ]);
+      expect(first.record.stages.suppressed).toEqual([]);
+
+      // The second run omits the suppressed finding and records it with its rule.
+      expect(second.record.posted.findings.map((f) => f.claim)).toEqual(["CLAIM-off-by-one"]);
+      expect(second.doc.findings.map((f: { claim: string }) => f.claim)).toEqual([
+        "CLAIM-off-by-one",
+      ]);
+      expect(second.record.stages.suppressed).toHaveLength(1);
+      expect(second.record.stages.suppressed[0]).toMatchObject({
+        reviewer: "conventions",
+        finding: { claim: "CLAIM-convention", category: "convention", start_line: 1 },
+        rule: { reviewer: "conventions", category: "convention", reason: "The linter owns style." },
+      });
+
+      // The hash follows spec R4: the path, one newline, the bytes. One file here.
+      const expected = createHash("sha256")
+        .update(Buffer.from(`.pr-review/config.yaml\n${CONFIG}`, "utf8"))
+        .digest("hex");
+      expect(second.record.identity.config_hash).toBe(expected);
+      expect(first.record.identity.config_hash).toBeNull();
+    } finally {
+      rmSync(configured.repo, { recursive: true, force: true });
+    }
+  }, 60_000);
 });

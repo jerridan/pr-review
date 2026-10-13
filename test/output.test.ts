@@ -89,7 +89,7 @@ function record(
         smoke: { model: "claude-sonnet-5-5", effort: "low" },
       },
     },
-    stages: { reviewers: [], verifications: [], merges: [], capped: [] },
+    stages: { reviewers: [], verifications: [], merges: [], capped: [], suppressed: [] },
     posted: {
       verdict: findings.some((f) => f.severity === "blocking")
         ? "would request changes"
@@ -99,6 +99,7 @@ function record(
         reviewers_failed: [],
         reviewers_skipped: [],
         reviewers_without_bash: [],
+        sensitive_without_hunks: [],
         findings_dropped_by_failed_verifier: 0,
       },
       findings,
@@ -144,6 +145,7 @@ describe("table output (A10)", () => {
         reviewers_failed: ["diff-bugs"],
         reviewers_skipped: [],
         reviewers_without_bash: [],
+        sensitive_without_hunks: [],
         findings_dropped_by_failed_verifier: 2,
       },
     });
@@ -172,6 +174,28 @@ describe("table output (A10)", () => {
     expect(text).toContain("src/stats.ts:11");
     expect(text).toContain("src/format.ts:3-7");
     expect(text).not.toContain("overflow");
+  });
+
+  it("shows the skipped reviewers, the reviewers without Bash and the sensitive paths without hunks", () => {
+    const r = record([]);
+    const coverage = {
+      ...r.posted.coverage,
+      reviewers_skipped: [
+        { name: "diff-bugs", reason: "disabled by config" as const },
+        { name: "security", reason: "token ceiling" as const, pass: 2 },
+      ],
+      reviewers_without_bash: [{ name: "shell-check", reason: "not trusted" }],
+      sensitive_without_hunks: [".github/workflows/ci.yml"],
+    };
+    const text = formatTable({ ...r, posted: { ...r.posted, coverage } });
+    expect(text).toContain(
+      "reviewers skipped: diff-bugs (disabled by config), security (token ceiling, pass 2)",
+    );
+    expect(text).toContain("reviewers without Bash: shell-check (not trusted)");
+    expect(text).toContain("sensitive paths without hunks: .github/workflows/ci.yml");
+    expect(formatTable(r)).toContain(
+      "reviewers skipped: none; reviewers without Bash: none; sensitive paths without hunks: none;",
+    );
   });
 
   it("shows each excluded file with its reason", () => {
@@ -227,6 +251,22 @@ describe("json output", () => {
     const coverage = { ...r.posted.coverage, reviewers_without_bash: withoutBash };
     const doc = JSON.parse(formatJson({ ...r, posted: { ...r.posted, coverage } }, "/out/r.json"));
     expect(doc.coverage.reviewers_without_bash).toEqual(withoutBash);
+  });
+
+  it("holds the sensitive paths without hunks in its coverage", () => {
+    const r = record([]);
+    const paths = ["bin/run", "assets/key.bin"];
+    const coverage = { ...r.posted.coverage, sensitive_without_hunks: paths };
+    const doc = JSON.parse(formatJson({ ...r, posted: { ...r.posted, coverage } }, "/out/r.json"));
+    expect(doc.coverage.sensitive_without_hunks).toEqual(paths);
+    expect(Object.keys(doc.coverage).sort()).toEqual([
+      "findings_dropped_by_failed_verifier",
+      "reviewers_failed",
+      "reviewers_ran",
+      "reviewers_skipped",
+      "reviewers_without_bash",
+      "sensitive_without_hunks",
+    ]);
   });
 
   it("holds the excluded files with their reasons", () => {

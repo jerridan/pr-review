@@ -315,6 +315,95 @@ describe("the config hash of a fixture with config (R4)", () => {
   });
 });
 
+describe("a sensitive path with no text hunk (R9)", () => {
+  let zeroFx: Fixture;
+  let zeroRecord: RunRecord;
+
+  beforeAll(async () => {
+    const source = mkdtempSync(join(tmpdir(), "pr-review-record-zero-"));
+    mkdirSync(join(source, "dir"));
+    // README.md is sensitive here, so a mode flip of it is a sensitive path with no hunk.
+    writeFileSync(join(source, "dir", "config.yaml"), "sensitive_globs:\n  - README.md\n");
+    try {
+      zeroFx = await makeFixture("--pr-review-dir", join(source, "dir"));
+    } finally {
+      rmSync(source, { recursive: true, force: true });
+    }
+    // The head gets a binary file under a sensitive path and a mode flip.
+    // The base has README.md, which it holds with mode 100644.
+    const git = (...args: string[]) =>
+      run("git", ["-C", zeroFx.repo, ...args], {
+        env: {
+          ...process.env,
+          GIT_CONFIG_GLOBAL: "/dev/null",
+          GIT_AUTHOR_NAME: "t",
+          GIT_AUTHOR_EMAIL: "t@example.invalid",
+          GIT_COMMITTER_NAME: "t",
+          GIT_COMMITTER_EMAIL: "t@example.invalid",
+        },
+      });
+    writeFileSync(join(zeroFx.repo, ".github", "workflows", "logo.bin"), Buffer.from([0, 1, 2, 0]));
+    await git("add", ".github/workflows/logo.bin");
+    await git("update-index", "--chmod=+x", "README.md");
+    await git("commit", "--quiet", "-m", "Head: add a binary and flip a mode");
+    zeroFx.head = (await git("rev-parse", "HEAD")).stdout.trim();
+    const fake = createFakeSdkClient((req): QueryOutcome<unknown> => {
+      if (req.role === "triage") {
+        return {
+          ok: true,
+          output: {
+            tier: "fast",
+            reason: "r",
+            confidence: "high",
+            categories: [],
+            hotspots: [],
+            file_notes: [],
+            summary: "s",
+          },
+          raw: meta(0.01),
+        };
+      }
+      if (req.role === "reviewer") return { ok: true, output: { findings: [] }, raw: meta(0.1) };
+      throw new Error(`unexpected role ${req.role}`);
+    });
+    zeroRecord = (
+      await runReview({
+        repo: zeroFx.repo,
+        base: zeroFx.base,
+        head: zeroFx.head,
+        outDir: join(outRoot, "zero-records"),
+        allowApiKey: false,
+        client: fake,
+      })
+    ).record;
+  }, 30_000);
+
+  afterAll(() => {
+    if (zeroFx) rmSync(zeroFx.repo, { recursive: true, force: true });
+  });
+
+  it("lists the paths in coverage and keeps them in sensitive_files", () => {
+    expect(zeroRecord.identity.sensitive_files).toEqual([
+      ".github/workflows/ci.yml",
+      ".github/workflows/logo.bin",
+      "README.md",
+    ]);
+    expect(zeroRecord.posted.coverage.sensitive_without_hunks).toEqual([
+      ".github/workflows/logo.bin",
+      "README.md",
+    ]);
+  });
+
+  it("does not change the tier: the sensitive floor of full stays", () => {
+    expect(zeroRecord.identity.tier).toBe("full");
+    expect(zeroRecord.identity.tier_reason).toMatch(/sensitive/i);
+  });
+
+  it("lists nothing for the default fixture, whose sensitive path has a hunk", () => {
+    expect(record.posted.coverage.sensitive_without_hunks).toEqual([]);
+  });
+});
+
 describe("the record parts", () => {
   it("holds the identity and inputs", () => {
     const id = record.identity;
@@ -378,6 +467,7 @@ describe("the record parts", () => {
     ]);
     expect(record.stages.merges).toEqual([]);
     expect(record.stages.capped).toEqual([]);
+    expect(record.stages.suppressed).toEqual([]);
   });
 
   it("holds what was posted: a failed escalation drops the finding and makes the verdict incomplete", () => {
@@ -388,6 +478,7 @@ describe("the record parts", () => {
       reviewers_failed: [],
       reviewers_skipped: [],
       reviewers_without_bash: [],
+      sensitive_without_hunks: [],
       findings_dropped_by_failed_verifier: 1,
     });
   });

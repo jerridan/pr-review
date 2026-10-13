@@ -1,10 +1,10 @@
 // The run record: one JSON file per run, with four parts. This schema is
 // not sent to a model.
 import { z } from "zod";
-import { RepoConfigSchema, type RepoConfig } from "../config/repo-config.js";
+import { RepoConfigSchema, type RepoConfig, type Suppression } from "../config/repo-config.js";
 import { EFFORTS, ROLES, type Effort, type Role } from "../config/models.js";
 import type { QueryMeta } from "../sdk/client.js";
-import { FindingSchema, SEVERITIES, findingShape, type Finding } from "./finding.js";
+import { CATEGORIES, FindingSchema, SEVERITIES, findingShape, type Finding } from "./finding.js";
 import { integer } from "./json-schema.js";
 import { MergeOutputSchema, type MergeOutput } from "./merge.js";
 import { TIERS, TriageBriefSchema, type TriageBrief } from "./triage.js";
@@ -101,6 +101,8 @@ export type RunRecord = {
     }[];
     merges: { group: number[]; result: MergeOutput | QueryFailure; rejected?: string }[];
     capped: PostedFinding[];
+    /** The verified findings that a suppression rule removed before the merge groups formed. */
+    suppressed: { finding: Finding; reviewer: string; rule: Suppression }[];
   };
   posted: {
     verdict: "skipped" | "incomplete" | "would request changes" | "would approve";
@@ -110,6 +112,11 @@ export type RunRecord = {
       reviewers_skipped: SkippedReviewer[];
       /** Custom reviewers whose tools name Bash and that ran without it, with the reason. */
       reviewers_without_bash: { name: string; reason: string }[];
+      /**
+       * Sensitive paths in the diff with no text hunk (a mode flip or a
+       * binary). The tier does not change for them.
+       */
+      sensitive_without_hunks: string[];
       findings_dropped_by_failed_verifier: number;
     };
     findings: PostedFinding[];
@@ -254,6 +261,18 @@ const StagesSchema = z.strictObject({
     }),
   ),
   capped: z.array(PostedFindingSchema),
+  suppressed: z.array(
+    z.strictObject({
+      finding: FindingSchema,
+      reviewer: z.string(),
+      rule: z.strictObject({
+        reviewer: z.string().optional(),
+        category: z.enum(CATEGORIES).optional(),
+        path: z.string().optional(),
+        reason: z.string(),
+      }),
+    }),
+  ),
 });
 
 export const SkippedReviewerSchema: z.ZodType<SkippedReviewer> = z.strictObject({
@@ -269,6 +288,7 @@ const PostedSchema = z.strictObject({
     reviewers_failed: z.array(z.string()),
     reviewers_skipped: z.array(SkippedReviewerSchema),
     reviewers_without_bash: z.array(z.strictObject({ name: z.string(), reason: z.string() })),
+    sensitive_without_hunks: z.array(z.string()),
     findings_dropped_by_failed_verifier: integer(),
   }),
   findings: z.array(PostedFindingSchema),

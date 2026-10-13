@@ -39,15 +39,16 @@ function uniqueNames(runs: ReviewerRun[]): string[] {
 /**
  * The reviewers that ran with no failed pass, the reviewers with a failed
  * pass, the selected reviewers or passes that did not run, the custom
- * reviewers that ran without the Bash they asked for, and the findings
- * dropped because their verifier call failed or because code rejected
- * their verifier result.
+ * reviewers that ran without the Bash they asked for, the sensitive paths
+ * with no text hunk, and the findings dropped because their verifier call
+ * failed or because code rejected their verifier result.
  */
 export function coverage(
   reviewerRuns: ReviewerRun[],
   verifierFailures: number,
   skipped: SkippedReviewer[] = [],
   withoutBash: { name: string; reason: string }[] = [],
+  sensitiveWithoutHunks: string[] = [],
 ): RunRecord["posted"]["coverage"] {
   const failed = new Set(reviewerRuns.filter((r) => r.status === "failed").map((r) => r.name));
   const names = uniqueNames(reviewerRuns);
@@ -56,6 +57,7 @@ export function coverage(
     reviewers_failed: names.filter((name) => failed.has(name)),
     reviewers_skipped: skipped,
     reviewers_without_bash: withoutBash,
+    sensitive_without_hunks: sensitiveWithoutHunks,
     findings_dropped_by_failed_verifier: verifierFailures,
   };
 }
