@@ -89,9 +89,9 @@ file, start_line, end_line, category, severity, claim,
 evidence (code the reviewer read, quoted), suggested_fix, confidence
 ```
 
-Reviewer prompts follow the patterns that worked in the research: one evidence source per reviewer, an explicit do-not-flag list, leave lint and formatting to linters, no finding without quoted evidence, and no finding on code the PR did not add, change or aggravate.
+Reviewer prompts follow the 5.5 prompting guidance (see `docs/research/claude-5-5-models.md`): one evidence source per reviewer, and an instruction to report every issue in scope with a confidence and an estimated severity, because 5.x models over-filter when told to be conservative. All filtering happens in verify and merge. Scope is the only exclusion: not lint or formatting, and nothing on code the PR did not add, change or aggravate. No finding without quoted evidence, which the orchestrator checks is a substring of the diff or file. A one-line explanation per finding, never visible reasoning. Diff first, instructions last. PR text and diff in tagged untrusted blocks. A line that forbids launching subagents.
 
-Each reviewer sets its own model. Sonnet is the default. Reviewers that need strong judgment (security, history, tests) run on Opus. Findings come back as structured output validated against a schema. The orchestrator is code, so no LLM retypes a finding on the way to the record.
+Each reviewer is one SDK `query()` with its own model, effort and output schema. Default is Opus 5.5 at low effort; see section 5. Findings come back as structured output validated against a schema. The orchestrator is code, so no LLM retypes a finding on the way to the record.
 
 Built-in reviewers for v1, split by evidence source:
 
@@ -116,7 +116,7 @@ Each finding goes to a verifier with the finding, the quoted evidence, the full 
 
 Scope is a gate before the score: a finding on code the PR did not add, change or aggravate fails verification whatever its score, and is tagged pre-existing in the record. Findings under the threshold are dropped but kept in the record. Default threshold 80, configurable per repo and per reviewer. The verifier never sees which reviewer produced the finding.
 
-Verification starts per finding as soon as its reviewer returns. Merge is the only barrier, so the slowest reviewer delays only its own findings. The verifier runs on Sonnet with the full file in context, and escalates to Opus when the reviewer marks a finding `needs_context: true`. The verifier also assigns severity, because reviewers rate their own findings too high. Merge may downgrade a severity when it sees the full set, never upgrade.
+Verification starts per finding as soon as its reviewer returns. Merge is the only barrier, so the slowest reviewer delays only its own findings. The verifier runs on Sonnet 5.5 at high effort with thinking on, a different model from the finders, as Anthropic's evaluation guidance recommends. It has the full file in context and read-only tools to find its own supporting quotes, and must retract a finding it cannot quote. It escalates to Opus 5.5 at high when the reviewer marks a finding `needs_context: true` or when the score lands in a middle band (default 60 to 85), following Anthropic's two-pass pattern. The verifier also assigns severity, because reviewers rate their own findings too high. Merge may downgrade a severity when it sees the full set, never upgrade.
 
 | Severity | Test | Posts on later runs |
 |----------|------|---------------------|
@@ -142,7 +142,7 @@ GitHub: one review per run, posted the way a human posts one.
 - A neutral check run carries the same counts and a severity line in its text.
 - A later run posts a new review scoped to what changed, as a human would, and resolves threads that no longer hold.
 - Fork PRs: see section 6.
-- Failures are visible. The review always posts, and its body carries a coverage line: reviewers that ran, reviewers that failed, findings dropped because a verifier call failed. A run that dies before posting still posts a short review that says so. Unverified findings are never posted.
+- Failures are visible. The review always posts, and its body carries a coverage line: reviewers that ran, reviewers that failed, findings dropped because a verifier call failed. A `refusal` stop from the safety classifiers, which a security reviewer can trigger, counts as a reviewer failure. A run that dies before posting still posts a short review that says so. Unverified findings are never posted.
 - Pre-existing issues never appear in the review and never affect the verdict. A repo can set `pre_existing: comment` to have verified pre-existing issues posted as one separate issue comment titled cleanup opportunities. The default is off.
 
 Local:
@@ -157,7 +157,7 @@ One JSON file per run, in four parts:
 - **Identity and inputs**: repo, PR, base and head SHAs, timestamp, tool version, config hash, changed files with hunk counts, the triage brief, reviewers selected with the trigger that picked each, model per role.
 - **Raw stage outputs**: every finding each reviewer returned per pass, every verifier call with score, severity and scope gate result, every merge decision (dedupe groups, downgrades, suppressions, cap overflow, prior-thread matches).
 - **What was posted**: review body, verdict, inline comments with fingerprints.
-- **Cost and health**: tokens and wall time per stage and per agent, every error with its stage.
+- **Cost and health**: `modelUsage` from every query (tokens, cache reads, estimated cost per model), wall time per stage and per agent, every error with its stage, every `refusal` or `max_tokens` stop.
 
 The Action uploads the record as a workflow artifact and pushes it to a `pr-review-records` branch, so it outlives artifact retention.
 
@@ -220,32 +220,35 @@ A custom reviewer can also override `threshold` to be stricter, never looser tha
 
 ## 5. Models and budget
 
-| Role | Default model | Reason |
-|------|---------------|--------|
-| triage | Sonnet | reads the whole diff once and judges risk; failure falls back to full |
-| reviewers | Sonnet, Opus per reviewer | best cost per useful finding; Opus for security, history and tests |
-| verifier | Sonnet, Opus on escalation | few calls per PR, and severity is a judgment call |
-| semantic merge | Sonnet | needs judgment on wording |
-| summarizer | Haiku | formatting only |
+| Role | Default model | Effort | Reason |
+|------|---------------|--------|--------|
+| triage | Sonnet 5.5 | medium, thinking on | judgment on risk from one read of the diff; failure falls back to full |
+| reviewers | Opus 5.5 | low | half the old price gap; best published bug-catch rates at low effort; Sonnet 5.5 medium is the first harness comparison |
+| verifier | Sonnet 5.5, Opus 5.5 on escalation | high, thinking on | a different model from the finders; escalation on `needs_context` or a middle-band score |
+| semantic merge | Sonnet 5.5 | medium | needs judgment on wording |
+| summarizer | Haiku 5.5 | medium, thinking on | formatting only; low effort leaks reasoning text |
 
-Per-repo overrides for any role. A run-level token ceiling stops new reviewer launches when reached and notes it in the summary.
+Effort and output schema stay fixed per role, because changing either invalidates the prompt cache. Haiku 5.5 is not used as a verifier or reviewer: its system card reports the highest over-refusal rate of any tested model and work reported done without checking at low and medium effort.
+
+Per-repo overrides for any role. A run-level token ceiling stops new reviewer launches when reached and notes it in the summary. Each SDK query is its own Claude Code process of about 1 GiB, and a standard GitHub runner has 7 GiB, so the orchestrator runs at most 5 queries at once by default. Unattended runs set `CLAUDE_CODE_RETRY_WATCHDOG=1` so rate-limit responses retry without a cap.
 
 ### 5.1 Model versions
 
 Config pins exact model IDs, defaulting to the 5.5 family: `claude-haiku-5-5`, `claude-sonnet-5-5`, `claude-opus-5-5`. A model change is a config diff the harness can measure, never a silent upgrade.
 
-The role assignments above are hypotheses, because the research behind them ran on 4.x models. One result stands out: Haiku 4.5 beat Sonnet 4.6 on F1 as a reviewer at a third of the cost. The first harness experiments are:
+The role assignments above come from `docs/research/claude-5-5-models.md` and are hypotheses until the harness confirms them. Anthropic's advice is that effort is a better lever than model choice, so the first harness experiments are:
 
-- Haiku 5.5 as a reviewer against Sonnet 5.5.
-- Sonnet 5.5 as triage and verifier against Opus 5.5.
+- Reviewers: Opus 5.5 at low against Sonnet 5.5 at medium, on cost per confirmed finding.
+- One Opus 5.5 reviewer at medium effort over the whole diff, as a baseline against the specialist set. Anthropic found a single model in one context beat a lead-with-workers setup when the work fit.
+- Verifier: Sonnet 5.5 at high against Opus 5.5 at high, and the 0 to 100 score against a 5-band scale.
 
-Prompts are written against Anthropic's current prompting guidance for the 5.5 family, fetched when the prompts are written, not from patterns learned on older models.
+Prompts follow Anthropic's current prompting guidance for the 5.5 family, summarized in the research doc, not patterns learned on older models.
 
 ## 6. Trust model
 
 - All configuration and all agent files load from the base branch. PR versions are ignored and the diff of `.pr-review/` is itself reviewed by the security reviewer.
-- The PR head checks out into a separate directory. Reviewers read it as data. No hooks, no project MCP servers, no settings from the head.
-- Built-in and custom reviewers get read-only tools by default. Read-only comes from the tools list, not from permission mode, because subagents inherit the parent mode.
+- The PR head checks out into a separate directory. Reviewers read it as data. Every SDK query runs with `settingSources: []`, so no hooks, MCP servers, agents or CLAUDE.md load from the checkout. The orchestrator injects CLAUDE.md and the rules file from the base branch itself.
+- Built-in and custom reviewers get read-only tools by default: Read, Grep and Glob. Bash, Write and Edit go in `disallowedTools`, which removes them from the request, and `permissionMode` is set explicitly to `dontAsk`. The auto-approve list alone does not restrict, and an omitted mode can start in auto.
 - A custom reviewer may request `Bash`. The orchestrator grants it only when the PR author has write access to the repo and the reviewer sets `trusted: true`. Otherwise the reviewer runs without Bash and the summary says so.
 - Fork PRs: no automatic run by default. A maintainer applies a label to trigger a run, and that run uses the restricted tool set for every reviewer.
 - The PR title and body are untrusted data in every prompt.
@@ -261,7 +264,7 @@ Prompts are written against Anthropic's current prompting guidance for the 5.5 f
 
 - Golden set: start with 20 to 50 cases from the user's own repos, taken from real misses and real false positives, plus a ReviewBench subset for breadth. Each case is a frozen checkout, a diff and a list of golden findings with severity and category.
 - Contract: the harness runs the same CLI with `--format json` against the frozen checkout, no network.
-- Scoring: match each finding to a golden item by file and span. One Haiku judge call only for pairs that overlap but do not match exactly. No holistic score.
+- Scoring: match each finding to a golden item by file and span. One judge call, with thinking on and on a different model from the reviewers under test, only for pairs that overlap but do not match exactly. No holistic score.
 - Metrics: grounded recall on golden findings, precision on posted findings, findings per PR, cost per PR. Run each case three times and report the spread.
 - Gate: a change to a prompt or threshold needs the eval run in CI. Fail when recall or precision drops past a set margin.
 - Online: track addressed rate by re-running the verifier on the next push, and reaction counts. Compare to offline before trusting offline alone.
@@ -340,10 +343,12 @@ Settled on 2026-10-13:
 12. **Records**: workflow artifact plus a `pr-review-records` branch.
 13. **Distribution**: composite action run from source, wrapped in a reusable workflow, plus the CLI. No npm package. Concurrency cap deferred until it is a problem.
 14. **Orchestrator**: plain code, no model. Every judgment call is a bounded agent call with a schema.
-15. **Model versions**: exact IDs pinned in config, 5.5 family by default. Role assignments are harness hypotheses.
+15. **Model versions**: exact IDs pinned in config, 5.5 family by default. Reviewers on Opus 5.5 at low effort, verifier on Sonnet 5.5 at high with Opus escalation, triage and merge on Sonnet 5.5, summarizer on Haiku 5.5. Harness hypotheses, see section 5.1.
+16. **Reviewer prompts**: report everything in scope with confidence and severity; filtering is the verifier's job. Follows the 5.x guidance that conservative review prompts over-filter.
+17. **Parallelism**: a semaphore sized to runner memory, default 5, because each SDK query is a process of about 1 GiB. This is a resource bound, not a rate-limit policy.
 
 ## 11. Open risks
 
 - A Sonnet verifier may be too weak for findings that need cross-file reasoning. Mitigation: route a finding to Opus when the reviewer marks it `needs_context: true`.
 - Semantic merge is one more LLM step that can hide a real finding. Mitigation: the record keeps every input and output of the merge, and `explain` shows them.
-- The eval judge is a Claude model and the reviewer is a Claude model. Nobody has measured this bias. Mitigation: match by span first and use the judge only for ambiguous pairs.
+- The eval judge is a Claude model and the reviewer is a Claude model. Nobody has measured this bias. Mitigation: match by span first, use the judge only for ambiguous pairs, and use a different Claude model for the judge than for the reviewers, as Anthropic's evaluation guidance recommends.
