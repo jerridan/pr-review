@@ -230,6 +230,17 @@ A custom reviewer can also override `threshold` to be stricter, never looser tha
 
 Per-repo overrides for any role. A run-level token ceiling stops new reviewer launches when reached and notes it in the summary.
 
+### 5.1 Model versions
+
+Config pins exact model IDs, defaulting to the 5.5 family: `claude-haiku-5-5`, `claude-sonnet-5-5`, `claude-opus-5-5`. A model change is a config diff the harness can measure, never a silent upgrade.
+
+The role assignments above are hypotheses, because the research behind them ran on 4.x models. One result stands out: Haiku 4.5 beat Sonnet 4.6 on F1 as a reviewer at a third of the cost. The first harness experiments are:
+
+- Haiku 5.5 as a reviewer against Sonnet 5.5.
+- Sonnet 5.5 as triage and verifier against Opus 5.5.
+
+Prompts are written against Anthropic's current prompting guidance for the 5.5 family, fetched when the prompts are written, not from patterns learned on older models.
+
 ## 6. Trust model
 
 - All configuration and all agent files load from the base branch. PR versions are ignored and the diff of `.pr-review/` is itself reviewed by the security reviewer.
@@ -328,6 +339,8 @@ Settled on 2026-10-13:
 11. **Failures**: always visible in the review, verdict `incomplete`. Never post unverified findings.
 12. **Records**: workflow artifact plus a `pr-review-records` branch.
 13. **Distribution**: composite action run from source, wrapped in a reusable workflow, plus the CLI. No npm package. Concurrency cap deferred until it is a problem.
+14. **Orchestrator**: plain code, no model. Every judgment call is a bounded agent call with a schema.
+15. **Model versions**: exact IDs pinned in config, 5.5 family by default. Role assignments are harness hypotheses.
 
 ## 11. Open risks
 
