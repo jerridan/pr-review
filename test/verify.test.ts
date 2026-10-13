@@ -48,6 +48,7 @@ const DIFF = [
 const head = mkdtempSync(join(tmpdir(), "pr-review-verify-"));
 mkdirSync(join(head, "src"));
 writeFileSync(join(head, "src/stats.ts"), FILE_TEXT);
+writeFileSync(join(head, "src/other.ts"), "export const other = 42;\n");
 afterAll(() => rmSync(head, { recursive: true, force: true }));
 
 const OPTIONS: RunOptions = { allowApiKey: false, env: {} };
@@ -295,6 +296,55 @@ describe("verifyFinding (A6)", () => {
     const good = await verify(result(95, { quotes: ["not here", "i   <=\n  values.length"] }));
     expect(good.passed).toBe(true);
     expect(good.rejected).toBeUndefined();
+  });
+
+  it("removes the line prefixes that the message and the tools add before it matches a quote", async () => {
+    const noBand = { ...DEFAULT_VERIFY_CONFIG, bandLow: 101, bandHigh: 101 };
+    const verify = (quotes: string[]) =>
+      verifyFinding(
+        createFakeSdkClient(script(result(95, { quotes }))),
+        OPTIONS,
+        finding(),
+        ctx(noBand),
+      );
+
+    // The numbered lines of the head file block in the user message.
+    const numbered = await verify(["3| for (let i = 0; i <= values.length; i++) {"]);
+    expect(numbered.passed).toBe(true);
+    expect(numbered.rejected).toBeUndefined();
+
+    // A quote of two numbered lines.
+    const twoLines = await verify([
+      "3|   for (let i = 0; i <= values.length; i++) {\n4|     total += values[i];",
+    ]);
+    expect(twoLines.passed).toBe(true);
+
+    // The output of the Read tool.
+    const read = await verify(["     3→  for (let i = 0; i <= values.length; i++) {"]);
+    expect(read.passed).toBe(true);
+
+    // The output of the Grep tool.
+    const grep = await verify(["src/stats.ts:3:  for (let i = 0; i <= values.length; i++) {"]);
+    expect(grep.passed).toBe(true);
+  });
+
+  it("fails a result whose only quote is from a file that the finding does not name", async () => {
+    const noBand = { ...DEFAULT_VERIFY_CONFIG, bandLow: 101, bandHigh: 101 };
+    const out = await verifyFinding(
+      createFakeSdkClient(script(result(95, { quotes: ["export const other = 42;"] }))),
+      OPTIONS,
+      finding(),
+      ctx(noBand),
+    );
+    expect(out.passed).toBe(false);
+    expect(out.rejected).toMatch(/quote/i);
+  });
+
+  it("tells the verifier to quote without line prefixes and from the file that the finding names", () => {
+    const body = loadPrompt("verifier.md").body;
+    expect(body).toMatch(/line numbers/);
+    expect(body).toContain("path:line:");
+    expect(body).toMatch(/at least one quote .*file that the finding names/i);
   });
 
   it("applies the quote check to the escalated result", async () => {

@@ -30,15 +30,30 @@ export type Verification = {
   rejected?: string;
 };
 
+// A line number prefix: "  11| " from the user message, "  11→" from
+// the Read tool, or "11:".
+const NUMBER_PREFIX = /^\s*\d+[|→:]\s?/;
+// A Grep prefix: "path/file.ts:7:".
+const GREP_PREFIX = /^[^\s:]+:\d+:\s?/;
+
+/** Remove the line prefix that the message or a tool adds to each line of a quote. */
+export function stripLinePrefixes(quote: string): string {
+  return quote
+    .split("\n")
+    .map((line) => line.replace(NUMBER_PREFIX, "").replace(GREP_PREFIX, ""))
+    .join("\n");
+}
+
 /**
  * Return true when at least one quote is a substring of the head file,
- * after whitespace collapse in both. An empty quote never matches.
+ * after line prefixes are removed from the quote and after whitespace
+ * collapse in both. An empty quote never matches.
  */
 export function quoteMatches(quotes: string[], headFileText: string | null): boolean {
   if (headFileText === null) return false;
   const file = normalizeWs(headFileText);
   return quotes.some((q) => {
-    const quote = normalizeWs(q);
+    const quote = normalizeWs(stripLinePrefixes(q));
     return quote !== "" && file.includes(quote);
   });
 }
@@ -91,13 +106,16 @@ export function verifierTexts(prompt: PromptFile): VerifierTexts {
   };
 }
 
-/** Build the verifier user message: the finding, the head file and its diff. */
+/**
+ * Build the verifier user message: the finding, the head file and its
+ * diff. "text" is the head file, or null when the head has no such file.
+ */
 export function buildVerifierMessage(
   texts: VerifierTexts,
   finding: Finding,
+  text: string | null,
   ctx: VerifyContext,
 ): string {
-  const text = readHeadFile(ctx.cwd, finding.file);
   const fileDiff = filterDiff(ctx.diff, (path) => path === finding.file);
   const blocks = {
     finding: wrapUntrusted("finding", describeFinding(finding)).block,
@@ -122,11 +140,14 @@ export async function verifyFinding(
 ): Promise<Verification> {
   const prompt = loadPrompt("verifier.md");
   const texts = verifierTexts(prompt);
+  // One read serves both verifier messages and the quote check.
+  const headText = readHeadFile(ctx.cwd, finding.file);
 
   const ask = async (
     role: "verifier" | "verifier-escalation",
   ): Promise<VerifierResult | QueryFailure> => {
-    const userMessage = buildVerifierMessage(texts, finding, ctx);
+    // Each query gets its own message, so its blocks get new ids.
+    const userMessage = buildVerifierMessage(texts, finding, headText, ctx);
     try {
       const outcome = await ctx.semaphore(() =>
         client.query<VerifierResult>(
@@ -152,7 +173,7 @@ export async function verifyFinding(
   // that passes on the model's own fields fails when no quote is real.
   const decide = (r: VerifierResult): { passed: boolean; rejected?: string } => {
     if (!(r.in_scope && r.claim_holds && r.score >= threshold)) return { passed: false };
-    if (!quoteMatches(r.quotes, readHeadFile(ctx.cwd, finding.file))) {
+    if (!quoteMatches(r.quotes, headText)) {
       return {
         passed: false,
         rejected: "No quote of the verifier is in the head file of the finding.",

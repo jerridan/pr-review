@@ -147,6 +147,9 @@ function collectErrors(
         message: `${where} escalation: ${describeFailure(v.escalated)}`,
       });
     }
+    // Code failed a result that the verifier passed, so show it, as a
+    // rejected merge is shown.
+    if (v.rejected) errors.push({ stage: "verify", message: `${where} rejected: ${v.rejected}` });
   }
   for (const merge of merges) {
     if ("kind" in merge.result) {

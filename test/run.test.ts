@@ -424,6 +424,32 @@ describe("refusals and the verdict", () => {
   });
 });
 
+describe("a verifier result that the quote check rejects", () => {
+  it("is not posted and is in the errors of the record", async () => {
+    const fake = createFakeSdkClient((req) =>
+      req.role === "verifier" || req.role === "verifier-escalation"
+        ? { ok: true, output: { ...PASS, quotes: ["this text is not in the file"] }, raw: META }
+        : script(fx)(req),
+    );
+    const { record } = await runReview({
+      repo: fx.repo,
+      base: fx.base,
+      head: fx.head,
+      outDir: join(outRoot, "rejected-quote"),
+      allowApiKey: false,
+      client: fake,
+    });
+    expect(record.stages.verifications[0]?.rejected).toMatch(/quote/i);
+    expect(record.posted.findings).toEqual([]);
+    expect(record.cost.errors).toEqual([
+      {
+        stage: "verify",
+        message: expect.stringMatching(new RegExp(`^${fx.file}:${fx.line} rejected: .*quote`, "i")),
+      },
+    ]);
+  });
+});
+
 describe("the selected reviewers in the record", () => {
   function def(name: string, model: string, effort: "low" | "high"): ReviewerDefinition {
     return {
