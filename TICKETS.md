@@ -1,18 +1,6 @@
 # Tickets
 
-Work that remains after D1, the local walking skeleton. Each ticket is one deliverable: one branch, one PR. The design is `docs/design/high-level-design.md`; section numbers below refer to it.
-
-## D2: Full reviewer set and repo configuration
-
-Goal: every built-in reviewer from section 3.4 runs, and a target repo can shape the review from `.pr-review/`.
-
-- Add the six remaining built-in reviewers under `prompts/reviewers/`: conventions, tests, security, history, description-drift, docs-and-comments. Each has its own evidence source, triggers and do-not-flag scope. History needs git blame and log through read-only Bash or a gather helper; decide which.
-- Load `.pr-review/config.yaml`, `.pr-review/rules.md` and `.pr-review/reviewers/*.md` from the base branch only (section 6). Config covers thresholds, suppressions, sensitive and generated globs, skip rules, caps, model and effort overrides per role, `pre_existing`.
-- Inject `rules.md` and the base-branch `CLAUDE.md` into every reviewer prompt. Keep `settingSources: []`.
-- Honour `passes` above 1 with dedupe, and measure whether a second pass of diff-bugs raises recall on the fixture set.
-- Custom reviewer Bash policy: grant Bash only when `trusted: true` and the author has write access; otherwise run without it and say so in coverage.
-- Add the run-level token ceiling and the per-repo overrides for the concurrency limit.
-- Acceptance: a fixture repo with a `.pr-review/` directory changes which reviewers run and which findings are suppressed, and the record shows the config hash.
+Work that remains after D1, the local walking skeleton, and D2, the full reviewer set and repo configuration. Each ticket is one deliverable: one branch, one PR. The design is `docs/design/high-level-design.md`; section numbers below refer to it.
 
 ## D3: GitHub review posting and CI packaging
 
@@ -36,12 +24,13 @@ Goal: measure a change to a prompt, a threshold or a model before it ships (sect
 - A CI gate that fails when recall or precision drops past a set margin.
 - `pr-review explain <record.json>` to show why each finding was kept or dropped.
 
-## Smaller follow-ups found during D1
+## Smaller follow-ups found during D1 and D2
 
 - The verifier prompt and the merge prompt have not been tuned on real findings. Review them against the first ten records.
 - `pr-review smoke` uses Sonnet 5.5; consider Haiku 5.5 to make the check cheaper.
 - The fixture's head commit touches `.github/workflows/`, so every acceptance run takes the full tier by the sensitive floor. Add a second fixture without a sensitive path to exercise triage.
 - The default record directory `./pr-review-records` sits inside the repo under review (skeptical review nit, declined for D1); D3 moves records to workflow artifacts and a branch.
-- A change with zero text hunks on a sensitive path (a mode flip, a binary) is skipped by the precedence the spec fixed; D2 should decide whether such a change forces a full tier with a note instead.
 - The verifier message numbers every line and the quote check strips the prefixes back off; an alternative is to ask for quotes by line span and compare against the span text, to be measured in D4.
 - The acceptance run on 2026-10-13 cost about $0.61 for one reviewer pass and one verification on a 2-file fixture. Track this per run in D4.
+- D2 added `scripts/measure-passes.sh`. Its first result, one pass against two passes of diff-bugs on the fixture, goes in `docs/research/passes-recall.md`. Set the diff-bugs `passes` default from it.
+- The skip fields and `pre_existing` in `.pr-review/config.yaml` are parsed and recorded but not applied; D3 applies them when it has the PR metadata.
