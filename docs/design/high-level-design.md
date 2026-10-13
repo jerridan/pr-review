@@ -375,7 +375,7 @@ Settled on 2026-10-13:
 10. **Non-blocking cap**: `3 + ceil(hunks / 4)`, at most 20. A starting value for the harness to tune.
 11. **Failures**: always visible in the review, verdict `incomplete`. Never post unverified findings.
 12. **Records**: workflow artifact plus a `pr-review-records` branch.
-13. **Distribution**: composite action run from source, wrapped in a reusable workflow, plus the CLI. No npm package. Concurrency cap deferred until it is a problem.
+13. **Distribution**: composite action run from source, wrapped in a reusable workflow, plus the CLI. No npm package. The concurrency limit is the `concurrency` key of the repo config, default 5, as decision 17 says.
 14. **Orchestrator**: plain code, no model. Every judgment call is a bounded agent call with a schema.
 15. **Model versions**: exact IDs pinned in config, 5.5 family by default. Reviewers on Opus 5.5 at low effort, verifier on Sonnet 5.5 at high with Opus escalation, triage and merge on Sonnet 5.5, summarizer on Haiku 5.5. Harness hypotheses, see section 5.1.
 16. **Reviewer prompts**: report everything in scope with confidence and severity; filtering is the verifier's job. Follows the 5.x guidance that conservative review prompts over-filter.
