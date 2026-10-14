@@ -106,9 +106,13 @@ export async function loadPriorState(
   const { ctx } = input;
   const slug = ctx.slug;
   const number = ctx.pr.number;
+  // The own login is the author that the prior record names. Without it,
+  // the login is the viewer login of the context.
+  const record = await findPriorRecord(input.outDir, { slug, pr: number });
+  const login = record?.record.posted.github?.author ?? ctx.viewerLogin;
   // Read markers only from reviews of the tool's own login.
   const own = (await client.listReviews({ slug, number })).filter((r) =>
-    sameLogin(r.author, ctx.viewerLogin),
+    sameLogin(r.author, login),
   );
   const reviewed = own.filter((r) => {
     const marker = parseRunMarker(r.body);
@@ -121,7 +125,6 @@ export async function loadPriorState(
   // When they differ, a records push failed after a newer review, so the
   // record is too old. The run then takes the marker source.
   const newestHead = parseRunMarker(newest.body)?.head ?? "";
-  const record = await findPriorRecord(input.outDir, { slug, pr: number });
   const found = record !== null && record.record.identity.head === newestHead ? record : null;
   const findings = new Map<string, PostedFinding>();
   if (found) {
@@ -141,7 +144,7 @@ export async function loadPriorState(
   // Inline comments: the thread state and the reactions decide each one.
   // One call gives them all, with the thread state on each comment.
   const comments = (await client.listReviewComments({ slug, number })).filter((c) =>
-    sameLogin(c.author, ctx.viewerLogin),
+    sameLogin(c.author, login),
   );
   for (const comment of comments) {
     const [fp] = parseFingerprintMarkers(comment.body);
@@ -156,7 +159,7 @@ export async function loadPriorState(
       const last = comment.thread_last_comment;
       const byTool =
         last !== null &&
-        sameLogin(last.author, ctx.viewerLogin) &&
+        sameLogin(last.author, login) &&
         last.body.startsWith(RESOLVED_REPLY_PREFIX);
       if (!byTool) state.dismissed.add(fp);
       continue;

@@ -99,6 +99,7 @@ export async function postRun(
   const result: PostedGitHub = {
     review_id: null,
     review_url: null,
+    author: null,
     error: null,
     inline: [],
     in_body: [],
@@ -140,6 +141,15 @@ export async function postRun(
   result.review_id = review.id;
   result.review_url = review.url;
   result.in_body = inBody.map((f) => f.fingerprint);
+
+  // The author of the new review is the true login of the tool. The login
+  // of the context can be a guess, so a later run uses this one.
+  try {
+    const reviews = await client.listReviews({ slug, number });
+    result.author = reviews.find((r) => r.id === review.id)?.author ?? null;
+  } catch (err) {
+    result.errors.push({ step: "list reviews", message: messageOf(err) });
+  }
 
   // The comment ids of the inline comments come from the new review.
   if (inline.length > 0) {

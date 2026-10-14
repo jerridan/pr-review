@@ -9,7 +9,8 @@ export type PrContext = {
   viewerLogin: string;
 };
 
-// The login of the GITHUB_TOKEN in GitHub Actions.
+// The login of the GITHUB_TOKEN in GitHub Actions. The GITHUB_TOKEN
+// cannot read the viewer, so the run uses this login when the call fails.
 const ACTIONS_LOGIN = "github-actions[bot]";
 
 // These permission levels give write access.
@@ -20,7 +21,8 @@ const WRITE_LEVELS: ReadonlySet<string> = new Set(["admin", "maintain", "write"]
  * login of the viewer. "githubRepo" replaces the slug of the checkout.
  * A pull request from a fork never gets write access, whatever the
  * permission level and the flag. "env" defaults to process.env. The
- * function reads only GITHUB_ACTIONS from it.
+ * function reads only GITHUB_ACTIONS from it. In GitHub Actions, a failed
+ * viewer call gives github-actions[bot].
  */
 export async function loadPrContext(
   client: GitHubClient,
@@ -46,7 +48,9 @@ export async function loadPrContext(
     authorWriteAccess = WRITE_LEVELS.has(level);
   }
 
-  const viewerLogin = env.GITHUB_ACTIONS ? ACTIONS_LOGIN : await client.viewerLogin();
+  const viewerLogin = env.GITHUB_ACTIONS
+    ? await client.viewerLogin().catch(() => ACTIONS_LOGIN)
+    : await client.viewerLogin();
   return { pr, slug, authorWriteAccess, viewerLogin };
 }
 

@@ -37,6 +37,12 @@ export type PostedGitHub = {
   /** Both are null when the review did not post. */
   review_id: number | null;
   review_url: string | null;
+  /**
+   * The login of the author of the posted review, as GitHub gives it. A
+   * later run finds its own posts by this login. Null when the review did
+   * not post or the run could not read the author.
+   */
+  author: string | null;
   /** The error text of a review that did not post, or null. */
   error: string | null;
   inline: { fingerprint: string; comment_id: number }[];
@@ -256,6 +262,7 @@ export const PostedFindingSchema: z.ZodType<PostedFinding> = z.strictObject({
 export const PostedGitHubSchema: z.ZodType<PostedGitHub> = z.strictObject({
   review_id: integer().nullable(),
   review_url: z.string().nullable(),
+  author: z.string().nullable(),
   error: z.string().nullable(),
   inline: z.array(z.strictObject({ fingerprint: z.string(), comment_id: integer() })),
   in_body: z.array(z.string()),
