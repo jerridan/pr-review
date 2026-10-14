@@ -24,7 +24,6 @@ import { createFakeGitHubClient, type FakePullRequestSeed } from "../src/github/
 import { formatFingerprintMarker, formatRunMarker } from "../src/github/markers.js";
 import { prDescription } from "../src/github/metadata.js";
 import type * as PromptLoad from "../src/prompts/load.js";
-import type * as ReviewerLoader from "../src/reviewers/loader.js";
 import type { ReviewerDefinition } from "../src/reviewers/loader.js";
 import { describeSelected, runReview } from "../src/run.js";
 import type { Finding } from "../src/schemas/finding.js";
@@ -40,7 +39,6 @@ import { UNTRUSTED_SYSTEM_LINE } from "../src/untrusted.js";
 // sets them.
 const mocks = vi.hoisted(() => ({
   failVerifierPrompt: false,
-  reviewerPasses: undefined as number | undefined,
 }));
 
 vi.mock("../src/prompts/load.js", async (importOriginal) => {
@@ -53,21 +51,6 @@ vi.mock("../src/prompts/load.js", async (importOriginal) => {
       }
       return original.loadPrompt(relativePath);
     },
-  };
-});
-
-vi.mock("../src/reviewers/loader.js", async (importOriginal) => {
-  const original = await importOriginal<typeof ReviewerLoader>();
-  return {
-    ...original,
-    loadBuiltinReviewers: () =>
-      original
-        .loadBuiltinReviewers()
-        .map((def) =>
-          mocks.reviewerPasses === undefined
-            ? def
-            : { ...def, frontmatter: { ...def.frontmatter, passes: mocks.reviewerPasses } },
-        ),
   };
 });
 
@@ -637,42 +620,55 @@ describe("the selected reviewers in the record", () => {
 });
 
 describe("a verifier prompt that does not load", () => {
+  // The repo config gives diff-bugs two passes, so the test does not
+  // depend on the default in the reviewer file.
+  let pfx: Fixture;
+  beforeAll(async () => {
+    pfx = await fixtureWithFiles({ "config.yaml": "reviewers:\n  diff-bugs:\n    passes: 2\n" });
+  }, 30_000);
+  afterAll(() => {
+    if (pfx) rmSync(pfx.repo, { recursive: true, force: true });
+  });
   afterEach(() => {
     mocks.failVerifierPrompt = false;
-    mocks.reviewerPasses = undefined;
   });
 
   it("fails the verification, writes the record and removes the worktree while a reviewer pass is pending", async () => {
     mocks.failVerifierPrompt = true;
-    mocks.reviewerPasses = 2;
     let reviewerCalls = 0;
     const fake = createFakeSdkClient(async (req) => {
       if (req.role === "reviewer" && req.reviewerName === "diff-bugs") {
         reviewerCalls += 1;
         if (reviewerCalls === 1) {
-          return { ok: true, output: { findings: [plantedFinding(fx)] }, raw: META };
+          return { ok: true, output: { findings: [plantedFinding(pfx)] }, raw: META };
         }
         // The second pass is still pending when the first finding goes
         // to its verifier.
         await new Promise((resolve) => setTimeout(resolve, 50));
         return { ok: true, output: { findings: [] }, raw: META };
       }
-      return script(fx)(req);
+      return script(pfx)(req);
     });
     const { record, recordPath } = await runReview({
-      repo: fx.repo,
-      base: fx.base,
-      head: fx.head,
+      repo: pfx.repo,
+      base: pfx.base,
+      head: pfx.head,
       outDir: join(outRoot, "verifier-prompt-fails"),
       format: "json",
       allowApiKey: false,
       client: fake,
     });
     expect(reviewerCalls).toBe(2);
+    expect(
+      record.stages.reviewers
+        .filter((r) => r.name === "diff-bugs")
+        .map((r) => r.pass)
+        .sort(),
+    ).toEqual([1, 2]);
     expect(existsSync(recordPath)).toBe(true);
     expect(record.stages.verifications).toEqual([
       {
-        finding: plantedFinding(fx),
+        finding: plantedFinding(pfx),
         first: { kind: "thrown", message: expect.stringContaining("PROMPT-LOAD-FAILED") },
         final: null,
         passed: false,
@@ -685,7 +681,7 @@ describe("a verifier prompt that does not load", () => {
     const cwd = fake.calls[0]?.cwd ?? "";
     expect(cwd).not.toBe("");
     expect(existsSync(cwd)).toBe(false);
-    expect(await worktrees(fx.repo)).not.toContain(cwd);
+    expect(await worktrees(pfx.repo)).not.toContain(cwd);
   });
 });
 
