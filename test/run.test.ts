@@ -37,6 +37,7 @@ import { UNTRUSTED_SYSTEM_LINE } from "../src/untrusted.js";
 const mocks = vi.hoisted(() => ({
   failVerifierPrompt: false,
   failHistory: false,
+  historyCalls: 0,
   reviewerPasses: undefined as number | undefined,
 }));
 
@@ -57,10 +58,12 @@ vi.mock("../src/gather/history.js", async (importOriginal) => {
   const original = await importOriginal<typeof History>();
   return {
     ...original,
-    gatherHistory: (...args: Parameters<typeof original.gatherHistory>) =>
-      mocks.failHistory
+    gatherHistory: (...args: Parameters<typeof original.gatherHistory>) => {
+      mocks.historyCalls += 1;
+      return mocks.failHistory
         ? Promise.reject(new Error("git blame failed"))
-        : original.gatherHistory(...args),
+        : original.gatherHistory(...args);
+    },
   };
 });
 
@@ -686,7 +689,7 @@ describe("the repo config in a run (R3)", () => {
     const cfx = await fixtureWithConfig(
       [
         "thresholds:",
-        "  middle_band: [10, 20]",
+        "  middle_band: [93, 95]",
         "reviewers:",
         "  diff-bugs:",
         "    threshold: 95",
@@ -737,7 +740,7 @@ describe("the repo config in a run (R3)", () => {
       });
     }
     expect(byRole("verifier").map((c) => c.overrides)).toEqual([{ effort: "max" }]);
-    // The score 92 is outside the band 10 to 20, so no escalation runs, and
+    // The score 92 is below the band 93 to 95, so no escalation runs, and
     // it is below the reviewer threshold 95, so the finding fails.
     expect(byRole("verifier-escalation")).toEqual([]);
     expect(record.stages.verifications.map((v) => v.passed)).toEqual([false]);
@@ -1360,6 +1363,21 @@ describe("the history block and the history reviewer config", () => {
   it("builds no history block when reviewers.history.enabled is false", async () => {
     const record = await review(disabled, "history-off");
     expect(record.identity.history).toEqual({ built: false, truncated: false });
+  });
+
+  it("builds no history block, and does not call the gather, at the skip tier", async () => {
+    mocks.historyCalls = 0;
+    const { record } = await runReview({
+      repo: enabled.repo,
+      base: enabled.base,
+      head: enabled.head,
+      tierOverride: "skip",
+      outDir: join(outRoot, "history-skip"),
+      allowApiKey: false,
+      client: createFakeSdkClient(script(enabled)),
+    });
+    expect(record.identity.history).toEqual({ built: false, truncated: false });
+    expect(mocks.historyCalls).toBe(0);
   });
 
   it("completes the run, with no history block, when the history gather fails", async () => {

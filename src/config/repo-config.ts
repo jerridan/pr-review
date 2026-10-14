@@ -180,13 +180,32 @@ export const RepoConfigSchema: z.ZodType<RepoConfig, unknown> = z
     token_ceiling: atLeast(1).nullable().default(null),
   })
   .superRefine((config, ctx) => {
-    // A reviewer threshold can be stricter than the repo floor, never looser.
+    const high = config.thresholds.middle_band[1];
+    // A score above the band and below the threshold could never escalate
+    // and could never pass. The band must reach the threshold.
+    if (high < config.thresholds.default) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["thresholds", "middle_band"],
+        message: `the upper bound of the band (${high}) must be at least the default threshold (${config.thresholds.default}), or a score above the band and below the threshold could never escalate and never pass`,
+      });
+    }
     for (const [name, entry] of Object.entries(config.reviewers)) {
-      if (entry.threshold !== undefined && entry.threshold < config.thresholds.default) {
+      if (entry.threshold === undefined) continue;
+      // A reviewer threshold can be stricter than the repo floor, never looser.
+      if (entry.threshold < config.thresholds.default) {
         ctx.addIssue({
           code: "custom",
           path: ["reviewers", name, "threshold"],
           message: `${entry.threshold} is below thresholds.default (${config.thresholds.default})`,
+        });
+      }
+      // Above the band, a score below the threshold could never escalate.
+      if (entry.threshold > high) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["reviewers", name, "threshold"],
+          message: `${entry.threshold} is above the upper bound of thresholds.middle_band (${high}). The upper bound must be at least the threshold, or a score above the band and below the threshold could never escalate and never pass`,
         });
       }
     }

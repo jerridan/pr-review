@@ -125,14 +125,6 @@ export function loadBuiltinReviewers(): ReviewerDefinition[] {
   return defs;
 }
 
-/**
- * The query overrides for a reviewer: its model as a pinned ID, and its
- * effort. They apply to the queries of this reviewer only.
- */
-export function reviewerOverrides(def: ReviewerDefinition): { model: string; effort: Effort } {
-  return { model: resolveModel(def.frontmatter.model), effort: def.frontmatter.effort };
-}
-
 /** The one tool beyond the read-only set that a reviewer can get. */
 export const BASH_TOOL = "Bash";
 

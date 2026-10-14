@@ -123,6 +123,7 @@ A config file that does not parse or validate stops the run. An unknown key is a
 
 Notes on the keys:
 
+- **Band and threshold.** The upper bound of `thresholds.middle_band` must be at least `thresholds.default`. A `reviewers.<name>.threshold` must not be above that upper bound. A score above the band and below the threshold could never escalate and never pass, so the config is an error.
 - **Reviewer names.** `<name>` is a built-in reviewer or a custom reviewer. Any other name is an error.
 - **Models.** A model is an alias (`opus`, `sonnet` or `haiku`) or an exact model id.
 - **Effective model and effort.** The order is `reviewers.<name>.model`, then `models.reviewer.model`, then the frontmatter value. The effort follows the same order.

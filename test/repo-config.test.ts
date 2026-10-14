@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   DEFAULT_REPO_CONFIG,
   loadRepoConfig,
+  parseRepoConfig,
   RepoConfigError,
   type RepoConfig,
 } from "../src/config/repo-config.js";
@@ -330,6 +331,47 @@ describe("loadRepoConfig: defaults and files", () => {
     const loaded = await loadRepoConfig(repo, sha);
     expect(loaded.config).toEqual(DEFAULT_REPO_CONFIG);
     expect(loaded.hash).toBe(r4Hash({ ".pr-review/config.yaml": "" }));
+  });
+});
+
+describe("parseRepoConfig: the threshold and the middle band must agree", () => {
+  const file = ".pr-review/config.yaml";
+  const names = ["diff-bugs"];
+  const failure = (text: string): RepoConfigError => {
+    try {
+      parseRepoConfig(text, file, names);
+    } catch (err) {
+      if (err instanceof RepoConfigError) return err;
+      throw err;
+    }
+    throw new Error("expected a RepoConfigError");
+  };
+
+  it("rejects a default threshold above the upper bound of the default band", () => {
+    const err = failure("thresholds:\n  default: 90\n");
+    expect(err.file).toBe(file);
+    expect(err.field).toBe("thresholds.middle_band");
+    expect(err.message).toMatch(
+      /upper bound of the band .* must be at least the default threshold/,
+    );
+  });
+
+  it("rejects a reviewer threshold above the upper bound of the band", () => {
+    const err = failure(
+      "thresholds:\n  default: 80\n  middle_band: [60, 85]\nreviewers:\n  diff-bugs:\n    threshold: 90\n",
+    );
+    expect(err.file).toBe(file);
+    expect(err.field).toBe("reviewers.diff-bugs.threshold");
+    expect(err.message).toMatch(/upper bound/);
+  });
+
+  it("accepts the defaults, a default of 85, and a threshold at the upper bound", () => {
+    expect(parseRepoConfig("", file, names)).toEqual(DEFAULT_REPO_CONFIG);
+    expect(parseRepoConfig("thresholds:\n  default: 85\n", file, names).thresholds.default).toBe(
+      85,
+    );
+    const config = parseRepoConfig("reviewers:\n  diff-bugs:\n    threshold: 85\n", file, names);
+    expect(config.reviewers["diff-bugs"]?.threshold).toBe(85);
   });
 });
 

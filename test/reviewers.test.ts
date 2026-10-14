@@ -9,11 +9,11 @@ import { VerifierResultSchema } from "../src/schemas/verifier.js";
 import type { QueryRequest } from "../src/sdk/client.js";
 import { buildQueryOptions } from "../src/sdk/options.js";
 import {
+  effectiveModel,
   loadBuiltinReviewers,
   loadReviewer,
   parseReviewer,
   ReviewerLoadError,
-  reviewerOverrides,
   reviewerTools,
   type ReviewerDefinition,
 } from "../src/reviewers/loader.js";
@@ -259,14 +259,20 @@ describe("loadReviewer", () => {
 describe("model overrides from frontmatter", () => {
   it("maps an alias to the pinned ID", () => {
     const def = loadReviewer(writeReviewer(withField("model", "model: haiku")));
-    expect(reviewerOverrides(def)).toEqual({ model: "claude-haiku-5-5", effort: "medium" });
+    expect(effectiveModel(def, DEFAULT_REPO_CONFIG)).toEqual({
+      model: "claude-haiku-5-5",
+      effort: "medium",
+    });
     const builtin = loadBuiltinReviewers()[0] as ReviewerDefinition;
-    expect(reviewerOverrides(builtin)).toEqual({ model: "claude-opus-5-5", effort: "low" });
+    expect(effectiveModel(builtin, DEFAULT_REPO_CONFIG)).toEqual({
+      model: "claude-opus-5-5",
+      effort: "low",
+    });
   });
 
   it("passes an exact ID through", () => {
     const def = loadReviewer(writeReviewer(withField("model", "model: claude-opus-4-1-20250805")));
-    expect(reviewerOverrides(def).model).toBe("claude-opus-4-1-20250805");
+    expect(effectiveModel(def, DEFAULT_REPO_CONFIG).model).toBe("claude-opus-4-1-20250805");
   });
 
   it("changes the model for that reviewer only", () => {
@@ -278,7 +284,7 @@ describe("model overrides from frontmatter", () => {
       role: "reviewer",
       reviewerName: def.frontmatter.name,
       schema: FindingsOutputSchema,
-      overrides: reviewerOverrides(def),
+      overrides: effectiveModel(def, DEFAULT_REPO_CONFIG),
     });
     const env = { allowApiKey: false, env: {} };
     expect(buildQueryOptions(req(sonnet), env).model).toBe("claude-sonnet-5-5");
@@ -401,7 +407,7 @@ describe("the tools of a reviewer", () => {
         userMessage: "u",
         schema: FindingsOutputSchema,
         cwd: "/tmp/x",
-        overrides: reviewerOverrides(def),
+        overrides: effectiveModel(def, DEFAULT_REPO_CONFIG),
         tools: def.frontmatter.tools,
       },
       { allowApiKey: false, env: {} },

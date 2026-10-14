@@ -291,8 +291,9 @@ export async function runReview(
   const gathered: GatherResult = await timed("gather", () =>
     gather(repo, baseSha, input.head, {
       ...withRepoGlobs(config),
-      // The history block exists only for the history reviewer.
-      history: config.reviewers.history?.enabled !== false,
+      // The history block exists only for the history reviewer. The skip
+      // tier runs no reviewer, so it builds no block.
+      history: config.reviewers.history?.enabled !== false && input.tierOverride !== "skip",
     }),
   );
 
