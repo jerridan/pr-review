@@ -8,12 +8,14 @@ export function recordFileName(startedAt: Date, head: string): string {
   return `${startedAt.toISOString().replace(/:/g, "")}-${head.slice(0, 7)}.json`;
 }
 
-/** The run id: the record file name without ".json" (R5). */
+/** The run id of a run that started at "startedAt" on "head": the record file name without ".json" (R5). */
+export function runIdFor(startedAt: Date, head: string): string {
+  return recordFileName(startedAt, head).replace(/\.json$/, "");
+}
+
+/** The run id of "record". */
 export function recordRunId(record: RunRecord): string {
-  return recordFileName(new Date(record.identity.started_at), record.identity.head).replace(
-    /\.json$/,
-    "",
-  );
+  return runIdFor(new Date(record.identity.started_at), record.identity.head);
 }
 
 /**

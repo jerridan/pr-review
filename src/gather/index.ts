@@ -138,14 +138,6 @@ async function tryGatherHistory(
   }
 }
 
-/**
- * The subject and body of each commit in base..head, oldest first, each
- * trimmed, joined with one blank line.
- */
-export async function describeChange(repo: string, base: string, head: string): Promise<string> {
-  return (await commitMessages(repo, base, head)).join("\n\n");
-}
-
 /** The subject and body of each commit in base..head, oldest first, each trimmed. */
 export async function commitMessages(repo: string, base: string, head: string): Promise<string[]> {
   const out = await runGit(repo, [

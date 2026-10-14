@@ -31,7 +31,7 @@ import { sanitizeGitHubText } from "./github/sanitize.js";
 import { withHeadWorktree } from "./gather/worktree.js";
 import { mergeFindings, toPostedFinding } from "./merge/index.js";
 import { applySuppressions } from "./merge/suppress.js";
-import { recordFileName, recordRunId, writeRecord } from "./record/write.js";
+import { recordRunId, runIdFor, writeRecord } from "./record/write.js";
 import {
   effectiveModel,
   effectiveThreshold,
@@ -897,7 +897,7 @@ export async function runReview(input: RunInput): Promise<RunResult> {
     // review posted. No record exists, so the run posts a failure review
     // and fails.
     const marker = {
-      run: recordFileName(startedAt, headRev).replace(/\.json$/, ""),
+      run: runIdFor(startedAt, headRev),
       head: headRev,
       base: baseRev,
       tier: progress.tier ?? ("unknown" as const),
