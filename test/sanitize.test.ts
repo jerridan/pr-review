@@ -42,6 +42,23 @@ describe("sanitizeGitHubText (R3)", () => {
     expect(sanitizeGitHubText("a\tb\nc\u0007d\u001Be\r\n").text).toBe("a\tb\ncde\n");
   });
 
+  it("turns CRLF into LF, and does not report that as a change", () => {
+    expect(sanitizeGitHubText("a\r\nb\r\n\r\nc")).toEqual({
+      text: "a\nb\n\nc",
+      sanitized: false,
+      truncated: false,
+    });
+  });
+
+  it("removes a lone CR as a C0 control, and reports it", () => {
+    expect(sanitizeGitHubText("a\rb")).toEqual({ text: "ab", sanitized: true, truncated: false });
+    expect(sanitizeGitHubText("a\r\nb\rc")).toEqual({
+      text: "a\nbc",
+      sanitized: true,
+      truncated: false,
+    });
+  });
+
   // Each case is a character that GitHub shows as nothing.
   const invisible: [string, string[]][] = [
     ["a variation selector", ["\uFE0F"]],
@@ -100,6 +117,15 @@ describe("sanitizeCommitMessages (R3)", () => {
       sanitized: true,
       truncated: false,
     });
+  });
+
+  it("turns CRLF into LF in a message, and does not report that as a change", () => {
+    expect(sanitizeCommitMessages(["One\r\ntwo", "Three"])).toEqual({
+      text: "One\ntwo\n\nThree",
+      sanitized: false,
+      truncated: false,
+    });
+    expect(sanitizeCommitMessages(["One\rtwo"]).sanitized).toBe(true);
   });
 
   it("does not change clean messages", () => {

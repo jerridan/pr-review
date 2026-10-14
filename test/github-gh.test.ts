@@ -397,10 +397,15 @@ describe("createGhClient: REST writes (R1)", () => {
 
 describe("createGhClient: GraphQL (R1)", () => {
   it("reads the viewer login", async () => {
-    reply({ stdout: { data: { viewer: { login: "octocat" } } } });
+    reply({ stdout: { data: { viewer: { __typename: "User", login: "octocat" } } } });
     expect(await client().viewerLogin()).toBe("octocat");
     const body = graphqlBody(onlyCall());
-    expect(body.query).toMatch(/viewer\s*\{\s*login\s*\}/);
+    expect(body.query).toMatch(/viewer\s*\{\s*__typename\s+login\s*\}/);
+  });
+
+  it("adds [bot] to the viewer login when the viewer is a bot", async () => {
+    reply({ stdout: { data: { viewer: { __typename: "Bot", login: "my-app" } } } });
+    expect(await client().viewerLogin()).toBe("my-app[bot]");
   });
 
   it("lists the review comments with their threads, over all thread pages", async () => {
