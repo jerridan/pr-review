@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import {
   chmodSync,
   existsSync,
@@ -19,7 +19,6 @@ import { CommanderError } from "commander";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_REPO_CONFIG } from "../src/config/repo-config.js";
 import { createProgram } from "../src/cli.js";
-import type * as History from "../src/gather/history.js";
 import { GitHubError, type GitHubClient } from "../src/github/client.js";
 import { createFakeGitHubClient, type FakePullRequestSeed } from "../src/github/fake.js";
 import { formatFingerprintMarker, formatRunMarker } from "../src/github/markers.js";
@@ -41,8 +40,6 @@ import { UNTRUSTED_SYSTEM_LINE } from "../src/untrusted.js";
 // sets them.
 const mocks = vi.hoisted(() => ({
   failVerifierPrompt: false,
-  failHistory: false,
-  historyCalls: 0,
   reviewerPasses: undefined as number | undefined,
 }));
 
@@ -55,19 +52,6 @@ vi.mock("../src/prompts/load.js", async (importOriginal) => {
         throw new Error("PROMPT-LOAD-FAILED");
       }
       return original.loadPrompt(relativePath);
-    },
-  };
-});
-
-vi.mock("../src/gather/history.js", async (importOriginal) => {
-  const original = await importOriginal<typeof History>();
-  return {
-    ...original,
-    gatherHistory: (...args: Parameters<typeof original.gatherHistory>) => {
-      mocks.historyCalls += 1;
-      return mocks.failHistory
-        ? Promise.reject(new Error("git blame failed"))
-        : original.gatherHistory(...args);
     },
   };
 });
@@ -89,6 +73,59 @@ vi.mock("../src/reviewers/loader.js", async (importOriginal) => {
 
 const run = promisify(execFile);
 const SCRIPT = fileURLToPath(new URL("../scripts/make-fixture.sh", import.meta.url));
+
+// git is a third party. Find the real git before a test changes PATH.
+const REAL_GIT = execFileSync("bash", ["-c", "command -v git"], { encoding: "utf8" }).trim();
+
+type GitStub = { dir: string; blameCalls: () => number };
+
+const stubDirs: string[] = [];
+afterAll(() => {
+  for (const dir of stubDirs) rmSync(dir, { recursive: true, force: true });
+});
+
+// Make a git program that stands in for the real one. It writes one marker
+// file for each "blame" call. When "failBlame" is true, each "blame" call
+// writes STUB-BLAME-FAILED to stderr and exits 1. All other calls go to the
+// real git.
+function gitStub(failBlame: boolean): GitStub {
+  const dir = mkdtempSync(join(tmpdir(), "pr-review-git-stub-"));
+  stubDirs.push(dir);
+  const marks = join(dir, "marks");
+  mkdirSync(marks);
+  const fail = failBlame ? 'echo "STUB-BLAME-FAILED" >&2; exit 1' : ":";
+  const script = `#!/usr/bin/env bash
+subcommand() {
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      -C|-c) shift 2 ;;
+      -*) shift ;;
+      *) echo "$1"; return ;;
+    esac
+  done
+}
+if [ "$(subcommand "$@")" = "blame" ]; then
+  mktemp "${marks}/blame.XXXXXX" > /dev/null
+  ${fail}
+fi
+exec "${REAL_GIT}" "$@"
+`;
+  writeFileSync(join(dir, "git"), script);
+  chmodSync(join(dir, "git"), 0o755);
+  return { dir, blameCalls: () => readdirSync(marks).length };
+}
+
+// Run "body" with the stub first on PATH. Restore PATH after.
+async function withGitStub<T>(stub: GitStub, body: () => Promise<T>): Promise<T> {
+  const saved = process.env.PATH;
+  process.env.PATH = `${stub.dir}:${saved ?? ""}`;
+  try {
+    return await body();
+  } finally {
+    if (saved === undefined) delete process.env.PATH;
+    else process.env.PATH = saved;
+  }
+}
 
 type Fixture = { repo: string; base: string; head: string; file: string; line: number };
 
@@ -1361,11 +1398,7 @@ describe("the history block and the history reviewer config", () => {
     fixtures.push(enabled, disabled);
   }, 30_000);
   afterAll(() => {
-    mocks.failHistory = false;
     for (const f of fixtures) rmSync(f.repo, { recursive: true, force: true });
-  });
-  afterEach(() => {
-    mocks.failHistory = false;
   });
 
   async function review(f: Fixture, out: string) {
@@ -1383,8 +1416,10 @@ describe("the history block and the history reviewer config", () => {
   }
 
   it("builds the history block when the history reviewer is enabled", async () => {
-    const record = await review(enabled, "history-on");
+    const stub = gitStub(false);
+    const record = await withGitStub(stub, () => review(enabled, "history-on"));
     expect(record.identity.history.built).toBe(true);
+    expect(stub.blameCalls()).toBeGreaterThan(0);
   });
 
   it("builds no history block when reviewers.history.enabled is false", async () => {
@@ -1392,33 +1427,35 @@ describe("the history block and the history reviewer config", () => {
     expect(record.identity.history).toEqual({ built: false, truncated: false });
   });
 
-  it("builds no history block, and does not call the gather, at the skip tier", async () => {
-    mocks.historyCalls = 0;
-    const { record } = await runReview({
-      repo: enabled.repo,
-      base: enabled.base,
-      head: enabled.head,
-      tierOverride: "skip",
-      outDir: join(outRoot, "history-skip"),
-      format: "json",
-      allowApiKey: false,
-      client: createFakeSdkClient(script(enabled)),
-    });
+  it("builds no history block, and runs no git blame, at the skip tier", async () => {
+    const stub = gitStub(false);
+    const { record } = await withGitStub(stub, () =>
+      runReview({
+        repo: enabled.repo,
+        base: enabled.base,
+        head: enabled.head,
+        tierOverride: "skip",
+        outDir: join(outRoot, "history-skip"),
+        format: "json",
+        allowApiKey: false,
+        client: createFakeSdkClient(script(enabled)),
+      }),
+    );
     expect(record.identity.history).toEqual({ built: false, truncated: false });
-    expect(mocks.historyCalls).toBe(0);
+    expect(stub.blameCalls()).toBe(0);
   });
 
-  it("completes the run, with no history block, when the history gather fails", async () => {
-    mocks.failHistory = true;
-    const record = await review(enabled, "history-fails");
+  it("completes the run, with no history block, when git blame fails", async () => {
+    const stub = gitStub(true);
+    const record = await withGitStub(stub, () => review(enabled, "history-fails"));
+    expect(stub.blameCalls()).toBeGreaterThan(0);
     expect(record.identity.history).toEqual({ built: false, truncated: false });
     expect(record.identity.selected_reviewers.map((r) => r.name)).toContain("diff-bugs");
     expect(record.cost.errors).toContainEqual({
       stage: "gather",
-      message: "history: git blame failed",
+      message: expect.stringMatching(/^history: git blame .* failed: STUB-BLAME-FAILED$/),
     });
     // The failure does not change the verdict.
-    mocks.failHistory = false;
     const clean = await review(enabled, "history-fails-control");
     expect(record.posted.verdict).toEqual(clean.posted.verdict);
   });
@@ -1724,12 +1761,14 @@ esac
   });
 
   it("builds no history block and runs no query when a label gives skip", async () => {
-    mocks.historyCalls = 0;
-    const { record, calls } = await reviewPr(pullRequest({ labels: ["review:skip"] }), "pr-label");
+    const stub = gitStub(false);
+    const { record, calls } = await withGitStub(stub, () =>
+      reviewPr(pullRequest({ labels: ["review:skip"] }), "pr-label"),
+    );
     expect(record.identity.tier).toBe("skip");
     expect(record.identity.tier_reason).toContain("review:skip");
     expect(record.identity.history.built).toBe(false);
-    expect(mocks.historyCalls).toBe(0);
+    expect(stub.blameCalls()).toBe(0);
     expect(calls).toEqual([]);
   });
 
