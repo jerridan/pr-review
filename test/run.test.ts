@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -21,9 +22,7 @@ import { createProgram } from "../src/cli.js";
 import type * as History from "../src/gather/history.js";
 import { GitHubError, type GitHubClient } from "../src/github/client.js";
 import { createFakeGitHubClient, type FakePullRequestSeed } from "../src/github/fake.js";
-import type * as Gh from "../src/github/gh.js";
 import { formatFingerprintMarker, formatRunMarker } from "../src/github/markers.js";
-import type * as Tier from "../src/triage/tier.js";
 import { prDescription } from "../src/github/metadata.js";
 import type * as PromptLoad from "../src/prompts/load.js";
 import type * as ReviewerLoader from "../src/reviewers/loader.js";
@@ -45,36 +44,7 @@ const mocks = vi.hoisted(() => ({
   failHistory: false,
   historyCalls: 0,
   reviewerPasses: undefined as number | undefined,
-  // The count of real GitHub clients made, and the client the mock gives
-  // in their place, so no test runs gh.
-  ghClients: 0,
-  // The input of each decideTier call.
-  tierInputs: [] as Parameters<typeof Tier.decideTier>[0][],
-  ghStandIn: null as GitHubClient | null,
 }));
-
-vi.mock("../src/triage/tier.js", async (importOriginal) => {
-  const original = await importOriginal<typeof Tier>();
-  return {
-    ...original,
-    decideTier: (input: Parameters<typeof original.decideTier>[0]) => {
-      mocks.tierInputs.push(input);
-      return original.decideTier(input);
-    },
-  };
-});
-
-vi.mock("../src/github/gh.js", async (importOriginal) => {
-  const original = await importOriginal<typeof Gh>();
-  return {
-    ...original,
-    createGhClient: (): GitHubClient => {
-      mocks.ghClients += 1;
-      if (!mocks.ghStandIn) throw new Error("A test made a real gh client.");
-      return mocks.ghStandIn;
-    },
-  };
-});
 
 vi.mock("../src/prompts/load.js", async (importOriginal) => {
   const original = await importOriginal<typeof PromptLoad>();
@@ -1577,10 +1547,60 @@ describe("a run with a pull request (R2, R3, R4)", () => {
     return { record, calls: fake.calls };
   }
 
-  afterEach(() => {
-    mocks.ghClients = 0;
-    mocks.ghStandIn = null;
-  });
+  // Make a gh program that stands in for the real one, which is a third
+  // party. The program answers the calls of a pull request run with canned
+  // JSON when "answers" is true. It exits 1 on every call when "answers"
+  // is false. Give the directory to put first on PATH.
+  function ghStub(name: string, answers: boolean): string {
+    const dir = join(outRoot, name);
+    mkdirSync(dir, { recursive: true });
+    const repo = { full_name: "acme/widgets" };
+    writeFileSync(
+      join(dir, "pr.json"),
+      JSON.stringify({
+        number: 7,
+        title: "Add average",
+        body: "Body.",
+        state: "open",
+        draft: false,
+        labels: [],
+        user: { login: "alice", type: "User" },
+        head: { sha: fx.head, repo },
+        base: { ref: "main", sha: fx.base, repo },
+        html_url: "https://github.com/acme/widgets/pull/7",
+      }),
+    );
+    writeFileSync(join(dir, "permission.json"), JSON.stringify({ role_name: "write" }));
+    writeFileSync(
+      join(dir, "viewer.json"),
+      JSON.stringify({ data: { viewer: { __typename: "User", login: "me" } } }),
+    );
+    const script = answers
+      ? `#!/usr/bin/env bash
+case "$*" in
+  "api -X GET repos/acme/widgets/pulls/7") cat "${dir}/pr.json" ;;
+  "api -X GET repos/acme/widgets/collaborators/alice/permission") cat "${dir}/permission.json" ;;
+  "api graphql --input -") cat > /dev/null; cat "${dir}/viewer.json" ;;
+  *) echo "Unexpected gh call: $*" >&2; exit 1 ;;
+esac
+`
+      : '#!/usr/bin/env bash\necho "gh must not run" >&2\nexit 1\n';
+    writeFileSync(join(dir, "gh"), script);
+    chmodSync(join(dir, "gh"), 0o755);
+    return dir;
+  }
+
+  // Run "body" with the stub directory first on PATH. Restore PATH after.
+  async function withGhOnPath<T>(dir: string, body: () => Promise<T>): Promise<T> {
+    const saved = process.env.PATH;
+    process.env.PATH = `${dir}:${saved ?? ""}`;
+    try {
+      return await body();
+    } finally {
+      if (saved === undefined) delete process.env.PATH;
+      else process.env.PATH = saved;
+    }
+  }
 
   it("sends none of the five R3 inputs to a reviewer or a verifier", async () => {
     const github = pullRequest({ title: DIRTY_TITLE, body: DIRTY_BODY });
@@ -1632,29 +1652,49 @@ describe("a run with a pull request (R2, R3, R4)", () => {
     expect(record.identity.github).toMatchObject({ slug: "acme/widgets", labels: ["bug"] });
   });
 
-  it("does not make the real gh client when a fake is given", async () => {
-    await reviewPr(pullRequest(), "pr-lazy-fake", "skip");
-    expect(mocks.ghClients).toBe(0);
+  it("does not call gh when a fake is given", async () => {
+    const dir = ghStub("gh-fails", false);
+    const { record } = await withGhOnPath(dir, () =>
+      reviewPr(pullRequest(), "pr-lazy-fake", "skip"),
+    );
+    expect(record.identity.pr).toBe(7);
   });
 
-  it("makes the real gh client only when no fake is given and --pr is set", async () => {
-    mocks.ghStandIn = pullRequest();
-    const { record } = await reviewPr(undefined, "pr-lazy-real", "skip");
-    expect(mocks.ghClients).toBe(1);
-    expect(record.identity.pr).toBe(7);
-
-    mocks.ghClients = 0;
-    await runReview({
-      repo: fx.repo,
-      base: fx.base,
-      head: fx.head,
-      tierOverride: "skip",
-      outDir: join(outRoot, "pr-lazy-none"),
-      format: "json",
-      allowApiKey: false,
-      client: createFakeSdkClient(script(fx)),
+  it("calls gh only when no fake is given and --pr is set", async () => {
+    const answering = ghStub("gh-answers", true);
+    const { record } = await withGhOnPath(answering, async () => {
+      const sdk = createFakeSdkClient(script(fx));
+      return runReview({
+        repo: fx.repo,
+        pr: 7,
+        githubRepo: "acme/widgets",
+        tierOverride: "skip",
+        outDir: join(outRoot, "pr-lazy-real"),
+        format: "json",
+        allowApiKey: false,
+        client: sdk,
+      });
     });
-    expect(mocks.ghClients).toBe(0);
+    expect(record.identity.pr).toBe(7);
+    expect(record.identity.github).toMatchObject({ slug: "acme/widgets" });
+    expect(record.identity.base).toBe(fx.base);
+    expect(record.identity.head).toBe(fx.head);
+
+    // A run with a base and a head and no pull request calls no gh.
+    const failing = ghStub("gh-fails-none", false);
+    const none = await withGhOnPath(failing, () =>
+      runReview({
+        repo: fx.repo,
+        base: fx.base,
+        head: fx.head,
+        tierOverride: "skip",
+        outDir: join(outRoot, "pr-lazy-none"),
+        format: "json",
+        allowApiKey: false,
+        client: createFakeSdkClient(script(fx)),
+      }),
+    );
+    expect(none.record.identity.pr).toBeNull();
   });
 
   it("throws without a base and a head and without a pull request", async () => {
@@ -2025,6 +2065,25 @@ describe("the prior triage tier of a later run (R7)", () => {
     if (f) rmSync(f.repo, { recursive: true, force: true });
   });
 
+  // Make a commit on top of "parent" with the same tree except the workflow
+  // file. Git plumbing and a private index leave the checkout as it is.
+  async function commitWithoutWorkflow(repo: string, parent: string): Promise<string> {
+    const env = {
+      ...process.env,
+      GIT_INDEX_FILE: join(outRoot, "prior-triage-index"),
+      GIT_AUTHOR_NAME: "t",
+      GIT_AUTHOR_EMAIL: "t@example.com",
+      GIT_COMMITTER_NAME: "t",
+      GIT_COMMITTER_EMAIL: "t@example.com",
+    };
+    const git = async (...args: string[]) =>
+      (await run("git", ["-C", repo, ...args], { env })).stdout.trim();
+    await git("read-tree", parent);
+    await git("update-index", "--force-remove", ".github/workflows/ci.yml");
+    const tree = await git("write-tree");
+    return git("commit-tree", tree, "-p", parent, "-m", "Drop the workflow file");
+  }
+
   it("passes identity.triage.tier of the prior record, and records this run's triage", async () => {
     {
       const gh = createFakeGitHubClient({
@@ -2045,14 +2104,21 @@ describe("the prior triage tier of a later run (R7)", () => {
       const input = { repo: f.repo, pr: 7, github: gh, outDir: out, format: "github" as const };
       const first = await runReview({ ...input, allowApiKey: false, client: sdk });
       expect(first.record.identity.triage?.tier).toBe("full");
-      expect(mocks.tierInputs.at(-1)?.priorTriageTier ?? null).toBeNull();
 
-      gh.state.pr.head_sha = f.head2;
+      // The second head drops the workflow file. The fixture marks that file
+      // as a sensitive path, and a sensitive path sets the tier to full
+      // whatever the triage says. Without it, only the prior record keeps
+      // the tier at full.
+      gh.state.pr.head_sha = await commitWithoutWorkflow(f.repo, f.head2);
       triageTier.value = "fast";
       const second = await runReview({ ...input, allowApiKey: false, client: sdk });
       expect(second.record.identity.run_kind).toBe("later");
       expect(second.record.identity.triage?.tier).toBe("fast");
-      expect(mocks.tierInputs.at(-1)?.priorTriageTier).toBe("full");
+      // The tier stays full, although the triage of this run gave fast.
+      expect(second.record.identity.tier).toBe("full");
+      expect(second.record.identity.tier_reason).toContain(
+        "The tier stays full from the prior record",
+      );
     }
   }, 60_000);
 });
