@@ -43,7 +43,9 @@ The tool uses your Claude subscription. It never reads or stores credentials. Pi
 
 When `CLAUDE_CODE_OAUTH_TOKEN` is set, it wins over the saved login.
 
-The tool removes `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL` and the Bedrock, Vertex and Foundry switches from the environment of every query, so the subscription login is the only route. To keep them, pass `--allow-api-key`.
+The tool removes `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL` and the Bedrock, Vertex and Foundry switches from the environment of every query, so the subscription login is the only route. To keep them, pass `--allow-api-key`. It always removes `GH_TOKEN` and `GITHUB_TOKEN` from that environment.
+
+The environment variable `PR_REVIEW_PROMPTS_DIR` replaces the prompts directory of the package. The tests use it. Set it only to ship other prompts.
 
 ## Run
 
@@ -321,7 +323,7 @@ The workflow runs one review for each PR at a time. A new push cancels the run i
 | `out` | The records directory. The default is `pr-review-records`. |
 | `allow-api-key` | Keep `ANTHROPIC_API_KEY` in the environment. |
 
-The action has two outputs: `record`, the record path, and `verdict`. The action reads no secret. The caller sets `CLAUDE_CODE_OAUTH_TOKEN` and `GH_TOKEN` in `env`. `GH_TOKEN` must be the job token, `${{ github.token }}`. The run reads the state of earlier runs as the login `github-actions[bot]`, so a run with another token finds no earlier review and posts every finding again.
+The action has two outputs: `record`, the record path, and `verdict`. The action reads no secret. The caller sets `CLAUDE_CODE_OAUTH_TOKEN` and `GH_TOKEN` in `env`. `GH_TOKEN` is the job token, `${{ github.token }}`, in the reusable workflow. The run records the login that posted each review and reads the state of earlier runs as that login, so another token works once it has posted one review; before that, the run reads the viewer login, or `github-actions[bot]` when the token cannot read it.
 
 ### Fork PRs
 
@@ -332,6 +334,7 @@ The action has two outputs: `record`, the record path, and `verdict`. The action
 - The label sets the tier. The label `review:full` also runs fresh.
 - The run grants Bash to no custom reviewer on a fork PR, whatever the permission level of the author.
 - Never add a step that builds or tests the fork head in the same job. That job holds the secret.
+- The checkout keeps no token in the workspace: the workflow sets `persist-credentials: false`. The fetch and push steps get the job token through the `gh` credential helper, which reads `GH_TOKEN` from the env of those steps only. The reviewer subprocesses get no `GH_TOKEN`.
 
 ### The release tag
 
