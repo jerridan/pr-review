@@ -20,7 +20,7 @@ const OPEN_HTML_COMMENT = /<!--[\s\S]*$/;
 // - The braille blank U+2800.
 const INVISIBLE_CHARS = /[\p{Cf}\p{Default_Ignorable_Code_Point}\u2800]/gu;
 // Remove C0 control characters (below U+0020) other than tab (U+0009)
-// and newline (U+000A). A regex with control characters fails the lint
+// and newline (U+000A). This also removes a lone CR (U+000D). A regex with control characters fails the lint
 // rule no-control-regex, so this is a loop.
 function removeC0Controls(text: string): string {
   let out = "";
@@ -31,7 +31,15 @@ function removeC0Controls(text: string): string {
   return out;
 }
 
+// Turn each CRLF into LF. The GitHub web editor writes CRLF. This is a
+// change of the line ending only, so it does not count as a sanitize.
+function normalizeLineEndings(text: string): string {
+  return text.replace(/\r\n/g, "\n");
+}
+
 // Remove the hidden and invisible parts and normalize to NFC. No cap.
+// The text must have LF line endings. Call normalizeLineEndings first, so
+// that removeC0Controls removes only a lone CR.
 // The invisible characters go first. Thus a comment that they split, such
 // as "<!\u200B--", is still found and removed.
 function clean(text: string): string {
@@ -52,15 +60,18 @@ function capText(text: string, cap: number): { text: string; truncated: boolean 
 }
 
 /**
- * Remove C0 controls other than tab and newline, format characters,
- * default ignorable code points and the braille blank. Then remove HTML
- * comments, normalize to NFC, and cap the text at "cap" characters.
- * "sanitized" is true when the result differs from the input. "truncated"
- * is true when the cap cut the text.
+ * Turn CRLF into LF. Remove C0 controls other than tab and newline,
+ * format characters, default ignorable code points and the braille blank.
+ * Then remove HTML comments, normalize to NFC, and cap the text at "cap"
+ * characters. "sanitized" is true when the result differs from the input
+ * after the CRLF step. A body whose only change is CRLF gives false. A lone
+ * CR is a C0 control, so it gives true. "truncated" is true when the cap
+ * cut the text.
  */
 export function sanitizeGitHubText(text: string, cap = SANITIZE_CAP): Sanitized {
-  const capped = capText(clean(text), cap);
-  return { text: capped.text, sanitized: capped.text !== text, truncated: capped.truncated };
+  const lf = normalizeLineEndings(text);
+  const capped = capText(clean(lf), cap);
+  return { text: capped.text, sanitized: capped.text !== lf, truncated: capped.truncated };
 }
 
 /**
@@ -69,8 +80,10 @@ export function sanitizeGitHubText(text: string, cap = SANITIZE_CAP): Sanitized 
  * message opens cannot remove text of the next message.
  */
 export function sanitizeCommitMessages(messages: string[], cap = SANITIZE_CAP): Sanitized {
-  const cleaned = messages.map(clean);
-  const changed = cleaned.some((m, i) => m !== messages[i]);
+  // The CRLF step is not a sanitize, the same as in sanitizeGitHubText.
+  const lf = messages.map(normalizeLineEndings);
+  const cleaned = lf.map(clean);
+  const changed = cleaned.some((m, i) => m !== lf[i]);
   const capped = capText(cleaned.join("\n\n"), cap);
   return { text: capped.text, sanitized: changed || capped.truncated, truncated: capped.truncated };
 }
