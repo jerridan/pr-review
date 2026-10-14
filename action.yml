@@ -39,12 +39,11 @@ outputs:
 runs:
   using: composite
   steps:
+    # No npm cache: a cache-dependency-path outside the workspace fails, and hashFiles() has the same limit.
     - name: Set up Node 20
       uses: actions/setup-node@v4
       with:
         node-version: 20
-        cache: npm
-        cache-dependency-path: ${{ github.action_path }}/package-lock.json
 
     # Install and build in the action path. Never install or build in the
     # workspace: the workspace is the repo under review, and it is data.
