@@ -22,12 +22,8 @@ export interface GatherResult {
    * base..head, oldest first, each sanitized, joined with a blank line.
    */
   description: string;
-  /**
-   * Whether the sanitizer changed or cut the commit messages (R3). The
-   * field is optional so a test literal of a GatherResult may omit it.
-   * Gather always sets it.
-   */
-  descriptionMeta?: { sanitized: boolean; truncated: boolean };
+  /** Whether the sanitizer changed or cut the commit messages (R3). */
+  descriptionMeta: { sanitized: boolean; truncated: boolean };
   /** Blame and log at the merge base for the changed lines, or null when none. */
   history: { text: string; truncated: boolean } | null;
   /**

@@ -335,6 +335,7 @@ const GATHERED: GatherResult = {
   totalHunks: 2,
   mergeBase: "c".repeat(40),
   description: "",
+  descriptionMeta: { sanitized: false, truncated: false },
   history: null,
 };
 

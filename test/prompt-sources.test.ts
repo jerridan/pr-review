@@ -459,6 +459,7 @@ describe("A13: placeholder and list text in a block comes from the prompt files"
     totalHunks: 4,
     mergeBase: "c".repeat(40),
     description: "",
+    descriptionMeta: { sanitized: false, truncated: false },
     history: null,
   };
 

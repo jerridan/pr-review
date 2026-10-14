@@ -501,8 +501,8 @@ export async function runReview(input: RunInput): Promise<RunResult> {
       ? { source: "pr", sanitized: prText.sanitized, truncated: prText.truncated }
       : {
           source: "commits",
-          sanitized: commitsGathered.descriptionMeta?.sanitized ?? false,
-          truncated: commitsGathered.descriptionMeta?.truncated ?? false,
+          sanitized: commitsGathered.descriptionMeta.sanitized,
+          truncated: commitsGathered.descriptionMeta.truncated,
         };
 
     // The head checkout lives for the whole review and is the cwd of every

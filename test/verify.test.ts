@@ -549,6 +549,7 @@ describe("verification starts per finding", () => {
     totalHunks: 1,
     mergeBase: "c".repeat(40),
     description: "",
+    descriptionMeta: { sanitized: false, truncated: false },
     history: null,
   };
 
