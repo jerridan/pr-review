@@ -692,14 +692,32 @@ export async function runReview(input: RunInput): Promise<RunResult> {
         failed.value = { stage: progress.stage, message: messageOf(err) };
       }
 
-      // The verified pre-existing findings (R6), in a stable order.
-      const preExisting: PostedFinding[] = verifications
-        .flatMap((v, i) =>
+      // The verified pre-existing findings (R6), in a stable order. The
+      // suppression rules apply to them, with the reviewer name of each
+      // entry. The record of the suppressions does not list them. A finding
+      // that a person dismissed on an earlier run does not return. Two
+      // reviewers can report one issue, so one entry stays for each
+      // fingerprint: the first in file and line order.
+      const preExistingSorted: PostedFinding[] = applySuppressions(
+        verifications.flatMap((v, i) =>
           preExistingFlags[i] === true && !isFailure(v.first) && v.first !== undefined
-            ? [toPostedFinding(v.finding, v.first, readHeadFile(cwd, v.finding.file))]
+            ? [
+                {
+                  finding: v.finding,
+                  posted: toPostedFinding(v.finding, v.first, readHeadFile(cwd, v.finding.file)),
+                  reviewer: reviewerNames[i] ?? "",
+                },
+              ]
             : [],
-        )
+        ),
+        config.suppressions,
+      )
+        .kept.map((item) => item.posted)
+        .filter((f) => prior === null || !prior.dismissed.has(f.fingerprint))
         .sort((a, b) => a.file.localeCompare(b.file) || a.start_line - b.start_line);
+      const preExisting = preExistingSorted.filter(
+        (f, i) => preExistingSorted.findIndex((g) => g.fingerprint === f.fingerprint) === i,
+      );
 
       // The prior state of a later or fresh run (R7). Each open fingerprint
       // is checked against the head file. A new finding with an open or
