@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { GitHubError } from "../src/github/client.js";
 import { createFakeGitHubClient } from "../src/github/fake.js";
 import { loadPrContext, prDescription } from "../src/github/metadata.js";
 
@@ -44,8 +45,28 @@ describe("loadPrContext (R2)", () => {
     });
   });
 
-  it("gives github-actions[bot] as the viewer in GitHub Actions, with no viewer call", async () => {
+  it("takes the viewer login from GitHub in GitHub Actions when the call works", async () => {
+    const gh = createFakeGitHubClient({ number: 1, viewer_login: "my-app[bot]" });
+    const ctx = await loadPrContext(gh, {
+      repo: "/repo",
+      number: 1,
+      authorWriteAccessFlag: false,
+      env: { GITHUB_ACTIONS: "true" },
+    });
+    expect(ctx.viewerLogin).toBe("my-app[bot]");
+  });
+
+  it("gives github-actions[bot] as the viewer in GitHub Actions when the viewer call fails", async () => {
+    // The GITHUB_TOKEN of a workflow cannot read the viewer.
     const gh = createFakeGitHubClient({ number: 1, viewer_login: "someone" });
+    gh.failNext(
+      "viewerLogin",
+      new GitHubError({
+        endpoint: "graphql",
+        exitCode: 1,
+        message: "Resource not accessible by integration (HTTP 403)",
+      }),
+    );
     const ctx = await loadPrContext(gh, {
       repo: "/repo",
       number: 1,
@@ -53,7 +74,22 @@ describe("loadPrContext (R2)", () => {
       env: { GITHUB_ACTIONS: "true" },
     });
     expect(ctx.viewerLogin).toBe("github-actions[bot]");
-    expect(gh.calls.map((c) => c.method)).not.toContain("viewerLogin");
+  });
+
+  it("lets a failed viewer call through outside GitHub Actions", async () => {
+    const gh = createFakeGitHubClient({ number: 1 });
+    gh.failNext(
+      "viewerLogin",
+      new GitHubError({ endpoint: "graphql", exitCode: 4, message: "auth" }),
+    );
+    await expect(
+      loadPrContext(gh, {
+        repo: "/repo",
+        number: 1,
+        authorWriteAccessFlag: false,
+        env: NO_ACTIONS,
+      }),
+    ).rejects.toThrow(/auth/);
   });
 
   it.each([

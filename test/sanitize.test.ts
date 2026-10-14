@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeCommitMessages, sanitizeGitHubText } from "../src/github/sanitize.js";
+import { redact, sanitizeCommitMessages, sanitizeGitHubText } from "../src/github/sanitize.js";
 
 describe("sanitizeGitHubText (R3)", () => {
   it("removes an HTML comment, also one across lines", () => {
@@ -140,5 +140,22 @@ describe("sanitizeCommitMessages (R3)", () => {
     const out = sanitizeCommitMessages(["a".repeat(15_000), "b".repeat(15_000)]);
     expect(out.text).toHaveLength(20_000);
     expect(out.truncated).toBe(true);
+  });
+});
+
+describe("redact", () => {
+  it("removes a GitHub token and the credential in a URL, and keeps the other text", () => {
+    const token = `ghp_${"Q7".repeat(18)}`;
+    const pat = `github_pat_${"A1_".repeat(10)}`;
+    const out = redact(`token ${token} and ${pat} at https://x-access:${token}@github.com/a/b`);
+    expect(out).not.toContain(token);
+    expect(out).not.toContain(pat);
+    expect(out).not.toContain("x-access");
+    expect(out).toContain("token [redacted] and [redacted]");
+    expect(out).toContain("https://[redacted]@github.com/a/b");
+  });
+
+  it("keeps text with no credential as it is", () => {
+    expect(redact("gh api repos/a/b failed: HTTP 404")).toBe("gh api repos/a/b failed: HTTP 404");
   });
 });

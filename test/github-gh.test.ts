@@ -418,6 +418,7 @@ describe("createGhClient: GraphQL (R1)", () => {
       startLine: null,
       author: { __typename: "User", login: "alice" },
       pullRequestReview: { databaseId: 77 },
+      reactions: { totalCount: 0 },
       ...extra,
     });
     const page = (
@@ -433,6 +434,7 @@ describe("createGhClient: GraphQL (R1)", () => {
                 id: t.id,
                 isResolved: false,
                 comments: { nodes: t.comments },
+                lastComment: { nodes: [] },
               })),
             },
           },
@@ -457,6 +459,7 @@ describe("createGhClient: GraphQL (R1)", () => {
       { stdout: page([{ id: "T2", comments: [comment(3, { author: null, line: null })] }], null) },
     );
     const out = await client().listReviewComments({ slug: SLUG, number: 7 });
+    const open = { thread_resolved: false, thumbs_down: 0, thread_last_comment: null };
     expect(out).toEqual([
       {
         id: 1,
@@ -468,6 +471,7 @@ describe("createGhClient: GraphQL (R1)", () => {
         author: "github-actions[bot]",
         thread_id: "T1",
         review_id: 77,
+        ...open,
       },
       {
         id: 2,
@@ -479,6 +483,7 @@ describe("createGhClient: GraphQL (R1)", () => {
         author: "alice",
         thread_id: "T1",
         review_id: null,
+        ...open,
       },
       {
         id: 3,
@@ -490,6 +495,7 @@ describe("createGhClient: GraphQL (R1)", () => {
         author: "ghost",
         thread_id: "T2",
         review_id: 77,
+        ...open,
       },
     ]);
     const [first, second] = calls().map(graphqlBody);
@@ -504,7 +510,59 @@ describe("createGhClient: GraphQL (R1)", () => {
     });
   });
 
-  it("reads a thread by its node id", async () => {
+  it("gives the resolved flag, the thumbs-down count and the last comment of each thread in one call", async () => {
+    // The thread holds more comments than the first page. Its last comment
+    // comes from its own field, not from the end of the page.
+    const node = (id: number, login: string, downs: number) => ({
+      databaseId: id,
+      id: `PRRC_${id}`,
+      body: `c${id}`,
+      path: "a.ts",
+      line: 3,
+      startLine: null,
+      author: { __typename: "User", login },
+      pullRequestReview: { databaseId: 77 },
+      reactions: { totalCount: downs },
+    });
+    reply({
+      stdout: {
+        data: {
+          repository: {
+            pullRequest: {
+              reviewThreads: {
+                pageInfo: { hasNextPage: false, endCursor: null },
+                nodes: [
+                  {
+                    id: "T1",
+                    isResolved: true,
+                    comments: { nodes: [node(1, "alice", 2), node(2, "bob", 0)] },
+                    lastComment: {
+                      nodes: [
+                        {
+                          body: "Resolved by pr-review: x",
+                          author: { __typename: "Bot", login: "pr-review" },
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        },
+      },
+    });
+    const out = await client().listReviewComments({ slug: SLUG, number: 7 });
+    expect(calls()).toHaveLength(1);
+    expect(out.map((c) => [c.id, c.thread_resolved, c.thumbs_down, c.thread_last_comment])).toEqual(
+      [
+        [1, true, 2, { author: "pr-review[bot]", body: "Resolved by pr-review: x" }],
+        [2, true, 0, { author: "pr-review[bot]", body: "Resolved by pr-review: x" }],
+      ],
+    );
+  });
+
+  it("reads a thread by its node id, with its first comment id and its last comment", async () => {
     reply({
       stdout: {
         data: {
@@ -517,6 +575,10 @@ describe("createGhClient: GraphQL (R1)", () => {
                 { databaseId: 2, body: "y", author: { __typename: "Bot", login: "pr-review" } },
               ],
             },
+            firstComment: { nodes: [{ databaseId: 1 }] },
+            lastComment: {
+              nodes: [{ body: "z", author: { __typename: "User", login: "carol" } }],
+            },
           },
         },
       },
@@ -528,10 +590,32 @@ describe("createGhClient: GraphQL (R1)", () => {
         { id: 1, body: "x", author: "alice" },
         { id: 2, body: "y", author: "pr-review[bot]" },
       ],
+      first_comment_id: 1,
+      last_comment: { author: "carol", body: "z" },
     });
     const body = graphqlBody(onlyCall());
     expect(body.query).toContain("PullRequestReviewThread");
     expect(body.variables).toEqual({ id: "T1" });
+  });
+
+  it("gives no first comment id and no last comment for a thread with no comment", async () => {
+    reply({
+      stdout: {
+        data: {
+          node: {
+            id: "T1",
+            isResolved: false,
+            comments: { nodes: [] },
+            firstComment: { nodes: [] },
+            lastComment: { nodes: [] },
+          },
+        },
+      },
+    });
+    expect(await client().getThread({ thread_id: "T1" })).toMatchObject({
+      first_comment_id: null,
+      last_comment: null,
+    });
   });
 
   it("throws a GitHubError for a thread id that names no thread", async () => {

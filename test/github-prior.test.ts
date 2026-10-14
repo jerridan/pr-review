@@ -144,6 +144,7 @@ function makeRecord(
           ? {
               review_id: 1,
               review_url: "u",
+              author: null,
               error: null,
               inline: [],
               in_body: [],
@@ -327,6 +328,52 @@ describe("loadPriorState (R7)", () => {
     expect(prior.dismissed.has(F_TOOL.fingerprint)).toBe(false);
   });
 
+  it("reads the thread state of every own inline comment from one call", async () => {
+    const { gh, ctx } = setup();
+    await postedState(gh);
+    const out = newOutDir();
+    writeRecordFile(out, "2026-10-13T120000.000Z-aaaaaaa.json", makeRecord());
+    const before = gh.calls.length;
+    const prior = (await loadPriorState(gh, { ctx, outDir: out }))!;
+    const methods = gh.calls.slice(before).map((c) => c.method);
+    expect(methods.filter((m) => m === "listReviewComments")).toHaveLength(1);
+    expect(methods).not.toContain("listReactions");
+    expect(methods).not.toContain("getThread");
+    expect([...prior.dismissed].sort()).toEqual([F_DOWN.fingerprint, F_HUMAN.fingerprint].sort());
+    expect(prior.open.has(F_TOOL.fingerprint)).toBe(false);
+  });
+
+  it("takes the own login from the author in the prior record, over the viewer login", async () => {
+    // The tool posted as VIEWER. This run sees another viewer login.
+    const { gh, ctx } = setup();
+    await postedState(gh);
+    const other: PrContext = { ...ctx, viewerLogin: "github-actions[bot]" };
+    const out = newOutDir();
+    writeRecordFile(
+      out,
+      "2026-10-13T120000.000Z-aaaaaaa.json",
+      makeRecord({ github: { ...makeRecord().posted.github!, author: VIEWER } }),
+    );
+    expect(await loadPriorState(gh, { ctx: other, outDir: newOutDir() })).toBeNull();
+    const prior = (await loadPriorState(gh, { ctx: other, outDir: out }))!;
+    expect(prior.source).toBe("record");
+    expect([...prior.open.keys()].sort()).toEqual([F_OPEN.fingerprint, F_BODY.fingerprint].sort());
+    expect(prior.open.has(F_TOOL.fingerprint)).toBe(false);
+    expect(prior.dismissed.has(F_TOOL.fingerprint)).toBe(false);
+  });
+
+  it("ignores the reviews of the viewer login when the prior record names another author", async () => {
+    const { gh, ctx } = setup();
+    await postedState(gh);
+    const out = newOutDir();
+    writeRecordFile(
+      out,
+      "2026-10-13T120000.000Z-aaaaaaa.json",
+      makeRecord({ github: { ...makeRecord().posted.github!, author: "other-app[bot]" } }),
+    );
+    expect(await loadPriorState(gh, { ctx, outDir: out })).toBeNull();
+  });
+
   it("falls back to the newest body marker with no record, with no findings and no triage tier", async () => {
     const { gh, ctx } = setup();
     await postedState(gh);
@@ -490,6 +537,7 @@ describe("reverify and resolveStaleThreads (R7)", () => {
     const out = newOutDir();
     writeRecordFile(out, "2026-10-13T120000.000Z-aaaaaaa.json", makeRecord());
     const state = (await loadPriorState(gh, { ctx, outDir: out }))!;
+    const replies = gh.state.replies.length;
     gh.failNext(
       "resolveThread",
       new GitHubError({ endpoint: "graphql", exitCode: 1, message: "boom" }),
@@ -499,5 +547,54 @@ describe("reverify and resolveStaleThreads (R7)", () => {
     expect(result.errors).toEqual([
       { step: "resolve thread", message: expect.stringContaining("boom") },
     ]);
+    // The thread did not resolve, so it gets no reply. A later run then
+    // does not find a second reply.
+    expect(gh.state.replies).toHaveLength(replies);
+  });
+
+  it("resolves a thread whose last comment is already the reply of the tool, with no second reply", async () => {
+    // An earlier run replied. Then a person opened the thread again.
+    const { gh, ctx } = setup();
+    const { byFp } = await postedState(gh);
+    await gh.replyToComment({
+      slug: SLUG,
+      number: 7,
+      comment_id: byFp(F_OPEN).id,
+      body: "Resolved by pr-review: the code this comment refers to changed at x.",
+    });
+    const out = newOutDir();
+    writeRecordFile(out, "2026-10-13T120000.000Z-aaaaaaa.json", makeRecord());
+    const state = (await loadPriorState(gh, { ctx, outDir: out }))!;
+    expect(state.open.has(F_OPEN.fingerprint)).toBe(true);
+    const replies = gh.state.replies.length;
+    const result = await resolveStaleThreads(gh, {
+      ctx,
+      prior: state,
+      headFileText: () => "const five = 5;\n",
+    });
+    const thread = byFp(F_OPEN).thread_id;
+    expect(result).toEqual({
+      resolved: [{ thread_id: thread, fingerprint: F_OPEN.fingerprint }],
+      errors: [],
+    });
+    expect((await gh.getThread({ thread_id: thread })).resolved).toBe(true);
+    expect(gh.state.replies).toHaveLength(replies);
+  });
+
+  it("replies to the first comment of the thread when the entry has no comment id", async () => {
+    const { gh, ctx } = setup();
+    const { byFp } = await postedState(gh);
+    const out = newOutDir();
+    writeRecordFile(out, "2026-10-13T120000.000Z-aaaaaaa.json", makeRecord());
+    const state = (await loadPriorState(gh, { ctx, outDir: out }))!;
+    const entry = state.open.get(F_OPEN.fingerprint)!;
+    state.open.set(F_OPEN.fingerprint, { ...entry, comment_id: null });
+    const result = await resolveStaleThreads(gh, {
+      ctx,
+      prior: state,
+      headFileText: () => "const five = 5;\n",
+    });
+    expect(result.errors).toEqual([]);
+    expect(gh.state.replies.at(-1)?.comment_id).toBe(byFp(F_OPEN).id);
   });
 });

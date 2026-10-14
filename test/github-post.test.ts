@@ -187,6 +187,7 @@ describe("postRun: the review (R5)", () => {
     expect(out).toEqual({
       review_id: gh.state.reviews[0]?.id,
       review_url: gh.state.reviews[0]?.url,
+      author: "bot[bot]",
       error: null,
       inline: [
         { fingerprint: INLINE_A.fingerprint, comment_id: comments[0]?.id },
@@ -198,6 +199,26 @@ describe("postRun: the review (R5)", () => {
       resolved: [],
       errors: [],
     });
+  });
+
+  it("records the author of the posted review, which a later run takes as its own login", async () => {
+    // The context guessed the login. GitHub gives the true author.
+    const { gh, ctx } = setup();
+    gh.state.viewer_login = "my-app[bot]";
+    const out = await post(gh, { ...ctx, viewerLogin: "github-actions[bot]" });
+    expect(gh.state.reviews[0]?.author).toBe("my-app[bot]");
+    expect(out.author).toBe("my-app[bot]");
+  });
+
+  it("records no author, and an error, when the review list fails after the review posted", async () => {
+    const { gh, ctx } = setup();
+    gh.failNext("listReviews", boom("repos/acme/widgets/pulls/7/reviews"));
+    const out = await post(gh, ctx);
+    expect(out.review_id).toBe(gh.state.reviews[0]?.id);
+    expect(out.author).toBeNull();
+    expect(out.errors).toEqual([
+      { step: "list reviews", message: expect.stringContaining("boom") },
+    ]);
   });
 
   it("passes carried markers and the earlier head to the body", async () => {

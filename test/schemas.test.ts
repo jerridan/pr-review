@@ -600,6 +600,7 @@ describe("RecordSchema", () => {
     const github = {
       review_id: 10,
       review_url: "https://github.com/acme/widgets/pull/7#pullrequestreview-10",
+      author: "github-actions[bot]",
       error: null,
       inline: [{ fingerprint: "abc", comment_id: 11 }],
       in_body: ["def"],
@@ -622,6 +623,10 @@ describe("RecordSchema", () => {
     const { errors: _errors, ...noErrors } = github;
     expect(withGithub(noErrors)).toBe(false);
     expect(withGithub(undefined)).toBe(false);
+    // The author is the login of the posted review, or null when unknown.
+    expect(withGithub({ ...github, author: null })).toBe(true);
+    const { author: _author, ...noAuthor } = github;
+    expect(withGithub(noAuthor)).toBe(false);
   });
 
   it("requires stages.suppressed, each item with a finding, a reviewer and a rule", () => {

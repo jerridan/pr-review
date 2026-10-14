@@ -2122,3 +2122,36 @@ describe("the prior triage tier of a later run (R7)", () => {
     }
   }, 60_000);
 });
+
+describe("the own login of a later run (R7)", () => {
+  it("records the author of the posted review, and a later run takes it over the viewer login", async () => {
+    const gh = createFakeGitHubClient({
+      number: 7,
+      base_sha: fx.base,
+      head_sha: fx.head,
+      url: "https://github.com/acme/widgets/pull/7",
+      viewer_login: "my-app[bot]",
+    });
+    const input = { repo: fx.repo, pr: 7, github: gh, format: "github" as const };
+    const out = join(outRoot, "own-login");
+    const sdk = () => createFakeSdkClient(script(fx));
+    const first = await runReview({ ...input, outDir: out, allowApiKey: false, client: sdk() });
+    expect(first.record.posted.github?.author).toBe("my-app[bot]");
+
+    // The viewer call now gives another login. The prior record names the
+    // author of the earlier review, so the run still finds that review.
+    gh.state.viewer_login = "someone-else";
+    const later = await runReview({ ...input, outDir: out, allowApiKey: false, client: sdk() });
+    expect(later.record.identity.run_kind).toBe("later");
+
+    // With no prior record, the run has only the viewer login. It finds no
+    // review of its own, so it is a first run.
+    const none = await runReview({
+      ...input,
+      outDir: join(outRoot, "own-login-none"),
+      allowApiKey: false,
+      client: sdk(),
+    });
+    expect(none.record.identity.run_kind).toBe("first");
+  }, 120_000);
+});

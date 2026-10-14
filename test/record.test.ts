@@ -16,7 +16,7 @@ import { promisify } from "node:util";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DEFAULT_REPO_CONFIG } from "../src/config/repo-config.js";
 import { formatJson } from "../src/output/json.js";
-import { recordFileName, writeRecord } from "../src/record/write.js";
+import { recordFileName, recordRunId, runIdFor, writeRecord } from "../src/record/write.js";
 import { loadBuiltinReviewers } from "../src/reviewers/loader.js";
 import { runReview } from "../src/run.js";
 import type { Finding } from "../src/schemas/finding.js";
@@ -170,6 +170,13 @@ describe("the record file (A9)", () => {
     );
     expect(basename(recordPath)).toBe(`2026-10-13T123456.789Z-${fx.head.slice(0, 7)}.json`);
     expect(isAbsolute(recordPath)).toBe(true);
+  });
+
+  it("gives the run id as the file name of the record without .json", () => {
+    // The run marker on GitHub names the record by this id.
+    expect(basename(recordPath, ".json")).toBe(recordRunId(record));
+    const startedAt = new Date(record.identity.started_at);
+    expect(runIdFor(startedAt, record.identity.head)).toBe(recordRunId(record));
   });
 
   it("validates against the record schema, as written", () => {

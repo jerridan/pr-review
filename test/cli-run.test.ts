@@ -1036,6 +1036,7 @@ describe("--format github (R5, R5a, R6)", () => {
       expect(record?.posted.github).toMatchObject({
         review_id: review.id,
         review_url: review.url,
+        author: "me",
         error: null,
         in_body: expect.arrayContaining([fp(record, "CLAIM-B"), fp(record, "CLAIM-C")]),
         check_run: { id: github.state.check_runs[0]?.id },
