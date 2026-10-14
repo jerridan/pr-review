@@ -162,7 +162,7 @@ A local token can lack the `checks` scope. The check run then fails and the revi
 The run sanitizes the PR title, the PR body and the commit messages before they enter a prompt. The steps are:
 
 - Remove HTML comments.
-- Remove Unicode format characters. This covers zero-width characters, bidi controls, the soft hyphen and the byte order mark.
+- Remove Unicode format characters and default ignorable code points. This covers zero-width characters, bidi controls, the soft hyphen, the byte order mark, the variation selectors and the Hangul fillers. The braille blank goes too.
 - Remove C0 control characters, except tab and newline.
 - Normalize the text to NFC.
 - Cut the text at 20000 characters.
