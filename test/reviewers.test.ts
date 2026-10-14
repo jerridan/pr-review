@@ -1,21 +1,23 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
+import { DEFAULT_REPO_CONFIG } from "../src/config/repo-config.js";
 import { ROLE_DEFAULTS } from "../src/config/models.js";
 import { FindingsOutputSchema } from "../src/schemas/finding.js";
 import { VerifierResultSchema } from "../src/schemas/verifier.js";
 import type { QueryRequest } from "../src/sdk/client.js";
 import { buildQueryOptions } from "../src/sdk/options.js";
 import {
+  effectiveModel,
   loadBuiltinReviewers,
   loadReviewer,
+  parseReviewer,
   ReviewerLoadError,
-  reviewerOverrides,
   reviewerTools,
   type ReviewerDefinition,
 } from "../src/reviewers/loader.js";
-import { selectReviewers } from "../src/reviewers/select.js";
+import { selectReviewers, skipSelected } from "../src/reviewers/select.js";
 import { UNTRUSTED_SYSTEM_LINE } from "../src/untrusted.js";
 
 const dir = mkdtempSync(join(tmpdir(), "pr-review-reviewers-"));
@@ -60,44 +62,157 @@ function loadError(path: string): ReviewerLoadError {
   throw new Error(`Expected ${path} to fail to load.`);
 }
 
-describe("built-in reviewers (A4)", () => {
-  it("loads diff-bugs with the shipped values", () => {
-    const defs = loadBuiltinReviewers();
-    expect(defs.map((d) => d.frontmatter.name)).toEqual(["diff-bugs"]);
-    const def = defs[0] as ReviewerDefinition;
-    expect(def.frontmatter).toMatchObject({
-      name: "diff-bugs",
-      model: "opus",
-      effort: "low",
-      passes: 1,
-      threshold: 80,
-      triggers: { paths: [], categories: [], min_tier: "fast" },
-    });
-    expect(def.path).toMatch(/prompts[/\\]reviewers[/\\]diff-bugs\.md$/);
-  });
+// The built-in reviewers of spec R1, in file name order, with their triggers.
+const BUILTINS: { name: string; minTier: "fast" | "full"; passes: number }[] = [
+  { name: "conventions", minTier: "fast", passes: 1 },
+  { name: "description-drift", minTier: "full", passes: 1 },
+  { name: "diff-bugs", minTier: "fast", passes: 2 },
+  { name: "docs-and-comments", minTier: "full", passes: 1 },
+  { name: "history", minTier: "full", passes: 1 },
+  { name: "security", minTier: "full", passes: 2 },
+  { name: "tests", minTier: "full", passes: 1 },
+];
 
-  it("uses the body as the system prompt, with the prompt rules", () => {
-    const def = loadBuiltinReviewers()[0] as ReviewerDefinition;
-    const prompt = def.systemPrompt;
-    expect(prompt).not.toMatch(/^---/);
-    expect(prompt).toContain(UNTRUSTED_SYSTEM_LINE);
-    expect(prompt).toMatch(/every issue/i);
-    expect(prompt).toMatch(/confidence/i);
-    expect(prompt).toMatch(/severity/i);
-    expect(prompt).toMatch(/quote/i);
-    expect(prompt).toMatch(/subagent/i);
-    expect(prompt.split("\n").length).toBeLessThan(80);
-  });
+const PATH_RULE =
+  "the path from the repo root, without the a/ or b/ prefix of the diff and without a leading /";
 
-  it("tells the reviewer to give the file path without the diff prefix or a leading /", () => {
-    const def = loadBuiltinReviewers()[0] as ReviewerDefinition;
-    expect(def.systemPrompt).toContain(
-      "the path from the repo root, without the a/ or b/ prefix of the diff and without a leading /",
+function builtin(name: string): ReviewerDefinition {
+  const def = loadBuiltinReviewers().find((d) => d.frontmatter.name === name);
+  if (!def) throw new Error(`no built-in reviewer ${name}`);
+  return def;
+}
+
+// The text of one section of a body: from its "## " heading to the next.
+function section(body: string, heading: string): string {
+  const start = body.indexOf(`## ${heading}\n`);
+  if (start < 0) return "";
+  const rest = body.slice(start + heading.length + 4);
+  const next = rest.search(/^## /m);
+  return next < 0 ? rest : rest.slice(0, next);
+}
+
+describe("built-in reviewers (A4, R1)", () => {
+  it("loads the seven reviewers, in file name order", () => {
+    expect(loadBuiltinReviewers().map((d) => d.frontmatter.name)).toEqual(
+      BUILTINS.map((b) => b.name),
     );
+  });
+
+  for (const { name, minTier, passes } of BUILTINS) {
+    describe(name, () => {
+      it("has the frontmatter of spec R1", () => {
+        const def = builtin(name);
+        expect(def.frontmatter).toEqual({
+          name,
+          description: expect.any(String),
+          model: "opus",
+          effort: "low",
+          tools: ["Read", "Grep", "Glob"],
+          triggers: { paths: [], categories: [], min_tier: minTier },
+          passes,
+          threshold: 80,
+          trusted: false,
+        });
+        expect(def.frontmatter.description.trim()).not.toBe("");
+        expect(def.source).toBe("builtin");
+        expect(def.path).toMatch(new RegExp(`prompts[/\\\\]reviewers[/\\\\]${name}\\.md$`));
+        // The file omits the trusted key; the schema fills in false.
+        expect(readFileSync(def.path, "utf8")).not.toMatch(/^trusted:/m);
+      });
+
+      it("uses the body as the system prompt, with the prompt rules", () => {
+        const prompt = builtin(name).systemPrompt;
+        expect(prompt).not.toMatch(/^---/);
+        expect(prompt).toContain(UNTRUSTED_SYSTEM_LINE);
+        expect(prompt).toMatch(/every issue/i);
+        expect(prompt).toMatch(/confidence/i);
+        expect(prompt).toMatch(/severity/i);
+        expect(prompt).toMatch(/quote/i);
+        expect(prompt).toMatch(/subagent/i);
+        expect(prompt).toMatch(/lint or formatting/i);
+        expect(prompt.split("\n").length).toBeLessThan(80);
+      });
+
+      it("tells the reviewer to give the file path without the diff prefix or a leading /", () => {
+        expect(builtin(name).systemPrompt).toContain(PATH_RULE);
+      });
+
+      it("has a Do not flag section with content", () => {
+        const body = builtin(name).systemPrompt;
+        expect(body).toContain("\n## Do not flag\n");
+        expect(section(body, "Do not flag").trim()).not.toBe("");
+      });
+    });
+  }
+
+  it("lists in each Do not flag section what spec R1 gives", () => {
+    const doNotFlag = (name: string) => section(builtin(name).systemPrompt, "Do not flag");
+    expect(doNotFlag("diff-bugs")).toMatch(/security/i);
+    expect(doNotFlag("diff-bugs")).toMatch(/test/i);
+    expect(doNotFlag("diff-bugs")).toMatch(/docs/i);
+    expect(doNotFlag("diff-bugs")).toMatch(/convention/i);
+    expect(doNotFlag("conventions")).toMatch(/logic bug/i);
+    expect(doNotFlag("conventions")).toMatch(/missing test/i);
+    expect(doNotFlag("conventions")).toMatch(/security/i);
+    expect(doNotFlag("conventions")).toMatch(/linter or a formatter/i);
+    expect(doNotFlag("tests")).toMatch(/logic bug/i);
+    expect(doNotFlag("tests")).toMatch(/naming/i);
+    expect(doNotFlag("security")).toMatch(/no security effect/i);
+    expect(doNotFlag("history")).toMatch(/does not show/i);
+    expect(doNotFlag("description-drift")).toMatch(/code itself/i);
+    expect(doNotFlag("docs-and-comments")).toMatch(/no comment or doc/i);
+  });
+
+  it("names the evidence source of each reviewer", () => {
+    const opening = (name: string) => builtin(name).systemPrompt.split("\n## ")[0] ?? "";
+    expect(opening("conventions")).toMatch(/CLAUDE\.md/);
+    expect(opening("conventions")).toMatch(/rules\.md/);
+    expect(opening("conventions")).toMatch(/nearby code/i);
+    expect(opening("tests")).toMatch(/test/i);
+    expect(opening("security")).toContain(".pr-review/");
+    expect(opening("history")).toMatch(/history block/i);
+    expect(opening("description-drift")).toMatch(/description block/i);
+    expect(opening("docs-and-comments")).toMatch(/comments/i);
+    expect(opening("diff-bugs")).toMatch(/diff and the files of the head commit/);
+  });
+
+  it("tells the history reviewer that the block holds blame and log at the merge base, and never to quote it", () => {
+    const body = builtin("history").systemPrompt;
+    expect(body).toMatch(/blame/i);
+    expect(body).toMatch(/merge base/i);
+    expect(body).toMatch(/never quote the history block/i);
+    expect(body).toMatch(/head file or .*diff/i);
+  });
+
+  it("tells the description-drift reviewer what to report and where to quote from", () => {
+    const body = builtin("description-drift").systemPrompt;
+    expect(body).toMatch(/does not keep/i);
+    expect(body).toMatch(/does not mention/i);
+    expect(body).toMatch(/never quote the description block/i);
   });
 });
 
 describe("loadReviewer", () => {
+  it("makes trusted optional, with the default false", () => {
+    const def = loadReviewer(writeReviewer(withField("trusted", null)));
+    expect(def.frontmatter.trusted).toBe(false);
+    expect(loadError(writeReviewer(withField("trusted", "trusted: maybe"))).message).toMatch(
+      /trusted/,
+    );
+  });
+
+  it("marks a built-in reviewer with source builtin, and a custom one as told", () => {
+    expect(loadBuiltinReviewers().every((d) => d.source === "builtin")).toBe(true);
+    expect(loadReviewer(writeReviewer(GOOD_FRONTMATTER)).source).toBe("builtin");
+    expect(
+      parseReviewer(`---\n${GOOD_FRONTMATTER.join("\n")}\n---\nBody.\n`, "x.md", "custom"),
+    ).toMatchObject({
+      source: "custom",
+      path: "x.md",
+      systemPrompt: "Body.\n",
+    });
+  });
+
   it("reads passes, threshold and trusted", () => {
     const def = loadReviewer(writeReviewer(withField("trusted", "trusted: true")));
     expect(def.frontmatter.passes).toBe(2);
@@ -144,14 +259,20 @@ describe("loadReviewer", () => {
 describe("model overrides from frontmatter", () => {
   it("maps an alias to the pinned ID", () => {
     const def = loadReviewer(writeReviewer(withField("model", "model: haiku")));
-    expect(reviewerOverrides(def)).toEqual({ model: "claude-haiku-5-5", effort: "medium" });
+    expect(effectiveModel(def, DEFAULT_REPO_CONFIG)).toEqual({
+      model: "claude-haiku-5-5",
+      effort: "medium",
+    });
     const builtin = loadBuiltinReviewers()[0] as ReviewerDefinition;
-    expect(reviewerOverrides(builtin)).toEqual({ model: "claude-opus-5-5", effort: "low" });
+    expect(effectiveModel(builtin, DEFAULT_REPO_CONFIG)).toEqual({
+      model: "claude-opus-5-5",
+      effort: "low",
+    });
   });
 
   it("passes an exact ID through", () => {
     const def = loadReviewer(writeReviewer(withField("model", "model: claude-opus-4-1-20250805")));
-    expect(reviewerOverrides(def).model).toBe("claude-opus-4-1-20250805");
+    expect(effectiveModel(def, DEFAULT_REPO_CONFIG).model).toBe("claude-opus-4-1-20250805");
   });
 
   it("changes the model for that reviewer only", () => {
@@ -163,7 +284,7 @@ describe("model overrides from frontmatter", () => {
       role: "reviewer",
       reviewerName: def.frontmatter.name,
       schema: FindingsOutputSchema,
-      overrides: reviewerOverrides(def),
+      overrides: effectiveModel(def, DEFAULT_REPO_CONFIG),
     });
     const env = { allowApiKey: false, env: {} };
     expect(buildQueryOptions(req(sonnet), env).model).toBe("claude-sonnet-5-5");
@@ -185,22 +306,94 @@ describe("the tools of a reviewer", () => {
     return { ...def, frontmatter: { ...def.frontmatter, tools } };
   }
 
+  const noBash = { bashGranted: false, bashReason: null };
+
   it("grants the read-only tools that the reviewer names, in canonical form", () => {
-    expect(reviewerTools(withTools(["Read", "Grep", "Glob"]))).toEqual({
+    expect(reviewerTools(withTools(["Read", "Grep", "Glob"]), false)).toEqual({
       granted: ["Read", "Grep", "Glob"],
       ignored: [],
+      ...noBash,
     });
-    expect(reviewerTools(withTools(["glob", "READ"]))).toEqual({
+    expect(reviewerTools(withTools(["glob", "READ"]), true)).toEqual({
       granted: ["Read", "Glob"],
       ignored: [],
+      ...noBash,
     });
-    expect(reviewerTools(withTools([]))).toEqual({ granted: [], ignored: [] });
+    expect(reviewerTools(withTools([]), false)).toEqual({ granted: [], ignored: [], ...noBash });
   });
 
   it("ignores a tool outside the read-only set and never grants it", () => {
-    expect(reviewerTools(withTools(["Bash", "Read", "WebFetch", "Write"]))).toEqual({
+    expect(reviewerTools(withTools(["Bash", "Read", "WebFetch", "Write"]), false)).toEqual({
       granted: ["Read"],
       ignored: ["Bash", "WebFetch", "Write"],
+      ...noBash,
+    });
+  });
+
+  describe("the Bash policy (R7)", () => {
+    function custom(trusted: boolean, tools = ["Read", "Bash", "Write"]): ReviewerDefinition {
+      const def = withTools(tools);
+      return { ...def, source: "custom", frontmatter: { ...def.frontmatter, trusted } };
+    }
+
+    it("grants Bash to a trusted custom reviewer when the author has write access", () => {
+      expect(reviewerTools(custom(true), true)).toEqual({
+        granted: ["Read", "Bash"],
+        ignored: ["Write"],
+        bashGranted: true,
+        bashReason: null,
+      });
+    });
+
+    it("does not grant Bash to a custom reviewer that is not trusted", () => {
+      expect(reviewerTools(custom(false), true)).toEqual({
+        granted: ["Read"],
+        ignored: ["Bash", "Write"],
+        bashGranted: false,
+        bashReason: "not trusted",
+      });
+    });
+
+    it("does not grant Bash when the author has no write access", () => {
+      expect(reviewerTools(custom(true), false)).toMatchObject({
+        granted: ["Read"],
+        bashGranted: false,
+        bashReason: "author has no write access",
+      });
+    });
+
+    it("joins both reasons with and", () => {
+      expect(reviewerTools(custom(false), false)).toMatchObject({
+        bashGranted: false,
+        bashReason: "not trusted and author has no write access",
+      });
+    });
+
+    it("matches the Bash name without regard to case", () => {
+      expect(reviewerTools(custom(true, ["bash"]), true)).toMatchObject({
+        granted: ["Bash"],
+        ignored: [],
+        bashGranted: true,
+      });
+    });
+
+    it("gives no reason for a custom reviewer whose tools do not name Bash", () => {
+      expect(reviewerTools(custom(false, ["Read"]), false)).toEqual({
+        granted: ["Read"],
+        ignored: [],
+        bashGranted: false,
+        bashReason: null,
+      });
+    });
+
+    it("never grants Bash to a built-in reviewer, whatever trusted says", () => {
+      const builtinDef = { ...custom(true), source: "builtin" as const };
+      expect(reviewerTools(builtinDef, true)).toEqual({
+        granted: ["Read"],
+        ignored: ["Bash", "Write"],
+        bashGranted: false,
+        bashReason: null,
+      });
     });
   });
 
@@ -214,7 +407,7 @@ describe("the tools of a reviewer", () => {
         userMessage: "u",
         schema: FindingsOutputSchema,
         cwd: "/tmp/x",
-        overrides: reviewerOverrides(def),
+        overrides: effectiveModel(def, DEFAULT_REPO_CONFIG),
         tools: def.frontmatter.tools,
       },
       { allowApiKey: false, env: {} },
@@ -248,6 +441,7 @@ describe("selectReviewers", () => {
     triggers: Partial<ReviewerDefinition["frontmatter"]["triggers"]> = {},
   ): ReviewerDefinition {
     return {
+      source: "builtin",
       path: `/x/${name}.md`,
       systemPrompt: "p",
       frontmatter: {
@@ -308,11 +502,42 @@ describe("selectReviewers", () => {
     expect(picked?.trigger).toContain("bug");
   });
 
-  it("selects the built-in diff-bugs in the fast and the full tier", () => {
+  it("skips a disabled reviewer, and the description reviewer when the description is empty", () => {
+    const picked = [def("diff-bugs"), def("description-drift"), def("tests")].map((d) => ({
+      def: d,
+      trigger: "t",
+    }));
+    const config = {
+      ...DEFAULT_REPO_CONFIG,
+      reviewers: { tests: { enabled: false } },
+    };
+    const empty = skipSelected(picked, { config, description: "  \n" });
+    expect(names(empty.run)).toEqual(["diff-bugs"]);
+    expect(empty.skipped).toEqual([
+      { name: "description-drift", reason: "no description" },
+      { name: "tests", reason: "disabled by config" },
+    ]);
+    const described = skipSelected(picked, { config, description: "Adds average." });
+    expect(names(described.run)).toEqual(["diff-bugs", "description-drift"]);
+    expect(described.skipped).toEqual([{ name: "tests", reason: "disabled by config" }]);
+    // A disabled description reviewer gives the config reason.
+    const off = skipSelected(picked, {
+      config: { ...DEFAULT_REPO_CONFIG, reviewers: { "description-drift": { enabled: false } } },
+      description: "",
+    });
+    expect(off.skipped).toEqual([{ name: "description-drift", reason: "disabled by config" }]);
+    // A reviewer that was not selected is in neither list.
+    expect(skipSelected([], { config, description: "" })).toEqual({ run: [], skipped: [] });
+  });
+
+  it("selects conventions and diff-bugs at the fast tier, and all seven at the full tier", () => {
     const builtins = loadBuiltinReviewers();
-    expect(names(selectReviewers(builtins, "fast", ["src/stats.ts"], []))).toEqual(["diff-bugs"]);
-    expect(names(selectReviewers(builtins, "full", ["src/stats.ts"], ["bug"]))).toEqual([
+    expect(names(selectReviewers(builtins, "fast", ["src/stats.ts"], []))).toEqual([
+      "conventions",
       "diff-bugs",
     ]);
+    expect(names(selectReviewers(builtins, "full", ["src/stats.ts"], []))).toEqual(
+      BUILTINS.map((b) => b.name),
+    );
   });
 });

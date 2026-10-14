@@ -1,5 +1,14 @@
 import { execFile } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,8 +25,8 @@ const SCRIPT = fileURLToPath(new URL("../scripts/make-fixture.sh", import.meta.u
 
 type Fixture = { repo: string; base: string; head: string; file: string; line: number };
 
-async function makeFixture(): Promise<Fixture> {
-  const { stdout } = await run("bash", [SCRIPT]);
+async function makeFixture(...options: string[]): Promise<Fixture> {
+  const { stdout } = await run("bash", [SCRIPT, ...options]);
   const value = (key: string) =>
     stdout
       .split("\n")
@@ -71,6 +80,15 @@ function script(fx: Fixture) {
             explanation: "e",
             needs_context: false,
           },
+        ],
+      });
+    }
+    // Every reviewer returns the same finding, so the verified copies form
+    // one merge group, and merge keeps one of them.
+    if (req.role === "merge") {
+      return out({
+        merged: [
+          { member_index: 0, claim: "CLAIM-off-by-one", explanation: "e", severity: "blocking" },
         ],
       });
     }
@@ -128,20 +146,36 @@ afterAll(() => {
 });
 
 function args(out: string, ...extra: string[]): string[] {
+  return argsFor(fx, out, ...extra);
+}
+
+function argsFor(fixture: Fixture, out: string, ...extra: string[]): string[] {
   return [
     "node",
     "pr-review",
     "run",
     "--repo",
-    fx.repo,
+    fixture.repo,
     "--base",
-    fx.base,
+    fixture.base,
     "--head",
-    fx.head,
+    fixture.head,
     "--out",
     out,
     ...extra,
   ];
+}
+
+/** Build a fixture whose base commit holds a .pr-review/config.yaml with this text. */
+async function fixtureWithConfig(configYaml: string): Promise<Fixture> {
+  const source = mkdtempSync(join(tmpdir(), "pr-review-cli-config-"));
+  try {
+    mkdirSync(join(source, "dir"));
+    writeFileSync(join(source, "dir", "config.yaml"), configYaml);
+    return await makeFixture("--pr-review-dir", join(source, "dir"));
+  } finally {
+    rmSync(source, { recursive: true, force: true });
+  }
 }
 
 describe("pr-review run through the CLI", () => {
@@ -179,6 +213,8 @@ describe("pr-review run through the CLI", () => {
     expect(typeof doc.total_cost_usd).toBe("number");
     expect(doc.tier).toBe("full");
     expect(doc.verdict).toBe("would request changes");
+    // Seven reviewers report the same finding, and merge keeps one.
+    expect(doc.coverage.reviewers_ran).toHaveLength(7);
     expect(doc.findings).toHaveLength(1);
     expect(doc.findings[0]).toMatchObject({
       file: fx.file,
@@ -253,4 +289,244 @@ describe("a skip run (A3)", () => {
     expect(stdout).toContain("skipped");
     expect(stdout).toContain("Tier set by --tier skip.");
   });
+});
+
+describe("the repo config on the base commit (R3)", () => {
+  const fixtures: Fixture[] = [];
+  afterAll(() => {
+    for (const f of fixtures) rmSync(f.repo, { recursive: true, force: true });
+  });
+
+  it("exits 1 on an invalid config, writes no record, and names the file and the field", async () => {
+    const bad = await fixtureWithConfig("thresholds:\n  default: 150\n");
+    fixtures.push(bad);
+    const fake = createFakeSdkClient(script(bad));
+    const out = join(outRoot, "bad-config");
+    const code = await exitCodeOf(
+      createProgram({ client: fake }).parseAsync(argsFor(bad, out, "--format", "json")),
+    );
+    expect(code).toBe(1);
+    expect(fake.calls).toEqual([]);
+    expect(existsSync(out) ? readdirSync(out) : []).toEqual([]);
+    expect(stdout).toBe("");
+    expect(stderr).toContain(".pr-review/config.yaml");
+    expect(stderr).toContain("thresholds.default");
+  }, 30_000);
+
+  it("lists a reviewer that the config disables under reviewers_skipped, not reviewers_ran", async () => {
+    const off = await fixtureWithConfig("reviewers:\n  diff-bugs:\n    enabled: false\n");
+    fixtures.push(off);
+    const fake = createFakeSdkClient(script(off));
+    const code = await exitCodeOf(
+      createProgram({ client: fake }).parseAsync(
+        argsFor(off, join(outRoot, "disabled"), "--format", "json"),
+      ),
+    );
+    expect(code).toBe(0);
+    const doc = JSON.parse(stdout);
+    expect(doc.coverage.reviewers_skipped).toEqual([
+      { name: "diff-bugs", reason: "disabled by config" },
+    ]);
+    expect(doc.coverage.reviewers_ran).not.toContain("diff-bugs");
+    const record = JSON.parse(readFileSync(doc.record_path, "utf8")) as RunRecord;
+    expect(RecordSchema.safeParse(record).error).toBeUndefined();
+    expect(record.posted.coverage.reviewers_skipped).toEqual([
+      { name: "diff-bugs", reason: "disabled by config" },
+    ]);
+    expect(record.posted.coverage.reviewers_ran).not.toContain("diff-bugs");
+    expect(record.identity.selected_reviewers.map((r) => r.name)).not.toContain("diff-bugs");
+    expect(fake.calls.filter((c) => c.reviewerName === "diff-bugs")).toEqual([]);
+    expect(record.identity.config_hash).toMatch(/^[0-9a-f]{64}$/);
+  }, 30_000);
+});
+
+describe("--author-write-access (R7)", () => {
+  let trustedFx: Fixture;
+  beforeAll(async () => {
+    const source = mkdtempSync(join(tmpdir(), "pr-review-cli-bash-"));
+    try {
+      mkdirSync(join(source, "dir", "reviewers"), { recursive: true });
+      writeFileSync(
+        join(source, "dir", "reviewers", "shell-check.md"),
+        [
+          "---",
+          "name: shell-check",
+          "description: Checks shell use.",
+          "model: sonnet",
+          "effort: medium",
+          "tools: [Read, Bash]",
+          "triggers:",
+          "  paths: []",
+          "  categories: []",
+          "  min_tier: fast",
+          "passes: 1",
+          "threshold: 80",
+          "trusted: true",
+          "---",
+          "You check shell use.",
+          "",
+        ].join("\n"),
+      );
+      trustedFx = await makeFixture("--pr-review-dir", join(source, "dir"));
+    } finally {
+      rmSync(source, { recursive: true, force: true });
+    }
+  }, 30_000);
+  afterAll(() => {
+    if (trustedFx) rmSync(trustedFx.repo, { recursive: true, force: true });
+  });
+
+  async function shellCall(...extra: string[]) {
+    const fake = createFakeSdkClient(script(trustedFx));
+    const code = await exitCodeOf(
+      createProgram({ client: fake }).parseAsync(
+        argsFor(
+          trustedFx,
+          join(outRoot, `bash-${extra.length}`),
+          "--format",
+          "json",
+          "--tier",
+          "fast",
+          ...extra,
+        ),
+      ),
+    );
+    expect(code).toBe(0);
+    const doc = JSON.parse(stdout);
+    stdout = "";
+    return { call: fake.calls.find((c) => c.reviewerName === "shell-check"), doc };
+  }
+
+  it("grants Bash to a trusted custom reviewer only with the option", async () => {
+    const without = await shellCall();
+    expect(without.call?.bash).not.toBe(true);
+    expect(without.doc.coverage.reviewers_without_bash).toEqual([
+      { name: "shell-check", reason: "author has no write access" },
+    ]);
+    const withOption = await shellCall("--author-write-access");
+    expect(withOption.call?.bash).toBe(true);
+    expect(withOption.doc.coverage.reviewers_without_bash).toEqual([]);
+  }, 30_000);
+});
+
+describe("the repo config changes the run (the charter's two runs)", () => {
+  const CONFIG = [
+    "reviewers:",
+    "  history:",
+    "    enabled: false",
+    "suppressions:",
+    "  - reviewer: conventions",
+    "    category: convention",
+    "    reason: The linter owns style.",
+    "",
+  ].join("\n");
+
+  // diff-bugs reports the planted bug. conventions reports a convention
+  // nit on line 1. The other reviewers report nothing.
+  function twoFindingScript(fixture: Fixture) {
+    const base = script(fixture);
+    return (req: QueryRequest): QueryOutcome<unknown> => {
+      if (req.role === "reviewer") {
+        const planted = base(req);
+        if (req.reviewerName === "diff-bugs") return planted;
+        if (req.reviewerName !== "conventions") {
+          return { ok: true, output: { findings: [] }, raw: META };
+        }
+        return {
+          ok: true,
+          output: {
+            findings: [
+              {
+                file: fixture.file,
+                start_line: 1,
+                end_line: 1,
+                category: "convention",
+                severity_estimate: "nit",
+                confidence: "high",
+                claim: "CLAIM-convention",
+                evidence: "export function sum(values: number[]): number {",
+                explanation: "e",
+                needs_context: false,
+              },
+            ],
+          },
+          raw: META,
+        };
+      }
+      if (req.role === "verifier" || req.role === "verifier-escalation") {
+        const verified = base(req) as { output: Record<string, unknown> };
+        return {
+          ok: true,
+          output: {
+            ...verified.output,
+            quotes: ["export function sum", "i <= values.length"],
+            severity: "suggestion",
+          },
+          raw: META,
+        } as QueryOutcome<unknown>;
+      }
+      return base(req);
+    };
+  }
+
+  async function review(fixture: Fixture, name: string) {
+    const fake = createFakeSdkClient(twoFindingScript(fixture));
+    const code = await exitCodeOf(
+      createProgram({ client: fake }).parseAsync(
+        argsFor(fixture, join(outRoot, name), "--format", "json"),
+      ),
+    );
+    expect(code).toBe(0);
+    const doc = JSON.parse(stdout);
+    stdout = "";
+    const record = JSON.parse(readFileSync(doc.record_path, "utf8")) as RunRecord;
+    expect(RecordSchema.safeParse(record).error).toBeUndefined();
+    return { doc, record };
+  }
+
+  it("differs in the reviewers that ran, the posted findings, the suppressed list and the hash", async () => {
+    const configured = await fixtureWithConfig(CONFIG);
+    try {
+      const first = await review(fx, "two-runs-1");
+      const second = await review(configured, "two-runs-2");
+
+      // The reviewers that ran differ: the second run lacks history.
+      expect(first.record.posted.coverage.reviewers_ran).toContain("history");
+      expect(second.record.posted.coverage.reviewers_ran).not.toContain("history");
+      expect(second.record.posted.coverage.reviewers_ran).toHaveLength(
+        first.record.posted.coverage.reviewers_ran.length - 1,
+      );
+      expect(second.doc.coverage.reviewers_skipped).toEqual([
+        { name: "history", reason: "disabled by config" },
+      ]);
+
+      // The first run posts both findings and suppresses none.
+      expect(first.record.posted.findings.map((f) => f.claim).sort()).toEqual([
+        "CLAIM-convention",
+        "CLAIM-off-by-one",
+      ]);
+      expect(first.record.stages.suppressed).toEqual([]);
+
+      // The second run omits the suppressed finding and records it with its rule.
+      expect(second.record.posted.findings.map((f) => f.claim)).toEqual(["CLAIM-off-by-one"]);
+      expect(second.doc.findings.map((f: { claim: string }) => f.claim)).toEqual([
+        "CLAIM-off-by-one",
+      ]);
+      expect(second.record.stages.suppressed).toHaveLength(1);
+      expect(second.record.stages.suppressed[0]).toMatchObject({
+        reviewer: "conventions",
+        finding: { claim: "CLAIM-convention", category: "convention", start_line: 1 },
+        rule: { reviewer: "conventions", category: "convention", reason: "The linter owns style." },
+      });
+
+      // The hash follows spec R4: the path, one newline, the bytes. One file here.
+      const expected = createHash("sha256")
+        .update(Buffer.from(`.pr-review/config.yaml\n${CONFIG}`, "utf8"))
+        .digest("hex");
+      expect(second.record.identity.config_hash).toBe(expected);
+      expect(first.record.identity.config_hash).toBeNull();
+    } finally {
+      rmSync(configured.repo, { recursive: true, force: true });
+    }
+  }, 60_000);
 });

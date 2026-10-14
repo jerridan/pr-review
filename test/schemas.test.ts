@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_REPO_CONFIG } from "../src/config/repo-config.js";
 import { z } from "zod";
 import { SmokeOutputSchema } from "../src/cli.js";
 import type { Role } from "../src/config/models.js";
@@ -98,6 +99,10 @@ function makeRecord(): RunRecord {
       started_at: "2026-10-13T12:00:00.000Z",
       tool_version: "0.1.0",
       config_hash: null,
+      config: { files: [], values: DEFAULT_REPO_CONFIG, custom_reviewers: [] },
+      description: "Fix the loop bound.",
+      history: { built: true, truncated: false },
+      injected: [{ path: "CLAUDE.md", truncated: false }],
       changed_files: [{ path: "src/a.ts", hunks: 1 }],
       excluded_files: [{ path: "package-lock.json", reason: "generated" }],
       sensitive_files: [],
@@ -166,12 +171,16 @@ function makeRecord(): RunRecord {
       ],
       merges: [],
       capped: [],
+      suppressed: [],
     },
     posted: {
       verdict: "would request changes",
       coverage: {
         reviewers_ran: ["diff-bugs"],
         reviewers_failed: [],
+        reviewers_skipped: [],
+        reviewers_without_bash: [],
+        sensitive_without_hunks: [],
         findings_dropped_by_failed_verifier: 1,
       },
       findings: [
@@ -360,7 +369,7 @@ describe("RecordSchema", () => {
     }
   });
 
-  it("requires pr and config_hash to be null", () => {
+  it("requires pr to be null, and config_hash to be null or a hex SHA-256", () => {
     const record = makeRecord();
     expect(
       RecordSchema.safeParse({ ...record, identity: { ...record.identity, pr: 12 } }).success,
@@ -369,6 +378,121 @@ describe("RecordSchema", () => {
       RecordSchema.safeParse({ ...record, identity: { ...record.identity, config_hash: "x" } })
         .success,
     ).toBe(false);
+    expect(
+      RecordSchema.safeParse({
+        ...record,
+        identity: { ...record.identity, config_hash: "a".repeat(64) },
+      }).success,
+    ).toBe(true);
+  });
+
+  it("requires identity.config with the files, the validated values and the custom reviewers", () => {
+    const record = makeRecord();
+    const withConfig = (config: unknown) =>
+      RecordSchema.safeParse({ ...record, identity: { ...record.identity, config } }).success;
+    expect(withConfig(record.identity.config)).toBe(true);
+    expect(
+      withConfig({
+        files: [".pr-review/config.yaml"],
+        values: DEFAULT_REPO_CONFIG,
+        custom_reviewers: [{ name: "m", bash_granted: false, reason: "not trusted" }],
+      }),
+    ).toBe(true);
+    expect(withConfig(undefined)).toBe(false);
+    expect(withConfig({ files: [], custom_reviewers: [] })).toBe(false);
+    expect(
+      withConfig({
+        files: [],
+        values: { ...DEFAULT_REPO_CONFIG, colour: 1 },
+        custom_reviewers: [],
+      }),
+    ).toBe(false);
+    expect(
+      withConfig({ files: [], values: DEFAULT_REPO_CONFIG, custom_reviewers: [], hash: "x" }),
+    ).toBe(false);
+  });
+
+  it("requires the description, the history flags and the injected files", () => {
+    const record = makeRecord();
+    const withIdentity = (patch: Record<string, unknown>) =>
+      RecordSchema.safeParse({ ...record, identity: { ...record.identity, ...patch } }).success;
+    expect(withIdentity({ description: "", history: { built: false, truncated: false } })).toBe(
+      true,
+    );
+    expect(withIdentity({ injected: [] })).toBe(true);
+    expect(withIdentity({ description: undefined })).toBe(false);
+    expect(withIdentity({ history: { built: true } })).toBe(false);
+    expect(withIdentity({ history: { built: true, truncated: false, bytes: 1 } })).toBe(false);
+    expect(withIdentity({ injected: [{ path: "CLAUDE.md" }] })).toBe(false);
+    expect(withIdentity({ injected: undefined })).toBe(false);
+  });
+
+  it("requires coverage.reviewers_without_bash, each with a name and a reason", () => {
+    const record = makeRecord();
+    const withList = (list: unknown) =>
+      RecordSchema.safeParse({
+        ...record,
+        posted: {
+          ...record.posted,
+          coverage: { ...record.posted.coverage, reviewers_without_bash: list },
+        },
+      }).success;
+    expect(withList([{ name: "shell-check", reason: "not trusted" }])).toBe(true);
+    expect(withList([{ name: "shell-check" }])).toBe(false);
+    expect(withList([{ name: "shell-check", reason: "r", extra: 1 }])).toBe(false);
+    expect(withList(undefined)).toBe(false);
+  });
+
+  it("requires coverage.reviewers_skipped, with a known reason", () => {
+    const record = makeRecord();
+    const withSkipped = (skipped: unknown) =>
+      RecordSchema.safeParse({
+        ...record,
+        posted: {
+          ...record.posted,
+          coverage: { ...record.posted.coverage, reviewers_skipped: skipped },
+        },
+      }).success;
+    expect(withSkipped([{ name: "diff-bugs", reason: "disabled by config" }])).toBe(true);
+    expect(withSkipped([{ name: "diff-bugs", reason: "token ceiling", pass: 2 }])).toBe(true);
+    expect(withSkipped([{ name: "description-drift", reason: "no description" }])).toBe(true);
+    expect(withSkipped([{ name: "diff-bugs", reason: "bored" }])).toBe(false);
+    expect(withSkipped(undefined)).toBe(false);
+  });
+
+  it("requires coverage.sensitive_without_hunks, a list of paths", () => {
+    const record = makeRecord();
+    const withList = (list: unknown) =>
+      RecordSchema.safeParse({
+        ...record,
+        posted: {
+          ...record.posted,
+          coverage: { ...record.posted.coverage, sensitive_without_hunks: list },
+        },
+      }).success;
+    expect(withList([])).toBe(true);
+    expect(withList([".github/workflows/ci.yml"])).toBe(true);
+    expect(withList([1])).toBe(false);
+    expect(withList(undefined)).toBe(false);
+  });
+
+  it("requires stages.suppressed, each item with a finding, a reviewer and a rule", () => {
+    const record = makeRecord();
+    const withList = (list: unknown) =>
+      RecordSchema.safeParse({ ...record, stages: { ...record.stages, suppressed: list } }).success;
+    const rule = { category: "convention", path: "docs/**", reason: "drafts" };
+    expect(withList([{ finding, reviewer: "conventions", rule }])).toBe(true);
+    expect(
+      withList([{ finding, reviewer: "conventions", rule: { reviewer: "a", reason: "r" } }]),
+    ).toBe(true);
+    expect(withList([{ finding, reviewer: "conventions" }])).toBe(false);
+    expect(withList([{ reviewer: "conventions", rule }])).toBe(false);
+    expect(withList([{ finding, reviewer: "conventions", rule: { reviewer: "a" } }])).toBe(false);
+    expect(withList([{ finding, reviewer: "conventions", rule: { ...rule, extra: 1 } }])).toBe(
+      false,
+    );
+    expect(withList([{ finding, reviewer: "conventions", rule, extra: 1 }])).toBe(false);
+    expect(withList(undefined)).toBe(false);
   });
 
   it("requires the resolved model and effort of each selected reviewer", () => {

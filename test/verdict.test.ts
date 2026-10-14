@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
+import { DEFAULT_REPO_CONFIG } from "../src/config/repo-config.js";
 import { runReviewers, type ReviewerRun } from "../src/find/index.js";
 import type { GatherResult } from "../src/gather/index.js";
 import { mergeFindings } from "../src/merge/index.js";
@@ -53,6 +54,9 @@ const GATHERED: GatherResult = {
   sensitive: [],
   diff: DIFF,
   totalHunks: 1,
+  mergeBase: "c".repeat(40),
+  description: "",
+  history: null,
 };
 
 function finding(line: number): Finding {
@@ -134,6 +138,15 @@ describe("decideVerdict (A8)", () => {
     expect(decideVerdict({ ...base, refusals: 1 })).toBe("incomplete");
   });
 
+  it("is incomplete when the token ceiling stopped a reviewer pass (R8)", () => {
+    expect(decideVerdict({ ...base, ceilingSkips: 1 })).toBe("incomplete");
+    expect(decideVerdict({ ...base, ceilingSkips: 1, posted: [posted("blocking")] })).toBe(
+      "incomplete",
+    );
+    expect(decideVerdict({ ...base, ceilingSkips: 0 })).toBe("would approve");
+    expect(decideVerdict({ ...base, tier: "skip", ceilingSkips: 1 })).toBe("skipped");
+  });
+
   it("puts incomplete before would request changes", () => {
     expect(decideVerdict({ ...base, verifierFailures: 1, posted: [posted("blocking")] })).toBe(
       "incomplete",
@@ -167,13 +180,26 @@ describe("coverage (A8)", () => {
     expect(coverage(runs, 3)).toEqual({
       reviewers_ran: ["diff-bugs"],
       reviewers_failed: ["security", "tests"],
+      reviewers_skipped: [],
+      reviewers_without_bash: [],
+      sensitive_without_hunks: [],
       findings_dropped_by_failed_verifier: 3,
     });
     expect(coverage([], 0)).toEqual({
       reviewers_ran: [],
       reviewers_failed: [],
+      reviewers_skipped: [],
+      reviewers_without_bash: [],
+      sensitive_without_hunks: [],
       findings_dropped_by_failed_verifier: 0,
     });
+    const skipped = [{ name: "docs", reason: "disabled by config" as const }];
+    expect(coverage(runs, 0, skipped).reviewers_skipped).toEqual(skipped);
+    const withoutBash = [{ name: "shell-check", reason: "not trusted" }];
+    expect(coverage(runs, 0, [], withoutBash).reviewers_without_bash).toEqual(withoutBash);
+    expect(coverage(runs, 0, [], [], [".github/workflows/ci.yml"]).sensitive_without_hunks).toEqual(
+      [".github/workflows/ci.yml"],
+    );
   });
 
   it("counts verifier failures and refusals from the verifications", () => {
@@ -243,6 +269,7 @@ const FAILURE_KINDS: QueryFailure["kind"][] = [
 
 function def(name: string): ReviewerDefinition {
   return {
+    source: "builtin",
     path: `/x/${name}.md`,
     systemPrompt: "s",
     frontmatter: {
@@ -291,7 +318,13 @@ describe("the query failure rule: each condition and each stage outcome (A8)", (
         createFakeSdkClient(() => failed),
         OPTIONS,
         [{ def: def("diff-bugs"), trigger: "t" }],
-        { gathered: GATHERED, brief: null, cwd: head, semaphore: createSemaphore(2) },
+        {
+          gathered: GATHERED,
+          brief: null,
+          cwd: head,
+          semaphore: createSemaphore(2),
+          config: DEFAULT_REPO_CONFIG,
+        },
         () => {},
       );
       expect(runs[0]?.status).toBe("failed");

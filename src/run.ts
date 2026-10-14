@@ -2,33 +2,37 @@
 // find with verification per finding, merge, verdict, and the record.
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { withRepoGlobs } from "./config/globs.js";
 import { ROLE_DEFAULTS, ROLES, resolveModel, type Effort, type Role } from "./config/models.js";
-import { runReviewers, type ReviewerRun } from "./find/index.js";
+import { loadRepoConfig, type ConfigRole, type RepoConfig } from "./config/repo-config.js";
+import { injectedRuleFiles, runReviewers, type ReviewerRun } from "./find/index.js";
 import { diffSections } from "./gather/diff.js";
-import { gather, type GatherResult } from "./gather/index.js";
+import { gather, resolveCommit, type GatherResult } from "./gather/index.js";
 import { withHeadWorktree } from "./gather/worktree.js";
 import { mergeFindings } from "./merge/index.js";
+import { applySuppressions } from "./merge/suppress.js";
 import { writeRecord } from "./record/write.js";
 import {
+  effectiveModel,
+  effectiveThreshold,
   loadBuiltinReviewers,
-  reviewerOverrides,
   reviewerTools,
   type ReviewerDefinition,
 } from "./reviewers/loader.js";
-import { selectReviewers } from "./reviewers/select.js";
+import { selectReviewers, skipSelected } from "./reviewers/select.js";
 import type { Finding } from "./schemas/finding.js";
-import type { QueryFailure, RunRecord } from "./schemas/record.js";
+import type { QueryFailure, RunRecord, SkippedReviewer } from "./schemas/record.js";
 import type { TriageBrief } from "./schemas/triage.js";
 import type { VerifierResult } from "./schemas/verifier.js";
-import type { QueryOutcome, QueryRequest, SdkClient } from "./sdk/client.js";
+import { usageTokens, type QueryOutcome, type QueryRequest, type SdkClient } from "./sdk/client.js";
 import type { RunOptions } from "./sdk/options.js";
 import { createSemaphore } from "./semaphore.js";
 import { runTriage } from "./triage/index.js";
 import { decideTier, shouldRunTriage, type Tier } from "./triage/tier.js";
 import { coverage, decideVerdict, verificationCounts } from "./verdict.js";
 import {
-  DEFAULT_VERIFY_CONFIG,
   loadVerifierPrompt,
+  verifyConfigFor,
   verifyFinding,
   type Verification,
   type VerifierPrompt,
@@ -41,11 +45,19 @@ export interface RunInput {
   tierOverride?: Tier;
   outDir: string;
   allowApiKey: boolean;
+  /**
+   * True when the PR author has write access. With "trusted: true", a
+   * custom reviewer then gets Bash. Absent means false.
+   */
+  authorWriteAccess?: boolean;
   client?: SdkClient;
   now?: () => Date;
 }
 
-/** The default bound on SDK queries at once. Each query is its own process. */
+/**
+ * The default bound on SDK queries at once. Each query is its own process.
+ * The repo config key "concurrency" replaces it.
+ */
 export const DEFAULT_CONCURRENCY = 5;
 
 type CostEntry = RunRecord["cost"]["queries"][number];
@@ -59,12 +71,18 @@ function toolVersion(): string {
   return pkg.version ?? "0.0.0";
 }
 
-function defaultModels(): Record<Role, { model: string; effort: Effort }> {
+function isConfigRole(role: Role): role is ConfigRole {
+  return role !== "smoke";
+}
+
+/** The model, as a pinned ID, and the effort of each role, after the repo config. */
+export function roleModels(config: RepoConfig): Record<Role, { model: string; effort: Effort }> {
   const models = {} as Record<Role, { model: string; effort: Effort }>;
   for (const role of ROLES) {
+    const set = isConfigRole(role) ? config.models[role] : undefined;
     models[role] = {
-      model: resolveModel(ROLE_DEFAULTS[role].model),
-      effort: ROLE_DEFAULTS[role].effort,
+      model: resolveModel(set?.model ?? ROLE_DEFAULTS[role].model),
+      effort: set?.effort ?? ROLE_DEFAULTS[role].effort,
     };
   }
   return models;
@@ -72,25 +90,63 @@ function defaultModels(): Record<Role, { model: string; effort: Effort }> {
 
 /**
  * The record entry of each selected reviewer, with the model and effort
- * that its queries use after its frontmatter override, and the tools of
- * its frontmatter that the run did not grant.
+ * that its queries use after the repo config and the frontmatter, and the
+ * tools of its frontmatter that the run did not grant.
  */
 export function describeSelected(
   selected: { def: ReviewerDefinition; trigger: string }[],
+  config: RepoConfig,
+  authorWriteAccess = false,
 ): RunRecord["identity"]["selected_reviewers"] {
   return selected.map((s) => ({
     name: s.def.frontmatter.name,
     trigger: s.trigger,
-    ...reviewerOverrides(s.def),
-    tools_ignored: reviewerTools(s.def).ignored,
+    ...effectiveModel(s.def, config),
+    tools_ignored: reviewerTools(s.def, authorWriteAccess).ignored,
   }));
 }
 
-// Wrap the client so that each query gives one cost entry, also a query
-// that fails or throws.
-function recordingClient(inner: SdkClient, entries: CostEntry[]): SdkClient {
+// The roles whose model and effort the recording client sets from the
+// repo config. The reviewer role is not here: find sends the overrides of
+// each reviewer itself.
+const CLIENT_OVERRIDE_ROLES: ReadonlySet<Role> = new Set<Role>([
+  "triage",
+  "verifier",
+  "verifier-escalation",
+  "merge",
+]);
+
+// Add the repo config's model and effort for the role of the request.
+// An override that the request sets itself wins.
+function withRoleOverrides(req: QueryRequest, config: RepoConfig): QueryRequest {
+  if (!CLIENT_OVERRIDE_ROLES.has(req.role) || !isConfigRole(req.role)) return req;
+  const set = config.models[req.role];
+  if (!set || (set.model === undefined && set.effort === undefined)) return req;
   return {
-    async query<T>(req: QueryRequest, options: RunOptions): Promise<QueryOutcome<T>> {
+    ...req,
+    overrides: {
+      ...(set.model !== undefined ? { model: resolveModel(set.model) } : {}),
+      ...(set.effort !== undefined ? { effort: set.effort } : {}),
+      ...req.overrides,
+    },
+  };
+}
+
+// Wrap the client so that each query gives one cost entry, also a query
+// that fails or throws. The wrapper also applies the role overrides of
+// the repo config.
+// The tokens of every finished query of the run, for the token ceiling.
+type TokenCounter = { tokens: number };
+
+function recordingClient(
+  inner: SdkClient,
+  entries: CostEntry[],
+  config: RepoConfig,
+  counter: TokenCounter,
+): SdkClient {
+  return {
+    async query<T>(original: QueryRequest, options: RunOptions): Promise<QueryOutcome<T>> {
+      const req = withRoleOverrides(original, config);
       const start = performance.now();
       let outcome: QueryOutcome<T> | null = null;
       try {
@@ -99,6 +155,9 @@ function recordingClient(inner: SdkClient, entries: CostEntry[]): SdkClient {
       } finally {
         const raw = outcome?.raw ?? null;
         const subtype = raw?.subtype ?? (outcome && !outcome.ok ? outcome.failure.kind : "thrown");
+        // The count goes up before the query's promise resolves, so before
+        // its semaphore slot is free for the next query.
+        counter.tokens += usageTokens(raw?.usage);
         entries.push({
           role: req.role,
           ...(req.reviewerName !== undefined ? { reviewer: req.reviewerName } : {}),
@@ -112,6 +171,13 @@ function recordingClient(inner: SdkClient, entries: CostEntry[]): SdkClient {
       }
     },
   };
+}
+
+// The sensitive paths with no text hunk, such as a mode flip or a binary.
+// They stay in sensitive_files, and the tier does not change for them.
+function sensitiveWithoutHunks(gathered: GatherResult): string[] {
+  const hunks = new Map(gathered.changedFiles.map((f) => [f.path, f.hunks]));
+  return gathered.sensitive.filter((path) => (hunks.get(path) ?? 0) === 0);
 }
 
 // Wait for every promise, also when one rejects, then throw the first error.
@@ -196,12 +262,6 @@ export async function runReview(
   const now = input.now ?? (() => new Date());
   const startedAt = now();
   const repo = resolve(input.repo);
-  const inner = input.client ?? (await import("./sdk/client.js")).createSdkClient();
-  const queries: CostEntry[] = [];
-  const client = recordingClient(inner, queries);
-  const options: RunOptions = { allowApiKey: input.allowApiKey, env: process.env };
-  // One semaphore bounds every SDK query of the run.
-  const semaphore = createSemaphore(DEFAULT_CONCURRENCY);
   const stageMs: Record<string, number> = {};
   const timed = async <T>(stage: string, fn: () => Promise<T>): Promise<T> => {
     const start = performance.now();
@@ -212,7 +272,30 @@ export async function runReview(
     }
   };
 
-  const gathered: GatherResult = await timed("gather", () => gather(repo, input.base, input.head));
+  // The config loads from the base commit before any model call and
+  // before gather, because its globs change the exclusions. A config that
+  // does not validate throws here, so the run writes no record.
+  const baseSha = await resolveCommit(repo, input.base);
+  const loaded = await timed("config", () => loadRepoConfig(repo, baseSha));
+  const config = loaded.config;
+
+  const inner = input.client ?? (await import("./sdk/client.js")).createSdkClient();
+  const queries: CostEntry[] = [];
+  const counter: TokenCounter = { tokens: 0 };
+  const client = recordingClient(inner, queries, config, counter);
+  const authorWriteAccess = input.authorWriteAccess === true;
+  const options: RunOptions = { allowApiKey: input.allowApiKey, env: process.env };
+  // One semaphore bounds every SDK query of the run.
+  const semaphore = createSemaphore(config.concurrency);
+
+  const gathered: GatherResult = await timed("gather", () =>
+    gather(repo, baseSha, input.head, {
+      ...withRepoGlobs(config),
+      // The history block exists only for the history reviewer. The skip
+      // tier runs no reviewer, so it builds no block.
+      history: config.reviewers.history?.enabled !== false && input.tierOverride !== "skip",
+    }),
+  );
 
   // The head checkout lives for the whole review and is the cwd of every
   // query. withHeadWorktree removes it at the end, also on failure.
@@ -234,14 +317,36 @@ export async function runReview(
       triageFailed: triageFailure !== null,
     });
 
-    const selected = selectReviewers(
-      loadBuiltinReviewers(),
+    // The tier and the triggers select from the built-in and the custom
+    // reviewers. A selected reviewer that the config disables does not
+    // run, nor does the description reviewer when the description is
+    // empty. Coverage names each of them.
+    const candidates = selectReviewers(
+      [...loadBuiltinReviewers(), ...loaded.customReviewers],
       decision.tier,
       gathered.changedFiles.map((f) => f.path),
       brief?.categories ?? [],
     );
+    const { run: selected, skipped } = skipSelected(candidates, {
+      config,
+      description: gathered.description,
+    });
+    // A selected custom reviewer whose tools name Bash, and that does not
+    // get it, runs with read-only tools. Coverage names it with the reason.
+    const withoutBash = selected.flatMap(({ def }) => {
+      const reason = reviewerTools(def, authorWriteAccess).bashReason;
+      return reason === null ? [] : [{ name: def.frontmatter.name, reason }];
+    });
+    // No new reviewer pass starts once the tokens of the finished queries
+    // reach the ceiling. Verification of returned findings still runs.
+    const ceiling = config.token_ceiling;
+    const canStartPass = (): boolean => ceiling === null || counter.tokens < ceiling;
+    const ceilingSkipped: SkippedReviewer[] = [];
+    // The rules block of every reviewer holds the base commit's CLAUDE.md
+    // and rules.md, which the config loader already read.
+    const rules = { claudeMd: loaded.claudeMd, rulesMd: loaded.rulesMd };
     const thresholds = new Map(
-      selected.map((s) => [s.def.frontmatter.name, s.def.frontmatter.threshold]),
+      selected.map((s) => [s.def.frontmatter.name, effectiveThreshold(s.def, config)]),
     );
 
     // The run splits the diff per file once. Find and verify use the map.
@@ -253,11 +358,14 @@ export async function runReview(
     // Each finding goes to its verifier as soon as its reviewer pass
     // returns. Merge is the only barrier.
     const pending: Promise<VerificationEntry>[] = [];
+    // The reviewer name of each verification, in the order of "pending".
+    // Suppressions match it, and the verification entry does not hold it.
+    const reviewerNames: string[] = [];
     const onFinding = (finding: Finding, reviewer: string): void => {
-      const config = {
-        ...DEFAULT_VERIFY_CONFIG,
-        threshold: thresholds.get(reviewer) ?? DEFAULT_VERIFY_CONFIG.threshold,
-      };
+      const verifyConfig = verifyConfigFor(
+        thresholds.get(reviewer) ?? config.thresholds.default,
+        config,
+      );
       // The rejection handler is attached here, when the promise is made.
       // Other reviewer passes can run for a long time before the run waits
       // for this promise, and a rejection with no handler stops the
@@ -271,7 +379,8 @@ export async function runReview(
             sections,
             prompt: verifierPrompt,
             semaphore,
-            config,
+            config: verifyConfig,
+            description: gathered.description,
           });
         })
         .then(
@@ -284,6 +393,7 @@ export async function runReview(
           }),
         );
       pending.push(verification);
+      reviewerNames.push(reviewer);
     };
     const { runs, verifications } = await timed("find_verify", async () => {
       let found: ReviewerRun[];
@@ -292,7 +402,20 @@ export async function runReview(
           client,
           options,
           selected,
-          { gathered, brief, cwd, semaphore, sections },
+          {
+            gathered,
+            brief,
+            cwd,
+            semaphore,
+            sections,
+            config,
+            rules,
+            tier: decision.tier,
+            authorWriteAccess,
+            canStartPass,
+            onPassSkipped: (name, pass) =>
+              ceilingSkipped.push({ name, reason: "token ceiling", pass }),
+          },
           onFinding,
         );
       } catch (err) {
@@ -303,11 +426,23 @@ export async function runReview(
       return { runs: found, verifications: await settleAll(pending) };
     });
 
-    const verified = verifications.flatMap((v) =>
-      v.passed && v.final ? [{ finding: v.finding, result: v.final }] : [],
+    // A suppression removes a verified finding before the merge groups
+    // form. The record keeps the removed finding with its rule.
+    const { kept: verified, suppressed } = applySuppressions(
+      verifications.flatMap((v, i) =>
+        v.passed && v.final
+          ? [{ finding: v.finding, result: v.final, reviewer: reviewerNames[i] ?? "" }]
+          : [],
+      ),
+      config.suppressions,
     );
     const merged = await timed("merge", () =>
-      mergeFindings(client, options, verified, { cwd, totalHunks: gathered.totalHunks, semaphore }),
+      mergeFindings(client, options, verified, {
+        cwd,
+        totalHunks: gathered.totalHunks,
+        semaphore,
+        caps: config.caps,
+      }),
     );
 
     // A failed or refused verifier call, first or escalation, drops its
@@ -320,7 +455,16 @@ export async function runReview(
       verifierFailures: counts.failedVerifierCalls + counts.rejectedResults,
       refusals: counts.refusals,
       posted: merged.posted,
+      ceilingSkips: ceilingSkipped.length,
     });
+    // The ceiling skips come in the order the passes reached their slots,
+    // so they are sorted for a stable record.
+    const allSkipped = [
+      ...skipped,
+      ...[...ceilingSkipped].sort(
+        (a, b) => a.name.localeCompare(b.name) || (a.pass ?? 0) - (b.pass ?? 0),
+      ),
+    ];
 
     return {
       identity: {
@@ -330,25 +474,54 @@ export async function runReview(
         head: gathered.head,
         started_at: startedAt.toISOString(),
         tool_version: toolVersion(),
-        config_hash: null,
+        config_hash: loaded.hash,
+        config: {
+          files: loaded.files,
+          values: config,
+          custom_reviewers: loaded.customReviewers.map((def) => {
+            const tools = reviewerTools(def, authorWriteAccess);
+            return {
+              name: def.frontmatter.name,
+              bash_granted: tools.bashGranted,
+              reason: tools.bashReason,
+            };
+          }),
+        },
+        description: gathered.description,
+        history: {
+          built: gathered.history !== null,
+          truncated: gathered.history?.truncated ?? false,
+        },
+        // A skip run starts no reviewer, so it injects no file.
+        injected:
+          selected.length > 0
+            ? injectedRuleFiles(rules).map((f) => ({ path: f.path, truncated: f.truncated }))
+            : [],
         changed_files: gathered.changedFiles,
         excluded_files: gathered.excluded,
         sensitive_files: gathered.sensitive,
         triage: brief,
         tier: decision.tier,
         tier_reason: decision.reason,
-        selected_reviewers: describeSelected(selected),
-        models: defaultModels(),
+        selected_reviewers: describeSelected(selected, config, authorWriteAccess),
+        models: roleModels(config),
       },
       stages: {
         reviewers: runs,
         verifications,
         merges: merged.merges,
         capped: merged.capped,
+        suppressed: suppressed.map(({ finding, reviewer, rule }) => ({ finding, reviewer, rule })),
       },
       posted: {
         verdict,
-        coverage: coverage(runs, counts.droppedByFailedVerifier),
+        coverage: coverage(
+          runs,
+          counts.droppedByFailedVerifier,
+          allSkipped,
+          withoutBash,
+          sensitiveWithoutHunks(gathered),
+        ),
         findings: merged.posted,
       },
       cost: {
@@ -356,7 +529,14 @@ export async function runReview(
         total_cost_usd: totalCost(queries),
         queries_without_cost: queries.filter((q) => q.cost_usd === null).length,
         stage_ms: stageMs,
-        errors: collectErrors(triageFailure, runs, verifications, merged.merges),
+        errors: [
+          // Config and gather run first, so their errors come first.
+          ...loaded.warnings.map((message) => ({ stage: "config", message })),
+          ...(gathered.historyError
+            ? [{ stage: "gather", message: `history: ${gathered.historyError}` }]
+            : []),
+          ...collectErrors(triageFailure, runs, verifications, merged.merges),
+        ],
       },
     };
   });

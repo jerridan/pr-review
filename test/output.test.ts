@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_REPO_CONFIG } from "../src/config/repo-config.js";
 import { formatJson } from "../src/output/json.js";
 import { formatTable } from "../src/output/table.js";
 import type { Finding, Severity } from "../src/schemas/finding.js";
@@ -60,6 +61,10 @@ function record(
       started_at: "2026-10-13T12:00:00.000Z",
       tool_version: "0.1.0",
       config_hash: null,
+      config: { files: [], values: DEFAULT_REPO_CONFIG, custom_reviewers: [] },
+      description: "Fix the loop bound.",
+      history: { built: true, truncated: false },
+      injected: [{ path: "CLAUDE.md", truncated: false }],
       changed_files: [{ path: "src/stats.ts", hunks: 1 }],
       excluded_files: excluded,
       sensitive_files: [],
@@ -84,7 +89,7 @@ function record(
         smoke: { model: "claude-sonnet-5-5", effort: "low" },
       },
     },
-    stages: { reviewers: [], verifications: [], merges: [], capped: [] },
+    stages: { reviewers: [], verifications: [], merges: [], capped: [], suppressed: [] },
     posted: {
       verdict: findings.some((f) => f.severity === "blocking")
         ? "would request changes"
@@ -92,6 +97,9 @@ function record(
       coverage: {
         reviewers_ran: ["diff-bugs"],
         reviewers_failed: [],
+        reviewers_skipped: [],
+        reviewers_without_bash: [],
+        sensitive_without_hunks: [],
         findings_dropped_by_failed_verifier: 0,
       },
       findings,
@@ -135,6 +143,9 @@ describe("table output (A10)", () => {
       coverage: {
         reviewers_ran: [],
         reviewers_failed: ["diff-bugs"],
+        reviewers_skipped: [],
+        reviewers_without_bash: [],
+        sensitive_without_hunks: [],
         findings_dropped_by_failed_verifier: 2,
       },
     });
@@ -163,6 +174,28 @@ describe("table output (A10)", () => {
     expect(text).toContain("src/stats.ts:11");
     expect(text).toContain("src/format.ts:3-7");
     expect(text).not.toContain("overflow");
+  });
+
+  it("shows the skipped reviewers, the reviewers without Bash and the sensitive paths without hunks", () => {
+    const r = record([]);
+    const coverage = {
+      ...r.posted.coverage,
+      reviewers_skipped: [
+        { name: "diff-bugs", reason: "disabled by config" as const },
+        { name: "security", reason: "token ceiling" as const, pass: 2 },
+      ],
+      reviewers_without_bash: [{ name: "shell-check", reason: "not trusted" }],
+      sensitive_without_hunks: [".github/workflows/ci.yml"],
+    };
+    const text = formatTable({ ...r, posted: { ...r.posted, coverage } });
+    expect(text).toContain(
+      "reviewers skipped: diff-bugs (disabled by config), security (token ceiling, pass 2)",
+    );
+    expect(text).toContain("reviewers without Bash: shell-check (not trusted)");
+    expect(text).toContain("sensitive paths without hunks: .github/workflows/ci.yml");
+    expect(formatTable(r)).toContain(
+      "reviewers skipped: none; reviewers without Bash: none; sensitive paths without hunks: none;",
+    );
   });
 
   it("shows each excluded file with its reason", () => {
@@ -195,6 +228,45 @@ describe("json output", () => {
     );
     expect(unknown.total_cost_usd).toBeNull();
     expect(unknown.queries_without_cost).toBe(3);
+  });
+
+  it("holds the skipped reviewers in its coverage", () => {
+    const r = record([]);
+    const skipped = [{ name: "diff-bugs", reason: "disabled by config" as const }];
+    const doc = JSON.parse(
+      formatJson(
+        {
+          ...r,
+          posted: { ...r.posted, coverage: { ...r.posted.coverage, reviewers_skipped: skipped } },
+        },
+        "/out/r.json",
+      ),
+    );
+    expect(doc.coverage.reviewers_skipped).toEqual(skipped);
+  });
+
+  it("holds the custom reviewers that ran without Bash in its coverage", () => {
+    const r = record([]);
+    const withoutBash = [{ name: "shell-check", reason: "not trusted" }];
+    const coverage = { ...r.posted.coverage, reviewers_without_bash: withoutBash };
+    const doc = JSON.parse(formatJson({ ...r, posted: { ...r.posted, coverage } }, "/out/r.json"));
+    expect(doc.coverage.reviewers_without_bash).toEqual(withoutBash);
+  });
+
+  it("holds the sensitive paths without hunks in its coverage", () => {
+    const r = record([]);
+    const paths = ["bin/run", "assets/key.bin"];
+    const coverage = { ...r.posted.coverage, sensitive_without_hunks: paths };
+    const doc = JSON.parse(formatJson({ ...r, posted: { ...r.posted, coverage } }, "/out/r.json"));
+    expect(doc.coverage.sensitive_without_hunks).toEqual(paths);
+    expect(Object.keys(doc.coverage).sort()).toEqual([
+      "findings_dropped_by_failed_verifier",
+      "reviewers_failed",
+      "reviewers_ran",
+      "reviewers_skipped",
+      "reviewers_without_bash",
+      "sensitive_without_hunks",
+    ]);
   });
 
   it("holds the excluded files with their reasons", () => {

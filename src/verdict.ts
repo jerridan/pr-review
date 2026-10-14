@@ -1,6 +1,6 @@
 // The verdict and the coverage line of a run.
 import type { ReviewerRun } from "./find/index.js";
-import type { PostedFinding, QueryFailure, RunRecord } from "./schemas/record.js";
+import type { PostedFinding, QueryFailure, RunRecord, SkippedReviewer } from "./schemas/record.js";
 import type { VerifierResult } from "./schemas/verifier.js";
 import type { Tier } from "./triage/tier.js";
 import type { Verification } from "./verify/index.js";
@@ -8,9 +8,11 @@ import type { Verification } from "./verify/index.js";
 /**
  * The first rule that matches sets the verdict: skipped for the skip
  * tier; incomplete when a reviewer failed, a verifier call failed, code
- * rejected a verifier result, or a reviewer or verifier call was refused;
- * would request changes with a blocking finding; else would approve.
+ * rejected a verifier result, a reviewer or verifier call was refused, or
+ * a reviewer pass did not start because of the token ceiling; would
+ * request changes with a blocking finding; else would approve.
  * "verifierFailures" counts the failed calls and the rejected results.
+ * "ceilingSkips" counts the passes that the token ceiling stopped.
  */
 export function decideVerdict(input: {
   tier: Tier;
@@ -18,10 +20,14 @@ export function decideVerdict(input: {
   verifierFailures: number;
   refusals: number;
   posted: PostedFinding[];
+  ceilingSkips?: number;
 }): RunRecord["posted"]["verdict"] {
   if (input.tier === "skip") return "skipped";
   const reviewerFailed = input.reviewerRuns.some((run) => run.status === "failed");
-  if (reviewerFailed || input.verifierFailures > 0 || input.refusals > 0) return "incomplete";
+  const ceilingHit = (input.ceilingSkips ?? 0) > 0;
+  if (reviewerFailed || input.verifierFailures > 0 || input.refusals > 0 || ceilingHit) {
+    return "incomplete";
+  }
   if (input.posted.some((p) => p.severity === "blocking")) return "would request changes";
   return "would approve";
 }
@@ -32,18 +38,26 @@ function uniqueNames(runs: ReviewerRun[]): string[] {
 
 /**
  * The reviewers that ran with no failed pass, the reviewers with a failed
- * pass, and the findings dropped because their verifier call failed or
- * because code rejected their verifier result.
+ * pass, the selected reviewers or passes that did not run, the custom
+ * reviewers that ran without the Bash they asked for, the sensitive paths
+ * with no text hunk, and the findings dropped because their verifier call
+ * failed or because code rejected their verifier result.
  */
 export function coverage(
   reviewerRuns: ReviewerRun[],
   verifierFailures: number,
+  skipped: SkippedReviewer[] = [],
+  withoutBash: { name: string; reason: string }[] = [],
+  sensitiveWithoutHunks: string[] = [],
 ): RunRecord["posted"]["coverage"] {
   const failed = new Set(reviewerRuns.filter((r) => r.status === "failed").map((r) => r.name));
   const names = uniqueNames(reviewerRuns);
   return {
     reviewers_ran: names.filter((name) => !failed.has(name)),
     reviewers_failed: names.filter((name) => failed.has(name)),
+    reviewers_skipped: skipped,
+    reviewers_without_bash: withoutBash,
+    sensitive_without_hunks: sensitiveWithoutHunks,
     findings_dropped_by_failed_verifier: verifierFailures,
   };
 }

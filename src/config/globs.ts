@@ -30,6 +30,25 @@ export const SENSITIVE_GLOBS: readonly string[] = [
   "**/*.tf",
 ];
 
+/** The sensitive and generated globs that gather uses. */
+export type GatherGlobs = { sensitive: readonly string[]; generated: readonly string[] };
+
+export const DEFAULT_GLOBS: GatherGlobs = {
+  sensitive: SENSITIVE_GLOBS,
+  generated: GENERATED_GLOBS,
+};
+
+/** The default globs with the globs of a repo config added after them. */
+export function withRepoGlobs(extra: {
+  sensitive_globs: readonly string[];
+  generated_globs: readonly string[];
+}): GatherGlobs {
+  return {
+    sensitive: [...SENSITIVE_GLOBS, ...extra.sensitive_globs],
+    generated: [...GENERATED_GLOBS, ...extra.generated_globs],
+  };
+}
+
 // "dot: true" lets "*" and "**" match names that start with a dot, so a
 // path such as ".config/auth/x" is not missed.
 const matcherCache = new Map<string, (path: string) => boolean>();

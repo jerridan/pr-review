@@ -2,22 +2,30 @@
 // sets its model, effort and triggers, and the body is its system prompt.
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import type { RepoConfig } from "../config/repo-config.js";
 import { resolveModel, type Effort } from "../config/models.js";
 import { parseFrontmatter, promptPath } from "../prompts/load.js";
 import { narrowReadOnlyTools } from "../sdk/options.js";
 import { ReviewerFrontmatterSchema, type ReviewerFrontmatter } from "../schemas/reviewer.js";
+import type { Tier } from "../triage/tier.js";
 
 export interface ReviewerDefinition {
   frontmatter: ReviewerFrontmatter;
   systemPrompt: string;
+  /**
+   * The file of the reviewer: an absolute path for a built-in reviewer,
+   * and a repo-relative path in the base commit for a custom reviewer.
+   */
   path: string;
+  /** "builtin" for a file under prompts/reviewers, "custom" for one under .pr-review/reviewers. */
+  source: "builtin" | "custom";
 }
 
-type Issue = { path: (string | number)[]; message: string };
+export type Issue = { path: (string | number)[]; message: string };
 
 export class ReviewerLoadError extends Error {
   path: string;
-  issues: unknown[];
+  issues: Issue[];
 
   constructor(path: string, issues: Issue[]) {
     const lines = issues.map(
@@ -35,7 +43,10 @@ function messageOf(err: unknown): string {
 }
 
 /** Load and check one reviewer file. Throw ReviewerLoadError on a bad file. */
-export function loadReviewer(path: string): ReviewerDefinition {
+export function loadReviewer(
+  path: string,
+  source: ReviewerDefinition["source"] = "builtin",
+): ReviewerDefinition {
   let text: string;
   try {
     text = readFileSync(path, "utf8");
@@ -44,7 +55,18 @@ export function loadReviewer(path: string): ReviewerDefinition {
       { path: [], message: `cannot read the file: ${messageOf(err)}` },
     ]);
   }
+  return parseReviewer(text, path, source);
+}
 
+/**
+ * Check the text of one reviewer file. "path" names the file in errors.
+ * Throw ReviewerLoadError on a bad file.
+ */
+export function parseReviewer(
+  text: string,
+  path: string,
+  source: ReviewerDefinition["source"],
+): ReviewerDefinition {
   let parsed: { frontmatter: Record<string, unknown>; body: string };
   try {
     parsed = parseFrontmatter(text);
@@ -80,7 +102,7 @@ export function loadReviewer(path: string): ReviewerDefinition {
   }
   if (issues.length > 0) throw new ReviewerLoadError(path, issues);
 
-  return { frontmatter: result.data, systemPrompt, path };
+  return { frontmatter: result.data, systemPrompt, path, source };
 }
 
 /** Load every reviewer under prompts/reviewers, in name order of the files. */
@@ -89,7 +111,7 @@ export function loadBuiltinReviewers(): ReviewerDefinition[] {
   const files = readdirSync(dir)
     .filter((name) => name.endsWith(".md"))
     .sort();
-  const defs = files.map((name) => loadReviewer(join(dir, name)));
+  const defs = files.map((name) => loadReviewer(join(dir, name), "builtin"));
   const seen = new Map<string, string>();
   for (const def of defs) {
     const first = seen.get(def.frontmatter.name);
@@ -103,19 +125,84 @@ export function loadBuiltinReviewers(): ReviewerDefinition[] {
   return defs;
 }
 
-/**
- * The query overrides for a reviewer: its model as a pinned ID, and its
- * effort. They apply to the queries of this reviewer only.
- */
-export function reviewerOverrides(def: ReviewerDefinition): { model: string; effort: Effort } {
-  return { model: resolveModel(def.frontmatter.model), effort: def.frontmatter.effort };
-}
+/** The one tool beyond the read-only set that a reviewer can get. */
+export const BASH_TOOL = "Bash";
 
 /**
  * The tools of a reviewer: the read-only tools that its frontmatter names,
- * and the names that are not read-only tools. The query never gets an
- * ignored tool. The "trusted" field is parsed but not used in D1.
+ * Bash when the run grants it, and the names that the query does not get.
+ * The run grants Bash only to a custom reviewer whose tools name Bash, that
+ * sets "trusted: true", and whose PR author has write access. A built-in
+ * reviewer never gets Bash. "bashReason" tells why a custom reviewer that
+ * names Bash did not get it, and is null in every other case.
  */
-export function reviewerTools(def: ReviewerDefinition): { granted: string[]; ignored: string[] } {
-  return narrowReadOnlyTools(def.frontmatter.tools);
+export function reviewerTools(
+  def: ReviewerDefinition,
+  authorWriteAccess: boolean,
+): { granted: string[]; ignored: string[]; bashGranted: boolean; bashReason: string | null } {
+  const { granted, ignored } = narrowReadOnlyTools(def.frontmatter.tools);
+  const isBash = (tool: string) => tool.trim().toLowerCase() === BASH_TOOL.toLowerCase();
+  if (def.source !== "custom" || !def.frontmatter.tools.some(isBash)) {
+    return { granted, ignored, bashGranted: false, bashReason: null };
+  }
+  const reasons: string[] = [];
+  if (def.frontmatter.trusted !== true) reasons.push("not trusted");
+  if (!authorWriteAccess) reasons.push("author has no write access");
+  if (reasons.length > 0) {
+    return { granted, ignored, bashGranted: false, bashReason: reasons.join(" and ") };
+  }
+  return {
+    granted: [...granted, BASH_TOOL],
+    ignored: ignored.filter((tool) => !isBash(tool)),
+    bashGranted: true,
+    bashReason: null,
+  };
+}
+
+/**
+ * The reviewers.<name> entry of the config, or undefined when the config
+ * has none. Only own keys count, so a name such as "constructor" does not
+ * read a property of the object prototype.
+ */
+export function reviewerEntry(
+  config: RepoConfig,
+  name: string,
+): RepoConfig["reviewers"][string] | undefined {
+  return Object.hasOwn(config.reviewers, name) ? config.reviewers[name] : undefined;
+}
+
+/**
+ * The threshold of a reviewer: reviewers.<name>.threshold when the config
+ * sets it, else the higher of the frontmatter value and thresholds.default.
+ */
+export function effectiveThreshold(def: ReviewerDefinition, config: RepoConfig): number {
+  const set = reviewerEntry(config, def.frontmatter.name)?.threshold;
+  if (set !== undefined) return set;
+  return Math.max(def.frontmatter.threshold, config.thresholds.default);
+}
+
+/**
+ * The model, as a pinned ID, and the effort of a reviewer's queries. Each
+ * comes from reviewers.<name> when set, then models.reviewer when set,
+ * then the frontmatter.
+ */
+export function effectiveModel(
+  def: ReviewerDefinition,
+  config: RepoConfig,
+): { model: string; effort: Effort } {
+  const own = reviewerEntry(config, def.frontmatter.name);
+  const role = config.models.reviewer;
+  return {
+    model: resolveModel(own?.model ?? role?.model ?? def.frontmatter.model),
+    effort: own?.effort ?? role?.effort ?? def.frontmatter.effort,
+  };
+}
+
+/**
+ * The number of passes of a reviewer: 1 at the fast tier, else
+ * reviewers.<name>.passes when set, else the frontmatter value.
+ */
+export function effectivePasses(def: ReviewerDefinition, config: RepoConfig, tier: Tier): number {
+  if (tier === "fast") return 1;
+  return reviewerEntry(config, def.frontmatter.name)?.passes ?? def.frontmatter.passes;
 }

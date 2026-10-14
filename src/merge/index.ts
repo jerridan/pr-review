@@ -10,7 +10,7 @@ import type { SdkClient } from "../sdk/client.js";
 import type { RunOptions } from "../sdk/options.js";
 import type { Semaphore } from "../semaphore.js";
 import { wrapUntrusted } from "../untrusted.js";
-import { applyCap, nonBlockingCap } from "./cap.js";
+import { applyCap, nonBlockingCap, type CapConfig } from "./cap.js";
 import { fingerprint } from "./fingerprint.js";
 
 type Verified = { finding: Finding; result: VerifierResult };
@@ -111,7 +111,7 @@ export async function mergeFindings(
   client: SdkClient,
   options: RunOptions,
   verified: Verified[],
-  ctx: { cwd: string; totalHunks: number; semaphore: Semaphore },
+  ctx: { cwd: string; totalHunks: number; semaphore: Semaphore; caps?: CapConfig },
 ): Promise<{
   posted: PostedFinding[];
   capped: PostedFinding[];
@@ -205,7 +205,7 @@ export async function mergeFindings(
   const merges = results.flatMap((r) => (r.record ? [r.record] : []));
   const { posted, capped } = applyCap(
     rank(results.flatMap((r) => r.posted)),
-    nonBlockingCap(ctx.totalHunks),
+    nonBlockingCap(ctx.totalHunks, ctx.caps),
   );
   return { posted, capped, merges };
 }

@@ -2,9 +2,11 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { applyCap, nonBlockingCap } from "../src/merge/cap.js";
+import { DEFAULT_REPO_CONFIG, type Suppression } from "../src/config/repo-config.js";
+import { applyCap, DEFAULT_CAPS, nonBlockingCap } from "../src/merge/cap.js";
 import { fingerprint } from "../src/merge/fingerprint.js";
 import { groupFindings, mergeFindings } from "../src/merge/index.js";
+import { applySuppressions } from "../src/merge/suppress.js";
 import { loadPrompt } from "../src/prompts/load.js";
 import type { Finding, Severity } from "../src/schemas/finding.js";
 import type { MergeOutput } from "../src/schemas/merge.js";
@@ -379,6 +381,17 @@ describe("mergeFindings (A7)", () => {
     ]);
     expect(out.capped.map((p) => p.severity)).toEqual(["nit", "nit"]);
   });
+
+  it("uses the caps that the run gives", async () => {
+    const verified = Array.from({ length: 4 }, (_, i) => ({
+      finding: finding(i * 2 + 1, i * 2 + 1),
+      result: result(90 - i, "nit" as const),
+    }));
+    const caps = { non_blocking_base: 0, non_blocking_per_hunks: 4, non_blocking_max: 20 };
+    const out = await mergeFindings(noMergeClient(), OPTIONS, verified, { ...ctx(1), caps });
+    expect(out.posted).toHaveLength(1);
+    expect(out.capped).toHaveLength(3);
+  });
 });
 
 describe("cap", () => {
@@ -391,6 +404,17 @@ describe("cap", () => {
     expect(nonBlockingCap(68)).toBe(20);
     expect(nonBlockingCap(69)).toBe(20);
     expect(nonBlockingCap(10_000)).toBe(20);
+  });
+
+  it("takes the base, the hunks per step and the maximum from the repo config", () => {
+    expect(nonBlockingCap(0, DEFAULT_CAPS)).toBe(3);
+    expect(DEFAULT_CAPS).toEqual(DEFAULT_REPO_CONFIG.caps);
+    const caps = { non_blocking_base: 1, non_blocking_per_hunks: 2, non_blocking_max: 5 };
+    expect(nonBlockingCap(0, caps)).toBe(1);
+    expect(nonBlockingCap(1, caps)).toBe(2);
+    expect(nonBlockingCap(4, caps)).toBe(3);
+    expect(nonBlockingCap(100, caps)).toBe(5);
+    expect(nonBlockingCap(3, { ...caps, non_blocking_base: 0 })).toBe(2);
   });
 
   function posted(severity: Severity, score: number, n: number): PostedFinding {
@@ -429,5 +453,59 @@ describe("cap", () => {
     expect(applyCap(items, 5).capped).toEqual([]);
     expect(applyCap(items, 4).capped.map((p) => p.start_line)).toEqual([5]);
     expect(applyCap(items, 0).posted).toEqual([]);
+  });
+});
+
+describe("applySuppressions (R3)", () => {
+  const item = (reviewer: string, overrides: Partial<Finding> = {}) => ({
+    reviewer,
+    finding: finding(5, 5, overrides),
+  });
+  const items = [
+    item("diff-bugs"),
+    item("security", { category: "security" }),
+    item("conventions", { category: "convention", file: "docs/guide.md" }),
+    item("tests", { category: "test", file: "test/a.test.ts" }),
+  ];
+
+  it("keeps every finding when there are no rules", () => {
+    expect(applySuppressions(items, [])).toEqual({ kept: items, suppressed: [] });
+  });
+
+  it("matches the reviewer name alone", () => {
+    const rule: Suppression = { reviewer: "security", reason: "owned elsewhere" };
+    const out = applySuppressions(items, [rule]);
+    expect(out.kept.map((i) => i.reviewer)).toEqual(["diff-bugs", "conventions", "tests"]);
+    expect(out.suppressed).toEqual([{ ...items[1], rule }]);
+  });
+
+  it("matches the category alone", () => {
+    const rule: Suppression = { category: "convention", reason: "the linter owns it" };
+    const out = applySuppressions(items, [rule]);
+    expect(out.suppressed.map((i) => i.reviewer)).toEqual(["conventions"]);
+    expect(out.kept).toHaveLength(3);
+  });
+
+  it("matches the path as a glob against the file of the finding", () => {
+    const rule: Suppression = { path: "docs/**", reason: "drafts" };
+    const out = applySuppressions(items, [rule]);
+    expect(out.suppressed.map((i) => i.finding.file)).toEqual(["docs/guide.md"]);
+    const star: Suppression = { path: "**/*.test.ts", reason: "tests" };
+    expect(applySuppressions(items, [star]).suppressed.map((i) => i.reviewer)).toEqual(["tests"]);
+  });
+
+  it("needs every key that the rule gives", () => {
+    const rule: Suppression = { reviewer: "diff-bugs", category: "security", reason: "r" };
+    expect(applySuppressions(items, [rule])).toEqual({ kept: items, suppressed: [] });
+    const both: Suppression = { reviewer: "security", category: "security", reason: "r" };
+    expect(applySuppressions(items, [both]).suppressed).toEqual([{ ...items[1], rule: both }]);
+  });
+
+  it("uses the first rule that matches, and keeps the order of the findings", () => {
+    const first: Suppression = { category: "security", reason: "first" };
+    const second: Suppression = { reviewer: "security", reason: "second" };
+    const out = applySuppressions(items, [first, second]);
+    expect(out.suppressed).toEqual([{ ...items[1], rule: first }]);
+    expect(out.kept).toEqual([items[0], items[2], items[3]]);
   });
 });

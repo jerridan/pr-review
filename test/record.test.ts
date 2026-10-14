@@ -1,12 +1,23 @@
 import { execFile } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { DEFAULT_REPO_CONFIG } from "../src/config/repo-config.js";
 import { formatJson } from "../src/output/json.js";
 import { recordFileName, writeRecord } from "../src/record/write.js";
+import { loadBuiltinReviewers } from "../src/reviewers/loader.js";
 import { runReview } from "../src/run.js";
 import type { Finding } from "../src/schemas/finding.js";
 import { RecordSchema, type RunRecord } from "../src/schemas/record.js";
@@ -19,8 +30,8 @@ const SCRIPT = fileURLToPath(new URL("../scripts/make-fixture.sh", import.meta.u
 
 type Fixture = { repo: string; base: string; head: string; file: string; line: number };
 
-async function makeFixture(): Promise<Fixture> {
-  const { stdout } = await run("bash", [SCRIPT]);
+async function makeFixture(...options: string[]): Promise<Fixture> {
+  const { stdout } = await run("bash", [SCRIPT, ...options]);
   const value = (key: string) =>
     stdout
       .split("\n")
@@ -75,6 +86,17 @@ function plantedFinding(fx: Fixture, overrides: Partial<Finding> = {}): Finding 
   };
 }
 
+// The seven built-in reviewers, in file name order.
+const SEVEN = [
+  "conventions",
+  "description-drift",
+  "diff-bugs",
+  "docs-and-comments",
+  "history",
+  "security",
+  "tests",
+];
+
 let fx: Fixture;
 let outRoot: string;
 let record: RunRecord;
@@ -100,14 +122,18 @@ beforeAll(async () => {
         raw: meta(0.02),
       };
     }
+    // Only diff-bugs reports findings. The other reviewers report none.
     if (req.role === "reviewer") {
       return {
         ok: true,
         output: {
-          findings: [
-            plantedFinding(fx),
-            plantedFinding(fx, { evidence: "this text is not in the file" }),
-          ],
+          findings:
+            req.reviewerName === "diff-bugs"
+              ? [
+                  plantedFinding(fx),
+                  plantedFinding(fx, { evidence: "this text is not in the file" }),
+                ]
+              : [],
         },
         raw: meta(0.5),
       };
@@ -176,6 +202,206 @@ describe("the record file (A9)", () => {
     expect(record.identity.pr).toBeNull();
     expect(record.identity.config_hash).toBeNull();
   });
+
+  it("holds the description, the history flags and no injected file (R9)", () => {
+    expect(record.identity.description).toBe(
+      "Head: add average, move format helpers, bump lockfile, add CI",
+    );
+    expect(record.identity.history).toEqual({ built: true, truncated: false });
+    expect(record.identity.injected).toEqual([]);
+    // Each reviewer got its body alone, with no rules block.
+    const bodies = new Map(loadBuiltinReviewers().map((d) => [d.frontmatter.name, d.systemPrompt]));
+    const reviewers = calls.filter((c) => c.role === "reviewer");
+    expect(reviewers.length).toBeGreaterThan(0);
+    for (const call of reviewers) {
+      expect(call.systemPrompt).toBe(bodies.get(call.reviewerName ?? ""));
+    }
+  });
+
+  it("holds the default config, no loaded files and no custom reviewers", () => {
+    expect(record.identity.config).toEqual({
+      files: [],
+      values: DEFAULT_REPO_CONFIG,
+      custom_reviewers: [],
+    });
+  });
+});
+
+/** The config hash by spec R4, computed here apart from the code. */
+function r4Hash(files: Record<string, string>): string {
+  const paths = Object.keys(files).sort((a, b) => Buffer.compare(Buffer.from(a), Buffer.from(b)));
+  const joined = paths.map((p) => `${p}\n${files[p]}`).join("\0");
+  return createHash("sha256").update(Buffer.from(joined, "utf8")).digest("hex");
+}
+
+describe("the config hash of a fixture with config (R4)", () => {
+  const files: Record<string, string> = {
+    ".pr-review/config.yaml": "thresholds:\n  default: 82\nconcurrency: 2\n",
+    ".pr-review/rules.md": "Name each test after its behaviour.\n",
+  };
+  let configFx: Fixture;
+  let configRecord: RunRecord;
+  let configPath: string;
+
+  beforeAll(async () => {
+    const source = mkdtempSync(join(tmpdir(), "pr-review-record-config-"));
+    mkdirSync(join(source, "dir"));
+    writeFileSync(join(source, "dir", "config.yaml"), files[".pr-review/config.yaml"] ?? "");
+    writeFileSync(join(source, "dir", "rules.md"), files[".pr-review/rules.md"] ?? "");
+    writeFileSync(join(source, "claude.md"), "Not part of the hash.\n");
+    try {
+      configFx = await makeFixture(
+        "--pr-review-dir",
+        join(source, "dir"),
+        "--claude-md",
+        join(source, "claude.md"),
+      );
+    } finally {
+      rmSync(source, { recursive: true, force: true });
+    }
+    const fake = createFakeSdkClient((req): QueryOutcome<unknown> => {
+      if (req.role === "reviewer") return { ok: true, output: { findings: [] }, raw: meta(0.1) };
+      throw new Error(`unexpected role ${req.role}`);
+    });
+    const out = await runReview({
+      repo: configFx.repo,
+      base: configFx.base,
+      head: configFx.head,
+      tierOverride: "fast",
+      outDir: join(outRoot, "config-records"),
+      allowApiKey: false,
+      client: fake,
+    });
+    configRecord = out.record;
+    configPath = out.recordPath;
+  }, 30_000);
+
+  afterAll(() => {
+    if (configFx) rmSync(configFx.repo, { recursive: true, force: true });
+  });
+
+  it("equals the SHA-256 that the test computes from the loaded files", () => {
+    expect(configRecord.identity.config_hash).toBe(r4Hash(files));
+    expect(configRecord.identity.config_hash).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("lists the loaded paths and the validated values under identity.config", () => {
+    expect(configRecord.identity.config.files).toEqual([
+      ".pr-review/config.yaml",
+      ".pr-review/rules.md",
+    ]);
+    expect(configRecord.identity.config.values).toEqual({
+      ...DEFAULT_REPO_CONFIG,
+      thresholds: { ...DEFAULT_REPO_CONFIG.thresholds, default: 82 },
+      concurrency: 2,
+    });
+    expect(configRecord.identity.config.custom_reviewers).toEqual([]);
+  });
+
+  it("lists the injected files: the base commit's CLAUDE.md, then rules.md (R5)", () => {
+    expect(configRecord.identity.injected).toEqual([
+      { path: "CLAUDE.md", truncated: false },
+      { path: ".pr-review/rules.md", truncated: false },
+    ]);
+  });
+
+  it("writes a record that validates", () => {
+    const written = JSON.parse(readFileSync(configPath, "utf8"));
+    expect(RecordSchema.safeParse(written).error).toBeUndefined();
+  });
+
+  it("is null for the default fixture, which has no .pr-review/", () => {
+    expect(record.identity.config_hash).toBeNull();
+  });
+});
+
+describe("a sensitive path with no text hunk (R9)", () => {
+  let zeroFx: Fixture;
+  let zeroRecord: RunRecord;
+
+  beforeAll(async () => {
+    const source = mkdtempSync(join(tmpdir(), "pr-review-record-zero-"));
+    mkdirSync(join(source, "dir"));
+    // README.md is sensitive here, so a mode flip of it is a sensitive path with no hunk.
+    writeFileSync(join(source, "dir", "config.yaml"), "sensitive_globs:\n  - README.md\n");
+    try {
+      zeroFx = await makeFixture("--pr-review-dir", join(source, "dir"));
+    } finally {
+      rmSync(source, { recursive: true, force: true });
+    }
+    // The head gets a binary file under a sensitive path and a mode flip.
+    // The base has README.md, which it holds with mode 100644.
+    const git = (...args: string[]) =>
+      run("git", ["-C", zeroFx.repo, ...args], {
+        env: {
+          ...process.env,
+          GIT_CONFIG_GLOBAL: "/dev/null",
+          GIT_AUTHOR_NAME: "t",
+          GIT_AUTHOR_EMAIL: "t@example.invalid",
+          GIT_COMMITTER_NAME: "t",
+          GIT_COMMITTER_EMAIL: "t@example.invalid",
+        },
+      });
+    writeFileSync(join(zeroFx.repo, ".github", "workflows", "logo.bin"), Buffer.from([0, 1, 2, 0]));
+    await git("add", ".github/workflows/logo.bin");
+    await git("update-index", "--chmod=+x", "README.md");
+    await git("commit", "--quiet", "-m", "Head: add a binary and flip a mode");
+    zeroFx.head = (await git("rev-parse", "HEAD")).stdout.trim();
+    const fake = createFakeSdkClient((req): QueryOutcome<unknown> => {
+      if (req.role === "triage") {
+        return {
+          ok: true,
+          output: {
+            tier: "fast",
+            reason: "r",
+            confidence: "high",
+            categories: [],
+            hotspots: [],
+            file_notes: [],
+            summary: "s",
+          },
+          raw: meta(0.01),
+        };
+      }
+      if (req.role === "reviewer") return { ok: true, output: { findings: [] }, raw: meta(0.1) };
+      throw new Error(`unexpected role ${req.role}`);
+    });
+    zeroRecord = (
+      await runReview({
+        repo: zeroFx.repo,
+        base: zeroFx.base,
+        head: zeroFx.head,
+        outDir: join(outRoot, "zero-records"),
+        allowApiKey: false,
+        client: fake,
+      })
+    ).record;
+  }, 30_000);
+
+  afterAll(() => {
+    if (zeroFx) rmSync(zeroFx.repo, { recursive: true, force: true });
+  });
+
+  it("lists the paths in coverage and keeps them in sensitive_files", () => {
+    expect(zeroRecord.identity.sensitive_files).toEqual([
+      ".github/workflows/ci.yml",
+      ".github/workflows/logo.bin",
+      "README.md",
+    ]);
+    expect(zeroRecord.posted.coverage.sensitive_without_hunks).toEqual([
+      ".github/workflows/logo.bin",
+      "README.md",
+    ]);
+  });
+
+  it("does not change the tier: the sensitive floor of full stays", () => {
+    expect(zeroRecord.identity.tier).toBe("full");
+    expect(zeroRecord.identity.tier_reason).toMatch(/sensitive/i);
+  });
+
+  it("lists nothing for the default fixture, whose sensitive path has a hunk", () => {
+    expect(record.posted.coverage.sensitive_without_hunks).toEqual([]);
+  });
 });
 
 describe("the record parts", () => {
@@ -194,15 +420,17 @@ describe("the record parts", () => {
     expect(id.tier).toBe("full");
     expect(id.tier_reason).toMatch(/sensitive/i);
     expect(id.triage?.summary).toBe("s");
-    expect(id.selected_reviewers).toEqual([
-      {
-        name: "diff-bugs",
-        trigger: expect.stringContaining("min_tier fast"),
-        model: "claude-opus-5-5",
-        effort: "low",
-        tools_ignored: [],
-      },
-    ]);
+    expect(id.selected_reviewers.map((r) => r.name)).toEqual(SEVEN);
+    expect(id.selected_reviewers.find((r) => r.name === "diff-bugs")).toEqual({
+      name: "diff-bugs",
+      trigger: expect.stringContaining("min_tier fast"),
+      model: "claude-opus-5-5",
+      effort: "low",
+      tools_ignored: [],
+    });
+    expect(id.selected_reviewers.find((r) => r.name === "tests")?.trigger).toContain(
+      "min_tier full",
+    );
     expect(id.models).toEqual({
       triage: { model: "claude-sonnet-5-5", effort: "medium" },
       reviewer: { model: "claude-opus-5-5", effort: "low" },
@@ -214,13 +442,20 @@ describe("the record parts", () => {
   });
 
   it("holds the raw stage outputs, the drop and the failed escalation", () => {
-    expect(record.stages.reviewers).toHaveLength(1);
-    expect(record.stages.reviewers[0]?.dropped).toEqual([
-      {
-        finding: plantedFinding(fx, { evidence: "this text is not in the file" }),
-        reason: "bad-quote",
-      },
-    ]);
+    // diff-bugs and security run two passes; the other five run one.
+    expect(record.stages.reviewers).toHaveLength(9);
+    const diffBugs = record.stages.reviewers.filter((r) => r.name === "diff-bugs");
+    expect(diffBugs.map((r) => r.pass).sort()).toEqual([1, 2]);
+    for (const run of diffBugs) {
+      expect(run.findings).toEqual([plantedFinding(fx)]);
+      expect(run.dropped).toEqual([
+        {
+          finding: plantedFinding(fx, { evidence: "this text is not in the file" }),
+          reason: "bad-quote",
+        },
+      ]);
+    }
+    // Both passes give the same finding, so one copy is verified.
     expect(record.stages.verifications).toEqual([
       {
         finding: plantedFinding(fx),
@@ -232,24 +467,31 @@ describe("the record parts", () => {
     ]);
     expect(record.stages.merges).toEqual([]);
     expect(record.stages.capped).toEqual([]);
+    expect(record.stages.suppressed).toEqual([]);
   });
 
   it("holds what was posted: a failed escalation drops the finding and makes the verdict incomplete", () => {
     expect(record.posted.findings).toEqual([]);
     expect(record.posted.verdict).toBe("incomplete");
     expect(record.posted.coverage).toEqual({
-      reviewers_ran: ["diff-bugs"],
+      reviewers_ran: expect.arrayContaining(SEVEN),
       reviewers_failed: [],
+      reviewers_skipped: [],
+      reviewers_without_bash: [],
+      sensitive_without_hunks: [],
       findings_dropped_by_failed_verifier: 1,
     });
   });
 
   it("holds one cost entry per query, the total and every error", () => {
     expect(record.cost.queries).toHaveLength(calls.length);
-    expect(record.cost.queries.map((q) => q.role).sort()).toEqual(
-      ["reviewer", "triage", "verifier", "verifier-escalation"].sort(),
+    expect(new Set(record.cost.queries.map((q) => q.role))).toEqual(
+      new Set(["reviewer", "triage", "verifier", "verifier-escalation"]),
     );
-    const reviewer = record.cost.queries.find((q) => q.role === "reviewer");
+    expect(record.cost.queries.filter((q) => q.role === "reviewer")).toHaveLength(9);
+    const reviewer = record.cost.queries.find(
+      (q) => q.role === "reviewer" && q.reviewer === "diff-bugs",
+    );
     expect(reviewer).toMatchObject({
       reviewer: "diff-bugs",
       model: "claude-test",
@@ -263,7 +505,8 @@ describe("the record parts", () => {
       cost_usd: null,
       stop_reason: null,
     });
-    expect(record.cost.total_cost_usd).toBeCloseTo(0.62, 10);
+    // Triage 0.02, nine reviewer passes at 0.5 each, one verifier at 0.1.
+    expect(record.cost.total_cost_usd).toBeCloseTo(0.02 + 9 * 0.5 + 0.1, 10);
     // The failed escalation has no cost, so the total is a lower bound.
     expect(record.cost.queries_without_cost).toBe(1);
     expect(Object.keys(record.cost.stage_ms)).toEqual(

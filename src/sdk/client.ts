@@ -26,6 +26,12 @@ export interface QueryRequest {
    * never widen it. When this is not set, the role gets its full set.
    */
   tools?: readonly string[];
+  /**
+   * True when the run grants Bash to this query (a trusted custom reviewer
+   * whose author has write access). Only a role with read-only tools can
+   * get it. Write and Edit stay disallowed.
+   */
+  bash?: boolean;
 }
 
 export type QueryMeta = {
@@ -57,6 +63,33 @@ export type ResultFields = {
 };
 
 const LIMIT_SUBTYPES = new Set(["error_max_turns", "error_max_budget_usd"]);
+
+// The token counts of one model entry in the SDK result's "modelUsage".
+const TOKEN_FIELDS = [
+  "inputTokens",
+  "outputTokens",
+  "cacheReadInputTokens",
+  "cacheCreationInputTokens",
+] as const;
+
+/**
+ * The tokens of one query: the sum of the input, output, cache read and
+ * cache creation counts of each model in "usage" (the "modelUsage" map of
+ * the result). A count that is not a finite number of 0 or more is not
+ * in the sum.
+ */
+export function usageTokens(usage: unknown): number {
+  if (usage === null || typeof usage !== "object") return 0;
+  let total = 0;
+  for (const entry of Object.values(usage as Record<string, unknown>)) {
+    if (entry === null || typeof entry !== "object") continue;
+    for (const field of TOKEN_FIELDS) {
+      const value = (entry as Record<string, unknown>)[field];
+      if (typeof value === "number" && Number.isFinite(value) && value >= 0) total += value;
+    }
+  }
+  return total;
+}
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);

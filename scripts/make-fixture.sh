@@ -9,8 +9,40 @@
 #   - changes package-lock.json,
 #   - adds .github/workflows/ci.yml, which is a sensitive path.
 #
+# Options, each for the base commit after the fork (the BASE commit):
+#   --pr-review-dir <dir>  copy <dir> to .pr-review/
+#   --claude-md <file>     copy <file> to CLAUDE.md
+# With no option, the output does not change.
+#
 # Output lines: FIXTURE=<path>, BASE=<sha>, HEAD=<sha>, PLANTED=<file>:<line>.
 set -euo pipefail
+
+usage() {
+  echo "usage: $0 [--pr-review-dir <dir>] [--claude-md <file>]" >&2
+  exit 2
+}
+
+pr_review_dir=""
+claude_md=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --pr-review-dir)
+      [ "$#" -ge 2 ] || usage
+      [ -d "$2" ] || { echo "make-fixture: $2 is not a directory" >&2; exit 2; }
+      pr_review_dir="$(cd "$2" && pwd)"
+      shift 2
+      ;;
+    --claude-md)
+      [ "$#" -ge 2 ] || usage
+      [ -f "$2" ] || { echo "make-fixture: $2 is not a file" >&2; exit 2; }
+      claude_md="$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"
+      shift 2
+      ;;
+    *)
+      usage
+      ;;
+  esac
+done
 
 # Do not let the user's git config change the result.
 export GIT_CONFIG_NOSYSTEM=1
@@ -121,7 +153,19 @@ cat >> README.md <<'MD'
 
 The base branch moved on after the fork.
 MD
-git commit --quiet -am "Base: extend README after the fork"
+if [ -n "$pr_review_dir" ] || [ -n "$claude_md" ]; then
+  if [ -n "$pr_review_dir" ]; then
+    mkdir -p .pr-review
+    cp -R "$pr_review_dir/." .pr-review/
+  fi
+  if [ -n "$claude_md" ]; then
+    cp "$claude_md" CLAUDE.md
+  fi
+  git add -A
+  git commit --quiet -m "Base: extend README after the fork"
+else
+  git commit --quiet -am "Base: extend README after the fork"
+fi
 base_sha="$(git rev-parse HEAD)"
 
 # Leave the head commit checked out, as a PR checkout has it.

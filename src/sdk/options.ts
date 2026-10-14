@@ -57,7 +57,13 @@ export const PROVIDER_ENV_VARS: readonly string[] = [
   "CLAUDE_CODE_USE_FOUNDRY",
 ];
 
-/** Tools that no role can use: they write, run commands or reach the network. */
+/** The tool that a trusted custom reviewer can get. No other query gets it. */
+const BASH = "Bash";
+
+/**
+ * Tools that no role can use: they write, run commands or reach the
+ * network. Only a query that the run grants Bash gets Bash.
+ */
 export const ALWAYS_DISALLOWED_TOOLS: readonly string[] = [
   "Bash",
   "Write",
@@ -77,8 +83,10 @@ export function buildQueryOptions(req: QueryRequest, options: RunOptions): Recor
   const model = resolveModel(req.overrides?.model ?? role.model);
   const effort = req.overrides?.effort ?? role.effort;
   // A role with no tools gets none. A read-only role gets the read-only
-  // tools that the request names, or all of them when it names none.
-  const granted = role.tools === "read-only" ? narrowReadOnlyTools(req.tools).granted : [];
+  // tools that the request names, or all of them when it names none, and
+  // Bash when the request grants it.
+  const readOnly = role.tools === "read-only" ? narrowReadOnlyTools(req.tools).granted : [];
+  const bash = role.tools === "read-only" && req.bash === true;
 
   // The SDK replaces the subprocess environment with "env", so spread the
   // parent environment. An API key, another token or another provider wins
@@ -98,11 +106,13 @@ export function buildQueryOptions(req: QueryRequest, options: RunOptions): Recor
     settingSources: [],
     permissionMode: "dontAsk",
     // "tools" sets which built-in tools exist; "allowedTools" approves them.
-    tools: granted,
-    allowedTools: granted.map(readRule),
+    // A granted Bash has the bare rule "Bash", which approves every
+    // command. permissionMode stays dontAsk.
+    tools: bash ? [...readOnly, BASH] : readOnly,
+    allowedTools: bash ? [...readOnly.map(readRule), BASH] : readOnly.map(readRule),
     disallowedTools: [
-      ...ALWAYS_DISALLOWED_TOOLS,
-      ...READ_ONLY_TOOLS.filter((tool) => !granted.includes(tool)),
+      ...ALWAYS_DISALLOWED_TOOLS.filter((tool) => !(bash && tool === BASH)),
+      ...READ_ONLY_TOOLS.filter((tool) => !readOnly.includes(tool)),
     ],
     outputFormat: { type: "json_schema", schema: toSdkJsonSchema(req.schema) },
     maxTurns: role.maxTurns,

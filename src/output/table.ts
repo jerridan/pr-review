@@ -40,6 +40,13 @@ function costLine(cost: RunRecord["cost"]): string {
   return missing > 0 ? `at least ${total} ${note}` : total;
 }
 
+// A skipped reviewer, with the reason and, for the token ceiling, the pass.
+function skipped(items: RunRecord["posted"]["coverage"]["reviewers_skipped"]): string {
+  return list(
+    items.map((s) => `${s.name} (${s.reason}${s.pass !== undefined ? `, pass ${s.pass}` : ""})`),
+  );
+}
+
 export function formatTable(record: RunRecord): string {
   const { identity, posted, cost } = record;
   const coverage = posted.coverage;
@@ -47,7 +54,7 @@ export function formatTable(record: RunRecord): string {
     `Tier: ${identity.tier}`,
     `Reason: ${identity.tier_reason}`,
     `Verdict: ${posted.verdict}`,
-    `Coverage: reviewers ran: ${list(coverage.reviewers_ran)}; reviewers failed: ${list(coverage.reviewers_failed)}; findings dropped by failed verifier calls: ${coverage.findings_dropped_by_failed_verifier}`,
+    `Coverage: reviewers ran: ${list(coverage.reviewers_ran)}; reviewers failed: ${list(coverage.reviewers_failed)}; reviewers skipped: ${skipped(coverage.reviewers_skipped)}; reviewers without Bash: ${list(coverage.reviewers_without_bash.map((r) => `${r.name} (${r.reason})`))}; sensitive paths without hunks: ${list(coverage.sensitive_without_hunks)}; findings dropped by failed verifier calls: ${coverage.findings_dropped_by_failed_verifier}`,
     `Excluded files: ${excluded(identity.excluded_files)}`,
     `Cost: ${costLine(cost)}`,
     "",

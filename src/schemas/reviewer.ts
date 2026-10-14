@@ -13,7 +13,11 @@ export type ReviewerFrontmatter = {
   triggers: { paths: string[]; categories: string[]; min_tier: "fast" | "full" };
   passes: number;
   threshold: number;
-  trusted: boolean;
+  /**
+   * Only a custom reviewer can use this, to ask for Bash. Absent means
+   * false. The parsed value is always set.
+   */
+  trusted?: boolean;
 };
 
 export const ReviewerFrontmatterSchema: z.ZodType<ReviewerFrontmatter> = z.strictObject({
@@ -31,5 +35,5 @@ export const ReviewerFrontmatterSchema: z.ZodType<ReviewerFrontmatter> = z.stric
   threshold: integer().refine((value) => value >= 0 && value <= 100, {
     message: "threshold must be from 0 to 100",
   }),
-  trusted: z.boolean(),
+  trusted: z.boolean().default(false),
 });

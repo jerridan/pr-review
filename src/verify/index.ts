@@ -3,6 +3,7 @@
 import { normalizeWs, readHeadFile } from "../find/evidence.js";
 import { diffSections } from "../gather/diff.js";
 import { loadPrompt, render, type PromptFile } from "../prompts/load.js";
+import type { RepoConfig } from "../config/repo-config.js";
 import type { Finding } from "../schemas/finding.js";
 import type { QueryFailure } from "../schemas/record.js";
 import { VerifierResultSchema, type VerifierResult } from "../schemas/verifier.js";
@@ -19,6 +20,15 @@ export interface VerifyConfig {
 
 export const DEFAULT_VERIFY_CONFIG: VerifyConfig = { threshold: 80, bandLow: 60, bandHigh: 85 };
 
+/**
+ * The verify config of one finding: the threshold of its reviewer, and
+ * the middle band of the repo config.
+ */
+export function verifyConfigFor(threshold: number, config: RepoConfig): VerifyConfig {
+  const [bandLow, bandHigh] = config.thresholds.middle_band;
+  return { threshold, bandLow, bandHigh };
+}
+
 export type VerifyContext = {
   cwd: string;
   semaphore: Semaphore;
@@ -32,6 +42,11 @@ export type VerifyContext = {
   diff?: string;
   /** The verifier prompt. The run loads it once and gives it here. */
   prompt?: VerifierPrompt;
+  /**
+   * The description of the change. Every verifier query gets it, so the
+   * verifier can check a claim about the description. Absent means empty.
+   */
+  description?: string;
 };
 
 export type Verification = {
@@ -104,7 +119,12 @@ function numberLines(text: string): string {
 }
 
 /** The texts of prompts/verifier.md that the user message uses. */
-export type VerifierTexts = { template: string; noFileText: string; noDiffText: string };
+export type VerifierTexts = {
+  template: string;
+  noFileText: string;
+  noDiffText: string;
+  noDescriptionText: string;
+};
 
 function field(prompt: PromptFile, name: string): string {
   const value = prompt.frontmatter[name];
@@ -120,6 +140,7 @@ export function verifierTexts(prompt: PromptFile): VerifierTexts {
     template: field(prompt, "user_message"),
     noFileText: field(prompt, "no_file_text"),
     noDiffText: field(prompt, "no_diff_text"),
+    noDescriptionText: field(prompt, "no_description_text"),
   };
 }
 
@@ -133,20 +154,25 @@ export function loadVerifierPrompt(): VerifierPrompt {
 }
 
 /**
- * Build the verifier user message: the finding, the head file and its
- * diff. "text" is the head file, or null when the head has no such file.
- * "fileDiff" is the diff section of the finding's file, or "" when the
- * diff does not change the file.
+ * Build the verifier user message: the finding, the head file, the
+ * description of the change and the file's diff. "text" is the head file,
+ * or null when the head has no such file. "fileDiff" is the diff section
+ * of the finding's file, or "" when the diff does not change the file.
  */
 export function buildVerifierMessage(
   texts: VerifierTexts,
   finding: Finding,
   text: string | null,
   fileDiff: string,
+  description = "",
 ): string {
   const blocks = {
     finding: wrapUntrusted("finding", describeFinding(finding)).block,
     file: wrapUntrusted("head_file", text === null ? texts.noFileText : numberLines(text)).block,
+    description: wrapUntrusted(
+      "description",
+      description.trim() === "" ? texts.noDescriptionText : description,
+    ).block,
     diff: wrapUntrusted("diff", fileDiff.trim() === "" ? texts.noDiffText : fileDiff).block,
   };
   return render(texts.template, blocks);
@@ -175,7 +201,13 @@ export async function verifyFinding(
     role: "verifier" | "verifier-escalation",
   ): Promise<VerifierResult | QueryFailure> => {
     // Each query gets its own message, so its blocks get new ids.
-    const userMessage = buildVerifierMessage(prompt.texts, finding, headText, fileDiff);
+    const userMessage = buildVerifierMessage(
+      prompt.texts,
+      finding,
+      headText,
+      fileDiff,
+      ctx.description,
+    );
     try {
       const outcome = await ctx.semaphore(() =>
         client.query<VerifierResult>(

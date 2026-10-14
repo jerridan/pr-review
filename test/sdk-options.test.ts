@@ -11,6 +11,7 @@ import { VerifierResultSchema } from "../src/schemas/verifier.js";
 import {
   classifyResult,
   createSdkClient,
+  usageTokens,
   type QueryFn,
   type QueryOutcome,
   type QueryRequest,
@@ -297,6 +298,45 @@ describe("the tools of a reviewer narrow the read-only set", () => {
   });
 });
 
+describe("a query with Bash granted (R7)", () => {
+  it("lists Bash in tools and allowedTools, removes it from disallowedTools, and keeps the rest", () => {
+    const opts = buildQueryOptions(
+      request("reviewer", { tools: ["Read", "Bash"], bash: true }),
+      runOptions(false),
+    );
+    expect(opts.tools).toEqual(["Read", "Bash"]);
+    expect(opts.allowedTools).toEqual(["Read(./**)", "Bash"]);
+    const disallowed = opts.disallowedTools as string[];
+    expect(disallowed).not.toContain("Bash");
+    expect(disallowed).toEqual(
+      expect.arrayContaining(["Write", "Edit", "NotebookEdit", "WebFetch", "WebSearch", "Agent"]),
+    );
+    expect(disallowed).toEqual(expect.arrayContaining(["Grep", "Glob"]));
+    expect(opts.permissionMode).toBe("dontAsk");
+    expect(opts.settingSources).toEqual([]);
+    expect(opts.persistSession).toBe(false);
+  });
+
+  it("keeps Bash out when the request does not set bash, also when its tools name Bash", () => {
+    for (const bash of [undefined, false]) {
+      const opts = buildQueryOptions(
+        request("reviewer", { tools: ["Read", "Bash"], ...(bash === false ? { bash } : {}) }),
+        runOptions(false),
+      );
+      expect(opts.tools).toEqual(["Read"]);
+      expect(opts.allowedTools).toEqual(["Read(./**)"]);
+      expect(opts.disallowedTools).toEqual(expect.arrayContaining(["Bash"]));
+    }
+  });
+
+  it("does not give Bash to a role with no tools", () => {
+    const opts = buildQueryOptions(request("merge", { bash: true }), runOptions(false));
+    expect(opts.tools).toEqual([]);
+    expect(opts.allowedTools).toEqual([]);
+    expect(opts.disallowedTools).toEqual(expect.arrayContaining(["Bash"]));
+  });
+});
+
 describe("the wall-clock timeout of a query", () => {
   const VERIFIER_OUTPUT = {
     in_scope: true,
@@ -518,5 +558,30 @@ describe("classifyResult: the query failure rule", () => {
   it("gives a refusal precedence over an error subtype", () => {
     const outcome = classify({ stop_reason: "refusal", subtype: "error_during_execution" });
     expect(!outcome.ok && outcome.failure.kind).toBe("refusal");
+  });
+});
+
+describe("usageTokens (R8)", () => {
+  it("sums the four token counts of each model in modelUsage", () => {
+    expect(
+      usageTokens({
+        "claude-opus-5-5": {
+          inputTokens: 10,
+          outputTokens: 20,
+          cacheReadInputTokens: 30,
+          cacheCreationInputTokens: 40,
+          webSearchRequests: 5,
+          costUSD: 1.5,
+        },
+        "claude-haiku-5-5": { inputTokens: 1, outputTokens: 2 },
+      }),
+    ).toBe(103);
+  });
+
+  it("gives 0 for usage that is absent or not a map of counts", () => {
+    expect(usageTokens(undefined)).toBe(0);
+    expect(usageTokens(null)).toBe(0);
+    expect(usageTokens("x")).toBe(0);
+    expect(usageTokens({ m: null, n: { inputTokens: "7", outputTokens: -3 } })).toBe(0);
   });
 });
