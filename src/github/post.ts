@@ -2,7 +2,7 @@
 // (R5, R6), and the failure review (R5a).
 import { normalizeWs } from "../find/evidence.js";
 import type { PostedGitHub, PostedFinding, RunRecord } from "../schemas/record.js";
-import type { GitHubClient, Review } from "./client.js";
+import type { GitHubClient, Review, Thread } from "./client.js";
 import {
   CLEANUP_MARKER,
   parseFingerprintMarkers,
@@ -267,11 +267,13 @@ export function resolvedReply(head: string): string {
 
 /**
  * Resolve each open thread whose span text is gone from the head (R7).
- * First reply "Resolved by pr-review: ...", so that a later run sees the
- * thread as resolved by the tool, then resolve the thread. A failed step
- * goes to "errors", and the next thread still runs. With the marker
- * source, the run has no span text and resolves nothing. "head" is the
- * sha in the reply; it defaults to the head of the pull request.
+ * First resolve the thread. Then reply "Resolved by pr-review: ...", so
+ * that a later run sees the thread as resolved by the tool. A thread whose
+ * last comment already starts with that text gets no second reply. A
+ * failed step goes to "errors", and the next thread still runs. A failed
+ * resolve gives no reply. With the marker source, the run has no span
+ * text and resolves nothing. "head" is the sha in the reply; it defaults
+ * to the head of the pull request.
  */
 export async function resolveStaleThreads(
   client: GitHubClient,
@@ -292,12 +294,25 @@ export async function resolveStaleThreads(
   const body = resolvedReply(input.head ?? ctx.pr.head_sha);
   for (const stale of reverify(prior, input.headFileText).staleThreads) {
     const entry = prior.open.get(stale.fingerprint);
+    let thread: Thread;
     try {
-      let commentId = entry?.comment_id ?? null;
-      if (commentId === null) {
-        commentId =
-          (await client.getThread({ thread_id: stale.thread_id })).comments[0]?.id ?? null;
-      }
+      thread = await client.getThread({ thread_id: stale.thread_id });
+    } catch (err) {
+      errors.push({ step: "read thread", message: messageOf(err) });
+      continue;
+    }
+    try {
+      await client.resolveThread({ thread_id: stale.thread_id });
+      resolved.push(stale);
+    } catch (err) {
+      errors.push({ step: "resolve thread", message: messageOf(err) });
+      continue;
+    }
+    // An earlier run can have replied before a person opened the thread
+    // again. Do not reply a second time.
+    if (thread.last_comment?.body.startsWith(RESOLVED_REPLY_PREFIX)) continue;
+    try {
+      const commentId = entry?.comment_id ?? thread.first_comment_id;
       if (commentId === null) throw new Error(`The thread ${stale.thread_id} has no comment.`);
       await client.replyToComment({
         slug: ctx.slug,
@@ -307,13 +322,6 @@ export async function resolveStaleThreads(
       });
     } catch (err) {
       errors.push({ step: "reply", message: messageOf(err) });
-      continue;
-    }
-    try {
-      await client.resolveThread({ thread_id: stale.thread_id });
-      resolved.push(stale);
-    } catch (err) {
-      errors.push({ step: "resolve thread", message: messageOf(err) });
     }
   }
   return { resolved, errors };

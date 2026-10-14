@@ -552,6 +552,30 @@ describe("reverify and resolveStaleThreads (R7)", () => {
     expect(gh.state.replies).toHaveLength(replies);
   });
 
+  it("leaves a thread open, with no reply, when the thread does not read", async () => {
+    const { gh, ctx } = setup();
+    const { byFp } = await postedState(gh);
+    const out = newOutDir();
+    writeRecordFile(out, "2026-10-13T120000.000Z-aaaaaaa.json", makeRecord());
+    const state = (await loadPriorState(gh, { ctx, outDir: out }))!;
+    const replies = gh.state.replies.length;
+    gh.failNext(
+      "getThread",
+      new GitHubError({ endpoint: "graphql", exitCode: 1, message: "boom" }),
+    );
+    const result = await resolveStaleThreads(gh, {
+      ctx,
+      prior: state,
+      headFileText: () => "const five = 5;\n",
+    });
+    expect(result.resolved).toEqual([]);
+    expect(result.errors).toEqual([
+      { step: "read thread", message: expect.stringContaining("boom") },
+    ]);
+    expect(gh.state.threads.get(byFp(F_OPEN).thread_id)?.resolved).toBe(false);
+    expect(gh.state.replies).toHaveLength(replies);
+  });
+
   it("resolves a thread whose last comment is already the reply of the tool, with no second reply", async () => {
     // An earlier run replied. Then a person opened the thread again.
     const { gh, ctx } = setup();
