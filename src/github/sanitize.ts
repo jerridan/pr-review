@@ -11,9 +11,14 @@ const HTML_COMMENT = /<!--[\s\S]*?-->/g;
 // An HTML comment with no end. GitHub hides the text after it, so the
 // sanitizer removes the text to the end too.
 const OPEN_HTML_COMMENT = /<!--[\s\S]*$/;
-// Unicode format characters: zero-width characters, bidi controls, the
-// soft hyphen and the byte order mark.
-const FORMAT_CHARS = /\p{Cf}/gu;
+// Characters that GitHub shows as nothing:
+// - Unicode format characters (Cf): zero-width characters, bidi controls,
+//   the soft hyphen and the byte order mark.
+// - Default ignorable code points: also the variation selectors U+FE00 to
+//   U+FE0F and U+E0100 to U+E01EF, and the Hangul fillers U+115F, U+1160,
+//   U+3164 and U+FFA0. A string of variation selectors can hide bytes.
+// - The braille blank U+2800.
+const INVISIBLE_CHARS = /[\p{Cf}\p{Default_Ignorable_Code_Point}\u2800]/gu;
 // Remove C0 control characters (below U+0020) other than tab (U+0009)
 // and newline (U+000A). A regex with control characters fails the lint
 // rule no-control-regex, so this is a loop.
@@ -31,7 +36,7 @@ function removeC0Controls(text: string): string {
 // as "<!\u200B--", is still found and removed.
 function clean(text: string): string {
   return removeC0Controls(text)
-    .replace(FORMAT_CHARS, "")
+    .replace(INVISIBLE_CHARS, "")
     .replace(HTML_COMMENT, "")
     .replace(OPEN_HTML_COMMENT, "")
     .normalize("NFC");
@@ -47,8 +52,9 @@ function capText(text: string, cap: number): { text: string; truncated: boolean 
 }
 
 /**
- * Remove HTML comments, format characters and C0 controls other than tab
- * and newline, normalize to NFC, and cap the text at "cap" characters.
+ * Remove C0 controls other than tab and newline, format characters,
+ * default ignorable code points and the braille blank. Then remove HTML
+ * comments, normalize to NFC, and cap the text at "cap" characters.
  * "sanitized" is true when the result differs from the input. "truncated"
  * is true when the cap cut the text.
  */
