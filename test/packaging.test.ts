@@ -1,7 +1,7 @@
 // Tests for the CI and Claude Code packaging (R9, R10, R11): the composite
 // action, the reusable workflow, the plugin manifests and the /review command.
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -309,13 +309,18 @@ function runScript(
   return { status: result.status, stdout: result.stdout, stderr: result.stderr };
 }
 
-/** Run one workflow step in the sandbox, with its env rendered for "ctx". */
+/**
+ * Run one workflow step in the sandbox, with its env rendered for "ctx".
+ * "extra" adds env values that the runner gives, such as PATH.
+ */
 function runStep(
   step: Step,
   ctx: Record<string, Value>,
   runner: { workspace: string; temp: string },
+  extra: Record<string, string> = {},
 ): { status: number | null; stdout: string; stderr: string } {
   const env: Record<string, string> = {
+    ...extra,
     GITHUB_WORKSPACE: runner.workspace,
     RUNNER_TEMP: runner.temp,
   };
@@ -356,6 +361,28 @@ function makeSandbox(withRecords: boolean): {
   }
   execFileSync("git", ["clone", "-q", remote, workspace], { env: GIT_ENV });
   return { remote, workspace, temp };
+}
+
+/**
+ * Put a "gh" stub in a new bin directory. The stub writes its arguments to
+ * the log, and "token set" or "no token" for GH_TOKEN. It never writes the
+ * value of GH_TOKEN.
+ */
+function ghStub(dir: string): { path: string; log: string } {
+  const bin = join(dir, "bin");
+  const log = join(dir, "gh.log");
+  mkdirSync(bin);
+  writeFileSync(
+    join(bin, "gh"),
+    [
+      "#!/bin/sh",
+      'if [ -n "${GH_TOKEN:-}" ]; then t="token set"; else t="no token"; fi',
+      `printf '%s (%s)\\n' "$*" "$t" >> '${log}'`,
+      "",
+    ].join("\n"),
+    { mode: 0o755 },
+  );
+  return { path: `${bin}:${process.env.PATH ?? ""}`, log };
 }
 
 function remoteFiles(remote: string): string[] {
@@ -629,6 +656,8 @@ describe(".github/workflows/review.yml (R10)", () => {
       "checkout",
     );
     expect(checkout.with?.["fetch-depth"]).toBe(0);
+    // The reviewers read this checkout. Its .git/config must hold no token.
+    expect(checkout.with?.["persist-credentials"]).toBe(false);
     expect(String(checkout.with?.ref)).toMatch(/^refs\/pull\/\$\{\{.+\}\}\/head$/);
     expect(render(checkout.with?.ref, context("pull_request", prEvent("opened", false)))).toBe(
       `refs/pull/${PR_NUMBER}/head`,
@@ -640,6 +669,59 @@ describe(".github/workflows/review.yml (R10)", () => {
       "fetch",
     );
     expect(steps.indexOf(checkout)).toBeLessThan(steps.indexOf(fetch));
+  });
+
+  /** The steps that fetch from or push to origin, in the job order. */
+  function remoteSteps(): { steps: Step[]; remote: Step[] } {
+    const steps = loadJob().steps;
+    const remote = steps.filter((s) => /\b(fetch|ls-remote|push)\b/.test(s.run ?? ""));
+    expect(remote.length).toBeGreaterThanOrEqual(3);
+    return { steps, remote };
+  }
+
+  it("gives git the gh credential helper before the first fetch", () => {
+    const { steps, remote } = remoteSteps();
+    const setup = findStep(steps, (s) => /gh auth setup-git/.test(s.run ?? ""), "gh setup-git");
+    for (const step of remote) {
+      expect(steps.indexOf(setup)).toBeLessThan(steps.indexOf(step));
+    }
+  });
+
+  it("runs gh auth setup-git with GH_TOKEN when the job token is set, in a sandbox", () => {
+    const sandbox = makeSandbox(false);
+    const setup = findStep(
+      loadJob().steps,
+      (s) => /gh auth setup-git/.test(s.run ?? ""),
+      "gh setup-git",
+    );
+    const gh = ghStub(sandbox.temp);
+    const ran = runStep(setup, context("pull_request", prEvent("opened", false)), sandbox, {
+      PATH: gh.path,
+    });
+    expect(ran.status, ran.stderr).toBe(0);
+    expect(readFileSync(gh.log, "utf8")).toBe("auth setup-git (token set)\n");
+  });
+
+  it("skips gh auth setup-git when GH_TOKEN is not set, in a sandbox", () => {
+    const sandbox = makeSandbox(false);
+    const setup = findStep(
+      loadJob().steps,
+      (s) => /gh auth setup-git/.test(s.run ?? ""),
+      "gh setup-git",
+    );
+    const gh = ghStub(sandbox.temp);
+    const ctx = context("pull_request", prEvent("opened", false));
+    (ctx.github as Record<string, Value>).token = null;
+    const ran = runStep(setup, ctx, sandbox, { PATH: gh.path });
+    expect(ran.status, ran.stderr).toBe(0);
+    expect(existsSync(gh.log)).toBe(false);
+  });
+
+  it("gives the job token as GH_TOKEN to each step that fetches or pushes", () => {
+    const ctx = context("pull_request", prEvent("opened", false));
+    for (const step of remoteSteps().remote) {
+      expect(render(step.env?.GH_TOKEN, ctx), step.name).toBe("<token>");
+    }
   });
 
   it("fetches the pull request head and the base branch in a sandbox", () => {
@@ -756,6 +838,8 @@ describe(".github/workflows/review.yml (R10)", () => {
     const { checkout, push } = recordsSteps();
     const ctx = context("pull_request", prEvent("opened", false));
     (ctx.runner as Record<string, Value>).temp = sandbox.temp;
+    // The sandbox remotes are local. The steps get no GH_TOKEN.
+    (ctx.github as Record<string, Value>).token = null;
     return {
       checkout: () => runStep(checkout, ctx, sandbox),
       push: () => runStep(push, ctx, sandbox),
@@ -853,14 +937,18 @@ describe(".github/workflows/review.yml (R10)", () => {
     }
   });
 
-  it("puts no token in a command line and no secret in another step", () => {
+  it("puts no token in a command line, and gives another step only the job token as GH_TOKEN", () => {
     for (const step of loadJob().steps) {
       const run = step.run ?? "";
       expect(run).not.toMatch(/secrets\./);
       expect(run).not.toMatch(/github\.token/);
-      expect(run).not.toMatch(/GH_TOKEN|GITHUB_TOKEN|CLAUDE_CODE_OAUTH_TOKEN|x-access-token/);
+      // A script can test that GH_TOKEN is set. It never uses the value.
+      const rest = run.replace(/\[\s+-n\s+"\$\{GH_TOKEN:-\}"\s+\]/g, "");
+      expect(rest).not.toMatch(/GH_TOKEN|GITHUB_TOKEN|CLAUDE_CODE_OAUTH_TOKEN|x-access-token/);
       if (step.uses !== "jerridan/pr-review@v1") {
-        expect(JSON.stringify(step.env ?? {})).not.toMatch(/secrets\.|github\.token/);
+        const { GH_TOKEN: ghToken, ...env } = step.env ?? {};
+        if (ghToken !== undefined) expect(ghToken).toBe("${{ github.token }}");
+        expect(JSON.stringify(env)).not.toMatch(/secrets\.|github\.token/);
         expect(JSON.stringify(step.with ?? {})).not.toMatch(/secrets\.|github\.token/);
       }
     }
