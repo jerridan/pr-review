@@ -56,9 +56,10 @@ async function postCleanup(
 }
 
 /**
- * Post the review, then the check run, then the cleanup comment. When the
- * review fails, retry once with every finding in the body and no inline
- * comment. When the retry fails too, give the error and post nothing more.
+ * Post the review, the check run, then the cleanup comment of a first or
+ * fresh run. When the review fails, retry once with every finding in the
+ * body and no inline comment. When the retry fails too, give the error and
+ * post nothing more.
  * A failed check run goes under "check_run.error". A failed later step goes
  * under "errors", and the next steps still run.
  */
@@ -166,7 +167,11 @@ export async function postRun(
     result.check_run = { error: messageOf(err) };
   }
 
-  if (identity.config.values.pre_existing === "comment") {
+  // Only a first or fresh run writes the cleanup comment. A later run holds
+  // only the pre-existing findings near its new hunks, so it must not
+  // replace the comment of an earlier run.
+  const fullScope = identity.run_kind === "first" || identity.run_kind === "fresh";
+  if (fullScope && identity.config.values.pre_existing === "comment") {
     try {
       result.cleanup_comment_id = await postCleanup(client, ctx, record.stages.pre_existing);
     } catch (err) {
