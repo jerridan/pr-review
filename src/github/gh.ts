@@ -154,7 +154,7 @@ function gqlLogin(author: GqlAuthor): string {
 // The GraphQL documents. Each is a list of short lines, because the A13
 // test forbids a string in src longer than 200 characters. These are API
 // queries, not prompts.
-const VIEWER_QUERY = ["query {", "  viewer { login }", "}"].join("\n");
+const VIEWER_QUERY = ["query {", "  viewer { __typename login }", "}"].join("\n");
 
 const THREADS_QUERY = [
   "query($owner: String!, $name: String!, $number: Int!, $cursor: String) {",
@@ -341,8 +341,9 @@ export function createGhClient(
     },
 
     async viewerLogin() {
-      const data = await graphql<{ viewer: { login: string } }>(VIEWER_QUERY, {});
-      return data.viewer.login;
+      const data = await graphql<{ viewer: GqlAuthor }>(VIEWER_QUERY, {});
+      // A bot token gives "name[bot]", the same as REST does.
+      return gqlLogin(data.viewer);
     },
 
     async getPullRequest({ slug, number }) {
