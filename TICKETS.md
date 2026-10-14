@@ -27,7 +27,7 @@ Goal: measure a change to a prompt, a threshold or a model before it ships (sect
 
 ## Smaller follow-ups found during D3
 
-- The workflow uploads the whole records directory as the artifact, so the artifact grows with the `pr-review-records` branch. Upload only `pr-<n>/` of the current run, or the new file alone.
+- The workflow uploads `pr-<n>/` of the records branch as the artifact, so the artifact holds every record of the pull request. Upload the new file alone when that grows too large.
 - `viewerLogin` reads the GraphQL `viewer` field. Under the Actions token the run uses `github-actions[bot]` and never calls it, so the call is untested against an installation token. Check it once with a real token before a local bot login depends on it.
 - A later run posts nothing when the pull request has no new hunk, also with `--tier` or a label. Only `--fresh`, the `@pr-review full` comment or the `review:full` label event starts a new review. Decide whether `--tier full` on a reviewed head should force a fresh run too.
 - A thread whose span text changed is resolved without a verifier call. D4 measures whether a verifier re-run on the new span posts fewer wrong resolutions.
@@ -35,3 +35,4 @@ Goal: measure a change to a prompt, a threshold or a model before it ships (sect
 - A later run with no new hunk that resolved a stale thread posts a short review and writes a record with `identity.triage: null`, so the next run has no prior triage tier from that record. Carry the prior triage tier into that record, or read it from the record before it.
 - Triage runs on the whole diff also when `--tier` or a label fixes the tier, for the categories of the brief. On a large pull request that query can reach its budget. Skip triage under an override, or raise its budget.
 - A direct use of `action.yml` with a token other than the job token is unsupported: the viewer login is fixed to `github-actions[bot]` under GITHUB_ACTIONS. Read the login from the token instead.
+- A fork run executes no code from the head, but a reviewer subprocess runs with the head checkout as its cwd and `CLAUDE_CODE_OAUTH_TOKEN` in its env, while the workspace `.git/config` holds the job token that `actions/checkout` persisted. Whether `Read(./**)` follows a symlink out of the checkout is unverified. Harden it: set `persist-credentials: false` on the pull request checkout, give the records push its credentials in that step only, and add a test that no reviewer subprocess can reach a credential through a symlink.

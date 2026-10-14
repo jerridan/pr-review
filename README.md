@@ -130,7 +130,7 @@ Each skip rule gives a tier reason. The reason names the rule and the value that
 
 The CLI never reads comments. The workflow reads the comment and passes `tier: full` and `fresh: true`.
 
-When someone adds `review:fast` or `review:skip` to a head that has a review, the `labeled` event starts a later run with no new hunk. That run posts nothing.
+When someone adds `review:fast` or `review:skip` to a head that has a review, the `labeled` event starts a later run with no new hunk. That run posts nothing, unless a stale thread or body finding closed. See [Later runs](#later-runs).
 
 ### What the run posts
 
@@ -232,7 +232,7 @@ Triage runs on the whole PR diff. The triage result is the higher of the triage 
 
 When H0 is not in the local object store, the run fetches it with git. When the fetch fails, the run becomes a fresh run. Coverage says so.
 
-When the run finds no new hunk, it posts nothing. It writes a record with `posted.github: null` and exits with code 0.
+When the run finds no new hunk, it still re-verifies the open findings and resolves the stale threads. When a thread resolved or a body finding closed, the push changed what holds, so the run posts one short review at the tier of the prior record with the recomputed verdict and a check run. When nothing closed, it posts nothing, writes a record with `posted.github: null` and exits with code 0.
 
 ### What a later run does
 
