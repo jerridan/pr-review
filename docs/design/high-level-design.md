@@ -78,7 +78,7 @@ Tier effects:
 | fast | diff-only bug scan, convention check, custom reviewers that opt in | yes | small |
 | full | all matched built-in reviewers plus all matched custom reviewers | yes | normal |
 
-The fast tier runs one pass of diff-bugs, conventions and custom reviewers with `min_tier: fast`, then the same verifier, merge and single review. The review body states the tier and the triage reason, for example "Fast review: mechanical rename across 40 files, no logic change", so a wrong call is visible. Each push re-triages on the cumulative PR diff, and the tier only moves up, never down.
+The fast tier runs one pass of diff-bugs, conventions and custom reviewers with `min_tier: fast`, then the same verifier, merge and single review. The review body states the tier and the triage reason, for example "Fast review: mechanical rename across 40 files, no logic change", so a wrong call is visible. Each push re-triages on the cumulative PR diff. The triage result only moves up, never down, and an override above triage in the order of precedence still wins.
 
 ### 3.3 Select (code)
 
@@ -147,6 +147,9 @@ GitHub: one review per run, posted the way a human posts one.
 - A finding on a line outside the diff goes in the body with a full-SHA permalink.
 - A neutral check run carries the same counts and a severity line in its text.
 - A later run posts a new review scoped to what changed, as a human would, and resolves threads that no longer hold.
+- Hidden markers carry the run state. The review body holds `run`, `head`, `base` and `tier`. Each finding, inline or in the body, holds its fingerprint. A later run reads markers only from reviews by the login of the tool.
+- At the skip tier on a first run, the review is one line with the marker and the tier reason. The run posts it once for each reason.
+- The run records a failed check run, cleanup comment, thread resolve or reply. The exit code stays 0. When the review itself cannot post, the run exits with code 1.
 - Fork PRs: see section 6.
 - Failures are visible. The review always posts, and its body carries a coverage line: reviewers that ran, reviewers that failed, findings dropped because a verifier call failed. A `refusal` stop from the safety classifiers, which a security reviewer can trigger, counts as a reviewer failure. A run that dies before posting still posts a short review that says so. Unverified findings are never posted.
 - Pre-existing issues never appear in the review and never affect the verdict. A repo can set `pre_existing: comment` to have verified pre-existing issues posted as one separate issue comment titled cleanup opportunities. The default is off.
@@ -165,7 +168,7 @@ One JSON file per run, in four parts:
 - **What was posted**: review body, verdict, inline comments with fingerprints.
 - **Cost and health**: `modelUsage` from every query (tokens, cache reads, estimated cost per model), wall time per stage and per agent, every error with its stage, every `refusal` or `max_tokens` stop.
 
-The Action uploads the record as a workflow artifact and pushes it to a `pr-review-records` branch, so it outlives artifact retention.
+The workflow uploads the record as an artifact and pushes it to a `pr-review-records` branch, so it outlives artifact retention. The push needs `contents: write` on the job token. With `--pr`, the record goes in a `pr-<n>` directory.
 
 Uses:
 
@@ -173,7 +176,7 @@ Uses:
 - Records where a human acted on or dismissed a finding become golden cases without labeling.
 - Per-reviewer precision over time drives suppression suggestions and shows which reviewer to cut.
 - `explain` reads a record to show why a finding was kept or dropped.
-- Later runs read the previous record for the last reviewed head and the open fingerprints.
+- Later runs read two sources. GitHub gives the thread state and the posted fingerprints. The previous record gives the last reviewed head and the full finding of each open thread. When no record exists, the run takes the head from the newest review marker of the tool and resolves no thread.
 
 ### 3.9 First run and later runs
 
@@ -183,15 +186,19 @@ The first run casts a wide net. Wide means more passes over the PR's own changes
 
 **Later runs** (a new push on a PR this tool has reviewed):
 
-- Scope is the diff between the last reviewed head and the new head, computed from the merge base so a rebase does not re-review the whole PR.
-- Severity floor is blocking. No new suggestions or nits.
-- Open threads are re-verified against the new head. Threads that no longer hold are resolved.
-- The verdict is recomputed from all open blocking findings, not only new ones.
-- A push with no changed hunks posts nothing.
+- Scope is the new hunks. The run diffs from the merge base to the new head, and from the merge base of the last reviewed head to that head. A hunk is new when no hunk of the old diff has the same path and the same added and removed text. Only files with a new hunk reach the reviewers, and only new hunks are in the diff text. A rebase does not re-review the whole PR.
+- Triage runs on the whole PR diff. The triage result is the higher of this run's triage tier and the triage tier of the prior record. Overrides, skip rules, the zero-hunk rule and the sensitive floor win over it.
+- Severity floor is blocking. No new suggestions or nits. The record keeps them under `posted.below_floor`.
+- A new finding whose fingerprint is open or dismissed never posts.
+- Open threads are re-verified against the new head. The run compares the span text of the finding with the file at the new head. The run resolves a thread whose text is gone, with a reply that names the head.
+- A finding in a review body has no thread. It stays open while its span text is present. It counts for the verdict. The run never resolves it.
+- The run recomputes the verdict from all open blocking findings, not only new ones. Threads and body findings count.
+- The last reviewed head must be in the local object store. When it is not, the run fetches it with git. When the fetch fails, the run becomes a fresh run and coverage says so.
+- A push with no new hunk posts nothing and exits with code 0.
 
 **Verdict rule.** Incomplete when any reviewer or stage failed. Would request changes when at least one blocking finding is open. Would approve otherwise. The rule is fixed so the verdict is explainable.
 
-**Override.** A maintainer comment `@pr-review full` or a label forces a fresh full run.
+**Override.** A maintainer comment `@pr-review full` forces a fresh full run. The label `review:full` sets the tier floor to full. Only the `labeled` event that adds the label also forces a fresh run. A fresh run has full scope and posts every severity. It still never reposts an open or dismissed fingerprint. A `labeled` event for `review:fast` or `review:skip` on a head that has a review is a later run with no new hunk. It posts nothing.
 
 ## 4. Repo-side configuration
 
@@ -284,9 +291,9 @@ Prompts follow Anthropic's current prompting guidance for the 5.5 family, summar
 - The PR head checks out into a separate directory. Reviewers read it as data. Every SDK query runs with `settingSources: []`, so no hooks, MCP servers, agents or CLAUDE.md load from the checkout. The orchestrator injects CLAUDE.md and the rules file from the base branch itself.
 - Built-in and custom reviewers get read-only tools by default: Read, Grep and Glob. Bash, Write and Edit go in `disallowedTools`, which removes them from the request, and `permissionMode` is set explicitly to `dontAsk`. The auto-approve list alone does not restrict, and an omitted mode can start in auto.
 - A custom reviewer may request `Bash`. The orchestrator grants it only when the PR author has write access to the repo and the reviewer sets `trusted: true`. Otherwise the reviewer runs without Bash and the summary says so.
-- Fork PRs: no automatic run by default. A maintainer applies a label to trigger a run, and that run uses the restricted tool set for every reviewer.
+- Fork PRs: no automatic run. A `pull_request` event from a fork has a read-only token and no secrets, so the reusable workflow skips it. A maintainer with the association owner, member or collaborator adds the label `review:full` or `review:fast`. The `pull_request_target` event for that label runs the fork PR. The run checks out the fork head and executes no code from it. The CLI reads git objects. It runs no script, hook or build of the repo under review. The consumer must not add a step that builds or tests the fork head in the same job. A fork run grants Bash to no custom reviewer, whatever the permission level of the author. The other tool rules above hold as for any other run.
 - The PR title and body are untrusted data in every prompt.
-- Secrets: the API key is the only secret in the job. The GitHub token has `pull-requests: write` and `checks: write` only.
+- Secrets: the Claude token is the only secret in the job. The GitHub token has `pull-requests: write`, `checks: write` and `contents: write`. The job needs `contents: write` to push the `pr-review-records` branch.
 
 ## 7. Idempotency and feedback
 
@@ -307,13 +314,13 @@ Prompts follow Anthropic's current prompting guidance for the 5.5 family, summar
 ## 9. Interfaces
 
 ```
-pr-review run   --base <sha> --head <sha> [--pr <n>] [--tier full|fast] [--format github|json|md]
+pr-review run   [--base <sha>] [--head <sha>] [--pr <n>] [--github-repo <owner/repo>] [--fresh] [--tier full|fast|skip] [--format github|json|table|md]
 pr-review eval  [--cases <dir>] [--repeat 3]
 pr-review list  (reviewers that would run, with the trigger that selected them)
 pr-review explain <run.json>   (why each finding was kept or dropped)
 ```
 
-A GitHub Action wraps `run`. A Claude Code `/review` command wraps `run` for local use.
+A GitHub Action wraps `run`. A Claude Code `/review` command wraps `run` for local use. Without `--pr`, `--base` and `--head` are required. `--format github` needs `--pr`.
 
 ### 9.1 Auth
 
@@ -330,11 +337,16 @@ Local and CI runs both use the user's Claude subscription.
 
 This repo ships three things and no npm package.
 
-- **A composite action, run from source.** It sets up Node, installs from the lockfile, and runs the CLI. No built bundle is committed. The Agent SDK package bundles the Claude Code binary, so the lockfile pins every version.
-- **A reusable workflow that wraps the action.** It holds the job steps, permissions, checkout settings, the comment filter and the fork gate once. A consumer repo carries only its trigger list and a one-line call with `secrets: inherit`. A repo that needs extra steps in the job uses the action directly.
-- **The CLI for local runs.** Clone once and link it. The `/review` command ships through the user's Claude Code plugin marketplace so it is available in every project.
+- **A composite action, run from source.** The file is `action.yml` at the repo root. It sets up Node 20 from the lockfile and runs `npm ci` and `npm run build`. Then it runs `node dist/cli.js run --format github --pr <pr>` against the consumer checkout. The repo holds no built bundle. The Agent SDK package bundles the Claude Code binary, so the lockfile pins every version. The inputs are `pr`, `tier`, `fresh`, `out` and `allow-api-key`. The outputs are `record` and `verdict`. The action reads no secret. The caller sets `CLAUDE_CODE_OAUTH_TOKEN` and `GH_TOKEN` in `env`. The action sets `CLAUDE_CODE_RETRY_WATCHDOG=1` for the CLI step.
+- **A reusable workflow that wraps the action.** The file is `.github/workflows/review.yml`, with the trigger `workflow_call`. It has one job. The job has the permissions `pull-requests: write`, `checks: write` and `contents: write`, one concurrency group for each PR with cancel-in-progress, and a checkout with `fetch-depth: 0` that fetches `refs/pull/<n>/head` and the base branch. It holds the comment filter, the label filter, the fork gate and the records steps once. A consumer repo carries only its trigger list and a one-line call with `secrets: inherit`. A repo that needs extra steps in the job uses the action directly.
+- **The CLI for local runs.** Clone once and link it.
+- **The `/review` command, as a plugin of this repo.** This repo is its own Claude Code marketplace. The files are `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` and `commands/review.md`. A user installs it with `claude plugin marketplace add jerridan/pr-review` and `claude plugin install pr-review@pr-review`. The command runs `pr-review run` in the current repo and adds `--pr <n>` when `gh pr view` finds an open PR. It posts only when the user says `--format github`.
 
-Other repos the user owns reference this one by tag once this repo's Actions settings allow access from repositories the user owns. Making the repo public later changes nothing. Publishing to npm stays an option.
+The workflow filters its events. An `issue_comment` event runs only for a PR, a comment that holds `@pr-review full` and an author association of owner, member or collaborator. That run passes `tier: full` and `fresh: true`. A label event runs only for a label that starts with `review:`.
+
+The records steps run with `if: always()`. Before the action, the workflow checks the `pr-review-records` branch out at the `out` directory. After the action, it uploads that directory as the artifact `pr-review-record-<pr>-<run id>`, commits the new file at `pr-<n>/<file name>` and pushes it. It creates the branch as an orphan when the branch is absent. On a non-fast-forward refusal, it fetches and rebases up to three times.
+
+Other repos the user owns reference this one by the tag `v1`. This repo's Actions setting must allow access from repositories the user owns. The setting is "Accessible from repositories owned by the user", and the README gives its `gh api` command. Making the repo public later changes nothing. Publishing to npm stays an option.
 
 Consumer workflow:
 
@@ -342,16 +354,22 @@ Consumer workflow:
 name: PR review
 on:
   pull_request:
-    types: [opened, synchronize, ready_for_review, labeled]
+    types: [opened, synchronize, reopened, ready_for_review]
+  pull_request_target:
+    types: [labeled]
   issue_comment:
     types: [created]
 jobs:
   review:
+    permissions:
+      pull-requests: write
+      checks: write
+      contents: write
     uses: jerridan/pr-review/.github/workflows/review.yml@v1
     secrets: inherit
 ```
 
-The trigger list must live in the consumer, because GitHub reads `on:` only from the repo where the event happens. Fork PRs reach the tool only through the label path, because secrets are absent on fork-triggered runs.
+The trigger list must live in the consumer, because GitHub reads `on:` only from the repo where the event happens. Fork PRs reach the tool only through the label path, because a `pull_request` event from a fork has no secrets. The `pull_request_target` trigger carries that label event. The reusable workflow runs a fork PR only on a `pull_request_target` event with the label `review:full` or `review:fast`. The actor must have the association owner, member or collaborator. One `if` expression names `head.repo.fork` and these conditions. The same expression skips a `pull_request` event from a fork. A fork run passes `tier` from the label, and `fresh: true` for `review:full`.
 
 Options considered and set aside: a JavaScript action with a committed bundle (faster start, noisy bundle diffs), an npm package (needs a registry token in every consumer while private), a Docker image (strongest pinning, but the lockfile already pins the SDK and its bundled binary).
 
@@ -363,7 +381,7 @@ Settled on 2026-10-13:
 
 1. **Runtime**: Claude Agent SDK in TypeScript.
 2. **Agent file location**: `.pr-review/reviewers/`.
-3. **Fork policy**: label-gated run with restricted tools.
+3. **Fork policy**: label-gated run through `pull_request_target`. A maintainer adds `review:full` or `review:fast`. The run executes no code from the fork head.
 4. **Review format**: one GitHub review per run, short body with verdict, inline comments on diff lines. Comment event only.
 5. **Verifier threshold**: 80 as the default, tuned by the harness.
 6. **Reviewer models**: Opus 5.5 at low effort by default, as decision 15 states. A repo can override the model and effort per role or per reviewer. See section 4.
