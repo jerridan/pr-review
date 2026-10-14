@@ -72,6 +72,8 @@ function makeRecord(
       repo: "/repo",
       pr: 7,
       github: null,
+      run_kind: "first",
+      prior: null,
       base: BASE,
       head: HEAD,
       started_at: "2026-10-13T12:00:00.000Z",
@@ -111,6 +113,9 @@ function makeRecord(
       },
       findings,
       github: null,
+      below_floor: [],
+      not_reposted: [],
+      carried: [],
     },
     cost: {
       queries: [],

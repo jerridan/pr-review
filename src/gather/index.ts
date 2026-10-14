@@ -73,14 +73,7 @@ export async function gather(
   const headSha = await resolveCommit(repo, head);
   const range = `${baseSha}...${headSha}`;
   const nameStatus = await runGit(repo, ["diff", ...DIFF_OPTIONS, "--name-status", "-z", range]);
-  const patch = await runGit(repo, [
-    "diff",
-    ...DIFF_OPTIONS,
-    "--src-prefix=a/",
-    "--dst-prefix=b/",
-    "--unified=3",
-    range,
-  ]);
+  const patch = await prDiff(repo, baseSha, headSha);
   const entries = parseNameStatus(nameStatus);
   const result = applyExclusions(entries, patch, globs);
   const wantHistory = globs.history !== false;
@@ -114,6 +107,21 @@ export async function gather(
     history: built.history,
     historyError: built.error,
   };
+}
+
+/**
+ * The patch of base...head: the pull request diff from the merge base to
+ * the head, with no exclusion. Gather and the scope of a later run use it.
+ */
+export async function prDiff(repo: string, base: string, head: string): Promise<string> {
+  return runGit(repo, [
+    "diff",
+    ...DIFF_OPTIONS,
+    "--src-prefix=a/",
+    "--dst-prefix=b/",
+    "--unified=3",
+    `${base}...${head}`,
+  ]);
 }
 
 // The history block is extra context. A git failure gives no block. The

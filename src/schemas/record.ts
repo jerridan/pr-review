@@ -64,6 +64,19 @@ export type CustomReviewerEntry = { name: string; bash_granted: boolean; reason:
 
 export type Verdict = "skipped" | "incomplete" | "would request changes" | "would approve";
 
+/** The prior state of a later or fresh run, as the record holds it (R8). */
+export type PriorIdentity = {
+  /** The last reviewed head, H0. */
+  head: string;
+  source: "record" | "marker" | null;
+  /** The path of the prior record, or null. */
+  record: string | null;
+  open: string[];
+  dismissed: string[];
+  /** True when H0 was not in the store and the fetch failed: the run is then fresh. */
+  fetch_failed: boolean;
+};
+
 /** The pull request of a --pr run, as the record holds it (R2). */
 export type GitHubIdentity = {
   slug: string;
@@ -87,6 +100,10 @@ export type RunRecord = {
     pr: number | null;
     /** The pull request of a --pr run, or null. */
     github: GitHubIdentity | null;
+    /** A first run, a later run, or a fresh run (R7, R8). */
+    run_kind: "first" | "later" | "fresh";
+    /** The prior state of a later or fresh run, or null. */
+    prior: PriorIdentity | null;
     base: string;
     head: string;
     started_at: string;
@@ -172,6 +189,12 @@ export type RunRecord = {
     findings: PostedFinding[];
     /** What the run posted with --format github, or null when it tried no review. */
     github: PostedGitHub | null;
+    /** The new findings below blocking that a later run did not post (R7). */
+    below_floor: PostedFinding[];
+    /** The new findings whose fingerprint was open or dismissed (R7). */
+    not_reposted: { fingerprint: string; reason: "open" | "dismissed" }[];
+    /** The full finding of each open fingerprint of earlier runs that this run did not post (R7). */
+    carried: PostedFinding[];
   };
   cost: {
     queries: {
@@ -265,6 +288,17 @@ const IdentitySchema = z.strictObject({
   repo: z.string(),
   pr: integer().min(1).nullable(),
   github: GitHubIdentitySchema.nullable(),
+  run_kind: z.enum(["first", "later", "fresh"]),
+  prior: z
+    .strictObject({
+      head: z.string(),
+      source: z.enum(["record", "marker"]).nullable(),
+      record: z.string().nullable(),
+      open: z.array(z.string()),
+      dismissed: z.array(z.string()),
+      fetch_failed: z.boolean(),
+    })
+    .nullable(),
   base: z.string(),
   head: z.string(),
   started_at: z.string(),
@@ -380,6 +414,11 @@ const PostedSchema = z.strictObject({
   }),
   findings: z.array(PostedFindingSchema),
   github: PostedGitHubSchema.nullable(),
+  below_floor: z.array(PostedFindingSchema),
+  not_reposted: z.array(
+    z.strictObject({ fingerprint: z.string(), reason: z.enum(["open", "dismissed"]) }),
+  ),
+  carried: z.array(PostedFindingSchema),
 });
 
 const CostSchema = z.strictObject({

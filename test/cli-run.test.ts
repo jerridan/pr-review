@@ -10,7 +10,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { CommanderError } from "commander";
@@ -24,6 +24,7 @@ import {
   parseFingerprintMarkers,
   parseRunMarker,
 } from "../src/github/markers.js";
+import { recordFileName } from "../src/record/write.js";
 import { RecordSchema, type RunRecord } from "../src/schemas/record.js";
 import type { QueryMeta, QueryOutcome, QueryRequest } from "../src/sdk/client.js";
 import { createFakeSdkClient } from "../src/sdk/fake.js";
@@ -31,7 +32,16 @@ import { createFakeSdkClient } from "../src/sdk/fake.js";
 const run = promisify(execFile);
 const SCRIPT = fileURLToPath(new URL("../scripts/make-fixture.sh", import.meta.url));
 
-type Fixture = { repo: string; base: string; head: string; file: string; line: number };
+type Fixture = {
+  repo: string;
+  base: string;
+  head: string;
+  file: string;
+  line: number;
+  /** The heads of --second-push and --amend, or "". */
+  head2: string;
+  head3: string;
+};
 
 async function makeFixture(...options: string[]): Promise<Fixture> {
   const { stdout } = await run("bash", [SCRIPT, ...options]);
@@ -47,6 +57,8 @@ async function makeFixture(...options: string[]): Promise<Fixture> {
     head: value("HEAD"),
     file: file ?? "",
     line: Number(line),
+    head2: value("HEAD2"),
+    head3: value("HEAD3"),
   };
 }
 
@@ -126,9 +138,12 @@ beforeEach(() => {
     return true;
   });
   process.exitCode = undefined;
+  // The viewer login comes from the fake client, also in GitHub Actions.
+  vi.stubEnv("GITHUB_ACTIONS", "");
 });
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
   process.exitCode = undefined;
 });
 
@@ -184,6 +199,14 @@ async function fixtureWithConfig(configYaml: string): Promise<Fixture> {
   } finally {
     rmSync(source, { recursive: true, force: true });
   }
+}
+
+/** The run id of a record: its file name without ".json". */
+function recordRunIdOf(record: RunRecord): string {
+  return recordFileName(new Date(record.identity.started_at), record.identity.head).replace(
+    /\.json$/,
+    "",
+  );
 }
 
 /** A fake pull request whose base and head are the commits of "fixture". */
@@ -848,16 +871,38 @@ const GH_FINDINGS = [
   },
 ] as const;
 
-// diff-bugs reports the four findings. The verifier passes each one with
-// its severity and a quote from the head file.
+// The findings at HEAD2 of the fixture (--second-push). The push changes
+// line 14, so the span of D is gone. A is the same finding as before. E is
+// new and blocking on the new line 14. F is new on line 10 and is only a
+// suggestion. B is the same finding outside the diff as before.
+const GH_FINDINGS_2 = [
+  GH_FINDINGS[0],
+  {
+    claim: "CLAIM-E",
+    start: 14,
+    end: 14,
+    severity: "blocking",
+    evidence: "return values.length === 0 ? 0 : total / values.length;",
+  },
+  { claim: "CLAIM-F", start: 10, end: 10, severity: "suggestion", evidence: "let total = 0;" },
+  GH_FINDINGS[2],
+] as const;
+
+// diff-bugs reports the four findings of the head: GH_FINDINGS at HEAD and
+// GH_FINDINGS_2 at HEAD2 and HEAD3. The verifier passes each one with its
+// severity and a quote from the head file.
 function githubScript(fixture: Fixture) {
   const base = script(fixture);
+  const all = [...GH_FINDINGS, ...GH_FINDINGS_2];
   return (req: QueryRequest): QueryOutcome<unknown> => {
     const out = (output: unknown): QueryOutcome<unknown> => ({ ok: true, output, raw: META });
     if (req.role === "reviewer") {
       if (req.reviewerName !== "diff-bugs") return out({ findings: [] });
+      const pushed = readFileSync(join(req.cwd, "src/stats.ts"), "utf8").includes(
+        "values.length === 0",
+      );
       return out({
-        findings: GH_FINDINGS.map((f) => ({
+        findings: (pushed ? GH_FINDINGS_2 : GH_FINDINGS).map((f) => ({
           file: "src/stats.ts",
           start_line: f.start,
           end_line: f.end,
@@ -872,7 +917,7 @@ function githubScript(fixture: Fixture) {
       });
     }
     if (req.role === "verifier" || req.role === "verifier-escalation") {
-      const f = GH_FINDINGS.find((g) => req.userMessage.includes(`"claim": "${g.claim}"`));
+      const f = all.find((g) => req.userMessage.includes(`"claim": "${g.claim}"`));
       if (!f) throw new Error("unknown finding");
       return out({
         in_scope: true,
@@ -894,11 +939,12 @@ describe("--format github (R5, R5a, R6)", () => {
     github: ReturnType<typeof prFor>,
     script: (req: QueryRequest) => QueryOutcome<unknown>,
     name: string,
+    options: { sdk?: ReturnType<typeof createFakeSdkClient>; extra?: string[] } = {},
   ) {
-    const sdk = createFakeSdkClient(script);
+    const sdk = options.sdk ?? createFakeSdkClient(script);
     const code = await exitCodeOf(
       createProgram({ client: sdk, github }).parseAsync(
-        prArgs(fixture, join(outRoot, name), "--format", "github"),
+        prArgs(fixture, join(outRoot, name), "--format", "github", ...(options.extra ?? [])),
       ),
     );
     const text = stdout;
@@ -914,20 +960,41 @@ describe("--format github (R5, R5a, R6)", () => {
     record?.posted.findings.find((f) => f.claim === claim)?.fingerprint ?? "missing";
 
   describe("the three-run test", () => {
+    // One fixture with HEAD, HEAD2 and HEAD3, one fake SDK client and one
+    // fake GitHub client. All three runs write to one --out directory.
+    let fx3: Fixture;
+    let github: ReturnType<typeof prFor>;
+    let sdk: ReturnType<typeof createFakeSdkClient>;
+    let first: RunRecord;
+    let second: RunRecord;
+    beforeAll(async () => {
+      fx3 = await makeFixture("--amend");
+      github = prFor(fx3);
+      sdk = createFakeSdkClient(githubScript(fx3));
+    }, 30_000);
+    afterAll(() => {
+      if (fx3) rmSync(fx3.repo, { recursive: true, force: true });
+    });
+    const fpOf = (record: RunRecord, claim: string) =>
+      [...record.posted.findings, ...record.posted.below_floor].find((f) => f.claim === claim)
+        ?.fingerprint ?? "missing";
+
     it("first run: one COMMENT review on the head with the marker, the lines, inline and body findings", async () => {
-      const github = prFor(fx);
-      const { code, doc, record } = await githubRun(fx, github, githubScript(fx), "three-run-1");
+      const { code, doc, record } = await githubRun(fx3, github, githubScript(fx3), "three-run", {
+        sdk,
+      });
+      first = record!;
       expect(code).toBe(0);
 
       // One review, made with the create-review call, whose event is COMMENT.
       expect(github.calls.filter((c) => c.method === "createReview")).toHaveLength(1);
       expect(github.state.reviews).toHaveLength(1);
       const review = github.state.reviews[0]!;
-      expect(review.commit_id).toBe(fx.head);
+      expect(review.commit_id).toBe(fx3.head);
 
       const lines = review.body.split("\n");
       const runId = basename(doc.record_path, ".json");
-      const marker = { run: runId, head: fx.head, base: fx.base, tier: "full" as const };
+      const marker = { run: runId, head: fx3.head, base: fx3.base, tier: "full" as const };
       expect(lines[0]?.startsWith(formatRunMarker(marker))).toBe(true);
       expect(parseRunMarker(review.body)).toEqual(marker);
       expect(lines[0]).toContain("**Would request changes**");
@@ -955,12 +1022,12 @@ describe("--format github (R5, R5a, R6)", () => {
       expect(lines).toContain("### Findings outside the diff");
       const outside = lines.find((l) => l.includes("CLAIM-B")) ?? "";
       expect(outside).toContain(
-        `https://github.com/acme/widgets/blob/${fx.head}/src/stats.ts#L1-L1`,
+        `https://github.com/acme/widgets/blob/${fx3.head}/src/stats.ts#L1-L1`,
       );
       expect(outside).toContain(formatFingerprintMarker(fp(record, "CLAIM-B")));
       // A body entry for the span that crosses the edge of the hunk.
       const edge = lines.find((l) => l.includes("CLAIM-C")) ?? "";
-      expect(edge).toContain(`https://github.com/acme/widgets/blob/${fx.head}/src/stats.ts#L3-L6`);
+      expect(edge).toContain(`https://github.com/acme/widgets/blob/${fx3.head}/src/stats.ts#L3-L6`);
       expect(edge).toContain(formatFingerprintMarker(fp(record, "CLAIM-C")));
 
       // The stdout holds the JSON document and the review url.
@@ -979,8 +1046,252 @@ describe("--format github (R5, R5a, R6)", () => {
       expect(record?.posted.github?.inline).toHaveLength(2);
       expect(github.state.check_runs).toHaveLength(1);
       expect(basename(doc.record_path)).toBe(`${runId}.json`);
+      // With --pr, the record is in <out>/pr-<n>/.
+      expect(basename(dirname(doc.record_path))).toBe("pr-7");
+      expect(record?.identity.run_kind).toBe("first");
+      expect(record?.identity.prior).toBeNull();
+    }, 60_000);
+
+    it("second run on HEAD2: only new blocking findings, a since line, one resolved thread", async () => {
+      // A human gives the comment of A a thumbs-down. The PR moves to HEAD2.
+      const commentOf = (claim: string) =>
+        github.state.review_comments.find((c) =>
+          c.body.includes(formatFingerprintMarker(fpOf(first, claim))),
+        )!;
+      github.react(commentOf("CLAIM-A").id, "-1", "alice");
+      const threadD = commentOf("CLAIM-D").thread_id;
+      github.state.pr.head_sha = fx3.head2;
+      const callsBefore = sdk.calls.length;
+
+      const { code, doc, record } = await githubRun(fx3, github, githubScript(fx3), "three-run", {
+        sdk,
+      });
+      expect(code).toBe(0);
+      second = record!;
+      const runCalls = sdk.calls.slice(callsBefore);
+
+      // One more review, on HEAD2, with the since line.
+      expect(github.state.reviews).toHaveLength(2);
+      const review = github.state.reviews[1]!;
+      expect(review.commit_id).toBe(fx3.head2);
+      expect(parseRunMarker(review.body)).toMatchObject({ head: fx3.head2, tier: "full" });
+      expect(review.body).toContain(`Review of changes since ${fx3.head.slice(0, 7)}`);
+      expect(doc.review_url).toBe(review.url);
+
+      // Only the new blocking finding E posts. F is below the floor.
+      expect(second.posted.findings.map((f) => f.claim)).toEqual(["CLAIM-E"]);
+      expect(second.posted.below_floor.map((f) => f.claim)).toEqual(["CLAIM-F"]);
+      const inline = github.state.review_comments.filter((c) => c.review_id === review.id);
+      expect(inline.map((c) => parseFingerprintMarkers(c.body))).toEqual([
+        [fpOf(second, "CLAIM-E")],
+      ]);
+      expect(review.body).not.toContain("CLAIM-F");
+
+      // A (thumbs-down) and B (still open) do not post again.
+      const fpA = fpOf(first, "CLAIM-A");
+      const fpB = fpOf(first, "CLAIM-B");
+      const fpC = fpOf(first, "CLAIM-C");
+      const fpD = fpOf(first, "CLAIM-D");
+      expect(
+        [...second.posted.not_reposted].sort((a, b) => a.reason.localeCompare(b.reason)),
+      ).toEqual([
+        { fingerprint: fpA, reason: "dismissed" },
+        { fingerprint: fpB, reason: "open" },
+      ]);
+      const markers = parseFingerprintMarkers(review.body);
+      expect(markers).not.toContain(fpA);
+      expect(markers).not.toContain(fpD);
+      expect(review.body).not.toContain("CLAIM-A");
+      expect(review.body).not.toContain("CLAIM-B");
+      // The open body findings B and C stay listed as hidden markers only.
+      expect(markers).toEqual(expect.arrayContaining([fpB, fpC]));
+      expect(review.body).not.toContain("CLAIM-C");
+      expect(second.posted.carried.map((f) => f.claim).sort()).toEqual(["CLAIM-B", "CLAIM-C"]);
+
+      // The push removed the span of D, so its thread resolves with the reply.
+      expect(second.posted.github?.resolved).toEqual([{ thread_id: threadD, fingerprint: fpD }]);
+      const thread = await github.getThread({ thread_id: threadD });
+      expect(thread.resolved).toBe(true);
+      expect(thread.comments.at(-1)?.body).toBe(
+        `Resolved by pr-review: the code this comment refers to changed at ${fx3.head2}.`,
+      );
+
+      // The prior state came from the record of the first run.
+      expect(second.identity.run_kind).toBe("later");
+      expect(second.identity.prior).toEqual({
+        head: fx3.head,
+        source: "record",
+        record: first ? join(outRoot, "three-run", "pr-7", `${recordRunIdOf(first)}.json`) : null,
+        open: [fpB, fpC, fpD].sort(),
+        dismissed: [fpA],
+        fetch_failed: false,
+      });
+      expect(second.posted.verdict).toBe("would request changes");
+
+      // Triage reads the whole diff. The reviewers get only the new hunk.
+      const triage = runCalls.filter((c) => c.role === "triage");
+      expect(triage).toHaveLength(1);
+      expect(triage[0]?.userMessage).toContain("+++ b/.github/workflows/ci.yml");
+      const reviewers = runCalls.filter((c) => c.role === "reviewer");
+      expect(reviewers.length).toBeGreaterThan(0);
+      for (const c of reviewers) {
+        expect(c.userMessage).not.toContain("+++ b/.github/workflows/ci.yml");
+        expect(c.userMessage).toContain("+++ b/src/stats.ts");
+      }
+    }, 60_000);
+
+    it("third run on HEAD3: the same tree, so it posts nothing and exits 0", async () => {
+      github.state.pr.head_sha = fx3.head3;
+      const callsBefore = sdk.calls.length;
+      const { code, doc, record } = await githubRun(fx3, github, githubScript(fx3), "three-run", {
+        sdk,
+      });
+      expect(code).toBe(0);
+      expect(github.state.reviews).toHaveLength(2);
+      expect(github.state.check_runs).toHaveLength(2);
+      expect(record?.posted.github).toBeNull();
+      expect(doc.review_url).toBeNull();
+      expect(record?.identity.tier).toBe("skip");
+      expect(sdk.calls.length).toBe(callsBefore);
+      // H0 is HEAD2, from the record of the second run. The thread that the
+      // tool resolved is neither open nor dismissed.
+      const fpD = fpOf(first, "CLAIM-D");
+      expect(record?.identity.run_kind).toBe("later");
+      expect(record?.identity.prior?.head).toBe(fx3.head2);
+      expect(record?.identity.prior?.source).toBe("record");
+      expect(record?.identity.prior?.open).not.toContain(fpD);
+      expect(record?.identity.prior?.dismissed).toEqual([fpOf(first, "CLAIM-A")]);
+      expect(record?.identity.prior?.open).toContain(fpOf(second, "CLAIM-E"));
+      expect(basename(dirname(doc.record_path))).toBe("pr-7");
+      expect(record?.identity.tier_reason).toBe(`No new hunks since ${fx3.head2.slice(0, 7)}.`);
+    }, 60_000);
+
+    it("a labeled event for review:fast on the reviewed head posts nothing", async () => {
+      github.state.pr.labels = ["review:fast"];
+      const callsBefore = sdk.calls.length;
+      const { code, record } = await githubRun(fx3, github, githubScript(fx3), "three-run", {
+        sdk,
+      });
+      github.state.pr.labels = ["bug"];
+      expect(code).toBe(0);
+      expect(github.state.reviews).toHaveLength(2);
+      expect(record?.posted.github).toBeNull();
+      expect(record?.identity.tier).toBe("skip");
+      expect(sdk.calls.length).toBe(callsBefore);
     }, 60_000);
   });
+
+  describe("later runs on HEAD2 after a first run on HEAD", () => {
+    let fx3: Fixture;
+    beforeAll(async () => {
+      fx3 = await makeFixture("--amend");
+    }, 30_000);
+    afterAll(() => {
+      if (fx3) rmSync(fx3.repo, { recursive: true, force: true });
+    });
+
+    async function firstThenSecond(name: string, secondOut: string, ...extra: string[]) {
+      const github = prFor(fx3);
+      const firstRun = await githubRun(fx3, github, githubScript(fx3), name);
+      github.state.pr.head_sha = fx3.head2;
+      const sdk = createFakeSdkClient(githubScript(fx3));
+      const secondRun = await githubRun(fx3, github, githubScript(fx3), secondOut, {
+        sdk,
+        extra,
+      });
+      return {
+        github,
+        first: firstRun.record!,
+        second: secondRun.record!,
+        sdk,
+        code: secondRun.code,
+      };
+    }
+
+    it("falls back to the review markers with no record, and says no prior record", async () => {
+      const { github, first, second, code } = await firstThenSecond("marker-1", "marker-2");
+      expect(code).toBe(0);
+      expect(second.identity.run_kind).toBe("later");
+      expect(second.identity.prior).toMatchObject({
+        head: fx3.head,
+        source: "marker",
+        record: null,
+        fetch_failed: false,
+      });
+      const review = github.state.reviews[1]!;
+      expect(review.body.split("\n")[1]).toMatch(/; no prior record$/);
+      // It dedupes against the comment fingerprints, resolves no thread, and
+      // carries no full finding.
+      const fpB = first.posted.findings.find((f) => f.claim === "CLAIM-B")?.fingerprint;
+      expect(second.posted.not_reposted).toContainEqual({ fingerprint: fpB, reason: "open" });
+      expect(second.posted.github?.resolved).toEqual([]);
+      // The threads of A and D from the first run, and of E from this run.
+      expect(github.state.threads.size).toBe(3);
+      expect([...github.state.threads.values()].every((t) => !t.resolved)).toBe(true);
+      expect(second.posted.carried).toEqual([]);
+      expect(second.identity.tier_reason).not.toContain("prior record");
+    }, 60_000);
+
+    it("--fresh: a first run again with full scope and every severity, and no repost", async () => {
+      const { first, second, sdk, code, github } = await firstThenSecond(
+        "fresh-1",
+        "fresh-1",
+        "--fresh",
+      );
+      expect(code).toBe(0);
+      expect(second.identity.run_kind).toBe("fresh");
+      expect(second.identity.prior?.source).toBe("record");
+      // Every severity posts.
+      expect(second.posted.findings.map((f) => f.claim).sort()).toEqual(["CLAIM-E", "CLAIM-F"]);
+      expect(second.posted.below_floor).toEqual([]);
+      const fpB = first.posted.findings.find((f) => f.claim === "CLAIM-B")?.fingerprint;
+      const fpA = first.posted.findings.find((f) => f.claim === "CLAIM-A")?.fingerprint;
+      expect(second.posted.not_reposted).toEqual(
+        expect.arrayContaining([
+          { fingerprint: fpA, reason: "open" },
+          { fingerprint: fpB, reason: "open" },
+        ]),
+      );
+      // Full scope: the reviewers see the whole diff, and the body has no since line.
+      const reviewers = sdk.calls.filter((c) => c.role === "reviewer");
+      expect(reviewers.some((c) => c.userMessage.includes("+++ b/.github/workflows/ci.yml"))).toBe(
+        true,
+      );
+      expect(github.state.reviews[1]?.body).not.toContain("Review of changes since");
+    }, 60_000);
+  });
+
+  it("falls back to a fresh run when H0 cannot be fetched, and says so in coverage", async () => {
+    const github = prFor(fx);
+    const h0 = "e".repeat(40);
+    github.state.reviews.push({
+      id: 1,
+      body: `${formatRunMarker({ run: "old", head: h0, base: fx.base, tier: "full" })} old`,
+      author: "me",
+      commit_id: h0,
+      url: "u",
+      comments: [],
+    });
+    const { code, record } = await githubRun(fx, github, githubScript(fx), "fetch-fails");
+    expect(code).toBe(0);
+    expect(record?.identity.run_kind).toBe("fresh");
+    expect(record?.identity.prior).toMatchObject({
+      head: h0,
+      source: "marker",
+      fetch_failed: true,
+    });
+    expect(github.state.reviews).toHaveLength(2);
+    const body = github.state.reviews[1]?.body ?? "";
+    expect(body.split("\n")[1]).toContain("fresh run: could not fetch eeeeeee");
+    expect(body).not.toContain("Review of changes since");
+    // A fresh run posts every severity.
+    expect(record?.posted.findings.map((f) => f.claim).sort()).toEqual([
+      "CLAIM-A",
+      "CLAIM-B",
+      "CLAIM-C",
+      "CLAIM-D",
+    ]);
+  }, 60_000);
 
   it("retries once with a body-only review when the first create-review call fails", async () => {
     const github = prFor(fx);
@@ -1058,6 +1369,9 @@ describe("--format github (R5, R5a, R6)", () => {
     const next = parseRunMarker(github.state.reviews[1]?.body ?? "");
     expect(next).toMatchObject({ head: fx.head, tier: "full" });
     expect(next?.status).toBeUndefined();
+    // A failure review does not make a later run.
+    expect(second.record?.identity.run_kind).toBe("first");
+    expect(second.record?.identity.prior).toBeNull();
     expect(github.state.check_runs).toHaveLength(1);
   }, 60_000);
 
@@ -1114,5 +1428,8 @@ describe("--format github (R5, R5a, R6)", () => {
     expect(full).toContain("**Would request changes**");
     expect(github.state.review_comments).toHaveLength(2);
     expect(record?.posted.github?.review_id).toBe(github.state.reviews[1]?.id);
+    // A skip review does not make a later run.
+    expect(record?.identity.run_kind).toBe("first");
+    expect(record?.identity.prior).toBeNull();
   }, 60_000);
 });

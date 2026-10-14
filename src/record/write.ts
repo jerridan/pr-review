@@ -25,7 +25,9 @@ export async function writeRecord(outDir: string, record: RunRecord): Promise<st
   if (!checked.success) {
     throw new Error(`The run record is not valid: ${checked.error.message}`);
   }
-  const dir = resolve(outDir);
+  // A record of a --pr run goes in <out>/pr-<n>/, where a later run finds it.
+  const pr = record.identity.pr;
+  const dir = pr === null ? resolve(outDir) : join(resolve(outDir), `pr-${pr}`);
   await mkdir(dir, { recursive: true });
   const name = recordFileName(new Date(record.identity.started_at), record.identity.head);
   const path = join(dir, name);

@@ -108,6 +108,7 @@ function list(names: string[]): string {
 /** The coverage line. The table output and the review body both use it. */
 export function renderCoverage(record: RunRecord): string {
   const c = record.posted.coverage;
+  const prior = record.identity.prior;
   const skipped = list(
     c.reviewers_skipped.map(
       (s) => `${s.name} (${s.reason}${s.pass !== undefined ? `, pass ${s.pass}` : ""})`,
@@ -121,6 +122,10 @@ export function renderCoverage(record: RunRecord): string {
     `reviewers without Bash: ${withoutBash}`,
     `sensitive paths without hunks: ${list(c.sensitive_without_hunks)}`,
     `findings dropped by failed verifier calls: ${c.findings_dropped_by_failed_verifier}`,
+    // A later run with no prior record, or a fresh run that could not
+    // fetch the last reviewed head, says so (R7).
+    ...(prior?.source === "marker" && !prior.fetch_failed ? ["no prior record"] : []),
+    ...(prior?.fetch_failed ? [`fresh run: could not fetch ${prior.head.slice(0, 7)}`] : []),
   ].join("; ");
 }
 

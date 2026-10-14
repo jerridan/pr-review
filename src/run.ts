@@ -13,11 +13,20 @@ import {
 import { readHeadFile } from "./find/evidence.js";
 import { injectedRuleFiles, runReviewers, type ReviewerRun } from "./find/index.js";
 import { diffSections } from "./gather/diff.js";
-import { gather, resolveCommit, type GatherResult } from "./gather/index.js";
+import { countHunks } from "./gather/diff.js";
+import { gather, prDiff, resolveCommit, type GatherResult } from "./gather/index.js";
 import type { GitHubClient } from "./github/client.js";
-import type { RunMarker } from "./github/markers.js";
+import { formatFingerprintMarker, type RunMarker } from "./github/markers.js";
 import { loadPrContext, prDescription, type PrContext } from "./github/metadata.js";
-import { postFailure, postRun, skipReviewAlreadyPosted } from "./github/post.js";
+import {
+  postFailure,
+  postRun,
+  resolveStaleThreads,
+  reverify,
+  skipReviewAlreadyPosted,
+} from "./github/post.js";
+import { loadPriorState, type PriorOpen, type PriorState } from "./github/prior.js";
+import { ensureCommit, newHunks } from "./github/scope.js";
 import { sanitizeGitHubText } from "./github/sanitize.js";
 import { withHeadWorktree } from "./gather/worktree.js";
 import { mergeFindings, toPostedFinding } from "./merge/index.js";
@@ -78,6 +87,12 @@ export interface RunInput {
   github?: GitHubClient;
   /** The output format. "github" needs "pr". */
   format: "json" | "table" | "github";
+  /**
+   * Make a run on a pull request with an earlier review a first run again:
+   * full scope and every severity. An open or dismissed fingerprint still
+   * does not post again (R7).
+   */
+  fresh?: boolean;
   tierOverride?: Tier;
   outDir: string;
   allowApiKey: boolean;
@@ -381,7 +396,32 @@ export async function runReview(input: RunInput): Promise<RunResult> {
   const failed: { value: { stage: string; message: string } | null } = { value: null };
   let diff: string;
   let record: RunRecord;
+  // The state of a later or fresh run (R7), which the post step needs after
+  // the head checkout is gone. Closures set it, so it is an object.
+  const carry: {
+    prior: PriorState | null;
+    open: Map<string, PriorOpen>;
+    headTexts: Map<string, string | null>;
+  } = { prior: null, open: new Map(), headTexts: new Map() };
   try {
+    // A run that posts reads the prior state of the pull request. With no
+    // review of the tool, the run is a first run. A later run needs the
+    // last reviewed head in the store; when the fetch fails, the run is a
+    // fresh run.
+    progress.stage = "prior";
+    const prior = post
+      ? await loadPriorState(post.github, { ctx: post.ctx, outDir: input.outDir })
+      : null;
+    carry.prior = prior;
+    let runKind: "first" | "later" | "fresh" =
+      prior === null ? "first" : input.fresh === true ? "fresh" : "later";
+    let fetchFailed = false;
+    if (runKind === "later" && prior !== null && !(await ensureCommit(repo, prior.head))) {
+      runKind = "fresh";
+      fetchFailed = true;
+    }
+    progress.stage = "config";
+
     // The config loads from the base commit before any model call and
     // before gather, because its globs change the exclusions. A config that
     // does not validate throws here, so the run writes no record.
@@ -427,6 +467,23 @@ export async function runReview(input: RunInput): Promise<RunResult> {
     const gathered: GatherResult = prText
       ? { ...commitsGathered, description: prText.text }
       : commitsGathered;
+    // A later run reviews only the hunks that are new since the last
+    // reviewed head. Triage still reads the whole diff.
+    let scoped: GatherResult = gathered;
+    if (runKind === "later" && prior !== null) {
+      const priorDiff = await timed("scope", () => prDiff(repo, baseSha, prior.head));
+      const scope = newHunks(gathered.diff, priorDiff);
+      const counts = countHunks(scope.diff);
+      const changedFiles = gathered.changedFiles
+        .filter((f) => scope.files.includes(f.path))
+        .map((f) => ({ path: f.path, hunks: counts.get(f.path) ?? 0 }));
+      scoped = {
+        ...gathered,
+        diff: scope.diff,
+        changedFiles,
+        totalHunks: changedFiles.reduce((sum, f) => sum + f.hunks, 0),
+      };
+    }
     const descriptionMeta: RunRecord["identity"]["description_meta"] = prText
       ? { source: "pr", sanitized: prText.sanitized, truncated: prText.truncated }
       : {
@@ -441,21 +498,32 @@ export async function runReview(input: RunInput): Promise<RunResult> {
     record = await withHeadWorktree(repo, gathered.head, async (cwd): Promise<RunRecord> => {
       let brief: TriageBrief | null = null;
       let triageFailure: QueryFailure | null = null;
-      if (shouldRunTriage({ ...tierInput, totalHunks: gathered.totalHunks })) {
+      // A later run with no new hunk reviews nothing and posts nothing, also
+      // when a label or --tier names another tier (R4, R7).
+      const nothingNew = runKind === "later" && scoped.totalHunks === 0;
+      if (!nothingNew && shouldRunTriage({ ...tierInput, totalHunks: scoped.totalHunks })) {
         const triage = await timed("triage", () =>
           semaphore(() => runTriage(client, options, gathered, cwd)),
         );
         brief = triage.brief;
         triageFailure = triage.failure;
       }
-      const decision = decideTier({
-        ...tierInput,
-        skip: config.skip,
-        totalHunks: gathered.totalHunks,
-        sensitive: gathered.sensitive,
-        brief,
-        triageFailed: triageFailure !== null,
-      });
+      const decision = nothingNew
+        ? {
+            tier: "skip" as const,
+            reason: `No new hunks since ${prior?.head.slice(0, 7) ?? "the last review"}.`,
+            triageRan: false,
+          }
+        : decideTier({
+            ...tierInput,
+            skip: config.skip,
+            // A later run keeps the triage tier of its prior record or a higher one.
+            priorTriageTier: runKind === "later" ? (prior?.triageTier ?? null) : null,
+            totalHunks: scoped.totalHunks,
+            sensitive: gathered.sensitive,
+            brief,
+            triageFailed: triageFailure !== null,
+          });
       progress.tier = decision.tier;
 
       // The tier and the triggers select from the built-in and the custom
@@ -465,7 +533,7 @@ export async function runReview(input: RunInput): Promise<RunResult> {
       const candidates = selectReviewers(
         [...loadBuiltinReviewers(), ...loaded.customReviewers],
         decision.tier,
-        gathered.changedFiles.map((f) => f.path),
+        scoped.changedFiles.map((f) => f.path),
         brief?.categories ?? [],
       );
       const { run: selected, skipped } = skipSelected(candidates, {
@@ -491,7 +559,7 @@ export async function runReview(input: RunInput): Promise<RunResult> {
       );
 
       // The run splits the diff per file once. Find and verify use the map.
-      const sections = diffSections(gathered.diff);
+      const sections = diffSections(scoped.diff);
       // The verifier prompt loads once, at the first finding. A load that
       // fails is tried again at the next finding.
       let verifierPrompt: VerifierPrompt | undefined;
@@ -560,7 +628,7 @@ export async function runReview(input: RunInput): Promise<RunResult> {
               options,
               selected,
               {
-                gathered,
+                gathered: scoped,
                 brief,
                 cwd,
                 semaphore,
@@ -597,7 +665,7 @@ export async function runReview(input: RunInput): Promise<RunResult> {
         merged = await timed("merge", () =>
           mergeFindings(client, options, applied.kept, {
             cwd,
-            totalHunks: gathered.totalHunks,
+            totalHunks: scoped.totalHunks,
             semaphore,
             caps: config.caps,
           }),
@@ -618,6 +686,41 @@ export async function runReview(input: RunInput): Promise<RunResult> {
         )
         .sort((a, b) => a.file.localeCompare(b.file) || a.start_line - b.start_line);
 
+      // The prior state of a later or fresh run (R7). Each open fingerprint
+      // is checked against the head file. A new finding with an open or
+      // dismissed fingerprint does not post again. A later run posts only
+      // blocking findings.
+      let postedFindings = merged.posted;
+      const notReposted: { fingerprint: string; reason: "open" | "dismissed" }[] = [];
+      let belowFloor: PostedFinding[] = [];
+      let carried: PostedFinding[] = [];
+      let openBlocking = 0;
+      if (prior !== null) {
+        for (const entry of prior.open.values()) {
+          if (entry.finding && !carry.headTexts.has(entry.finding.file)) {
+            carry.headTexts.set(entry.finding.file, readHeadFile(cwd, entry.finding.file));
+          }
+        }
+        carry.open = reverify(prior, (path) => carry.headTexts.get(path) ?? null).open;
+        postedFindings = postedFindings.filter((f) => {
+          const reason = prior.open.has(f.fingerprint)
+            ? "open"
+            : prior.dismissed.has(f.fingerprint)
+              ? "dismissed"
+              : null;
+          if (reason !== null) notReposted.push({ fingerprint: f.fingerprint, reason });
+          return reason === null;
+        });
+        carried = [...carry.open.values()]
+          .flatMap((e) => (e.finding ? [e.finding] : []))
+          .sort((a, b) => a.file.localeCompare(b.file) || a.start_line - b.start_line);
+        openBlocking = [...carry.open.values()].filter((e) => e.severity === "blocking").length;
+      }
+      if (runKind === "later") {
+        belowFloor = postedFindings.filter((f) => f.severity !== "blocking");
+        postedFindings = postedFindings.filter((f) => f.severity === "blocking");
+      }
+
       // A failed or refused verifier call, first or escalation, drops its
       // finding and makes the verdict incomplete. So does a result that code
       // rejected after the verifier passed it.
@@ -632,8 +735,9 @@ export async function runReview(input: RunInput): Promise<RunResult> {
             reviewerRuns: runs,
             verifierFailures: counts.failedVerifierCalls + counts.rejectedResults,
             refusals: counts.refusals,
-            posted: merged.posted,
+            posted: postedFindings,
             ceilingSkips: ceilingSkipped.length,
+            openBlocking,
           });
       // The ceiling skips come in the order the passes reached their slots,
       // so they are sorted for a stable record.
@@ -662,6 +766,18 @@ export async function runReview(input: RunInput): Promise<RunResult> {
                 url: prContext.pr.url,
               }
             : null,
+          run_kind: runKind,
+          prior:
+            prior === null
+              ? null
+              : {
+                  head: prior.head,
+                  source: prior.source,
+                  record: prior.record,
+                  open: [...prior.open.keys()].sort(),
+                  dismissed: [...prior.dismissed].sort(),
+                  fetch_failed: fetchFailed,
+                },
           base: gathered.base,
           head: gathered.head,
           started_at: startedAt.toISOString(),
@@ -720,8 +836,11 @@ export async function runReview(input: RunInput): Promise<RunResult> {
             withoutBash,
             sensitiveWithoutHunks(gathered),
           ),
-          findings: merged.posted,
+          findings: postedFindings,
           github: null,
+          below_floor: belowFloor,
+          not_reposted: notReposted,
+          carried,
         },
         cost: {
           queries,
@@ -775,23 +894,43 @@ export async function runReview(input: RunInput): Promise<RunResult> {
 
   let posted: PostedGitHub | null = null;
   progress.stage = "post";
+  const prior = carry.prior;
+  const later = identity.run_kind === "later" && prior !== null;
   try {
-    // A skip run posts its one-line review once per reason.
+    // A later run whose own tier is skip posts nothing. A first skip run
+    // posts its one-line review once per reason.
     const already =
       identity.tier === "skip" &&
-      skipReviewAlreadyPosted(
-        await post.github.listReviews({ slug: post.ctx.slug, number: post.ctx.pr.number }),
-        post.ctx.viewerLogin,
-        identity.tier_reason,
-      );
+      (later ||
+        skipReviewAlreadyPosted(
+          await post.github.listReviews({ slug: post.ctx.slug, number: post.ctx.pr.number }),
+          post.ctx.viewerLogin,
+          identity.tier_reason,
+        ));
     if (!already) {
+      // The newest review body lists every body finding that is still open.
+      const carriedMarkers = [...carry.open]
+        .filter(([, entry]) => entry.thread_id === null)
+        .map(([fp]) => formatFingerprintMarker(fp));
       posted = await postRun(post.github, {
         ctx: post.ctx,
         record,
         runId,
         diff,
-        carriedMarkers: [],
+        carriedMarkers,
+        ...(later ? { sinceHead: prior.head } : {}),
       });
+      // After the review: resolve each thread whose code changed.
+      if (posted.error === null && prior !== null) {
+        const stale = await resolveStaleThreads(post.github, {
+          ctx: post.ctx,
+          prior,
+          headFileText: (path) => carry.headTexts.get(path) ?? null,
+          head: identity.head,
+        });
+        posted.resolved.push(...stale.resolved);
+        posted.errors.push(...stale.errors);
+      }
     }
   } catch (err) {
     // R5a: the run failed before the review posted.

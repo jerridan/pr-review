@@ -27,6 +27,7 @@ interface RunCliOptions {
   head?: string;
   pr?: number;
   githubRepo?: string;
+  fresh?: boolean;
   repo?: string;
   format: "json" | "table" | "github";
   out?: string;
@@ -119,6 +120,7 @@ async function runCommand(deps: ProgramDeps, options: RunCliOptions): Promise<vo
       ...(options.pr !== undefined ? { pr: options.pr } : {}),
       ...(options.githubRepo !== undefined ? { githubRepo: options.githubRepo } : {}),
       format: options.format,
+      ...(options.fresh === true ? { fresh: true } : {}),
       ...(options.tier ? { tierOverride: options.tier } : {}),
       outDir: options.out ?? DEFAULT_OUT_DIR,
       allowApiKey: options.allowApiKey === true,
@@ -164,6 +166,10 @@ export function createProgram(deps: ProgramDeps): Command {
       "--github-repo <owner/repo>",
       "the repo of the pull request (default: from the origin remote)",
       parseSlug,
+    )
+    .option(
+      "--fresh",
+      "with --pr, review the whole pull request again as a first run; open and dismissed findings still do not post again",
     )
     .option("--repo <path>", "the repo to review (default: the current directory)")
     .addOption(

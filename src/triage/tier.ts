@@ -5,6 +5,8 @@
 // 4. zero hunks means skip,
 // 5. a sensitive path sets a floor of full,
 // 6. a triage failure or low confidence gives full, else the triage brief.
+//    On a later run, the triage result is the higher of this run's triage
+//    tier and the triage tier of the prior record (R7).
 import type { RepoConfig } from "../config/repo-config.js";
 import type { TriageBrief } from "../schemas/triage.js";
 
@@ -84,8 +86,13 @@ export function shouldRunTriage(input: PreTierInput & { totalHunks: number }): b
   return preTier(input)?.tier !== "skip" && input.totalHunks > 0;
 }
 
+// The order of the tiers, so that one tier can be higher than another.
+const TIER_RANK: Record<Tier, number> = { skip: 0, fast: 1, full: 2 };
+
 export function decideTier(input: {
   override?: Tier;
+  /** The triage tier of the prior record of a later run, or null. */
+  priorTriageTier?: Tier | null;
   labels?: string[];
   pr?: TierPullRequest | null;
   skip: RepoConfig["skip"];
@@ -113,6 +120,12 @@ export function decideTier(input: {
   }
   if (input.brief.confidence === "low") {
     return result("full", "Triage has low confidence, so the review is full.");
+  }
+  // Triage never lowers the tier between runs.
+  const prior = input.priorTriageTier ?? null;
+  if (prior !== null && TIER_RANK[prior] > TIER_RANK[input.brief.tier]) {
+    const reason = input.brief.reason.replace(/\.$/, "");
+    return result(prior, `Triage: ${reason}. The tier stays ${prior} from the prior record.`);
   }
   return result(input.brief.tier, `Triage: ${input.brief.reason}`);
 }

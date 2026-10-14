@@ -10,7 +10,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, isAbsolute, join } from "node:path";
+import { basename, dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -418,6 +418,39 @@ describe("a sensitive path with no text hunk (R9)", () => {
 
   it("lists nothing for the default fixture, whose sensitive path has a hunk", () => {
     expect(record.posted.coverage.sensitive_without_hunks).toEqual([]);
+  });
+});
+
+describe("the record directory of a --pr run (R8)", () => {
+  it("writes a record with a pr number under <out>/pr-<n>/, with the same file name", async () => {
+    const out = join(outRoot, "pr-dir");
+    const withPr = { ...record, identity: { ...record.identity, pr: 12 } };
+    const path = await writeRecord(out, withPr);
+    expect(path).toBe(
+      join(
+        outRoot,
+        "pr-dir",
+        "pr-12",
+        recordFileName(new Date(record.identity.started_at), record.identity.head),
+      ),
+    );
+    expect(existsSync(path)).toBe(true);
+  });
+
+  it("writes a record with no pr number in <out>/", async () => {
+    const out = join(outRoot, "no-pr-dir");
+    const path = await writeRecord(out, record);
+    expect(dirname(path)).toBe(join(outRoot, "no-pr-dir"));
+  });
+});
+
+describe("the run kind and the prior state of a run without --pr (R8)", () => {
+  it("is a first run with no prior state and the new posted keys empty", () => {
+    expect(record.identity.run_kind).toBe("first");
+    expect(record.identity.prior).toBeNull();
+    expect(record.posted.below_floor).toEqual([]);
+    expect(record.posted.not_reposted).toEqual([]);
+    expect(record.posted.carried).toEqual([]);
   });
 });
 

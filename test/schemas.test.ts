@@ -95,6 +95,8 @@ function makeRecord(): RunRecord {
       repo: "/tmp/repo",
       pr: null,
       github: null,
+      run_kind: "first",
+      prior: null,
       base: "a".repeat(40),
       head: "b".repeat(40),
       started_at: "2026-10-13T12:00:00.000Z",
@@ -197,6 +199,9 @@ function makeRecord(): RunRecord {
         },
       ],
       github: null,
+      below_floor: [],
+      not_reposted: [],
+      carried: [],
     },
     cost: {
       queries: [
@@ -523,6 +528,55 @@ describe("RecordSchema", () => {
     expect(withList([".github/workflows/ci.yml"])).toBe(true);
     expect(withList([1])).toBe(false);
     expect(withList(undefined)).toBe(false);
+  });
+
+  it("requires identity.run_kind and identity.prior (R8)", () => {
+    const record = makeRecord();
+    const withIdentity = (patch: Record<string, unknown>) =>
+      RecordSchema.safeParse({ ...record, identity: { ...record.identity, ...patch } }).success;
+    const prior = {
+      head: "a".repeat(40),
+      source: "record",
+      record: "/out/pr-7/x.json",
+      open: ["fp1"],
+      dismissed: ["fp2"],
+      fetch_failed: false,
+    };
+    for (const kind of ["first", "later", "fresh"]) {
+      expect(withIdentity({ run_kind: kind })).toBe(true);
+    }
+    expect(withIdentity({ run_kind: "second" })).toBe(false);
+    expect(withIdentity({ run_kind: undefined })).toBe(false);
+    expect(withIdentity({ run_kind: "later", prior })).toBe(true);
+    expect(withIdentity({ prior: { ...prior, source: "marker", record: null } })).toBe(true);
+    expect(withIdentity({ prior: { ...prior, source: null, fetch_failed: true } })).toBe(true);
+    expect(withIdentity({ prior: { ...prior, source: "branch" } })).toBe(false);
+    expect(withIdentity({ prior: { ...prior, extra: 1 } })).toBe(false);
+    const { fetch_failed: _f, ...noFetch } = prior;
+    expect(withIdentity({ prior: noFetch })).toBe(false);
+    expect(withIdentity({ prior: undefined })).toBe(false);
+  });
+
+  it("requires posted.below_floor, posted.not_reposted and posted.carried (R7, R8)", () => {
+    const record = makeRecord();
+    const finding = record.posted.findings[0]!;
+    const withPosted = (patch: Record<string, unknown>) =>
+      RecordSchema.safeParse({ ...record, posted: { ...record.posted, ...patch } }).success;
+    expect(withPosted({ below_floor: [finding], carried: [finding] })).toBe(true);
+    expect(
+      withPosted({
+        not_reposted: [
+          { fingerprint: "a", reason: "open" },
+          { fingerprint: "b", reason: "dismissed" },
+        ],
+      }),
+    ).toBe(true);
+    expect(withPosted({ not_reposted: [{ fingerprint: "a", reason: "old" }] })).toBe(false);
+    expect(withPosted({ not_reposted: [{ fingerprint: "a" }] })).toBe(false);
+    expect(withPosted({ below_floor: [{ ...finding, span_text: undefined }] })).toBe(false);
+    for (const key of ["below_floor", "not_reposted", "carried"]) {
+      expect(withPosted({ [key]: undefined })).toBe(false);
+    }
   });
 
   it("requires span_text on a PostedFinding (R8)", () => {

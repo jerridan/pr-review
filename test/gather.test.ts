@@ -10,7 +10,8 @@ import { countHunks, diffSections, filterDiff, parseNameStatus } from "../src/ga
 import { applyExclusions } from "../src/gather/exclusions.js";
 import type * as History from "../src/gather/history.js";
 import { gatherHistory, HISTORY_CAP_BYTES, oldSideRanges } from "../src/gather/history.js";
-import { gather, type GatherResult } from "../src/gather/index.js";
+import { gather, prDiff, type GatherResult } from "../src/gather/index.js";
+import { newHunks } from "../src/github/scope.js";
 import { withHeadWorktree } from "../src/gather/worktree.js";
 
 // A switch for the history mock below. It is off unless a test sets it.
@@ -573,4 +574,79 @@ describe("gatherHistory", () => {
     expect(HISTORY_CAP_BYTES).toBe(65536);
     expect(out?.text.endsWith(";")).toBe(true);
   });
+});
+
+describe("the fixture states of a later run (R7)", () => {
+  type States = Record<string, string>;
+  const repos: string[] = [];
+  afterAll(() => {
+    for (const repo of repos) rmSync(repo, { recursive: true, force: true });
+  });
+
+  async function states(...options: string[]): Promise<States> {
+    const { stdout } = await run("bash", [SCRIPT, ...options]);
+    const out: States = {};
+    for (const line of stdout.split("\n")) {
+      const at = line.indexOf("=");
+      if (at > 0) out[line.slice(0, at)] = line.slice(at + 1);
+    }
+    if (out.FIXTURE) repos.push(out.FIXTURE);
+    return out;
+  }
+  const git = async (repo: string, ...args: string[]) =>
+    (await run("git", ["-C", repo, ...args])).stdout.trim();
+
+  it("--second-push adds HEAD2: one commit on HEAD that changes one hunk of src/stats.ts", async () => {
+    const st = await states("--second-push");
+    const repo = st.FIXTURE ?? "";
+    expect(st.HEAD2).toMatch(/^[0-9a-f]{40}$/);
+    expect(st.HEAD3).toBeUndefined();
+    expect(await git(repo, "rev-parse", `${st.HEAD2}^`)).toBe(st.HEAD);
+    expect(await git(repo, "diff", "--name-only", st.HEAD ?? "", st.HEAD2 ?? "")).toBe(
+      "src/stats.ts",
+    );
+    const stats = await git(repo, "show", `${st.HEAD2}:src/stats.ts`);
+    expect(stats).not.toContain("return total / values.length;");
+    expect(stats).toContain("values.length === 0");
+    // The planted line keeps its place.
+    expect(stats.split("\n")[10]).toContain("i <= values.length");
+  }, 30_000);
+
+  it("--amend adds HEAD3: the tree of HEAD2 with another sha, and implies --second-push", async () => {
+    const st = await states("--amend");
+    const repo = st.FIXTURE ?? "";
+    expect(st.HEAD2).toMatch(/^[0-9a-f]{40}$/);
+    expect(st.HEAD3).toMatch(/^[0-9a-f]{40}$/);
+    expect(st.HEAD3).not.toBe(st.HEAD2);
+    expect(await git(repo, "rev-parse", `${st.HEAD3}^{tree}`)).toBe(
+      await git(repo, "rev-parse", `${st.HEAD2}^{tree}`),
+    );
+    // HEAD2 stays in the object store.
+    await expect(git(repo, "cat-file", "-e", `${st.HEAD2}^{commit}`)).resolves.toBeDefined();
+  }, 30_000);
+
+  it("is the same on two builds: fixed dates give fixed shas", async () => {
+    const a = await states("--amend");
+    const b = await states("--amend");
+    expect([a.HEAD, a.HEAD2, a.HEAD3]).toEqual([b.HEAD, b.HEAD2, b.HEAD3]);
+  }, 30_000);
+
+  it("prDiff is the unfiltered three-dot diff of gather, and HEAD2 has one new hunk over HEAD", async () => {
+    const st = await states("--amend");
+    const repo = st.FIXTURE ?? "";
+    const base = st.BASE ?? "";
+    const atHead = await prDiff(repo, base, st.HEAD ?? "");
+    const gathered = await gather(repo, base, st.HEAD ?? "", { ...DEFAULT_GLOBS, history: false });
+    expect(atHead).toContain("+++ b/package-lock.json");
+    expect(gathered.diff).not.toContain("package-lock.json");
+    expect(atHead).toContain(diffSections(gathered.diff).get("src/stats.ts"));
+    expect(atHead).not.toContain("The base branch moved on");
+
+    const atHead2 = await prDiff(repo, base, st.HEAD2 ?? "");
+    const scoped = newHunks(atHead2, atHead);
+    expect(scoped.files).toEqual(["src/stats.ts"]);
+    expect(countHunks(scoped.diff).get("src/stats.ts")).toBe(1);
+    const atHead3 = await prDiff(repo, base, st.HEAD3 ?? "");
+    expect(newHunks(atHead3, atHead2)).toEqual({ diff: "", files: [] });
+  }, 30_000);
 });

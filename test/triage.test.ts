@@ -430,3 +430,47 @@ describe("runTriage", () => {
     expect(result.meta).toBeNull();
   });
 });
+
+describe("decideTier: the prior triage tier of a later run (R7)", () => {
+  it("keeps the higher prior triage tier, and says so", () => {
+    const result = decideTier(
+      input({ brief: brief({ tier: "fast", reason: "Small change." }), priorTriageTier: "full" }),
+    );
+    expect(result.tier).toBe("full");
+    expect(result.reason).toBe("Triage: Small change. The tier stays full from the prior record.");
+  });
+
+  it("takes this run's triage tier when it is the same or higher", () => {
+    const up = decideTier(input({ brief: brief({ tier: "full" }), priorTriageTier: "fast" }));
+    expect(up.tier).toBe("full");
+    expect(up.reason).not.toContain("prior record");
+    const same = decideTier(input({ brief: brief({ tier: "fast" }), priorTriageTier: "fast" }));
+    expect(same.tier).toBe("fast");
+    expect(same.reason).not.toContain("prior record");
+    const fromSkip = decideTier(input({ brief: brief({ tier: "fast" }), priorTriageTier: "skip" }));
+    expect(fromSkip.tier).toBe("fast");
+    expect(decideTier(input({ brief: brief({ tier: "fast" }), priorTriageTier: null })).tier).toBe(
+      "fast",
+    );
+  });
+
+  it("lets --tier, a label, a skip rule, zero hunks and the sensitive floor win over it", () => {
+    const prior = { priorTriageTier: "full" as const, brief: brief({ tier: "fast" }) };
+    expect(decideTier(input({ ...prior, override: "fast" })).tier).toBe("fast");
+    expect(decideTier(input({ ...prior, labels: ["review:fast"], pr: PR })).tier).toBe("fast");
+    expect(
+      decideTier(input({ ...prior, pr: { ...PR, draft: true }, skip: skipRules({ draft: true }) }))
+        .tier,
+    ).toBe("skip");
+    expect(decideTier(input({ ...prior, totalHunks: 0 })).tier).toBe("skip");
+    const sensitive = decideTier(input({ ...prior, sensitive: ["src/auth/x.ts"] }));
+    expect(sensitive.tier).toBe("full");
+    expect(sensitive.reason).toMatch(/sensitive/i);
+  });
+
+  it("does not lower a triage failure, which gives full", () => {
+    expect(
+      decideTier(input({ brief: null, triageFailed: true, priorTriageTier: "skip" })).tier,
+    ).toBe("full");
+  });
+});

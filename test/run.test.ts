@@ -22,6 +22,7 @@ import type * as History from "../src/gather/history.js";
 import { GitHubError, type GitHubClient } from "../src/github/client.js";
 import { createFakeGitHubClient, type FakePullRequestSeed } from "../src/github/fake.js";
 import type * as Gh from "../src/github/gh.js";
+import type * as Tier from "../src/triage/tier.js";
 import { prDescription } from "../src/github/metadata.js";
 import type * as PromptLoad from "../src/prompts/load.js";
 import type * as ReviewerLoader from "../src/reviewers/loader.js";
@@ -46,8 +47,21 @@ const mocks = vi.hoisted(() => ({
   // The count of real GitHub clients made, and the client the mock gives
   // in their place, so no test runs gh.
   ghClients: 0,
+  // The input of each decideTier call.
+  tierInputs: [] as Parameters<typeof Tier.decideTier>[0][],
   ghStandIn: null as GitHubClient | null,
 }));
+
+vi.mock("../src/triage/tier.js", async (importOriginal) => {
+  const original = await importOriginal<typeof Tier>();
+  return {
+    ...original,
+    decideTier: (input: Parameters<typeof original.decideTier>[0]) => {
+      mocks.tierInputs.push(input);
+      return original.decideTier(input);
+    },
+  };
+});
 
 vi.mock("../src/github/gh.js", async (importOriginal) => {
   const original = await importOriginal<typeof Gh>();
@@ -196,9 +210,12 @@ beforeEach(() => {
     return true;
   });
   process.exitCode = undefined;
+  // The viewer login comes from the fake client, also in GitHub Actions.
+  vi.stubEnv("GITHUB_ACTIONS", "");
 });
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
   process.exitCode = undefined;
 });
 
@@ -1758,6 +1775,7 @@ describe("pre-existing findings, the check run and the cleanup comment (R6)", ()
     gh: ReturnType<typeof github>,
     out: string,
     preClaim?: string,
+    fresh = false,
   ) {
     return runReview({
       repo: f.repo,
@@ -1765,6 +1783,7 @@ describe("pre-existing findings, the check run and the cleanup comment (R6)", ()
       github: gh,
       outDir: join(outRoot, out),
       format: "github",
+      fresh,
       allowApiKey: false,
       client: createFakeSdkClient(preScript(f, preClaim)),
     });
@@ -1807,7 +1826,8 @@ describe("pre-existing findings, the check run and the cleanup comment (R6)", ()
     expect(comment?.body).not.toContain("CLAIM-NOQUOTE");
     expect(first.record.posted.github?.cleanup_comment_id).toBe(comment?.id);
 
-    const second = await postRunOf(f, gh, "pre-comment-2", "CLAIM-PRE-SECOND");
+    // The second run is at the same head, so only a fresh run posts again.
+    const second = await postRunOf(f, gh, "pre-comment-2", "CLAIM-PRE-SECOND", true);
     expect(gh.state.issue_comments).toHaveLength(1);
     expect(gh.state.issue_comments[0]?.body).toContain("CLAIM-PRE-SECOND");
     expect(gh.state.issue_comments[0]?.body).not.toContain("CLAIM-PRE\n");
@@ -1888,4 +1908,59 @@ describe("pre-existing findings, the check run and the cleanup comment (R6)", ()
     expect(result.reviewUrl).toBeNull();
     expect(result.record.posted.github).toBeNull();
   });
+});
+
+describe("the prior triage tier of a later run (R7)", () => {
+  let f: Fixture & { head2: string };
+  beforeAll(async () => {
+    const { stdout } = await run("bash", [SCRIPT, "--amend"]);
+    const value = (key: string) =>
+      stdout
+        .split("\n")
+        .find((l) => l.startsWith(`${key}=`))
+        ?.slice(key.length + 1) ?? "";
+    const [file, line] = value("PLANTED").split(":");
+    f = {
+      repo: value("FIXTURE"),
+      base: value("BASE"),
+      head: value("HEAD"),
+      head2: value("HEAD2"),
+      file: file ?? "",
+      line: Number(line),
+    };
+  }, 30_000);
+  afterAll(() => {
+    if (f) rmSync(f.repo, { recursive: true, force: true });
+  });
+
+  it("passes identity.triage.tier of the prior record, and records this run's triage", async () => {
+    {
+      const gh = createFakeGitHubClient({
+        number: 7,
+        base_sha: f.base,
+        head_sha: f.head,
+        url: "https://github.com/acme/widgets/pull/7",
+        viewer_login: "me[bot]",
+      });
+      const out = join(outRoot, "prior-triage");
+      // The first run's triage gives full. The second run's triage gives fast.
+      const triageTier = { value: "full" as "full" | "fast" };
+      const sdk = createFakeSdkClient((req) =>
+        req.role === "triage"
+          ? { ok: true, output: { ...BRIEF, tier: triageTier.value }, raw: META }
+          : script(f)(req),
+      );
+      const input = { repo: f.repo, pr: 7, github: gh, outDir: out, format: "github" as const };
+      const first = await runReview({ ...input, allowApiKey: false, client: sdk });
+      expect(first.record.identity.triage?.tier).toBe("full");
+      expect(mocks.tierInputs.at(-1)?.priorTriageTier ?? null).toBeNull();
+
+      gh.state.pr.head_sha = f.head2;
+      triageTier.value = "fast";
+      const second = await runReview({ ...input, allowApiKey: false, client: sdk });
+      expect(second.record.identity.run_kind).toBe("later");
+      expect(second.record.identity.triage?.tier).toBe("fast");
+      expect(mocks.tierInputs.at(-1)?.priorTriageTier).toBe("full");
+    }
+  }, 60_000);
 });
