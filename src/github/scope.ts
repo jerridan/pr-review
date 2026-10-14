@@ -35,22 +35,32 @@ function splitHunks(section: string): { header: string; hunks: Hunk[] } {
 }
 
 /**
- * Give the hunks of "headDiff" that are new against "priorDiff". A hunk is
- * new when no hunk of the prior diff has the same path and the same added
- * and removed lines. The diff holds, per file with a new hunk, the header
- * lines of the file and its new hunks only. "files" lists those files.
+ * Give the hunks of "headDiff" that are new against "priorDiff". The prior
+ * diff holds each key (path plus added and removed lines) a number of times.
+ * Walk the head hunks in order. A head hunk is not new when the prior count
+ * of its key is more than zero. Then take one from that count. Thus a second
+ * hunk with the same changed lines as one prior hunk is new. The diff holds,
+ * per file with a new hunk, the header lines of the file and its new hunks
+ * only. "files" lists those files.
  */
 export function newHunks(headDiff: string, priorDiff: string): { diff: string; files: string[] } {
-  const priorKeys = new Map<string, Set<string>>();
+  const priorCounts = new Map<string, Map<string, number>>();
   for (const [path, section] of diffSections(priorDiff)) {
-    priorKeys.set(path, new Set(splitHunks(section).hunks.map((h) => h.key)));
+    const counts = new Map<string, number>();
+    for (const h of splitHunks(section).hunks) counts.set(h.key, (counts.get(h.key) ?? 0) + 1);
+    priorCounts.set(path, counts);
   }
   let diff = "";
   const files: string[] = [];
   for (const [path, section] of diffSections(headDiff)) {
     const { header, hunks } = splitHunks(section);
-    const seen = priorKeys.get(path) ?? new Set<string>();
-    const fresh = hunks.filter((h) => !seen.has(h.key));
+    const remaining = priorCounts.get(path) ?? new Map<string, number>();
+    const fresh = hunks.filter((h) => {
+      const left = remaining.get(h.key) ?? 0;
+      if (left === 0) return true;
+      remaining.set(h.key, left - 1);
+      return false;
+    });
     if (fresh.length === 0) continue;
     diff += header + fresh.map((h) => h.text).join("");
     files.push(path);
