@@ -42,6 +42,27 @@ describe("sanitizeGitHubText (R3)", () => {
     expect(sanitizeGitHubText("a\tb\nc\u0007d\u001Be\r\n").text).toBe("a\tb\ncde\n");
   });
 
+  // Each case is a character that GitHub shows as nothing.
+  const invisible: [string, string[]][] = [
+    ["a variation selector", ["\uFE0F"]],
+    ["the supplement variation selectors", ["\u{E0100}", "\u{E0141}"]],
+    ["the Hangul choseong filler", ["\u115F"]],
+    ["the Hangul jungseong filler", ["\u1160"]],
+    ["the Hangul filler", ["\u3164"]],
+    ["the halfwidth Hangul filler", ["\uFFA0"]],
+    ["the braille blank", ["\u2800"]],
+  ];
+  for (const [name, chars] of invisible) {
+    it(`removes ${name}`, () => {
+      const input = `a${chars.join("b")}c`;
+      const out = sanitizeGitHubText(input);
+      expect(out.sanitized).toBe(true);
+      expect(out.truncated).toBe(false);
+      for (const ch of chars) expect(out.text).not.toContain(ch);
+      expect(out.text).toBe(chars.length === 1 ? "ac" : "abc");
+    });
+  }
+
   it("caps a long body at 20000 characters and reports the cut", () => {
     const long = "x".repeat(25_000);
     const out = sanitizeGitHubText(long);

@@ -17,7 +17,7 @@ import {
   type QueryRequest,
 } from "../src/sdk/client.js";
 import { createFakeSdkClient } from "../src/sdk/fake.js";
-import { buildQueryOptions, type RunOptions } from "../src/sdk/options.js";
+import { buildQueryOptions, GITHUB_ENV_VARS, type RunOptions } from "../src/sdk/options.js";
 import { createSemaphore } from "../src/semaphore.js";
 
 // The pinned values from the spec. The test holds its own copy so that a
@@ -222,6 +222,27 @@ describe("A13: query options for every role", () => {
     expect(env.CLAUDE_CODE_USE_VERTEX).toBe("1");
     expect(env.CLAUDE_CODE_USE_FOUNDRY).toBe("1");
     expect(env.CLAUDE_CODE_DISABLE_AUTO_MEMORY).toBe("1");
+  });
+
+  it("removes GH_TOKEN and GITHUB_TOKEN from the SDK env, with or without allowApiKey", () => {
+    expect([...GITHUB_ENV_VARS].sort()).toEqual(["GH_TOKEN", "GITHUB_TOKEN"]);
+    for (const allowApiKey of [true, false]) {
+      const options = runOptions(allowApiKey);
+      options.env.GH_TOKEN = "x";
+      options.env.GITHUB_TOKEN = "x";
+      options.env.UNRELATED_VAR = "keep";
+      const env = buildQueryOptions(request("reviewer"), options).env as Record<
+        string,
+        string | undefined
+      >;
+      expect(env, String(allowApiKey)).not.toHaveProperty("GH_TOKEN");
+      expect(env, String(allowApiKey)).not.toHaveProperty("GITHUB_TOKEN");
+      expect(env.UNRELATED_VAR).toBe("keep");
+      expect(env.PATH).toBe("/usr/bin:/bin");
+      // The CLI process keeps the variables. Only the SDK env loses them.
+      expect(options.env.GH_TOKEN).toBe("x");
+      expect(options.env.GITHUB_TOKEN).toBe("x");
+    }
   });
 
   it("does not change the caller's env", () => {
