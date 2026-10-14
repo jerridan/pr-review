@@ -10,13 +10,10 @@ import {
   formatRunMarker,
   type RunMarker,
 } from "./markers.js";
+import { redact } from "./sanitize.js";
 
 // The longest failure message that a failure review holds.
 const MAX_FAILURE_MESSAGE = 500;
-
-// These patterns match GitHub tokens and a credential in a URL.
-const TOKEN_RE = /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})/g;
-const URL_CREDENTIAL_RE = /\/\/[^/\s@]+@/g;
 
 /**
  * Make model text safe in markdown: "<" and ">" become entities. Thus the
@@ -229,10 +226,7 @@ export function renderCleanupComment(findings: PostedFinding[]): string {
 
 /** Remove token-like text, put the text on one line, escape it and cut it. */
 function safeMessage(message: string): string {
-  const redacted = message
-    .replace(TOKEN_RE, "[redacted]")
-    .replace(URL_CREDENTIAL_RE, "//[redacted]@");
-  return escapeText(oneLine(redacted)).slice(0, MAX_FAILURE_MESSAGE);
+  return escapeText(oneLine(redact(message))).slice(0, MAX_FAILURE_MESSAGE);
 }
 
 /** The body of the failure review of R5a: the marker and one line. */

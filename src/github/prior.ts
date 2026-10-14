@@ -5,7 +5,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { RecordSchema, type PostedFinding, type RunRecord } from "../schemas/record.js";
-import type { GitHubClient, Review } from "./client.js";
+import { sameLogin, type GitHubClient, type Review } from "./client.js";
 import { parseFingerprintMarkers, parseRunMarker, parseSeverity } from "./markers.js";
 import type { PrContext } from "./metadata.js";
 
@@ -36,9 +36,6 @@ export type PriorState = {
 
 /** The first words of the reply with which the tool resolves a thread. */
 export const RESOLVED_REPLY_PREFIX = "Resolved by pr-review";
-
-// GitHub compares logins without regard to case.
-const sameLogin = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
 
 /**
  * Find the newest record in "<outDir>/pr-<pr>/" that posted a review with

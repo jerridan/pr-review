@@ -1,6 +1,11 @@
 // The GitHub boundary. This interface is the only way the tool reaches the
 // GitHub API. The real client is in gh.ts. The fake for tests is in fake.ts.
 
+/** True when two logins are the same. GitHub compares logins without regard to case. */
+export function sameLogin(a: string, b: string): boolean {
+  return a.toLowerCase() === b.toLowerCase();
+}
+
 export type Permission = "admin" | "maintain" | "write" | "triage" | "read" | "none";
 
 export type PullRequest = {

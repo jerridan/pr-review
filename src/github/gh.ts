@@ -16,6 +16,7 @@ import {
   type ReviewComment,
   type Thread,
 } from "./client.js";
+import { redact } from "./sanitize.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -26,16 +27,6 @@ const PERMISSIONS: readonly Permission[] = ["admin", "maintain", "write", "triag
 const SLUG_RE = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const LOGIN_RE = /^[A-Za-z0-9][A-Za-z0-9-]*(\[bot\])?$/;
 const SEGMENT_RE = /^[A-Za-z0-9_.-]+$/;
-
-// These patterns match GitHub tokens and a credential in a URL. The client
-// removes them from each error message. It does not compare with env values.
-const TOKEN_RE = /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})/g;
-const URL_CREDENTIAL_RE = /\/\/[^/\s@]+@/g;
-
-/** Remove token-like text from "text". */
-function redact(text: string): string {
-  return text.replace(TOKEN_RE, "[redacted]").replace(URL_CREDENTIAL_RE, "//[redacted]@");
-}
 
 /** Give the first line of stderr that is not empty, redacted and short. */
 function reasonOf(stderr: string | undefined): string {

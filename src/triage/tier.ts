@@ -8,6 +8,9 @@
 //    On a later run, the triage result is the higher of this run's triage
 //    tier and the triage tier of the prior record (R7).
 import type { RepoConfig } from "../config/repo-config.js";
+// GitHub compares label names the same way as logins: without regard to
+// case. So sameLogin also compares the labels.
+import { sameLogin } from "../github/client.js";
 import type { TriageBrief } from "../schemas/triage.js";
 
 export type Tier = "skip" | "fast" | "full";
@@ -30,9 +33,6 @@ const TIER_LABELS: { label: string; tier: Tier; reason: string }[] = [
   { label: "review:full", tier: "full", reason: "Label review:full sets a floor of full." },
 ];
 
-// GitHub compares label names and logins without regard to case.
-const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
-
 // Give the reason of the first skip rule that matches the pull request,
 // or null. Each reason names the rule and the config value that matched.
 function skipRuleReason(
@@ -48,11 +48,11 @@ function skipRuleReason(
   if (keyword !== undefined) {
     return `Skip rule skip.title_keywords: the title contains "${keyword}".`;
   }
-  const label = skip.labels.find((l) => labels.some((have) => same(have, l)));
+  const label = skip.labels.find((l) => labels.some((have) => sameLogin(have, l)));
   if (label !== undefined) {
     return `Skip rule skip.labels: the pull request has the label "${label}".`;
   }
-  const author = skip.bot_authors.find((a) => same(a, pr.author));
+  const author = skip.bot_authors.find((a) => sameLogin(a, pr.author));
   if (author !== undefined) {
     return `Skip rule skip.bot_authors: the author is "${author}".`;
   }
@@ -69,7 +69,8 @@ export function preTier(input: PreTierInput): { tier: Tier; reason: string } | n
   }
   const labels = input.labels ?? [];
   for (const entry of TIER_LABELS) {
-    if (labels.some((l) => same(l, entry.label))) return { tier: entry.tier, reason: entry.reason };
+    if (labels.some((l) => sameLogin(l, entry.label)))
+      return { tier: entry.tier, reason: entry.reason };
   }
   if (input.pr && input.skip) {
     const reason = skipRuleReason(input.pr, labels, input.skip);

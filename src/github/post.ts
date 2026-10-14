@@ -2,7 +2,7 @@
 // (R5, R6), and the failure review (R5a).
 import { normalizeWs } from "../find/evidence.js";
 import type { PostedGitHub, PostedFinding, RunRecord } from "../schemas/record.js";
-import type { GitHubClient, Review, Thread } from "./client.js";
+import { sameLogin, type GitHubClient, type Review, type Thread } from "./client.js";
 import {
   CLEANUP_MARKER,
   parseFingerprintMarkers,
@@ -27,9 +27,6 @@ export const CHECK_RUN_NAME = "pr-review";
 function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
-
-// GitHub compares logins without regard to case.
-const sameLogin = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
 
 /**
  * Update the cleanup comment of the viewer, or create one when it does

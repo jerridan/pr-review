@@ -1,6 +1,19 @@
 // Sanitize text from GitHub before it enters a prompt. The text is still
 // untrusted after this. The caller must also wrap it with src/untrusted.ts.
 
+// These patterns match GitHub tokens and a credential in a URL.
+const TOKEN_RE = /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})/g;
+const URL_CREDENTIAL_RE = /\/\/[^/\s@]+@/g;
+
+/**
+ * Remove token-like text and the credential in a URL from "text". Use it
+ * on each error text that goes to a record or to GitHub. It does not
+ * compare with env values.
+ */
+export function redact(text: string): string {
+  return text.replace(TOKEN_RE, "[redacted]").replace(URL_CREDENTIAL_RE, "//[redacted]@");
+}
+
 /** The default cap, in characters (code points). */
 export const SANITIZE_CAP = 20000;
 
