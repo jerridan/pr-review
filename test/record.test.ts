@@ -148,6 +148,7 @@ beforeAll(async () => {
     base: fx.base,
     head: fx.head,
     outDir: join(outRoot, "records"),
+    format: "json",
     allowApiKey: false,
     client: fake,
     now: () => new Date("2026-10-13T12:34:56.789Z"),
@@ -187,7 +188,7 @@ describe("the record file (A9)", () => {
 
   it("is not written when it does not validate", async () => {
     const dir = join(outRoot, "invalid");
-    const broken = { ...record, identity: { ...record.identity, pr: 7 } } as unknown as RunRecord;
+    const broken = { ...record, identity: { ...record.identity, pr: "7" } } as unknown as RunRecord;
     await expect(writeRecord(dir, broken)).rejects.toThrow();
     expect(existsSync(dir) ? readdirSync(dir) : []).toEqual([]);
   });
@@ -198,9 +199,18 @@ describe("the record file (A9)", () => {
     await expect(writeRecord(dir, record)).rejects.toThrow();
   });
 
-  it("has pr and config_hash set to null", () => {
+  it("has pr, github and config_hash set to null", () => {
     expect(record.identity.pr).toBeNull();
+    expect(record.identity.github).toBeNull();
     expect(record.identity.config_hash).toBeNull();
+  });
+
+  it("names the commits as the source of the description, not sanitized and not cut (R3)", () => {
+    expect(record.identity.description_meta).toEqual({
+      source: "commits",
+      sanitized: false,
+      truncated: false,
+    });
   });
 
   it("holds the description, the history flags and no injected file (R9)", () => {
@@ -269,6 +279,7 @@ describe("the config hash of a fixture with config (R4)", () => {
       head: configFx.head,
       tierOverride: "fast",
       outDir: join(outRoot, "config-records"),
+      format: "json",
       allowApiKey: false,
       client: fake,
     });
@@ -372,6 +383,7 @@ describe("a sensitive path with no text hunk (R9)", () => {
         base: zeroFx.base,
         head: zeroFx.head,
         outDir: join(outRoot, "zero-records"),
+        format: "json",
         allowApiKey: false,
         client: fake,
       })

@@ -229,6 +229,7 @@ describe("A13: every query takes its prompts from the prompt files", () => {
         base: value("BASE"),
         head: value("HEAD"),
         outDir,
+        format: "json",
         allowApiKey: false,
         client: fake,
       });

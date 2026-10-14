@@ -94,6 +94,7 @@ function makeRecord(): RunRecord {
     identity: {
       repo: "/tmp/repo",
       pr: null,
+      github: null,
       base: "a".repeat(40),
       head: "b".repeat(40),
       started_at: "2026-10-13T12:00:00.000Z",
@@ -101,6 +102,7 @@ function makeRecord(): RunRecord {
       config_hash: null,
       config: { files: [], values: DEFAULT_REPO_CONFIG, custom_reviewers: [] },
       description: "Fix the loop bound.",
+      description_meta: { source: "commits", sanitized: false, truncated: false },
       history: { built: true, truncated: false },
       injected: [{ path: "CLAUDE.md", truncated: false }],
       changed_files: [{ path: "src/a.ts", hunks: 1 }],
@@ -369,11 +371,15 @@ describe("RecordSchema", () => {
     }
   });
 
-  it("requires pr to be null, and config_hash to be null or a hex SHA-256", () => {
+  it("takes pr as null or a number (R2), and config_hash as null or a hex SHA-256", () => {
     const record = makeRecord();
-    expect(
-      RecordSchema.safeParse({ ...record, identity: { ...record.identity, pr: 12 } }).success,
-    ).toBe(false);
+    const withPr = (pr: unknown) =>
+      RecordSchema.safeParse({ ...record, identity: { ...record.identity, pr } }).success;
+    expect(withPr(12)).toBe(true);
+    expect(withPr(null)).toBe(true);
+    expect(withPr("12")).toBe(false);
+    expect(withPr(0)).toBe(false);
+    expect(withPr(1.5)).toBe(false);
     expect(
       RecordSchema.safeParse({ ...record, identity: { ...record.identity, config_hash: "x" } })
         .success,
@@ -410,6 +416,46 @@ describe("RecordSchema", () => {
     expect(
       withConfig({ files: [], values: DEFAULT_REPO_CONFIG, custom_reviewers: [], hash: "x" }),
     ).toBe(false);
+  });
+
+  it("takes identity.github as null or the strict PR object (R2)", () => {
+    const record = makeRecord();
+    const github = {
+      slug: "acme/widgets",
+      title: "Add average",
+      draft: false,
+      labels: ["review:full"],
+      author: "alice",
+      author_type: "User",
+      author_write_access: true,
+      fork: false,
+      head_repo: "acme/widgets",
+      url: "https://github.com/acme/widgets/pull/7",
+    };
+    const withGithub = (value: unknown) =>
+      RecordSchema.safeParse({ ...record, identity: { ...record.identity, pr: 7, github: value } })
+        .success;
+    expect(withGithub(github)).toBe(true);
+    expect(withGithub(null)).toBe(true);
+    expect(withGithub({ ...github, extra: 1 })).toBe(false);
+    const { fork: _fork, ...noFork } = github;
+    expect(withGithub(noFork)).toBe(false);
+    expect(withGithub(undefined)).toBe(false);
+  });
+
+  it("requires identity.description_meta with the source and the two flags (R3)", () => {
+    const record = makeRecord();
+    const withMeta = (value: unknown) =>
+      RecordSchema.safeParse({
+        ...record,
+        identity: { ...record.identity, description_meta: value },
+      }).success;
+    expect(withMeta({ source: "pr", sanitized: true, truncated: true })).toBe(true);
+    expect(withMeta({ source: "commits", sanitized: false, truncated: false })).toBe(true);
+    expect(withMeta({ source: "issue", sanitized: false, truncated: false })).toBe(false);
+    expect(withMeta({ source: "pr", sanitized: false })).toBe(false);
+    expect(withMeta({ source: "pr", sanitized: false, truncated: false, x: 1 })).toBe(false);
+    expect(withMeta(undefined)).toBe(false);
   });
 
   it("requires the description, the history flags and the injected files", () => {

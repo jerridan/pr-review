@@ -309,6 +309,7 @@ describe("the query failure rule: each condition and each stage outcome (A8)", (
           sensitive: [],
           brief: out.brief,
           triageFailed: out.failure !== null,
+          skip: DEFAULT_REPO_CONFIG.skip,
         }).tier,
       ).toBe("full");
     });

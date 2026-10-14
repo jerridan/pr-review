@@ -1,6 +1,7 @@
 // Gather: the three-dot diff between two commits, with rename detection,
 // the changed files with their hunk counts, the exclusions, the merge
 // base, the description of the change and the history block.
+import { sanitizeCommitMessages } from "../github/sanitize.js";
 import { diffSections, parseNameStatus } from "./diff.js";
 import { applyExclusions } from "./exclusions.js";
 import { gatherHistory, oldSideRanges } from "./history.js";
@@ -18,9 +19,15 @@ export interface GatherResult {
   mergeBase: string;
   /**
    * The description of the change: the subject and body of each commit in
-   * base..head, oldest first, joined with a blank line.
+   * base..head, oldest first, each sanitized, joined with a blank line.
    */
   description: string;
+  /**
+   * Whether the sanitizer changed or cut the commit messages (R3). The
+   * field is optional so a test literal of a GatherResult may omit it.
+   * Gather always sets it.
+   */
+  descriptionMeta?: { sanitized: boolean; truncated: boolean };
   /** Blame and log at the merge base for the changed lines, or null when none. */
   history: { text: string; truncated: boolean } | null;
   /**
@@ -94,12 +101,16 @@ export async function gather(
     ? await tryGatherHistory(repo, mergeBase, hunks)
     : { history: null, error: null };
 
+  // A commit message is untrusted text, as PR text is, so it is sanitized.
+  const description = sanitizeCommitMessages(await commitMessages(repo, baseSha, headSha));
+
   return {
     base: baseSha,
     head: headSha,
     ...result,
     mergeBase,
-    description: await describeChange(repo, baseSha, headSha),
+    description: description.text,
+    descriptionMeta: { sanitized: description.sanitized, truncated: description.truncated },
     history: built.history,
     historyError: built.error,
   };
@@ -124,6 +135,11 @@ async function tryGatherHistory(
  * trimmed, joined with one blank line.
  */
 export async function describeChange(repo: string, base: string, head: string): Promise<string> {
+  return (await commitMessages(repo, base, head)).join("\n\n");
+}
+
+/** The subject and body of each commit in base..head, oldest first, each trimmed. */
+export async function commitMessages(repo: string, base: string, head: string): Promise<string[]> {
   const out = await runGit(repo, [
     "log",
     "--reverse",
@@ -135,6 +151,5 @@ export async function describeChange(repo: string, base: string, head: string): 
   return out
     .split("\0")
     .map((message) => message.trim())
-    .filter((message) => message !== "")
-    .join("\n\n");
+    .filter((message) => message !== "");
 }

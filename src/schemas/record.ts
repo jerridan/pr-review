@@ -43,10 +43,29 @@ export type CustomReviewerEntry = { name: string; bash_granted: boolean; reason:
 
 export type Verdict = "skipped" | "incomplete" | "would request changes" | "would approve";
 
+/** The pull request of a --pr run, as the record holds it (R2). */
+export type GitHubIdentity = {
+  slug: string;
+  /** The sanitized title. */
+  title: string;
+  draft: boolean;
+  labels: string[];
+  author: string;
+  author_type: string;
+  /** False for a fork, whatever the permission level and the flag. */
+  author_write_access: boolean;
+  fork: boolean;
+  head_repo: string;
+  url: string;
+};
+
 export type RunRecord = {
   identity: {
     repo: string;
-    pr: null;
+    /** The pull request number of a --pr run, or null. */
+    pr: number | null;
+    /** The pull request of a --pr run, or null. */
+    github: GitHubIdentity | null;
     base: string;
     head: string;
     started_at: string;
@@ -61,6 +80,11 @@ export type RunRecord = {
     };
     /** The description of the change that every reviewer and verifier got. */
     description: string;
+    /**
+     * Where the description came from, whether the sanitizer changed it,
+     * and whether the sanitizer cut it (R3).
+     */
+    description_meta: { source: "pr" | "commits"; sanitized: boolean; truncated: boolean };
     /** Whether gather built the history block, and whether it cut the block to fit. */
     history: { built: boolean; truncated: boolean };
     /** The files in each reviewer's rules block, and whether each was cut to fit. */
@@ -181,9 +205,23 @@ const roleEnum = z.enum(ROLES as readonly [Role, ...Role[]]);
 const effortEnum = z.enum(EFFORTS as readonly [Effort, ...Effort[]]);
 const verifierOrFailure = z.union([VerifierResultSchema, QueryFailureSchema]);
 
+const GitHubIdentitySchema = z.strictObject({
+  slug: z.string(),
+  title: z.string(),
+  draft: z.boolean(),
+  labels: z.array(z.string()),
+  author: z.string(),
+  author_type: z.string(),
+  author_write_access: z.boolean(),
+  fork: z.boolean(),
+  head_repo: z.string(),
+  url: z.string(),
+});
+
 const IdentitySchema = z.strictObject({
   repo: z.string(),
-  pr: z.null(),
+  pr: integer().min(1).nullable(),
+  github: GitHubIdentitySchema.nullable(),
   base: z.string(),
   head: z.string(),
   started_at: z.string(),
@@ -204,6 +242,11 @@ const IdentitySchema = z.strictObject({
     ),
   }),
   description: z.string(),
+  description_meta: z.strictObject({
+    source: z.enum(["pr", "commits"]),
+    sanitized: z.boolean(),
+    truncated: z.boolean(),
+  }),
   history: z.strictObject({ built: z.boolean(), truncated: z.boolean() }),
   injected: z.array(z.strictObject({ path: z.string(), truncated: z.boolean() })),
   changed_files: z.array(z.strictObject({ path: z.string(), hunks: integer() })),

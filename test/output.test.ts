@@ -56,6 +56,7 @@ function record(
     identity: {
       repo: "/repo",
       pr: null,
+      github: null,
       base: "a".repeat(40),
       head: "b".repeat(40),
       started_at: "2026-10-13T12:00:00.000Z",
@@ -63,6 +64,7 @@ function record(
       config_hash: null,
       config: { files: [], values: DEFAULT_REPO_CONFIG, custom_reviewers: [] },
       description: "Fix the loop bound.",
+      description_meta: { source: "commits", sanitized: false, truncated: false },
       history: { built: true, truncated: false },
       injected: [{ path: "CLAUDE.md", truncated: false }],
       changed_files: [{ path: "src/stats.ts", hunks: 1 }],

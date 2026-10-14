@@ -16,6 +16,8 @@ import { promisify } from "node:util";
 import { CommanderError } from "commander";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createProgram } from "../src/cli.js";
+import { GitHubError } from "../src/github/client.js";
+import { createFakeGitHubClient, type FakePullRequestSeed } from "../src/github/fake.js";
 import { RecordSchema, type RunRecord } from "../src/schemas/record.js";
 import type { QueryMeta, QueryOutcome, QueryRequest } from "../src/sdk/client.js";
 import { createFakeSdkClient } from "../src/sdk/fake.js";
@@ -176,6 +178,29 @@ async function fixtureWithConfig(configYaml: string): Promise<Fixture> {
   } finally {
     rmSync(source, { recursive: true, force: true });
   }
+}
+
+/** A fake pull request whose base and head are the commits of "fixture". */
+function prFor(fixture: Fixture, seed: FakePullRequestSeed = {}) {
+  return createFakeGitHubClient({
+    number: 7,
+    title: "Add average",
+    body: "Adds an average function.",
+    author: "alice",
+    labels: ["bug"],
+    base_sha: fixture.base,
+    head_sha: fixture.head,
+    head_repo: "acme/widgets",
+    url: "https://github.com/acme/widgets/pull/7",
+    viewer_login: "me",
+    permission: "write",
+    ...seed,
+  });
+}
+
+/** The arguments of a --pr run, with no --base and no --head. */
+function prArgs(fixture: Fixture, out: string, ...extra: string[]): string[] {
+  return ["node", "pr-review", "run", "--repo", fixture.repo, "--out", out, "--pr", "7", ...extra];
 }
 
 describe("pr-review run through the CLI", () => {
@@ -407,6 +432,51 @@ describe("--author-write-access (R7)", () => {
     expect(withOption.call?.bash).toBe(true);
     expect(withOption.doc.coverage.reviewers_without_bash).toEqual([]);
   }, 30_000);
+
+  async function prShellCall(seed: FakePullRequestSeed, ...extra: string[]) {
+    const fake = createFakeSdkClient(script(trustedFx));
+    const github = prFor(trustedFx, seed);
+    const code = await exitCodeOf(
+      createProgram({ client: fake, github }).parseAsync(
+        prArgs(
+          trustedFx,
+          join(outRoot, `bash-pr-${extra.length}-${String(seed.fork)}`),
+          "--format",
+          "json",
+          "--tier",
+          "fast",
+          ...extra,
+        ),
+      ),
+    );
+    expect(code).toBe(0);
+    const doc = JSON.parse(stdout);
+    stdout = "";
+    const record = JSON.parse(readFileSync(doc.record_path, "utf8")) as RunRecord;
+    return { call: fake.calls.find((c) => c.reviewerName === "shell-check"), doc, record };
+  }
+
+  it("takes write access from the permission of the author with --pr (R2)", async () => {
+    const write = await prShellCall({ permission: "write" });
+    expect(write.call?.bash).toBe(true);
+    expect(write.record.identity.github?.author_write_access).toBe(true);
+    const read = await prShellCall({ permission: "read" });
+    expect(read.call?.bash).not.toBe(true);
+    expect(read.record.identity.github?.author_write_access).toBe(false);
+  }, 30_000);
+
+  it("gives no Bash for a fork pull request, even with the flag and admin (R2)", async () => {
+    const fork = await prShellCall(
+      { fork: true, head_repo: "eve/widgets", permission: "admin" },
+      "--author-write-access",
+    );
+    expect(fork.call?.bash).not.toBe(true);
+    expect(fork.record.identity.github?.author_write_access).toBe(false);
+    expect(fork.record.identity.github?.fork).toBe(true);
+    expect(fork.doc.coverage.reviewers_without_bash).toEqual([
+      { name: "shell-check", reason: "author has no write access" },
+    ]);
+  }, 30_000);
 });
 
 describe("the repo config changes the run (the charter's two runs)", () => {
@@ -529,4 +599,211 @@ describe("the repo config changes the run (the charter's two runs)", () => {
       rmSync(configured.repo, { recursive: true, force: true });
     }
   }, 60_000);
+});
+
+describe("--pr (R2)", () => {
+  async function prRun(github: ReturnType<typeof prFor>, name: string, ...extra: string[]) {
+    const fake = createFakeSdkClient(script(fx));
+    const code = await exitCodeOf(
+      createProgram({ client: fake, github }).parseAsync(
+        prArgs(fx, join(outRoot, name), "--format", "json", ...extra),
+      ),
+    );
+    const doc = code === 0 ? JSON.parse(stdout) : null;
+    stdout = "";
+    const record =
+      doc === null ? null : (JSON.parse(readFileSync(doc.record_path, "utf8")) as RunRecord);
+    if (record) expect(RecordSchema.safeParse(record).error).toBeUndefined();
+    return { code, doc, record, fake };
+  }
+
+  it("takes --base and --head from the pull request and records the PR identity", async () => {
+    const github = prFor(fx);
+    const { code, record } = await prRun(github, "pr-defaults", "--tier", "skip");
+    expect(code).toBe(0);
+    expect(record?.identity.base).toBe(fx.base);
+    expect(record?.identity.head).toBe(fx.head);
+    expect(record?.identity.pr).toBe(7);
+    expect(record?.identity.github).toEqual({
+      slug: "acme/widgets",
+      title: "Add average",
+      draft: false,
+      labels: ["bug"],
+      author: "alice",
+      author_type: "User",
+      author_write_access: true,
+      fork: false,
+      head_repo: "acme/widgets",
+      url: "https://github.com/acme/widgets/pull/7",
+    });
+    expect(record?.identity.description).toBe("Add average\n\nAdds an average function.");
+    expect(record?.identity.description_meta).toEqual({
+      source: "pr",
+      sanitized: false,
+      truncated: false,
+    });
+    expect(github.calls).toContainEqual({ method: "resolveSlug", input: { repo: fx.repo } });
+    expect(github.calls).toContainEqual({
+      method: "getPullRequest",
+      input: { slug: "acme/widgets", number: 7 },
+    });
+  });
+
+  it("keeps --base and --head when they are given", async () => {
+    const github = prFor(fx, { base_sha: "1".repeat(40), head_sha: "2".repeat(40) });
+    const { code, record } = await prRun(
+      github,
+      "pr-explicit",
+      "--tier",
+      "skip",
+      "--base",
+      fx.base,
+      "--head",
+      fx.head,
+    );
+    expect(code).toBe(0);
+    expect(record?.identity.base).toBe(fx.base);
+    expect(record?.identity.head).toBe(fx.head);
+  });
+
+  it("uses --github-repo over the slug of the checkout", async () => {
+    const github = prFor(fx);
+    const { code, record } = await prRun(
+      github,
+      "pr-slug",
+      "--tier",
+      "skip",
+      "--github-repo",
+      "other/place",
+    );
+    expect(code).toBe(0);
+    expect(record?.identity.github?.slug).toBe("other/place");
+    expect(github.calls.map((c) => c.method)).not.toContain("resolveSlug");
+    expect(github.calls).toContainEqual({
+      method: "getPullRequest",
+      input: { slug: "other/place", number: 7 },
+    });
+  });
+
+  it("exits 2 on --format github without --pr, and runs nothing", async () => {
+    const fake = createFakeSdkClient(script(fx));
+    const github = prFor(fx);
+    const out = join(outRoot, "github-no-pr");
+    const code = await exitCodeOf(
+      createProgram({ client: fake, github }).parseAsync(args(out, "--format", "github")),
+    );
+    expect(code).toBe(2);
+    expect(fake.calls).toEqual([]);
+    expect(github.calls).toEqual([]);
+    expect(existsSync(out)).toBe(false);
+  });
+
+  it("prints the JSON document with --format github and --pr", async () => {
+    const fake = createFakeSdkClient(script(fx));
+    const code = await exitCodeOf(
+      createProgram({ client: fake, github: prFor(fx) }).parseAsync(
+        prArgs(fx, join(outRoot, "github-format"), "--format", "github", "--tier", "skip"),
+      ),
+    );
+    expect(code).toBe(0);
+    const doc = JSON.parse(stdout);
+    expect(doc).toMatchObject({ tier: "skip", verdict: "skipped" });
+    expect(typeof doc.record_path).toBe("string");
+  });
+
+  it("exits 2 without --base or --head when --pr is absent", async () => {
+    for (const drop of ["--base", "--head"]) {
+      const full = args(join(outRoot, `missing${drop}`));
+      const at = full.indexOf(drop);
+      full.splice(at, 2);
+      const fake = createFakeSdkClient(script(fx));
+      expect(await exitCodeOf(createProgram({ client: fake }).parseAsync(full))).toBe(2);
+      expect(fake.calls).toEqual([]);
+    }
+  });
+
+  it("exits 2 on a --pr that is not a positive integer, or a bad --github-repo", async () => {
+    for (const bad of [
+      ["--pr", "abc"],
+      ["--pr", "0"],
+      ["--pr", "1.5"],
+      ["--pr", "7", "--github-repo", "no-slash"],
+    ]) {
+      const fake = createFakeSdkClient(script(fx));
+      const argv = [
+        "node",
+        "pr-review",
+        "run",
+        "--repo",
+        fx.repo,
+        "--out",
+        join(outRoot, "bad-pr"),
+        ...bad,
+      ];
+      expect(
+        await exitCodeOf(createProgram({ client: fake, github: prFor(fx) }).parseAsync(argv)),
+      ).toBe(2);
+      expect(fake.calls).toEqual([]);
+    }
+  });
+
+  it("exits 1 when GitHub fails, and names the endpoint", async () => {
+    const github = prFor(fx);
+    github.failNext(
+      "getPullRequest",
+      new GitHubError({
+        endpoint: "repos/acme/widgets/pulls/7",
+        exitCode: 4,
+        message: "gh api repos/acme/widgets/pulls/7 failed with exit code 4: Bad credentials",
+      }),
+    );
+    const { code } = await prRun(github, "pr-gh-fails");
+    expect(code).toBe(1);
+    expect(stderr).toContain("repos/acme/widgets/pulls/7");
+  });
+
+  it("gives the skip tier for a draft with skip.draft: true, and names the rule (R4)", async () => {
+    const draftFx = await fixtureWithConfig("skip:\n  draft: true\n");
+    try {
+      const fake = createFakeSdkClient(script(draftFx));
+      const code = await exitCodeOf(
+        createProgram({ client: fake, github: prFor(draftFx, { draft: true }) }).parseAsync(
+          prArgs(draftFx, join(outRoot, "pr-draft"), "--format", "json"),
+        ),
+      );
+      expect(code).toBe(0);
+      const doc = JSON.parse(stdout);
+      expect(doc).toMatchObject({ tier: "skip", verdict: "skipped" });
+      const record = JSON.parse(readFileSync(doc.record_path, "utf8")) as RunRecord;
+      expect(record.identity.tier).toBe("skip");
+      expect(record.identity.tier_reason).toContain("skip.draft");
+      expect(record.identity.github?.draft).toBe(true);
+      expect(fake.calls).toEqual([]);
+      expect(stderr).toContain("skip.draft");
+    } finally {
+      rmSync(draftFx.repo, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  it("gives the tier floor full for the label review:full alone, with no fresh flag (R4)", async () => {
+    const { code, record, fake } = await prRun(
+      prFor(fx, { labels: ["review:full"] }),
+      "pr-review-full",
+    );
+    expect(code).toBe(0);
+    expect(record?.identity.tier).toBe("full");
+    expect(record?.identity.tier_reason).toContain("review:full");
+    expect(record?.identity.tier_reason).toMatch(/floor of full/);
+    // The run is a normal review: triage and the reviewers run.
+    expect(fake.calls.some((c) => c.role === "triage")).toBe(true);
+    expect(fake.calls.some((c) => c.role === "reviewer")).toBe(true);
+  });
+
+  it("gives fast for the label review:fast, over the sensitive floor (R4)", async () => {
+    const { code, record } = await prRun(prFor(fx, { labels: ["review:fast"] }), "pr-fast");
+    expect(code).toBe(0);
+    expect(record?.identity.sensitive_files.length).toBeGreaterThan(0);
+    expect(record?.identity.tier).toBe("fast");
+    expect(record?.identity.tier_reason).toContain("review:fast");
+  });
 });

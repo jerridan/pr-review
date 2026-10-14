@@ -8,6 +8,9 @@ import { loadRepoConfig, type ConfigRole, type RepoConfig } from "./config/repo-
 import { injectedRuleFiles, runReviewers, type ReviewerRun } from "./find/index.js";
 import { diffSections } from "./gather/diff.js";
 import { gather, resolveCommit, type GatherResult } from "./gather/index.js";
+import type { GitHubClient } from "./github/client.js";
+import { loadPrContext, prDescription, type PrContext } from "./github/metadata.js";
+import { sanitizeGitHubText } from "./github/sanitize.js";
 import { withHeadWorktree } from "./gather/worktree.js";
 import { mergeFindings } from "./merge/index.js";
 import { applySuppressions } from "./merge/suppress.js";
@@ -28,7 +31,13 @@ import { usageTokens, type QueryOutcome, type QueryRequest, type SdkClient } fro
 import type { RunOptions } from "./sdk/options.js";
 import { createSemaphore } from "./semaphore.js";
 import { runTriage } from "./triage/index.js";
-import { decideTier, shouldRunTriage, type Tier } from "./triage/tier.js";
+import {
+  decideTier,
+  preTier,
+  shouldRunTriage,
+  type PreTierInput,
+  type Tier,
+} from "./triage/tier.js";
 import { coverage, decideVerdict, verificationCounts } from "./verdict.js";
 import {
   loadVerifierPrompt,
@@ -40,14 +49,29 @@ import {
 
 export interface RunInput {
   repo: string;
-  base: string;
-  head: string;
+  /** The base commit. With "pr", it defaults to the base sha of the pull request. */
+  base?: string;
+  /** The head commit. With "pr", it defaults to the head sha of the pull request. */
+  head?: string;
+  /** The pull request number. The run reads the pull request through "github". */
+  pr?: number;
+  /** The owner/repo of the pull request. It replaces the slug of the checkout. */
+  githubRepo?: string;
+  /**
+   * The GitHub client. Absent means the real gh client, which loads only
+   * when "pr" is set.
+   */
+  github?: GitHubClient;
+  /** The output format. "github" needs "pr". */
+  format: "json" | "table" | "github";
   tierOverride?: Tier;
   outDir: string;
   allowApiKey: boolean;
   /**
    * True when the PR author has write access. With "trusted: true", a
-   * custom reviewer then gets Bash. Absent means false.
+   * custom reviewer then gets Bash. Absent means false. With "pr", the
+   * permission of the author can also give write access, and a fork never
+   * gets it.
    */
   authorWriteAccess?: boolean;
   client?: SdkClient;
@@ -272,10 +296,32 @@ export async function runReview(
     }
   };
 
+  if (input.format === "github" && input.pr === undefined) {
+    throw new Error("--format github needs --pr.");
+  }
+  // With a pull request, the run reads it first, because the base and the
+  // head default to its shas. The real gh client loads only when no fake
+  // is given.
+  let prContext: PrContext | null = null;
+  if (input.pr !== undefined) {
+    const github = input.github ?? (await import("./github/gh.js")).createGhClient();
+    prContext = await loadPrContext(github, {
+      repo,
+      number: input.pr,
+      ...(input.githubRepo !== undefined ? { githubRepo: input.githubRepo } : {}),
+      authorWriteAccessFlag: input.authorWriteAccess === true,
+    });
+  }
+  const baseRev = input.base ?? prContext?.pr.base_sha;
+  const headRev = input.head ?? prContext?.pr.head_sha;
+  if (baseRev === undefined || headRev === undefined) {
+    throw new Error("Give --base and --head, or give --pr.");
+  }
+
   // The config loads from the base commit before any model call and
   // before gather, because its globs change the exclusions. A config that
   // does not validate throws here, so the run writes no record.
-  const baseSha = await resolveCommit(repo, input.base);
+  const baseSha = await resolveCommit(repo, baseRev);
   const loaded = await timed("config", () => loadRepoConfig(repo, baseSha));
   const config = loaded.config;
 
@@ -283,26 +329,54 @@ export async function runReview(
   const queries: CostEntry[] = [];
   const counter: TokenCounter = { tokens: 0 };
   const client = recordingClient(inner, queries, config, counter);
-  const authorWriteAccess = input.authorWriteAccess === true;
+  const authorWriteAccess = prContext
+    ? prContext.authorWriteAccess
+    : input.authorWriteAccess === true;
+  // The PR text goes through the sanitizer before any rule or prompt
+  // reads it.
+  const prTitle = prContext ? sanitizeGitHubText(prContext.pr.title).text : "";
+  const tierInput: PreTierInput = {
+    ...(input.tierOverride ? { override: input.tierOverride } : {}),
+    labels: prContext?.pr.labels ?? [],
+    pr: prContext
+      ? { draft: prContext.pr.draft, title: prTitle, author: prContext.pr.author }
+      : null,
+    skip: config.skip,
+  };
   const options: RunOptions = { allowApiKey: input.allowApiKey, env: process.env };
   // One semaphore bounds every SDK query of the run.
   const semaphore = createSemaphore(config.concurrency);
 
-  const gathered: GatherResult = await timed("gather", () =>
-    gather(repo, baseSha, input.head, {
+  const commitsGathered: GatherResult = await timed("gather", () =>
+    gather(repo, baseSha, headRev, {
       ...withRepoGlobs(config),
       // The history block exists only for the history reviewer. The skip
-      // tier runs no reviewer, so it builds no block.
-      history: config.reviewers.history?.enabled !== false && input.tierOverride !== "skip",
+      // tier runs no reviewer, so it builds no block. The rules before the
+      // diff (--tier, a label, a skip rule) can already give skip.
+      history: config.reviewers.history?.enabled !== false && preTier(tierInput)?.tier !== "skip",
     }),
   );
+  // With a pull request, the description is its sanitized title and body.
+  // Else it is the sanitized commit messages that gather gives. Every
+  // reviewer and verifier wraps it as untrusted text.
+  const prText = prContext ? prDescription(prContext.pr) : null;
+  const gathered: GatherResult = prText
+    ? { ...commitsGathered, description: prText.text }
+    : commitsGathered;
+  const descriptionMeta: RunRecord["identity"]["description_meta"] = prText
+    ? { source: "pr", sanitized: prText.sanitized, truncated: prText.truncated }
+    : {
+        source: "commits",
+        sanitized: commitsGathered.descriptionMeta?.sanitized ?? false,
+        truncated: commitsGathered.descriptionMeta?.truncated ?? false,
+      };
 
   // The head checkout lives for the whole review and is the cwd of every
   // query. withHeadWorktree removes it at the end, also on failure.
   const record = await withHeadWorktree(repo, gathered.head, async (cwd): Promise<RunRecord> => {
     let brief: TriageBrief | null = null;
     let triageFailure: QueryFailure | null = null;
-    if (shouldRunTriage({ override: input.tierOverride, totalHunks: gathered.totalHunks })) {
+    if (shouldRunTriage({ ...tierInput, totalHunks: gathered.totalHunks })) {
       const triage = await timed("triage", () =>
         semaphore(() => runTriage(client, options, gathered, cwd)),
       );
@@ -310,7 +384,8 @@ export async function runReview(
       triageFailure = triage.failure;
     }
     const decision = decideTier({
-      override: input.tierOverride,
+      ...tierInput,
+      skip: config.skip,
       totalHunks: gathered.totalHunks,
       sensitive: gathered.sensitive,
       brief,
@@ -469,7 +544,21 @@ export async function runReview(
     return {
       identity: {
         repo,
-        pr: null,
+        pr: input.pr ?? null,
+        github: prContext
+          ? {
+              slug: prContext.slug,
+              title: prTitle,
+              draft: prContext.pr.draft,
+              labels: prContext.pr.labels,
+              author: prContext.pr.author,
+              author_type: prContext.pr.author_type,
+              author_write_access: prContext.authorWriteAccess,
+              fork: prContext.pr.fork,
+              head_repo: prContext.pr.head_repo,
+              url: prContext.pr.url,
+            }
+          : null,
         base: gathered.base,
         head: gathered.head,
         started_at: startedAt.toISOString(),
@@ -488,6 +577,7 @@ export async function runReview(
           }),
         },
         description: gathered.description,
+        description_meta: descriptionMeta,
         history: {
           built: gathered.history !== null,
           truncated: gathered.history?.truncated ?? false,
