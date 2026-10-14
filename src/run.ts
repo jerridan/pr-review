@@ -308,6 +308,17 @@ function totalCost(entries: CostEntry[]): number | null {
   return known.reduce((sum, c) => sum + c, 0);
 }
 
+// The tier reason of the short review of a later run with no new hunk
+// (R7). It names the resolved threads. With no resolved thread, it names
+// the closed body findings.
+function noNewHunkReason(h0: string, resolved: number, closed: number): string {
+  const what =
+    resolved > 0
+      ? `${resolved} ${resolved === 1 ? "thread" : "threads"} resolved`
+      : `${closed} ${closed === 1 ? "body finding" : "body findings"} closed`;
+  return `No new hunks since ${h0.slice(0, 7)}; ${what}.`;
+}
+
 /** The result of a run that wrote its record. */
 export type RunResult = {
   record: RunRecord;
@@ -398,11 +409,13 @@ export async function runReview(input: RunInput): Promise<RunResult> {
   let record: RunRecord;
   // The state of a later or fresh run (R7), which the post step needs after
   // the head checkout is gone. Closures set it, so it is an object.
+  // "nothingNew" is true for a later run with no new hunk.
   const carry: {
     prior: PriorState | null;
     open: Map<string, PriorOpen>;
     headTexts: Map<string, string | null>;
-  } = { prior: null, open: new Map(), headTexts: new Map() };
+    nothingNew: boolean;
+  } = { prior: null, open: new Map(), headTexts: new Map(), nothingNew: false };
   try {
     // A run that posts reads the prior state of the pull request. With no
     // review of the tool, the run is a first run. A later run needs the
@@ -498,9 +511,11 @@ export async function runReview(input: RunInput): Promise<RunResult> {
     record = await withHeadWorktree(repo, gathered.head, async (cwd): Promise<RunRecord> => {
       let brief: TriageBrief | null = null;
       let triageFailure: QueryFailure | null = null;
-      // A later run with no new hunk reviews nothing and posts nothing, also
-      // when a label or --tier names another tier (R4, R7).
+      // A later run with no new hunk reviews nothing, also when a label or
+      // --tier names another tier (R4, R7). The post step posts a short
+      // review only when a thread or a body finding went stale.
       const nothingNew = runKind === "later" && scoped.totalHunks === 0;
+      carry.nothingNew = nothingNew;
       if (!nothingNew && shouldRunTriage({ ...tierInput, totalHunks: scoped.totalHunks })) {
         const triage = await timed("triage", () =>
           semaphore(() => runTriage(client, options, gathered, cwd)),
@@ -896,47 +911,93 @@ export async function runReview(input: RunInput): Promise<RunResult> {
   progress.stage = "post";
   const prior = carry.prior;
   const later = identity.run_kind === "later" && prior !== null;
+  // The newest review body lists every body finding that is still open.
+  const carriedMarkers = [...carry.open]
+    .filter(([, entry]) => entry.thread_id === null)
+    .map(([fp]) => formatFingerprintMarker(fp));
+  const headFileText = (path: string): string | null => carry.headTexts.get(path) ?? null;
   try {
-    // A later run whose own tier is skip posts nothing. A first skip run
-    // posts its one-line review once per reason.
-    const already =
-      identity.tier === "skip" &&
-      (later ||
-        skipReviewAlreadyPosted(
-          await post.github.listReviews({ slug: post.ctx.slug, number: post.ctx.pr.number }),
-          post.ctx.viewerLogin,
-          identity.tier_reason,
-        ));
-    if (!already) {
-      // The newest review body lists every body finding that is still open.
-      const carriedMarkers = [...carry.open]
-        .filter(([, entry]) => entry.thread_id === null)
-        .map(([fp]) => formatFingerprintMarker(fp));
-      posted = await postRun(post.github, {
+    if (later && carry.nothingNew) {
+      // A later run with no new hunk (R7). A push that only removes lines
+      // is the most common fix of a finding. So first resolve the stale
+      // threads, then post a short review when a thread resolved or a body
+      // finding closed. With nothing stale, post nothing.
+      const stale = await resolveStaleThreads(post.github, {
         ctx: post.ctx,
-        record,
-        runId,
-        diff,
-        carriedMarkers,
-        ...(later ? { sinceHead: prior.head } : {}),
+        prior,
+        headFileText,
+        head: identity.head,
       });
-      // After the review: resolve each thread whose code changed.
-      if (posted.error === null && prior !== null) {
-        const stale = await resolveStaleThreads(post.github, {
+      const closed = reverify(prior, headFileText).droppedBody.length;
+      if (stale.resolved.length > 0 || closed > 0) {
+        // No reviewer ran, so the verdict comes from the open blocking
+        // entries only. The tier is the tier of the prior record and never
+        // skip, so that a later run reads the marker of this review.
+        const tier: Tier =
+          prior.triageTier === null || prior.triageTier === "skip" ? "fast" : prior.triageTier;
+        identity.tier = tier;
+        identity.tier_reason = noNewHunkReason(prior.head, stale.resolved.length, closed);
+        progress.tier = tier;
+        const openBlocking = [...carry.open.values()].filter(
+          (e) => e.severity === "blocking",
+        ).length;
+        record.posted.verdict = openBlocking > 0 ? "would request changes" : "would approve";
+        posted = await postRun(post.github, {
           ctx: post.ctx,
-          prior,
-          headFileText: (path) => carry.headTexts.get(path) ?? null,
-          head: identity.head,
+          record,
+          runId,
+          diff,
+          carriedMarkers,
+          sinceHead: prior.head,
         });
         posted.resolved.push(...stale.resolved);
         posted.errors.push(...stale.errors);
+      } else {
+        // No review posts, so the errors of the resolve step go to the
+        // errors of the run.
+        record.cost.errors.push(
+          ...stale.errors.map((e) => ({ stage: "post", message: `${e.step}: ${e.message}` })),
+        );
+      }
+    } else {
+      // A later run whose own tier is skip posts nothing. A first skip run
+      // posts its one-line review once per reason.
+      const already =
+        identity.tier === "skip" &&
+        (later ||
+          skipReviewAlreadyPosted(
+            await post.github.listReviews({ slug: post.ctx.slug, number: post.ctx.pr.number }),
+            post.ctx.viewerLogin,
+            identity.tier_reason,
+          ));
+      if (!already) {
+        posted = await postRun(post.github, {
+          ctx: post.ctx,
+          record,
+          runId,
+          diff,
+          carriedMarkers,
+          ...(later ? { sinceHead: prior.head } : {}),
+        });
+        // After the review: resolve each thread whose code changed.
+        if (posted.error === null && prior !== null) {
+          const stale = await resolveStaleThreads(post.github, {
+            ctx: post.ctx,
+            prior,
+            headFileText,
+            head: identity.head,
+          });
+          posted.resolved.push(...stale.resolved);
+          posted.errors.push(...stale.errors);
+        }
       }
     }
   } catch (err) {
-    // R5a: the run failed before the review posted.
+    // R5a: the run failed before the review posted. The short review of a
+    // later run can change the tier, so the marker takes the tier now.
     const message = messageOf(err);
     record.cost.errors.push({ stage: progress.stage, message });
-    await postFailureReview(marker, message);
+    await postFailureReview({ ...marker, tier: identity.tier }, message);
     const recordPath = await writeRecord(input.outDir, record);
     return {
       record,
