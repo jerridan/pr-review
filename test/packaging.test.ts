@@ -401,7 +401,7 @@ describe("action.yml (R9)", () => {
     }
   });
 
-  it("sets up Node 20 with the npm cache from the action lockfile", () => {
+  it("sets up Node 20 with no npm cache, because the action lockfile is outside the workspace", () => {
     const steps = loadAction().runs.steps;
     const setup = findStep(
       steps,
@@ -409,10 +409,8 @@ describe("action.yml (R9)", () => {
       "node",
     );
     expect(String(setup.with?.["node-version"])).toBe("20");
-    expect(setup.with?.cache).toBe("npm");
-    expect(String(setup.with?.["cache-dependency-path"])).toMatch(
-      /\$\{\{\s*github\.action_path\s*\}\}\/package-lock\.json/,
-    );
+    expect(setup.with).not.toHaveProperty("cache");
+    expect(setup.with).not.toHaveProperty("cache-dependency-path");
   });
 
   it("runs npm ci and npm run build in the action path, never in the workspace", () => {
@@ -979,5 +977,14 @@ describe("the plugin and the /review command (R11)", () => {
     expect(body).toContain("gh pr view");
     expect(body).toContain("--pr <n>");
     expect(body).toContain("--format github");
+  });
+
+  it("runs the github format on the pull request shas, with no --base and no --head", () => {
+    const text = readText("commands/review.md");
+    expect(text).toContain("pr-review run --pr <n> --format github");
+    const line = text.split("\n").find((l) => l.includes("pr-review run --pr <n> --format github"));
+    expect(line).toBeDefined();
+    expect(line).not.toContain("--base");
+    expect(line).not.toContain("--head");
   });
 });
