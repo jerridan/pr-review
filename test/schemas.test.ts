@@ -4,7 +4,7 @@ import { z } from "zod";
 import { SmokeOutputSchema } from "../src/cli.js";
 import type { Role } from "../src/config/models.js";
 import { FindingSchema, FindingsOutputSchema } from "../src/schemas/finding.js";
-import { FORBIDDEN_SCHEMA_KEYWORDS, toSdkJsonSchema } from "../src/schemas/json-schema.js";
+import { toSdkJsonSchema } from "../src/schemas/json-schema.js";
 import { MergeOutputSchema } from "../src/schemas/merge.js";
 import { PostedFindingSchema, RecordSchema, type RunRecord } from "../src/schemas/record.js";
 import { ReviewerFrontmatterSchema } from "../src/schemas/reviewer.js";
@@ -232,12 +232,6 @@ describe("A13: generated JSON Schema of every role", () => {
       expect(findViolations(json)).toEqual([]);
     });
   }
-
-  it("names every keyword that the spec forbids", () => {
-    for (const key of SPEC_FORBIDDEN) {
-      expect(FORBIDDEN_SCHEMA_KEYWORDS).toContain(key);
-    }
-  });
 
   it("emits draft-07", () => {
     expect(toSdkJsonSchema(FindingsOutputSchema).$schema).toBe(

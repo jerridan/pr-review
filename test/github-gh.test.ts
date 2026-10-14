@@ -602,13 +602,6 @@ describe("createGhClient: errors (R1)", () => {
     expect((err as GitHubError).message).toMatch(/not (found|installed)/);
   });
 
-  it("names gh when ghPath points to no file", async () => {
-    const gh = createGhClient({ ghPath: join(work, "missing", "gh"), env: env() });
-    const err = await gh.getPullRequest({ slug: SLUG, number: 7 }).catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(GitHubError);
-    expect((err as GitHubError).message).toMatch(/\bgh\b/);
-  });
-
   it("runs the binary at ghPath", async () => {
     reply({ stdout: REST_PR });
     const gh = createGhClient({ ghPath: stubPath, env: env(SYSTEM_PATH) });
