@@ -814,6 +814,8 @@ describe(".github/workflows/review.yml (R10)", () => {
     };
   }
 
+  // Each records test runs several git processes. Under the load of the
+  // whole suite one can pass the 5 second default, so each gets 30 seconds.
   it("checks out an existing records branch and pushes a new record", () => {
     const sandbox = makeSandbox(true);
     const run = recordsRun(sandbox);
@@ -825,7 +827,7 @@ describe(".github/workflows/review.yml (R10)", () => {
     const pushed = run.push();
     expect(pushed.status, pushed.stderr).toBe(0);
     expect(remoteFiles(sandbox.remote)).toEqual(["pr-3/old.json", `pr-${PR_NUMBER}/new.json`]);
-  });
+  }, 30_000);
 
   it("creates the records branch as an orphan when it is absent", () => {
     const sandbox = makeSandbox(false);
@@ -839,7 +841,7 @@ describe(".github/workflows/review.yml (R10)", () => {
     expect(remoteFiles(sandbox.remote)).toEqual([`pr-${PR_NUMBER}/new.json`]);
     // The orphan branch shares no history with main.
     expect(git(sandbox.remote, "rev-list", "--count", "pr-review-records")).toBe("1");
-  });
+  }, 30_000);
 
   it("skips the commit and the push when there is no new record", () => {
     const sandbox = makeSandbox(true);
@@ -849,14 +851,14 @@ describe(".github/workflows/review.yml (R10)", () => {
     const pushed = run.push();
     expect(pushed.status, pushed.stderr).toBe(0);
     expect(git(sandbox.remote, "rev-parse", "pr-review-records")).toBe(before);
-  });
+  }, 30_000);
 
   it("skips the push when the records directory is absent", () => {
     const sandbox = makeSandbox(true);
     const run = recordsRun(sandbox);
     const pushed = run.push();
     expect(pushed.status, pushed.stderr).toBe(0);
-  });
+  }, 30_000);
 
   it("fetches and rebases when another run pushed first", () => {
     const sandbox = makeSandbox(true);
@@ -881,7 +883,7 @@ describe(".github/workflows/review.yml (R10)", () => {
       `pr-${PR_NUMBER}/new.json`,
       "pr-9/other.json",
     ]);
-  });
+  }, 30_000);
 
   it("limits the push to three fetch-and-rebase retries", () => {
     const { push } = recordsSteps();
