@@ -101,6 +101,14 @@ function counts(findings: PostedFinding[]): string {
   return `Blocking: ${n("blocking")}; Suggestions: ${n("suggestion")}; Nits: ${n("nit")}`;
 }
 
+// The open blocking findings of earlier runs also set the verdict. Name
+// them, so the counts of the new findings do not contradict the verdict.
+// This gives an empty list when no blocking finding is carried.
+function carriedNote(record: RunRecord): string[] {
+  const n = record.posted.carried.filter((f) => f.severity === "blocking").length;
+  return n > 0 ? [`Open from earlier runs: ${n} blocking.`] : [];
+}
+
 function list(names: string[]): string {
   return names.length > 0 ? names.join(", ") : "none";
 }
@@ -136,7 +144,8 @@ export function renderSkipLine(reason: string): string {
 
 /**
  * The review body. Line 1: the run marker, the verdict in bold, the tier
- * and the tier reason. Line 2: the counts and the coverage line. Then the
+ * and the tier reason. Line 2: the counts, the open blocking findings of
+ * earlier runs (when there are any) and the coverage line. Then the
  * findings outside the diff, the carried markers and the tool version. At
  * the skip tier, the body is one line: the marker and the reason.
  */
@@ -155,7 +164,7 @@ export function renderReviewBody(input: {
   }
   const lines = [
     `${formatRunMarker(marker)} **${VERDICT_TEXT[posted.verdict]}** at tier ${identity.tier}: ${escapeText(oneLine(identity.tier_reason))}`,
-    `${counts(posted.findings)}. ${renderCoverage(record)}`,
+    [`${counts(posted.findings)}.`, ...carriedNote(record), renderCoverage(record)].join(" "),
   ];
   if (input.sinceHead !== undefined) {
     lines.push(`Review of changes since ${input.sinceHead.slice(0, 7)}`);
@@ -198,7 +207,7 @@ export function renderCheckRun(record: RunRecord): { title: string; summary: str
     title: VERDICT_TEXT[record.posted.verdict],
     summary: [
       `${n} ${n === 1 ? "finding" : "findings"} posted.`,
-      counts(record.posted.findings),
+      [counts(record.posted.findings), ...carriedNote(record)].join(". "),
       renderCoverage(record),
     ].join("\n\n"),
   };
