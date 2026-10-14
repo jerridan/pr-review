@@ -28,6 +28,7 @@ function posted(
   return {
     ...finding,
     fingerprint: "0123456789abcdef",
+    span_text: "e",
     severity,
     score,
     verifier: {
@@ -91,7 +92,14 @@ function record(
         smoke: { model: "claude-sonnet-5-5", effort: "low" },
       },
     },
-    stages: { reviewers: [], verifications: [], merges: [], capped: [], suppressed: [] },
+    stages: {
+      reviewers: [],
+      verifications: [],
+      merges: [],
+      capped: [],
+      suppressed: [],
+      pre_existing: [],
+    },
     posted: {
       verdict: findings.some((f) => f.severity === "blocking")
         ? "would request changes"
@@ -105,6 +113,7 @@ function record(
         findings_dropped_by_failed_verifier: 0,
       },
       findings,
+      github: null,
       ...overrides,
     },
     cost: {

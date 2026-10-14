@@ -11,7 +11,7 @@ import type { RunOptions } from "../sdk/options.js";
 import type { Semaphore } from "../semaphore.js";
 import { wrapUntrusted } from "../untrusted.js";
 import { applyCap, nonBlockingCap, type CapConfig } from "./cap.js";
-import { fingerprint } from "./fingerprint.js";
+import { fingerprint, fingerprintSpanText } from "./fingerprint.js";
 
 type Verified = { finding: Finding; result: VerifierResult };
 type MergeRecord = RunRecord["stages"]["merges"][number];
@@ -107,6 +107,26 @@ function rejection(output: MergeOutput, members: Verified[]): string | null {
   return null;
 }
 
+/**
+ * Build the PostedFinding of a verified finding. This is the one place
+ * that builds one. The posted severity is the verifier's. "headFileText"
+ * is the head file of the finding, or null when the head has no such file.
+ */
+export function toPostedFinding(
+  finding: Finding,
+  result: VerifierResult,
+  headFileText: string | null,
+): PostedFinding {
+  return {
+    ...finding,
+    fingerprint: fingerprint(finding, headFileText),
+    severity: result.severity,
+    score: result.score,
+    verifier: result,
+    span_text: fingerprintSpanText(finding, headFileText),
+  };
+}
+
 export async function mergeFindings(
   client: SdkClient,
   options: RunOptions,
@@ -123,13 +143,8 @@ export async function mergeFindings(
     return headFiles.get(file) ?? null;
   };
   // The posted severity is always the verifier's, unless merge lowers it.
-  const toPosted = (v: Verified): PostedFinding => ({
-    ...v.finding,
-    fingerprint: fingerprint(v.finding, headFile(v.finding.file)),
-    severity: v.result.severity,
-    score: v.result.score,
-    verifier: v.result,
-  });
+  const toPosted = (v: Verified): PostedFinding =>
+    toPostedFinding(v.finding, v.result, headFile(v.finding.file));
 
   const prompt = loadPrompt("merge.md");
   const template = prompt.frontmatter.user_message;

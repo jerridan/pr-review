@@ -1,7 +1,15 @@
 // The --format json output: one JSON document.
 import type { RunRecord } from "../schemas/record.js";
 
-export function formatJson(record: RunRecord, recordPath: string): string {
+/**
+ * The JSON document. With "reviewUrl" in "options" (--format github), the
+ * document also holds "review_url", which is null when no review posted.
+ */
+export function formatJson(
+  record: RunRecord,
+  recordPath: string,
+  options?: { reviewUrl: string | null },
+): string {
   const doc = {
     record_path: recordPath,
     tier: record.identity.tier,
@@ -12,6 +20,7 @@ export function formatJson(record: RunRecord, recordPath: string): string {
     total_cost_usd: record.cost.total_cost_usd,
     queries_without_cost: record.cost.queries_without_cost,
     findings: record.posted.findings,
+    ...(options ? { review_url: options.reviewUrl } : {}),
   };
   return `${JSON.stringify(doc, null, 2)}\n`;
 }

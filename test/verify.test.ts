@@ -220,6 +220,7 @@ describe("verifyFinding (A6)", () => {
       escalated: result(81),
       final: result(81),
       passed: true,
+      pre_existing: false,
     });
     const down = await verifyFinding(
       createFakeSdkClient(script(result(84), result(50))),
@@ -256,7 +257,7 @@ describe("verifyFinding (A6)", () => {
     const failure = { kind: "subtype" as const, message: "error_during_execution" };
     const fake = createFakeSdkClient(script({ ok: false, failure, raw: META }));
     const out = await verifyFinding(fake, OPTIONS, finding({ needs_context: true }), ctx());
-    expect(out).toEqual({ first: failure, final: null, passed: false });
+    expect(out).toEqual({ first: failure, final: null, passed: false, pre_existing: false });
     expect(roles(fake.calls)).toEqual(["verifier"]);
   });
 
@@ -278,7 +279,13 @@ describe("verifyFinding (A6)", () => {
       ctx(),
     );
     // A first score of 82 passes the threshold, but the second check did not occur.
-    expect(out).toEqual({ first: result(82), escalated: failure, final: null, passed: false });
+    expect(out).toEqual({
+      first: result(82),
+      escalated: failure,
+      final: null,
+      passed: false,
+      pre_existing: false,
+    });
     const oor = await verifyFinding(
       createFakeSdkClient(script(result(70), result(200))),
       OPTIONS,
@@ -484,6 +491,50 @@ describe("verifyFinding (A6)", () => {
     const shared = { ...ctx(), semaphore: createSemaphore(1) };
     await Promise.all([1, 2, 3].map(() => verifyFinding(fake, OPTIONS, finding(), shared)));
     expect(peak).toBe(1);
+  });
+});
+
+describe("a verified pre-existing finding (R6)", () => {
+  const verify = (r: VerifierResult, config: VerifyConfig = DEFAULT_VERIFY_CONFIG) =>
+    verifyFinding(createFakeSdkClient(script(r)), OPTIONS, finding(), ctx(config));
+
+  it("is flagged when it is out of scope, holds, scores at the threshold and quotes the head file", async () => {
+    const out = await verify(result(80, { in_scope: false, introduced_by_pr: false }));
+    expect(out.pre_existing).toBe(true);
+    // The scope gate still fails it, so it is not posted.
+    expect(out.passed).toBe(false);
+    expect(out.escalated).toBeUndefined();
+  });
+
+  it("uses the threshold of the reviewer", async () => {
+    const strict = { ...DEFAULT_VERIFY_CONFIG, threshold: 90 };
+    expect((await verify(result(89, { in_scope: false }), strict)).pre_existing).toBe(false);
+    expect((await verify(result(90, { in_scope: false }), strict)).pre_existing).toBe(true);
+  });
+
+  it("is not flagged below the threshold, when the claim does not hold, or in scope", async () => {
+    expect((await verify(result(79, { in_scope: false }))).pre_existing).toBe(false);
+    expect((await verify(result(95, { in_scope: false, claim_holds: false }))).pre_existing).toBe(
+      false,
+    );
+    expect((await verify(result(95))).pre_existing).toBe(false);
+  });
+
+  it("is not flagged when no verifier quote is in the head file", async () => {
+    const out = await verify(result(95, { in_scope: false, quotes: ["not in the file at all"] }));
+    expect(out.pre_existing).toBe(false);
+    expect(out.passed).toBe(false);
+  });
+
+  it("is not flagged when the verifier query fails", async () => {
+    const failure = { kind: "subtype" as const, message: "x" };
+    const out = await verifyFinding(
+      createFakeSdkClient(script({ ok: false, failure, raw: META })),
+      OPTIONS,
+      finding(),
+      ctx(),
+    );
+    expect(out.pre_existing).toBe(false);
   });
 });
 

@@ -19,7 +19,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { DEFAULT_REPO_CONFIG } from "../src/config/repo-config.js";
 import { createProgram } from "../src/cli.js";
 import type * as History from "../src/gather/history.js";
-import type { GitHubClient } from "../src/github/client.js";
+import { GitHubError, type GitHubClient } from "../src/github/client.js";
 import { createFakeGitHubClient, type FakePullRequestSeed } from "../src/github/fake.js";
 import type * as Gh from "../src/github/gh.js";
 import { prDescription } from "../src/github/metadata.js";
@@ -1689,5 +1689,203 @@ describe("a run with a pull request (R2, R3, R4)", () => {
     expect(record.identity.description_meta.source).toBe("commits");
     expect(record.identity.pr).toBeNull();
     expect(record.identity.github).toBeNull();
+  });
+});
+
+describe("pre-existing findings, the check run and the cleanup comment (R6)", () => {
+  const fixtures: Fixture[] = [];
+  afterAll(() => {
+    for (const f of fixtures) rmSync(f.repo, { recursive: true, force: true });
+  });
+
+  // diff-bugs reports three findings. The verifier passes the planted bug.
+  // It marks the finding on line 1 out of scope but real, with a quote in
+  // the head file: a verified pre-existing finding. It marks the finding on
+  // line 3 the same, but with a quote that is not in the head file.
+  function preScript(f: Fixture, preClaim = "CLAIM-PRE") {
+    const planted = plantedFinding(f);
+    const others = [
+      {
+        ...planted,
+        start_line: 1,
+        end_line: 1,
+        claim: preClaim,
+        evidence: "export function sum(values: number[]): number {",
+      },
+      {
+        ...planted,
+        start_line: 3,
+        end_line: 3,
+        claim: "CLAIM-NOQUOTE",
+        evidence: "for (let i = 0; i < values.length; i++) {",
+      },
+    ];
+    return (req: QueryRequest): QueryOutcome<unknown> => {
+      const out = (output: unknown): QueryOutcome<unknown> => ({ ok: true, output, raw: META });
+      if (req.role === "triage") return out(BRIEF);
+      if (req.role === "reviewer") {
+        return out({ findings: req.reviewerName === "diff-bugs" ? [planted, ...others] : [] });
+      }
+      if (req.userMessage.includes(`"claim": "${preClaim}"`)) {
+        return out({
+          ...PASS,
+          in_scope: false,
+          introduced_by_pr: false,
+          quotes: ["export function sum"],
+          score: 90,
+          severity: "suggestion",
+        });
+      }
+      if (req.userMessage.includes('"claim": "CLAIM-NOQUOTE"')) {
+        return out({ ...PASS, in_scope: false, quotes: ["this text is not in the file"] });
+      }
+      return out(PASS);
+    };
+  }
+
+  function github(f: Fixture) {
+    return createFakeGitHubClient({
+      number: 7,
+      base_sha: f.base,
+      head_sha: f.head,
+      url: "https://github.com/acme/widgets/pull/7",
+      viewer_login: "me[bot]",
+    });
+  }
+
+  async function postRunOf(
+    f: Fixture,
+    gh: ReturnType<typeof github>,
+    out: string,
+    preClaim?: string,
+  ) {
+    return runReview({
+      repo: f.repo,
+      pr: 7,
+      github: gh,
+      outDir: join(outRoot, out),
+      format: "github",
+      allowApiKey: false,
+      client: createFakeSdkClient(preScript(f, preClaim)),
+    });
+  }
+
+  it("lists the verified pre-existing finding, and posts no comment with pre_existing: off", async () => {
+    const gh = github(fx);
+    const result = await postRunOf(fx, gh, "pre-off");
+    const { record } = result;
+    expect(result.exitCode).toBe(0);
+    expect(result.reviewUrl).toBe(gh.state.reviews[0]?.url);
+    expect(record.stages.pre_existing.map((p) => p.claim)).toEqual(["CLAIM-PRE"]);
+    const pre = record.stages.pre_existing[0];
+    expect(pre).toMatchObject({
+      file: "src/stats.ts",
+      start_line: 1,
+      severity: "suggestion",
+      score: 90,
+      span_text: "export function sum(values: number[]): number {",
+    });
+    expect(pre?.fingerprint).toMatch(/^[0-9a-f]{16}$/);
+    // It is not posted, and the verifications stay as they were.
+    expect(record.posted.findings.map((p) => p.claim)).not.toContain("CLAIM-PRE");
+    expect(record.stages.verifications.every((v) => !("pre_existing" in v))).toBe(true);
+    expect(gh.state.issue_comments).toEqual([]);
+    expect(gh.calls.map((c) => c.method)).not.toContain("createIssueComment");
+    expect(record.posted.github?.cleanup_comment_id).toBeNull();
+  }, 60_000);
+
+  it("posts one cleanup comment, and the second run updates it and replaces its body", async () => {
+    const f = await fixtureWithFiles({ "config.yaml": "pre_existing: comment\n" });
+    fixtures.push(f);
+    const gh = github(f);
+    const first = await postRunOf(f, gh, "pre-comment-1");
+    expect(gh.state.issue_comments).toHaveLength(1);
+    const comment = gh.state.issue_comments[0];
+    expect(comment?.body).toContain("<!-- pr-review cleanup -->");
+    expect(comment?.body).toContain("Cleanup opportunities");
+    expect(comment?.body).toContain("CLAIM-PRE");
+    expect(comment?.body).not.toContain("CLAIM-NOQUOTE");
+    expect(first.record.posted.github?.cleanup_comment_id).toBe(comment?.id);
+
+    const second = await postRunOf(f, gh, "pre-comment-2", "CLAIM-PRE-SECOND");
+    expect(gh.state.issue_comments).toHaveLength(1);
+    expect(gh.state.issue_comments[0]?.body).toContain("CLAIM-PRE-SECOND");
+    expect(gh.state.issue_comments[0]?.body).not.toContain("CLAIM-PRE\n");
+    expect(gh.calls.filter((c) => c.method === "createIssueComment")).toHaveLength(1);
+    expect(gh.calls.filter((c) => c.method === "updateIssueComment")).toHaveLength(1);
+    expect(second.record.posted.github?.cleanup_comment_id).toBe(comment?.id);
+  }, 60_000);
+
+  it("records a check run error and still posts the review", async () => {
+    const gh = github(fx);
+    gh.failNext(
+      "createCheckRun",
+      new GitHubError({
+        endpoint: "repos/acme/widgets/check-runs",
+        exitCode: 1,
+        message: "Resource not accessible by integration (HTTP 403)",
+      }),
+    );
+    const { record, exitCode } = await postRunOf(fx, gh, "check-run-error");
+    expect(exitCode).toBe(0);
+    expect(gh.state.reviews).toHaveLength(1);
+    expect(record.posted.github?.check_run).toEqual({
+      error: expect.stringContaining("HTTP 403"),
+    });
+    expect(record.posted.github?.errors).toEqual([]);
+  }, 60_000);
+
+  it("creates the check run pr-review on the head, neutral, with the verdict as title", async () => {
+    const gh = github(fx);
+    const { record } = await postRunOf(fx, gh, "check-run");
+    expect(gh.state.check_runs).toEqual([
+      {
+        id: expect.any(Number),
+        head_sha: fx.head,
+        name: "pr-review",
+        conclusion: "neutral",
+        title: "Would request changes",
+        summary: expect.stringContaining("Coverage: reviewers ran:"),
+      },
+    ]);
+    expect(record.posted.github?.check_run).toEqual({ id: gh.state.check_runs[0]?.id });
+  }, 60_000);
+
+  it("creates no check run and no cleanup comment when no review posts", async () => {
+    const f = await fixtureWithFiles({ "config.yaml": "pre_existing: comment\n" });
+    fixtures.push(f);
+    const gh = github(f);
+    const fail = () =>
+      new GitHubError({
+        endpoint: "repos/acme/widgets/pulls/7/reviews",
+        exitCode: 1,
+        message: "x",
+      });
+    gh.failNext("createReview", fail());
+    gh.failNext("createReview", fail());
+    const { record, exitCode, reviewUrl } = await postRunOf(f, gh, "no-review");
+    expect(exitCode).toBe(1);
+    expect(reviewUrl).toBeNull();
+    expect(record.stages.pre_existing).toHaveLength(1);
+    const methods = gh.calls.map((c) => c.method);
+    expect(methods).not.toContain("createCheckRun");
+    expect(methods).not.toContain("createIssueComment");
+    expect(methods).not.toContain("updateIssueComment");
+  }, 60_000);
+
+  it("gives exit code 0 and no review url for a json run", async () => {
+    const result = await runReview({
+      repo: fx.repo,
+      base: fx.base,
+      head: fx.head,
+      tierOverride: "skip",
+      outDir: join(outRoot, "json-result"),
+      format: "json",
+      allowApiKey: false,
+      client: createFakeSdkClient(script(fx)),
+    });
+    expect(result.exitCode).toBe(0);
+    expect(result.reviewUrl).toBeNull();
+    expect(result.record.posted.github).toBeNull();
   });
 });

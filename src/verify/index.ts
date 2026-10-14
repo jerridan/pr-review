@@ -56,6 +56,12 @@ export type Verification = {
   passed: boolean;
   /** Why code failed a final result that the model passed. */
   rejected?: string;
+  /**
+   * True for a verified pre-existing finding (R6): the first result is out
+   * of scope, the claim holds, the score is at or above the threshold, and
+   * a quote of the verifier is in the head file. "passed" stays false.
+   */
+  pre_existing: boolean;
 };
 
 // A line number prefix: "  11| " from the user message, "11<tab>" from
@@ -243,17 +249,26 @@ export async function verifyFinding(
   };
 
   const first = await ask("verifier");
-  if (isQueryFailure(first)) return { first, final: null, passed: false };
+  if (isQueryFailure(first)) return { first, final: null, passed: false, pre_existing: false };
   // The scope gate comes before the score, and an out-of-scope finding
-  // does not escalate.
-  if (!first.in_scope) return { first, final: first, passed: false };
+  // does not escalate. A real issue with a real quote that the change did
+  // not bring is a pre-existing finding.
+  if (!first.in_scope) {
+    const preExisting =
+      first.claim_holds && first.score >= threshold && quoteMatches(first.quotes, headText);
+    return { first, final: first, passed: false, pre_existing: preExisting };
+  }
 
   const inBand = first.score >= bandLow && first.score <= bandHigh;
-  if (!inBand && !finding.needs_context) return { first, final: first, ...decide(first) };
+  if (!inBand && !finding.needs_context) {
+    return { first, final: first, ...decide(first), pre_existing: false };
+  }
 
   const escalated = await ask("verifier-escalation");
   // The second check did not occur, so the finding has no final result
   // and is not posted. The verdict counts this as a failed verifier call.
-  if (isQueryFailure(escalated)) return { first, escalated, final: null, passed: false };
-  return { first, escalated, final: escalated, ...decide(escalated) };
+  if (isQueryFailure(escalated)) {
+    return { first, escalated, final: null, passed: false, pre_existing: false };
+  }
+  return { first, escalated, final: escalated, ...decide(escalated), pre_existing: false };
 }

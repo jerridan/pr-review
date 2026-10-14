@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // The pr-review command line. Exit codes: 0 when a run writes a record,
-// 1 when a run cannot write a record, 2 on a usage error.
+// 1 when a run cannot write a record or cannot post the review that
+// --format github asked for, 2 on a usage error.
 import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { Command, CommanderError, InvalidArgumentError, Option } from "commander";
@@ -111,7 +112,7 @@ export const DEFAULT_OUT_DIR = "pr-review-records";
 // verdict. A run that cannot write a record exits 1.
 async function runCommand(deps: ProgramDeps, options: RunCliOptions): Promise<void> {
   try {
-    const { record, recordPath } = await runReview({
+    const { record, recordPath, reviewUrl, exitCode, error } = await runReview({
       repo: options.repo ?? process.cwd(),
       ...(options.base !== undefined ? { base: options.base } : {}),
       ...(options.head !== undefined ? { head: options.head } : {}),
@@ -125,18 +126,19 @@ async function runCommand(deps: ProgramDeps, options: RunCliOptions): Promise<vo
       ...(deps.client ? { client: deps.client } : {}),
       ...(deps.github ? { github: deps.github } : {}),
     });
-    // The github format prints the JSON document too. A later change
-    // adds the post to GitHub.
+    // The github format prints the JSON document with the review url.
     if (options.format === "json" || options.format === "github") {
       // stdout holds one JSON document, so the skip reason goes to stderr.
       if (record.identity.tier === "skip") {
         process.stderr.write(`Skipped: ${record.identity.tier_reason}\n`);
       }
-      process.stdout.write(formatJson(record, recordPath));
+      const extra = options.format === "github" ? { reviewUrl } : undefined;
+      process.stdout.write(formatJson(record, recordPath, extra));
     } else {
       process.stdout.write(`${formatTable(record)}\nRecord: ${recordPath}\n`);
     }
-    process.exitCode = EXIT_OK;
+    if (error !== null) process.stderr.write(`pr-review run: ${error}\n`);
+    process.exitCode = exitCode === 0 ? EXIT_OK : EXIT_FAILURE;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     process.stderr.write(`pr-review run: ${message}\n`);

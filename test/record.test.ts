@@ -205,6 +205,11 @@ describe("the record file (A9)", () => {
     expect(record.identity.config_hash).toBeNull();
   });
 
+  it("has stages.pre_existing and posted.github null on a run without --format github (R5, R6)", () => {
+    expect(record.stages.pre_existing).toEqual([]);
+    expect(record.posted.github).toBeNull();
+  });
+
   it("names the commits as the source of the description, not sanitized and not cut (R3)", () => {
     expect(record.identity.description_meta).toEqual({
       source: "commits",

@@ -6,7 +6,7 @@ import type { Role } from "../src/config/models.js";
 import { FindingSchema, FindingsOutputSchema } from "../src/schemas/finding.js";
 import { FORBIDDEN_SCHEMA_KEYWORDS, toSdkJsonSchema } from "../src/schemas/json-schema.js";
 import { MergeOutputSchema } from "../src/schemas/merge.js";
-import { RecordSchema, type RunRecord } from "../src/schemas/record.js";
+import { PostedFindingSchema, RecordSchema, type RunRecord } from "../src/schemas/record.js";
 import { ReviewerFrontmatterSchema } from "../src/schemas/reviewer.js";
 import { TriageBriefSchema } from "../src/schemas/triage.js";
 import { VerifierResultSchema, type VerifierResult } from "../src/schemas/verifier.js";
@@ -174,6 +174,7 @@ function makeRecord(): RunRecord {
       merges: [],
       capped: [],
       suppressed: [],
+      pre_existing: [],
     },
     posted: {
       verdict: "would request changes",
@@ -192,8 +193,10 @@ function makeRecord(): RunRecord {
           severity: "blocking",
           score: 90,
           verifier: verifierResult,
+          span_text: "for (let i = 0; i < n; i++) {",
         },
       ],
+      github: null,
     },
     cost: {
       queries: [
@@ -520,6 +523,57 @@ describe("RecordSchema", () => {
     expect(withList([".github/workflows/ci.yml"])).toBe(true);
     expect(withList([1])).toBe(false);
     expect(withList(undefined)).toBe(false);
+  });
+
+  it("requires span_text on a PostedFinding (R8)", () => {
+    const record = makeRecord();
+    const [posted] = record.posted.findings;
+    expect(posted?.span_text).toBe("for (let i = 0; i < n; i++) {");
+    const { span_text: _span, ...withoutSpan } = posted!;
+    expect(PostedFindingSchema.safeParse(posted).success).toBe(true);
+    expect(PostedFindingSchema.safeParse(withoutSpan).success).toBe(false);
+    expect(PostedFindingSchema.safeParse({ ...posted, span_text: 1 }).success).toBe(false);
+  });
+
+  it("requires stages.pre_existing, a list of PostedFinding (R6)", () => {
+    const record = makeRecord();
+    const posted = record.posted.findings[0]!;
+    const withPre = (value: unknown) =>
+      RecordSchema.safeParse({ ...record, stages: { ...record.stages, pre_existing: value } })
+        .success;
+    expect(withPre([posted])).toBe(true);
+    expect(withPre([])).toBe(true);
+    expect(withPre(undefined)).toBe(false);
+    expect(withPre([{ ...posted, fingerprint: undefined }])).toBe(false);
+  });
+
+  it("takes posted.github as null or the strict object of R5", () => {
+    const record = makeRecord();
+    const github = {
+      review_id: 10,
+      review_url: "https://github.com/acme/widgets/pull/7#pullrequestreview-10",
+      error: null,
+      inline: [{ fingerprint: "abc", comment_id: 11 }],
+      in_body: ["def"],
+      check_run: { id: 12 },
+      cleanup_comment_id: null,
+      resolved: [{ thread_id: "T1", fingerprint: "abc" }],
+      errors: [{ step: "cleanup comment", message: "boom" }],
+    };
+    const withGithub = (value: unknown) =>
+      RecordSchema.safeParse({ ...record, posted: { ...record.posted, github: value } }).success;
+    expect(withGithub(github)).toBe(true);
+    expect(withGithub(null)).toBe(true);
+    expect(withGithub({ ...github, check_run: { error: "no checks scope" } })).toBe(true);
+    expect(withGithub({ ...github, check_run: null })).toBe(true);
+    expect(
+      withGithub({ ...github, review_id: null, review_url: null, error: "both calls failed" }),
+    ).toBe(true);
+    expect(withGithub({ ...github, check_run: { id: 1, error: "x" } })).toBe(false);
+    expect(withGithub({ ...github, extra: 1 })).toBe(false);
+    const { errors: _errors, ...noErrors } = github;
+    expect(withGithub(noErrors)).toBe(false);
+    expect(withGithub(undefined)).toBe(false);
   });
 
   it("requires stages.suppressed, each item with a finding, a reviewer and a rule", () => {

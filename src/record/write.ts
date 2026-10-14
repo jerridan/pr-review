@@ -8,6 +8,14 @@ export function recordFileName(startedAt: Date, head: string): string {
   return `${startedAt.toISOString().replace(/:/g, "")}-${head.slice(0, 7)}.json`;
 }
 
+/** The run id: the record file name without ".json" (R5). */
+export function recordRunId(record: RunRecord): string {
+  return recordFileName(new Date(record.identity.started_at), record.identity.head).replace(
+    /\.json$/,
+    "",
+  );
+}
+
 /**
  * Check the record against the schema, then write it to "outDir". Never
  * overwrite a file. Return the absolute path of the file.

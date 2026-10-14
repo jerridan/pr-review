@@ -28,6 +28,27 @@ export type PostedFinding = Finding & {
   severity: "blocking" | "suggestion" | "nit";
   score: number;
   verifier: VerifierResult;
+  /** The normalized span text that the fingerprint hashes (normalizeWs of the head lines). */
+  span_text: string;
+};
+
+/** What the run posted to GitHub with --format github (R5, R6). */
+export type PostedGitHub = {
+  /** Both are null when the review did not post. */
+  review_id: number | null;
+  review_url: string | null;
+  /** The error text of a review that did not post, or null. */
+  error: string | null;
+  inline: { fingerprint: string; comment_id: number }[];
+  /** The fingerprints of the findings in the review body. */
+  in_body: string[];
+  /** The check run, or its error. Null when no check run was tried. */
+  check_run: { id: number } | { error: string } | null;
+  cleanup_comment_id: number | null;
+  /** The threads that the run resolved. */
+  resolved: { thread_id: string; fingerprint: string }[];
+  /** The failed steps after the review: the cleanup comment, a thread resolve, a reply. */
+  errors: { step: string; message: string }[];
 };
 
 /** A reviewer that the tier and the triggers selected, but that did not run. */
@@ -127,6 +148,11 @@ export type RunRecord = {
     capped: PostedFinding[];
     /** The verified findings that a suppression rule removed before the merge groups formed. */
     suppressed: { finding: Finding; reviewer: string; rule: Suppression }[];
+    /**
+     * The verified pre-existing findings (R6): out of scope, but real, with
+     * a score at or above the threshold and a quote in the head file.
+     */
+    pre_existing: PostedFinding[];
   };
   posted: {
     verdict: "skipped" | "incomplete" | "would request changes" | "would approve";
@@ -144,6 +170,8 @@ export type RunRecord = {
       findings_dropped_by_failed_verifier: number;
     };
     findings: PostedFinding[];
+    /** What the run posted with --format github, or null when it tried no review. */
+    github: PostedGitHub | null;
   };
   cost: {
     queries: {
@@ -199,6 +227,21 @@ export const PostedFindingSchema: z.ZodType<PostedFinding> = z.strictObject({
   severity: z.enum(SEVERITIES),
   score: integer(),
   verifier: VerifierResultSchema,
+  span_text: z.string(),
+});
+
+export const PostedGitHubSchema: z.ZodType<PostedGitHub> = z.strictObject({
+  review_id: integer().nullable(),
+  review_url: z.string().nullable(),
+  error: z.string().nullable(),
+  inline: z.array(z.strictObject({ fingerprint: z.string(), comment_id: integer() })),
+  in_body: z.array(z.string()),
+  check_run: z
+    .union([z.strictObject({ id: integer() }), z.strictObject({ error: z.string() })])
+    .nullable(),
+  cleanup_comment_id: integer().nullable(),
+  resolved: z.array(z.strictObject({ thread_id: z.string(), fingerprint: z.string() })),
+  errors: z.array(z.strictObject({ step: z.string(), message: z.string() })),
 });
 
 const roleEnum = z.enum(ROLES as readonly [Role, ...Role[]]);
@@ -316,6 +359,7 @@ const StagesSchema = z.strictObject({
       }),
     }),
   ),
+  pre_existing: z.array(PostedFindingSchema),
 });
 
 export const SkippedReviewerSchema: z.ZodType<SkippedReviewer> = z.strictObject({
@@ -335,6 +379,7 @@ const PostedSchema = z.strictObject({
     findings_dropped_by_failed_verifier: integer(),
   }),
   findings: z.array(PostedFindingSchema),
+  github: PostedGitHubSchema.nullable(),
 });
 
 const CostSchema = z.strictObject({
