@@ -347,6 +347,22 @@ describe("loadPriorState (R7)", () => {
     expect([...prior.dismissed].sort()).toEqual([F_DOWN.fingerprint, F_HUMAN.fingerprint].sort());
   });
 
+  it("takes the marker source when the newest record's head is not the head of the newest review", async () => {
+    // A records push failed: the newest record is of the older review, but
+    // the newest review of the tool is at H0.
+    const { gh, ctx } = setup();
+    await postedState(gh);
+    const out = newOutDir();
+    writeRecordFile(out, "2026-10-13T120000.000Z-ccccccc.json", makeRecord({ head: OLDER }));
+    const prior = (await loadPriorState(gh, { ctx, outDir: out }))!;
+    expect(prior.source).toBe("marker");
+    expect(prior.head).toBe(H0);
+    expect(prior.record).toBeNull();
+    expect(prior.triageTier).toBeNull();
+    expect(prior.open.get(F_OPEN.fingerprint)?.finding).toBeNull();
+    expect(prior.open.get(F_BODY.fingerprint)?.finding).toBeNull();
+  });
+
   it("ignores an inline comment from another author", async () => {
     const { gh, ctx } = setup();
     await postedState(gh);

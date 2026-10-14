@@ -1261,6 +1261,232 @@ describe("--format github (R5, R5a, R6)", () => {
     }, 60_000);
   });
 
+  describe("a later run with no new hunk (R7)", () => {
+    // Each test makes its own fixture, runs a first review on HEAD, then
+    // adds a commit that only removes hunks, so no hunk is new.
+    const fixtures: Fixture[] = [];
+    afterAll(() => {
+      for (const f of fixtures) rmSync(f.repo, { recursive: true, force: true });
+    });
+
+    // A blocking finding on line 11, in the hunk: an inline thread.
+    const INLINE_A = GH_FINDINGS[0];
+    // A blocking finding on lines 4 to 9. It starts before the hunk, so it
+    // goes in the body. Its span holds the first line of "average".
+    const BODY_G = {
+      claim: "CLAIM-G",
+      start: 4,
+      end: 9,
+      severity: "blocking",
+      evidence: "export function average(values: number[]): number {",
+    } as const;
+
+    // diff-bugs reports "findings" at every head. The verifier passes each
+    // one with its severity and its evidence as the quote.
+    function findingsScript(
+      fixture: Fixture,
+      findings: readonly {
+        claim: string;
+        start: number;
+        end: number;
+        severity: string;
+        evidence: string;
+      }[],
+    ) {
+      const base = script(fixture);
+      return (req: QueryRequest): QueryOutcome<unknown> => {
+        const out = (output: unknown): QueryOutcome<unknown> => ({ ok: true, output, raw: META });
+        if (req.role === "reviewer") {
+          if (req.reviewerName !== "diff-bugs") return out({ findings: [] });
+          return out({
+            findings: findings.map((f) => ({
+              file: "src/stats.ts",
+              start_line: f.start,
+              end_line: f.end,
+              category: "bug",
+              severity_estimate: f.severity,
+              confidence: "high",
+              claim: f.claim,
+              evidence: f.evidence,
+              explanation: "e",
+              needs_context: false,
+            })),
+          });
+        }
+        if (req.role === "verifier" || req.role === "verifier-escalation") {
+          const f = findings.find((g) => req.userMessage.includes(`"claim": "${g.claim}"`));
+          if (!f) throw new Error("unknown finding");
+          return out({
+            in_scope: true,
+            claim_holds: true,
+            introduced_by_pr: true,
+            quotes: [f.evidence],
+            rationale: "r",
+            score: 95,
+            severity: f.severity,
+          });
+        }
+        return base(req);
+      };
+    }
+
+    // Commit the base text of each path on the feature branch of the
+    // fixture. Give the new head sha.
+    async function revertToBase(fixture: Fixture, paths: string[]): Promise<string> {
+      const env = {
+        ...process.env,
+        GIT_CONFIG_NOSYSTEM: "1",
+        GIT_CONFIG_GLOBAL: "/dev/null",
+        GIT_AUTHOR_NAME: "Fixture",
+        GIT_AUTHOR_EMAIL: "fixture@example.invalid",
+        GIT_COMMITTER_NAME: "Fixture",
+        GIT_COMMITTER_EMAIL: "fixture@example.invalid",
+      };
+      const git = (...a: string[]) => run("git", ["-C", fixture.repo, ...a], { env });
+      for (const path of paths) {
+        const { stdout: text } = await git("show", `${fixture.base}:${path}`);
+        writeFileSync(join(fixture.repo, path), text);
+      }
+      await git("commit", "--quiet", "-am", `Revert ${paths.join(", ")}`);
+      return (await git("rev-parse", "HEAD")).stdout.trim();
+    }
+
+    async function firstRun(
+      name: string,
+      findings: Parameters<typeof findingsScript>[1],
+    ): Promise<{ fixture: Fixture; github: ReturnType<typeof prFor>; first: RunRecord }> {
+      const fixture = await makeFixture();
+      fixtures.push(fixture);
+      const github = prFor(fixture);
+      const { code, record } = await githubRun(
+        fixture,
+        github,
+        findingsScript(fixture, findings),
+        name,
+      );
+      expect(code).toBe(0);
+      expect(record?.posted.verdict).toBe("would request changes");
+      return { fixture, github, first: record! };
+    }
+
+    it("resolves the thread whose hunk the push removes, and posts one short review that would approve", async () => {
+      const { fixture, github, first } = await firstRun("no-new-thread", [INLINE_A]);
+      const fpA = fp(first, "CLAIM-A");
+      const threadA = github.state.review_comments.find((c) =>
+        c.body.includes(formatFingerprintMarker(fpA)),
+      )!.thread_id;
+
+      // The push removes the hunk of "average", so no hunk is new.
+      const head2 = await revertToBase(fixture, ["src/stats.ts"]);
+      github.state.pr.head_sha = head2;
+      const sdk = createFakeSdkClient(findingsScript(fixture, [INLINE_A]));
+      const { code, doc, record } = await githubRun(
+        fixture,
+        github,
+        findingsScript(fixture, [INLINE_A]),
+        "no-new-thread",
+        { sdk },
+      );
+      expect(code).toBe(0);
+      expect(sdk.calls).toEqual([]);
+
+      // The thread of A resolves with the reply.
+      const thread = await github.getThread({ thread_id: threadA });
+      expect(thread.resolved).toBe(true);
+      expect(thread.comments.at(-1)?.body).toBe(
+        `Resolved by pr-review: the code this comment refers to changed at ${head2}.`,
+      );
+
+      // One short review on the new head, at the tier of the prior record.
+      expect(github.state.reviews).toHaveLength(2);
+      const review = github.state.reviews[1]!;
+      expect(review.commit_id).toBe(head2);
+      expect(parseRunMarker(review.body)).toMatchObject({ head: head2, tier: "fast" });
+      const lines = review.body.split("\n");
+      expect(lines[0]).toContain("**Would approve**");
+      expect(lines[0]).toContain(
+        `No new hunks since ${fixture.head.slice(0, 7)}; 1 thread resolved.`,
+      );
+      expect(lines[1]).toContain("Blocking: 0");
+      expect(lines[1]).toContain("Coverage: reviewers ran:");
+      expect(review.body).toContain(`Review of changes since ${fixture.head.slice(0, 7)}`);
+      expect(github.state.review_comments.filter((c) => c.review_id === review.id)).toEqual([]);
+      expect(github.state.check_runs).toHaveLength(2);
+      expect(doc.review_url).toBe(review.url);
+
+      // A normal record: this head is now the last reviewed head.
+      expect(record?.identity.run_kind).toBe("later");
+      expect(record?.identity.tier).toBe("fast");
+      expect(record?.posted.verdict).toBe("would approve");
+      expect(record?.posted.findings).toEqual([]);
+      expect(record?.posted.github?.review_id).toBe(review.id);
+      expect(record?.posted.github?.resolved).toEqual([{ thread_id: threadA, fingerprint: fpA }]);
+      expect(record?.posted.github?.check_run).toEqual({ id: github.state.check_runs[1]?.id });
+
+      // A run on the same head takes it as H0 and posts nothing.
+      const third = await githubRun(
+        fixture,
+        github,
+        findingsScript(fixture, [INLINE_A]),
+        "no-new-thread",
+      );
+      expect(third.code).toBe(0);
+      expect(github.state.reviews).toHaveLength(2);
+      expect(third.record?.identity.prior?.head).toBe(head2);
+      expect(third.record?.identity.prior?.source).toBe("record");
+      expect(third.record?.posted.github).toBeNull();
+    }, 90_000);
+
+    it("posts one short review when the push only drops a body finding", async () => {
+      const { fixture, github, first } = await firstRun("no-new-body", [BODY_G]);
+      expect(first.posted.github?.in_body).toEqual([fp(first, "CLAIM-G")]);
+
+      const head2 = await revertToBase(fixture, ["src/stats.ts"]);
+      github.state.pr.head_sha = head2;
+      const { code, record } = await githubRun(
+        fixture,
+        github,
+        findingsScript(fixture, [BODY_G]),
+        "no-new-body",
+      );
+      expect(code).toBe(0);
+      expect(github.state.reviews).toHaveLength(2);
+      const review = github.state.reviews[1]!;
+      expect(parseRunMarker(review.body)).toMatchObject({ head: head2, tier: "fast" });
+      const line = review.body.split("\n")[0] ?? "";
+      expect(line).toContain("**Would approve**");
+      expect(line).toContain(
+        `No new hunks since ${fixture.head.slice(0, 7)}; 1 body finding closed.`,
+      );
+      // The dropped body finding is not carried.
+      expect(parseFingerprintMarkers(review.body)).toEqual([]);
+      expect(record?.posted.github?.review_id).toBe(review.id);
+      expect(record?.posted.github?.resolved).toEqual([]);
+      expect(record?.posted.carried).toEqual([]);
+    }, 90_000);
+
+    it("posts nothing when the push removes no span of an open finding", async () => {
+      const { fixture, github } = await firstRun("no-new-none", [INLINE_A]);
+      // The push removes only the hunk of package-lock.json.
+      const head2 = await revertToBase(fixture, ["package-lock.json"]);
+      github.state.pr.head_sha = head2;
+      const { code, doc, record } = await githubRun(
+        fixture,
+        github,
+        findingsScript(fixture, [INLINE_A]),
+        "no-new-none",
+      );
+      expect(code).toBe(0);
+      expect(github.state.reviews).toHaveLength(1);
+      expect(github.state.check_runs).toHaveLength(1);
+      expect([...github.state.threads.values()].every((t) => !t.resolved)).toBe(true);
+      expect(doc.review_url).toBeNull();
+      expect(record?.identity.tier).toBe("skip");
+      expect(record?.identity.tier_reason).toBe(`No new hunks since ${fixture.head.slice(0, 7)}.`);
+      expect(record?.posted.github).toBeNull();
+    }, 90_000);
+  });
+
   it("falls back to a fresh run when H0 cannot be fetched, and says so in coverage", async () => {
     const github = prFor(fx);
     const h0 = "e".repeat(40);

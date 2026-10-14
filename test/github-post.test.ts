@@ -79,6 +79,7 @@ function makeRecord(
     preExisting?: PostedFinding[];
     mode?: "off" | "comment";
     tier?: RunRecord["identity"]["tier"];
+    runKind?: RunRecord["identity"]["run_kind"];
   } = {},
 ): RunRecord {
   return {
@@ -86,7 +87,7 @@ function makeRecord(
       repo: "/repo",
       pr: 7,
       github: null,
-      run_kind: "first",
+      run_kind: options.runKind ?? "first",
       prior: null,
       base: BASE,
       head: HEAD,
@@ -322,6 +323,37 @@ describe("postRun: the cleanup comment (R6)", () => {
     const { gh, ctx } = setup();
     await post(gh, ctx, makeRecord({ mode: "comment", preExisting: [] }));
     expect(gh.state.issue_comments).toEqual([]);
+  });
+
+  it("does not create or update the comment on a later run (R7)", async () => {
+    // A later run holds only the pre-existing findings near its new hunks,
+    // so it must not replace the comment of the first run.
+    const { gh, ctx } = setup();
+    await post(gh, ctx, makeRecord({ mode: "comment", preExisting: [PRE] }));
+    const before = gh.state.issue_comments[0]?.body;
+    expect(before).toContain(PRE.claim);
+    const callsBefore = gh.calls.length;
+
+    const later = makeRecord({ mode: "comment", preExisting: [], runKind: "later" });
+    const out = await post(gh, ctx, later);
+    expect(out.review_id).not.toBeNull();
+    expect(out.cleanup_comment_id).toBeNull();
+    expect(gh.state.issue_comments).toHaveLength(1);
+    expect(gh.state.issue_comments[0]?.body).toBe(before);
+    const methods = gh.calls.slice(callsBefore).map((c) => c.method);
+    expect(methods).not.toContain("listIssueComments");
+    expect(methods).not.toContain("updateIssueComment");
+    expect(methods).not.toContain("createIssueComment");
+
+    // With no comment yet, a later run does not create one.
+    const fresh = setup();
+    const other = finding(3, 3, "f", { severity: "nit" });
+    await post(
+      fresh.gh,
+      fresh.ctx,
+      makeRecord({ mode: "comment", preExisting: [other], runKind: "later" }),
+    );
+    expect(fresh.gh.state.issue_comments).toEqual([]);
   });
 
   it("records a failed cleanup comment under errors, and exits the step", async () => {
