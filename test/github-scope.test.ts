@@ -48,6 +48,27 @@ describe("newHunks (R7)", () => {
     expect(out.diff).toContain(changed);
   });
 
+  it("reports a second hunk with the same changed lines as new when the prior diff holds the key once", () => {
+    const prior = file("src/a.ts", HUNK_A);
+    const head = file("src/a.ts", HUNK_A, HUNK_A_MOVED);
+    const out = newHunks(head, prior);
+    expect(out.files).toEqual(["src/a.ts"]);
+    // One of the two hunks is new. The first one matches the prior hunk.
+    expect(out.diff).toBe(file("src/a.ts", HUNK_A_MOVED));
+  });
+
+  it("keeps a moved hunk as not new", () => {
+    const prior = file("src/a.ts", HUNK_B, HUNK_A);
+    const head = file("src/a.ts", HUNK_A_MOVED, HUNK_B);
+    expect(newHunks(head, prior)).toEqual({ diff: "", files: [] });
+  });
+
+  it("reports no hunk when two prior hunks and two head hunks share one key", () => {
+    const prior = file("src/a.ts", HUNK_A, HUNK_A_MOVED);
+    const head = file("src/a.ts", HUNK_A_MOVED, HUNK_A);
+    expect(newHunks(head, prior)).toEqual({ diff: "", files: [] });
+  });
+
   it("treats every hunk as new against an empty prior diff", () => {
     const head = file("src/a.ts", HUNK_A) + file("src/b.ts", HUNK_B);
     expect(newHunks(head, "")).toEqual({ diff: head, files: ["src/a.ts", "src/b.ts"] });

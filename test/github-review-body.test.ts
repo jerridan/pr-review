@@ -236,6 +236,34 @@ describe("renderReviewBody (R5)", () => {
     expect(second).toContain(renderCoverage(record));
   });
 
+  it("adds the open blocking findings of earlier runs after the counts, before the coverage line", () => {
+    const carriedRecord = makeRecord([inline]);
+    carriedRecord.posted.carried = [
+      finding("src/b.ts", 1, 1, { fingerprint: "5555555555555555" }),
+      finding("src/b.ts", 2, 2, { fingerprint: "6666666666666666" }),
+      finding("src/b.ts", 3, 3, { severity: "suggestion", fingerprint: "7777777777777777" }),
+    ];
+    const second =
+      renderReviewBody({
+        marker: MARKER,
+        record: carriedRecord,
+        slug: SLUG,
+        bodyFindings: [],
+        carriedMarkers: [],
+      }).split("\n")[1] ?? "";
+    expect(second).toContain("Open from earlier runs: 2 blocking.");
+    expect(second.indexOf("Blocking: 1")).toBeLessThan(
+      second.indexOf("Open from earlier runs: 2 blocking."),
+    );
+    expect(second.indexOf("Open from earlier runs: 2 blocking.")).toBeLessThan(
+      second.indexOf(renderCoverage(carriedRecord)),
+    );
+  });
+
+  it("does not mention earlier runs when no finding is carried", () => {
+    expect(body()).not.toContain("Open from earlier runs");
+  });
+
   it("lists each body finding with the bold severity, the claim, a permalink and its marker", () => {
     const text = body();
     expect(text).toContain("### Findings outside the diff");
@@ -349,6 +377,31 @@ describe("renderCheckRun (R6)", () => {
     expect(out.summary).toContain("Blocking: 1");
     expect(out.summary).toContain("Nits: 1");
     expect(out.summary).toContain(renderCoverage(record));
+  });
+});
+
+describe("renderCheckRun carried findings (R7)", () => {
+  it("adds the open blocking findings of earlier runs after the counts", () => {
+    const record = makeRecord([finding("src/a.ts", 1, 1)]);
+    record.posted.carried = [
+      finding("src/b.ts", 1, 1, { fingerprint: "5555555555555555" }),
+      finding("src/b.ts", 2, 2, { fingerprint: "6666666666666666" }),
+      finding("src/b.ts", 3, 3, { severity: "suggestion", fingerprint: "7777777777777777" }),
+    ];
+    const { summary } = renderCheckRun(record);
+    expect(summary).toContain("Open from earlier runs: 2 blocking.");
+    expect(summary.indexOf("Blocking: 1")).toBeLessThan(
+      summary.indexOf("Open from earlier runs: 2 blocking."),
+    );
+    expect(summary.indexOf("Open from earlier runs: 2 blocking.")).toBeLessThan(
+      summary.indexOf(renderCoverage(record)),
+    );
+  });
+
+  it("does not mention earlier runs when no finding is carried", () => {
+    expect(renderCheckRun(makeRecord([finding("src/a.ts", 1, 1)])).summary).not.toContain(
+      "Open from earlier runs",
+    );
   });
 });
 
