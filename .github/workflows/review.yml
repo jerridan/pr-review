@@ -5,8 +5,12 @@
 # Security rules for this file:
 # - The checkout of the pull request is data. No step runs npm, make, sh or
 #   another script or build from the workspace.
-# - No "run:" command line holds a token. The records steps use the
-#   credentials that actions/checkout keeps in the workspace repo.
+# - No "run:" command line holds a token.
+# - The checkout keeps no token in the workspace .git/config. The reviewers
+#   read the workspace, so they must find no token there.
+# - The gh credential helper gives git the job token. The helper reads
+#   GH_TOKEN from the env of each git command. Only the steps that fetch or
+#   push get GH_TOKEN. The reviewer subprocesses get no GH_TOKEN.
 # - Event values go to a script through env, never as text in the script.
 name: pr-review
 
@@ -71,6 +75,17 @@ jobs:
         with:
           ref: refs/pull/${{ steps.pr.outputs.number }}/head
           fetch-depth: 0
+          persist-credentials: false
+
+      # Set the gh credential helper in the global git configuration. This
+      # step writes no token to a file. Skip it when GH_TOKEN is not set.
+      - name: Give git the gh credential helper
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -n "${GH_TOKEN:-}" ]; then
+            gh auth setup-git
+          fi
 
       # Make the head sha and the base sha present on every event. An
       # issue_comment event names no base branch, so that event fetches
@@ -79,6 +94,7 @@ jobs:
         env:
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           BASE_REF: ${{ github.event.pull_request.base.ref }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           git -C "$GITHUB_WORKSPACE" fetch --no-tags origin \
             "+refs/pull/${PR_NUMBER}/head:refs/remotes/origin/pr/${PR_NUMBER}"
@@ -97,6 +113,7 @@ jobs:
         id: records
         env:
           RECORDS_DIR: ${{ runner.temp }}/pr-review-records
+          GH_TOKEN: ${{ github.token }}
         run: |
           found=0
           git -C "$GITHUB_WORKSPACE" ls-remote --exit-code --heads origin pr-review-records \
@@ -156,6 +173,7 @@ jobs:
         env:
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           RECORDS_DIR: ${{ runner.temp }}/pr-review-records
+          GH_TOKEN: ${{ github.token }}
         run: |
           dir="pr-${PR_NUMBER}"
           if [ ! -d "$RECORDS_DIR/$dir" ]; then
