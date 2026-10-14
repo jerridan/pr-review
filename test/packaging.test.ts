@@ -765,7 +765,7 @@ describe(".github/workflows/review.yml (R10)", () => {
     });
   });
 
-  it("uploads the record directory as an artifact with if: always()", () => {
+  it("uploads the records of the pull request as an artifact with if: always()", () => {
     const steps = loadJob().steps;
     const upload = findStep(
       steps,
@@ -776,7 +776,7 @@ describe(".github/workflows/review.yml (R10)", () => {
     expect(upload.if).toMatch(/always\(\)/);
     const ctx = context("pull_request", prEvent("opened", false));
     expect(render(upload.with?.name, ctx)).toBe(`pr-review-record-${PR_NUMBER}-4242`);
-    expect(render(upload.with?.path, ctx)).toMatch(/^\/runner\/temp\/pr-review-records/);
+    expect(render(upload.with?.path, ctx)).toBe(`/runner/temp/pr-review-records/pr-${PR_NUMBER}`);
     const review = findStep(steps, (s) => s.uses === "jerridan/pr-review@v1", "action");
     expect(steps.indexOf(review)).toBeLessThan(steps.indexOf(upload));
   });
