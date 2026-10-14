@@ -22,6 +22,7 @@ import type * as History from "../src/gather/history.js";
 import { GitHubError, type GitHubClient } from "../src/github/client.js";
 import { createFakeGitHubClient, type FakePullRequestSeed } from "../src/github/fake.js";
 import type * as Gh from "../src/github/gh.js";
+import { formatFingerprintMarker, formatRunMarker } from "../src/github/markers.js";
 import type * as Tier from "../src/triage/tier.js";
 import { prDescription } from "../src/github/metadata.js";
 import type * as PromptLoad from "../src/prompts/load.js";
@@ -1834,6 +1835,97 @@ describe("pre-existing findings, the check run and the cleanup comment (R6)", ()
     expect(gh.calls.filter((c) => c.method === "createIssueComment")).toHaveLength(1);
     expect(gh.calls.filter((c) => c.method === "updateIssueComment")).toHaveLength(1);
     expect(second.record.posted.github?.cleanup_comment_id).toBe(comment?.id);
+  }, 60_000);
+
+  it("leaves out a pre-existing finding that a suppression rule matches", async () => {
+    const rules = [
+      ["reviewer", "  - reviewer: diff-bugs\n    reason: Not wanted.\n"],
+      ["path", "  - path: 'src/**'\n    reason: Old code.\n"],
+    ] as const;
+    for (const [name, rule] of rules) {
+      const f = await fixtureWithFiles({
+        "config.yaml": `pre_existing: comment\nsuppressions:\n${rule}`,
+      });
+      fixtures.push(f);
+      const gh = github(f);
+      const { record } = await postRunOf(f, gh, `pre-suppressed-${name}`);
+      expect(record.stages.pre_existing, name).toEqual([]);
+      // The rule removes the planted finding only. The list of suppressions
+      // in the record does not name the pre-existing finding.
+      expect(
+        record.stages.suppressed.map((s) => s.finding.claim),
+        name,
+      ).toEqual([plantedFinding(f).claim]);
+      expect(gh.state.issue_comments, name).toEqual([]);
+    }
+  }, 120_000);
+
+  it("keeps a pre-existing finding that no suppression rule matches", async () => {
+    const f = await fixtureWithFiles({
+      "config.yaml": "suppressions:\n  - path: 'other/**'\n    reason: Not here.\n",
+    });
+    fixtures.push(f);
+    const { record } = await postRunOf(f, github(f), "pre-unmatched");
+    expect(record.stages.pre_existing.map((p) => p.claim)).toEqual(["CLAIM-PRE"]);
+  }, 60_000);
+
+  it("leaves out a pre-existing finding whose fingerprint a person dismissed", async () => {
+    const f = await fixtureWithFiles({ "config.yaml": "pre_existing: comment\n" });
+    fixtures.push(f);
+    const gh = github(f);
+    const first = await postRunOf(f, gh, "pre-dismissed-1");
+    const fingerprint = first.record.stages.pre_existing[0]?.fingerprint ?? "";
+    expect(fingerprint).toMatch(/^[0-9a-f]{16}$/);
+
+    // A person gives a thumbs-down to a comment of the tool that carries
+    // the fingerprint of the pre-existing finding.
+    await gh.createReview({
+      slug: "acme/widgets",
+      number: 7,
+      commit_id: f.head,
+      body: formatRunMarker({ run: "earlier", head: f.head, base: f.base, tier: "full" }),
+      comments: [
+        {
+          path: "src/stats.ts",
+          line: 1,
+          side: "RIGHT",
+          body: `**suggestion** Cleanup\n\n${formatFingerprintMarker(fingerprint)}`,
+        },
+      ],
+    });
+    const comment = gh.state.review_comments.find((c) => c.body.includes(fingerprint));
+    expect(comment).toBeDefined();
+    gh.react(comment?.id ?? 0, "-1", "alice");
+
+    const second = await postRunOf(f, gh, "pre-dismissed-2", undefined, true);
+    expect(second.record.identity.prior?.dismissed).toEqual([fingerprint]);
+    expect(second.record.stages.pre_existing).toEqual([]);
+    expect(gh.state.issue_comments.at(-1)?.body ?? "").not.toContain("CLAIM-PRE");
+  }, 120_000);
+
+  it("gives one entry when two reviewers report the same pre-existing finding", async () => {
+    const base = preScript(fx);
+    const twice = (req: QueryRequest): QueryOutcome<unknown> => {
+      if (req.role === "reviewer" && req.reviewerName === "conventions") {
+        const found = base({ ...req, reviewerName: "diff-bugs" });
+        const output = found.ok ? (found.output as { findings: { claim: string }[] }) : null;
+        const pre = output?.findings.filter((x) => x.claim === "CLAIM-PRE") ?? [];
+        return { ok: true, output: { findings: pre }, raw: META };
+      }
+      return base(req);
+    };
+    const result = await runReview({
+      repo: fx.repo,
+      pr: 7,
+      github: github(fx),
+      outDir: join(outRoot, "pre-twice"),
+      format: "github",
+      allowApiKey: false,
+      client: createFakeSdkClient(twice),
+    });
+    const claims = result.record.stages.verifications.map((v) => v.finding.claim);
+    expect(claims.filter((c) => c === "CLAIM-PRE")).toHaveLength(2);
+    expect(result.record.stages.pre_existing.map((p) => p.claim)).toEqual(["CLAIM-PRE"]);
   }, 60_000);
 
   it("records a check run error and still posts the review", async () => {
