@@ -2,7 +2,9 @@
 # reviews one pull request of the repo in the workspace.
 #
 # The action reads no secret. The caller sets CLAUDE_CODE_OAUTH_TOKEN and
-# GH_TOKEN in the env of the step that uses this action.
+# GH_TOKEN in the env of the step that uses this action. GH_TOKEN must be
+# the job token: the run reads the state of earlier runs as the login
+# github-actions[bot], so another token finds no earlier review.
 name: pr-review
 description: Review a pull request with Claude agents and post the review to GitHub.
 author: Jerridan Quiring

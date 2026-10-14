@@ -321,12 +321,13 @@ The workflow runs one review for each PR at a time. A new push cancels the run i
 | `out` | The records directory. The default is `pr-review-records`. |
 | `allow-api-key` | Keep `ANTHROPIC_API_KEY` in the environment. |
 
-The action has two outputs: `record`, the record path, and `verdict`. The action reads no secret. The caller sets `CLAUDE_CODE_OAUTH_TOKEN` and `GH_TOKEN` in `env`.
+The action has two outputs: `record`, the record path, and `verdict`. The action reads no secret. The caller sets `CLAUDE_CODE_OAUTH_TOKEN` and `GH_TOKEN` in `env`. `GH_TOKEN` must be the job token, `${{ github.token }}`. The run reads the state of earlier runs as the login `github-actions[bot]`, so a run with another token finds no earlier review and posts every finding again.
 
 ### Fork PRs
 
 - A `pull_request` event from a fork gets a read-only token and no secrets. It cannot post. The workflow skips it.
 - A maintainer adds the label `review:full` or `review:fast` to run a fork PR. The label event must come from an owner, member or collaborator.
+- The comment `@pr-review full` from an owner, member or collaborator is the second path that runs a fork PR. It runs fresh at the full tier.
 - The run checks out the fork head. It executes no code from it. The CLI reads git objects. It runs no script, hook or build of the repo under review.
 - The label sets the tier. The label `review:full` also runs fresh.
 - The run grants Bash to no custom reviewer on a fork PR, whatever the permission level of the author.
