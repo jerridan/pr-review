@@ -117,7 +117,12 @@ export async function loadPriorState(
   const newest = reviewed.at(-1);
   if (newest === undefined) return null;
 
-  const found = await findPriorRecord(input.outDir, { slug, pr: number });
+  // Use the record only when its head is the head of the newest review.
+  // When they differ, a records push failed after a newer review, so the
+  // record is too old. The run then takes the marker source.
+  const newestHead = parseRunMarker(newest.body)?.head ?? "";
+  const record = await findPriorRecord(input.outDir, { slug, pr: number });
+  const found = record !== null && record.record.identity.head === newestHead ? record : null;
   const findings = new Map<string, PostedFinding>();
   if (found) {
     for (const f of [...found.record.posted.findings, ...found.record.posted.carried]) {
@@ -125,7 +130,7 @@ export async function loadPriorState(
     }
   }
   const state: PriorState = {
-    head: found ? found.record.identity.head : (parseRunMarker(newest.body)?.head ?? ""),
+    head: newestHead,
     source: found ? "record" : "marker",
     record: found ? found.path : null,
     triageTier: found ? (found.record.identity.triage?.tier ?? null) : null,
