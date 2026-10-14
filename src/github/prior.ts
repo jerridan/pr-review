@@ -139,29 +139,23 @@ export async function loadPriorState(
   };
 
   // Inline comments: the thread state and the reactions decide each one.
+  // One call gives them all, with the thread state on each comment.
   const comments = (await client.listReviewComments({ slug, number })).filter((c) =>
     sameLogin(c.author, ctx.viewerLogin),
   );
-  const threads = new Map<string, Awaited<ReturnType<GitHubClient["getThread"]>>>();
   for (const comment of comments) {
     const [fp] = parseFingerprintMarkers(comment.body);
     if (fp === undefined) continue;
-    const reactions = await client.listReactions({ slug, comment_id: comment.id });
-    if (reactions.some((r) => r.content === "-1")) {
+    if (comment.thumbs_down > 0) {
       state.dismissed.add(fp);
       continue;
     }
-    let thread = threads.get(comment.thread_id);
-    if (thread === undefined) {
-      thread = await client.getThread({ thread_id: comment.thread_id });
-      threads.set(comment.thread_id, thread);
-    }
-    if (thread.resolved) {
+    if (comment.thread_resolved) {
       // A thread that the tool resolved with its reply is neither open nor
       // dismissed. A thread that someone else resolved is dismissed.
-      const last = thread.comments.at(-1);
+      const last = comment.thread_last_comment;
       const byTool =
-        last !== undefined &&
+        last !== null &&
         sameLogin(last.author, ctx.viewerLogin) &&
         last.body.startsWith(RESOLVED_REPLY_PREFIX);
       if (!byTool) state.dismissed.add(fp);

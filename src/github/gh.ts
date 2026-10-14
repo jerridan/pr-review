@@ -137,6 +137,7 @@ function notJson(endpoint: string): GitHubError {
 
 type User = { login?: string } | null | undefined;
 type GqlAuthor = { __typename?: string; login?: string } | null | undefined;
+type GqlComment = { body: string; author: GqlAuthor };
 
 function restLogin(user: User): string {
   return user?.login ?? "ghost";
@@ -170,7 +171,11 @@ const THREADS_QUERY = [
   "              databaseId id body path line startLine",
   "              author { __typename login }",
   "              pullRequestReview { databaseId }",
+  "              reactions(content: THUMBS_DOWN) { totalCount }",
   "            }",
+  "          }",
+  "          lastComment: comments(last: 1) {",
+  "            nodes { body author { __typename login } }",
   "          }",
   "        }",
   "      }",
@@ -187,6 +192,10 @@ const THREAD_QUERY = [
   "      isResolved",
   "      comments(first: 100) {",
   "        nodes { databaseId body author { __typename login } }",
+  "      }",
+  "      firstComment: comments(first: 1) { nodes { databaseId } }",
+  "      lastComment: comments(last: 1) {",
+  "        nodes { body author { __typename login } }",
   "      }",
   "    }",
   "  }",
@@ -208,6 +217,7 @@ type ThreadsPage = {
         pageInfo: { hasNextPage: boolean; endCursor: string | null };
         nodes: {
           id: string;
+          isResolved: boolean;
           comments: {
             nodes: {
               databaseId: number;
@@ -218,8 +228,10 @@ type ThreadsPage = {
               startLine: number | null;
               author: GqlAuthor;
               pullRequestReview: { databaseId: number } | null;
+              reactions: { totalCount: number } | null;
             }[];
           };
+          lastComment: { nodes: GqlComment[] } | null;
         }[];
       };
     } | null;
@@ -230,6 +242,8 @@ type ThreadNode = {
   id?: string;
   isResolved?: boolean;
   comments?: { nodes: { databaseId: number; body: string; author: GqlAuthor }[] };
+  firstComment?: { nodes: { databaseId: number }[] } | null;
+  lastComment?: { nodes: GqlComment[] } | null;
 } | null;
 
 /** Make the real client. "env" goes to gh unchanged. */
@@ -438,6 +452,10 @@ export function createGhClient(
           });
         }
         for (const thread of threads.nodes) {
+          // The last comment comes from its own field. The page can end
+          // before the last comment of a long thread.
+          const last = thread.lastComment?.nodes[0];
+          const lastComment = last ? { author: gqlLogin(last.author), body: last.body } : null;
           for (const c of thread.comments.nodes) {
             out.push({
               id: c.databaseId,
@@ -449,6 +467,9 @@ export function createGhClient(
               author: gqlLogin(c.author),
               thread_id: thread.id,
               review_id: c.pullRequestReview?.databaseId ?? null,
+              thread_resolved: thread.isResolved,
+              thumbs_down: c.reactions?.totalCount ?? 0,
+              thread_last_comment: lastComment,
             });
           }
         }
@@ -468,6 +489,7 @@ export function createGhClient(
           message: "gh api graphql: the thread id names no review thread",
         });
       }
+      const last = node.lastComment?.nodes[0];
       const thread: Thread = {
         id: node.id,
         resolved: node.isResolved,
@@ -476,6 +498,8 @@ export function createGhClient(
           body: c.body,
           author: gqlLogin(c.author),
         })),
+        first_comment_id: node.firstComment?.nodes[0]?.databaseId ?? null,
+        last_comment: last ? { author: gqlLogin(last.author), body: last.body } : null,
       };
       return thread;
     },

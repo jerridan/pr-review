@@ -20,14 +20,29 @@ export type FakePullRequestSeed = Partial<PullRequest> & {
   slug?: string;
 };
 
+/**
+ * A review comment as the fake keeps it. The fake adds the thread state
+ * and the thumbs-down count when it lists the comments.
+ */
+export type FakeReviewComment = Omit<
+  ReviewComment,
+  "thread_resolved" | "thumbs_down" | "thread_last_comment"
+>;
+
+/**
+ * A thread as the fake keeps it. The fake adds the first comment id and
+ * the last comment when it gives the thread.
+ */
+export type FakeThread = Pick<Thread, "id" | "resolved" | "comments">;
+
 export type FakeState = {
   slug: string;
   pr: PullRequest;
   viewer_login: string;
   permission: string;
   reviews: (Review & { comments: InlineComment[] })[];
-  review_comments: ReviewComment[];
-  threads: Map<string, Thread>;
+  review_comments: FakeReviewComment[];
+  threads: Map<string, FakeThread>;
   reactions: Map<number, Reaction[]>;
   issue_comments: IssueComment[];
   check_runs: {
@@ -111,7 +126,7 @@ export function createFakeGitHubClient(seed: FakePullRequestSeed = {}): FakeGitH
     if (error) throw error;
   }
 
-  function thread(method: string, thread_id: string): Thread {
+  function thread(method: string, thread_id: string): FakeThread {
     const found = state.threads.get(thread_id);
     if (!found) throw notFound(method, `thread ${thread_id}`);
     return found;
@@ -122,6 +137,12 @@ export function createFakeGitHubClient(seed: FakePullRequestSeed = {}): FakeGitH
   }
 
   const copy = <T>(value: T): T => structuredClone(value);
+
+  // The last comment of a thread that the fake keeps, or null.
+  function lastOf(t: FakeThread | undefined): { author: string; body: string } | null {
+    const last = t?.comments.at(-1);
+    return last ? { author: last.author, body: last.body } : null;
+  }
 
   return {
     calls,
@@ -163,12 +184,22 @@ export function createFakeGitHubClient(seed: FakePullRequestSeed = {}): FakeGitH
     async listReviewComments(input) {
       enter("listReviewComments", input);
       checkPr("listReviewComments", input.number);
-      return copy(state.review_comments);
+      return state.review_comments.map((c): ReviewComment => {
+        const t = state.threads.get(c.thread_id);
+        const reactions = state.reactions.get(c.id) ?? [];
+        return copy({
+          ...c,
+          thread_resolved: t?.resolved ?? false,
+          thumbs_down: reactions.filter((r) => r.content === "-1").length,
+          thread_last_comment: lastOf(t),
+        });
+      });
     },
 
     async getThread(input) {
       enter("getThread", input);
-      return copy(thread("getThread", input.thread_id));
+      const t = thread("getThread", input.thread_id);
+      return copy({ ...t, first_comment_id: t.comments[0]?.id ?? null, last_comment: lastOf(t) });
     },
 
     async listReactions(input) {

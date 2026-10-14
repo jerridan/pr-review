@@ -38,12 +38,23 @@ export type ReviewComment = {
   author: string;
   thread_id: string;
   review_id: number | null;
+  /** True when the thread of the comment is resolved. */
+  thread_resolved: boolean;
+  /** The number of thumbs-down reactions on the comment. */
+  thumbs_down: number;
+  /** The last comment of the thread, or null when the thread has none. */
+  thread_last_comment: { author: string; body: string } | null;
 };
 
 export type Thread = {
   id: string;
   resolved: boolean;
+  /** The first page of the comments of the thread. */
   comments: { id: number; body: string; author: string }[];
+  /** The id of the first comment of the thread, or null. */
+  first_comment_id: number | null;
+  /** The last comment of the thread, or null. */
+  last_comment: { author: string; body: string } | null;
 };
 
 export type InlineComment = {
