@@ -1,6 +1,7 @@
 import { execFile, execFileSync } from "node:child_process";
 import {
   chmodSync,
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -23,7 +24,6 @@ import { GitHubError, type GitHubClient } from "../src/github/client.js";
 import { createFakeGitHubClient, type FakePullRequestSeed } from "../src/github/fake.js";
 import { formatFingerprintMarker, formatRunMarker } from "../src/github/markers.js";
 import { prDescription } from "../src/github/metadata.js";
-import type * as PromptLoad from "../src/prompts/load.js";
 import type { ReviewerDefinition } from "../src/reviewers/loader.js";
 import { describeSelected, runReview } from "../src/run.js";
 import type { Finding } from "../src/schemas/finding.js";
@@ -34,25 +34,6 @@ import type { QueryMeta, QueryOutcome, QueryRequest } from "../src/sdk/client.js
 import { createFakeSdkClient } from "../src/sdk/fake.js";
 import { buildQueryOptions } from "../src/sdk/options.js";
 import { UNTRUSTED_SYSTEM_LINE } from "../src/untrusted.js";
-
-// Test switches for the module mocks below. They are off unless a test
-// sets them.
-const mocks = vi.hoisted(() => ({
-  failVerifierPrompt: false,
-}));
-
-vi.mock("../src/prompts/load.js", async (importOriginal) => {
-  const original = await importOriginal<typeof PromptLoad>();
-  return {
-    ...original,
-    loadPrompt: (relativePath: string) => {
-      if (mocks.failVerifierPrompt && relativePath === "verifier.md") {
-        throw new Error("PROMPT-LOAD-FAILED");
-      }
-      return original.loadPrompt(relativePath);
-    },
-  };
-});
 
 const run = promisify(execFile);
 const SCRIPT = fileURLToPath(new URL("../scripts/make-fixture.sh", import.meta.url));
@@ -626,15 +607,29 @@ describe("a verifier prompt that does not load", () => {
   beforeAll(async () => {
     pfx = await fixtureWithFiles({ "config.yaml": "reviewers:\n  diff-bugs:\n    passes: 2\n" });
   }, 30_000);
+  // A copy of prompts/ without verifier.md.
+  let promptsDir: string;
+  beforeAll(() => {
+    promptsDir = mkdtempSync(join(tmpdir(), "pr-review-prompts-"));
+    cpSync(fileURLToPath(new URL("../prompts/", import.meta.url)), promptsDir, {
+      recursive: true,
+    });
+    rmSync(join(promptsDir, "verifier.md"));
+  });
   afterAll(() => {
     if (pfx) rmSync(pfx.repo, { recursive: true, force: true });
+    rmSync(promptsDir, { recursive: true, force: true });
   });
   afterEach(() => {
-    mocks.failVerifierPrompt = false;
+    vi.unstubAllEnvs();
   });
 
   it("fails the verification, writes the record and removes the worktree while a reviewer pass is pending", async () => {
-    mocks.failVerifierPrompt = true;
+    // The prompt loader reads PR_REVIEW_PROMPTS_DIR when it loads, so load
+    // a new copy of the run module after the variable is set.
+    vi.stubEnv("PR_REVIEW_PROMPTS_DIR", promptsDir);
+    vi.resetModules();
+    const { runReview: runWithPrompts } = await import("../src/run.js");
     let reviewerCalls = 0;
     const fake = createFakeSdkClient(async (req) => {
       if (req.role === "reviewer" && req.reviewerName === "diff-bugs") {
@@ -649,7 +644,7 @@ describe("a verifier prompt that does not load", () => {
       }
       return script(pfx)(req);
     });
-    const { record, recordPath } = await runReview({
+    const { record, recordPath } = await runWithPrompts({
       repo: pfx.repo,
       base: pfx.base,
       head: pfx.head,
@@ -669,7 +664,10 @@ describe("a verifier prompt that does not load", () => {
     expect(record.stages.verifications).toEqual([
       {
         finding: plantedFinding(pfx),
-        first: { kind: "thrown", message: expect.stringContaining("PROMPT-LOAD-FAILED") },
+        first: {
+          kind: "thrown",
+          message: expect.stringContaining('Cannot read prompt "verifier.md"'),
+        },
         final: null,
         passed: false,
       },

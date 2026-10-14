@@ -12,7 +12,14 @@ export interface PromptFile {
 
 // This file is at src/prompts/load.ts and at dist/prompts/load.js. In both
 // cases the package root is two levels up.
-const PROMPTS_DIR = fileURLToPath(new URL("../../prompts/", import.meta.url));
+const PACKAGE_PROMPTS_DIR = fileURLToPath(new URL("../../prompts/", import.meta.url));
+
+// PR_REVIEW_PROMPTS_DIR replaces the prompts directory of the package. The
+// variable exists for tests and for a user who ships other prompts. The
+// module reads it one time, when it loads. An empty value gives the default.
+const PROMPTS_DIR = process.env.PR_REVIEW_PROMPTS_DIR
+  ? resolve(process.env.PR_REVIEW_PROMPTS_DIR)
+  : PACKAGE_PROMPTS_DIR;
 
 /**
  * Give the absolute path of "prompts/<relativePath>". Throw when the path
@@ -54,7 +61,7 @@ export function parseFrontmatter(text: string): PromptFile {
   return { frontmatter: { ...(data as Record<string, unknown>) }, body };
 }
 
-/** Read "prompts/<relativePath>" from the package root. */
+/** Read "<relativePath>" from the prompts directory. */
 export function loadPrompt(relativePath: string): PromptFile {
   const full = promptPath(relativePath);
   let text: string;
