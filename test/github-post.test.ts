@@ -5,14 +5,12 @@ import { createFakeGitHubClient, type FakeGitHubClient } from "../src/github/fak
 import {
   CLEANUP_MARKER,
   formatFingerprintMarker,
-  formatRunMarker,
   parseFingerprintMarkers,
-  parseRunMarker,
   type RunMarker,
 } from "../src/github/markers.js";
 import type { PrContext } from "../src/github/metadata.js";
 import { postFailure, postRun, skipReviewAlreadyPosted } from "../src/github/post.js";
-import { renderCheckRun, renderReviewBody } from "../src/github/review-body.js";
+import { renderReviewBody } from "../src/github/review-body.js";
 import type { PostedFinding, RunRecord } from "../src/schemas/record.js";
 
 const HEAD = "a".repeat(40);
@@ -172,11 +170,12 @@ describe("postRun: the review (R5)", () => {
     const input = creates[0]?.input as { commit_id: string; body: string; comments: unknown[] };
     expect(input.commit_id).toBe(HEAD);
     expect(gh.state.reviews).toHaveLength(1);
-    const marker: RunMarker = { run: RUN_ID, head: HEAD, base: BASE, tier: "full" };
-    expect(input.body).toBe(
-      renderReviewBody({ marker, record, slug: SLUG, bodyFindings: [OUTSIDE], carriedMarkers: [] }),
-    );
-    expect(parseRunMarker(input.body)).toEqual(marker);
+    expect(
+      input.body.startsWith(`<!-- pr-review run=${RUN_ID} head=${HEAD} base=${BASE} tier=full -->`),
+    ).toBe(true);
+    expect(input.body).toContain("**Would request changes**");
+    expect(input.body).toContain("Blocking: 3");
+    expect(parseFingerprintMarkers(input.body)).toEqual([OUTSIDE.fingerprint]);
     expect(input.comments).toHaveLength(2);
 
     const comments = gh.state.review_comments;
@@ -274,17 +273,17 @@ describe("postRun: the review (R5)", () => {
 });
 
 describe("postRun: the check run (R6)", () => {
-  it("creates the check run pr-review on the head, neutral, with the rendered text", async () => {
+  it("creates the check run pr-review on the head, neutral, with the verdict as title", async () => {
     const { gh, ctx } = setup();
-    const record = makeRecord();
-    await post(gh, ctx, record);
+    await post(gh, ctx, makeRecord());
     expect(gh.state.check_runs).toEqual([
       {
         id: expect.any(Number),
         head_sha: HEAD,
         name: "pr-review",
         conclusion: "neutral",
-        ...renderCheckRun(record),
+        title: "Would request changes",
+        summary: expect.stringContaining("Blocking: 3"),
       },
     ]);
   });
@@ -409,7 +408,11 @@ describe("postFailure (R5a)", () => {
     };
     expect(input.commit_id).toBe(HEAD);
     expect(input.comments).toEqual([]);
-    expect(input.body).toBe(`${formatRunMarker(marker)}\npr-review failed at find_verify: boom`);
+    expect(
+      input.body.startsWith(
+        `<!-- pr-review run=${RUN_ID} head=${HEAD} base=${BASE} tier=unknown status=failed -->`,
+      ),
+    ).toBe(true);
     expect(gh.state.check_runs).toEqual([]);
     expect(gh.state.issue_comments).toEqual([]);
   });
