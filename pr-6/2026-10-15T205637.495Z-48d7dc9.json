@@ -1,0 +1,1641 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 6,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Shape the review body as a summary with a folded coverage block",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/6"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "472d12334dbbd5d59d2664fb27dadf66c2141315",
+    "head": "48d7dc9d5bcc46a503346c49875a287fb1e1631b",
+    "started_at": "2026-10-15T20:56:37.495Z",
+    "tool_version": "0.1.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Shape the review body as a summary with a folded coverage block\n\nThe review body opened with one long line of counts and coverage parts that mostly said \"none\". A reader had to scan it for the news.\n\nThe body now has this shape:\n\n```\n\n## ✅ Would approve\n\n**Tier** full. Triage: ...\n\n| Blocking | Suggestions | Nits |\n|---|---|---|\n| 0 | 0 | 0 |\n\n<details><summary>Coverage and cost</summary>\n\n- Reviewers ran: conventions, ...\n- 9 candidate findings raised, 9 dropped by the verifier\n- Cost $0.70, 49 s of run time\n\n</details>\n\n<sub>pr-review 0.1.0</sub>\n```\n\n- The verdict is a heading with an icon. The tier and its reason follow.\n- The counts are a table. The open blocking findings of earlier runs, the \"Review of changes since\" line and the findings outside the diff keep their places.\n- The coverage is folded and lists only the parts that carry news. A part that says \"none\" or \"0\" is left out.\n- The folded block adds the candidate findings and the verifier drops, the cost and the run time, all from the record.\n- The check run summary uses the same table and bullets.\n- The marker stays on line 1, so later runs read it as before. The table output keeps its one-line coverage.\n\nThe README section \"The review body\" describes the new shape. Tests in `test/github-review-body.test.ts` cover each part; six assertions in the CLI and post tests follow the new shape.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01KFgKDUH5g8JkJwwpZsR1X4\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": true,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": "README.md",
+        "hunks": 2
+      },
+      {
+        "path": "src/github/review-body.ts",
+        "hunks": 5
+      },
+      {
+        "path": "src/output/table.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/cli-run.test.ts",
+        "hunks": 4
+      },
+      {
+        "path": "test/github-post.test.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/github-review-body.test.ts",
+        "hunks": 5
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "Changes the logic that renders the GitHub review body and check run output, which other code and tests parse, so the change needs a full review.",
+      "confidence": "medium",
+      "categories": [
+        "bug",
+        "test",
+        "docs"
+      ],
+      "hotspots": [
+        "src/github/review-body.ts: renderReviewBody (new line layout, marker on its own line)",
+        "src/github/review-body.ts: coverageParts / coverageBullets (the news filter, capitalization of bullets)",
+        "src/github/review-body.ts: costLine and candidatesLine (rounding, null cost, stage_ms sum)",
+        "src/github/review-body.ts: renderCheckRun (summary join, carriedNote spacing)",
+        "src/github/review-body.ts: renderCoverage (still used by the table output)"
+      ],
+      "file_notes": [
+        {
+          "file": "src/github/review-body.ts",
+          "note": "Changes the layout of the review body and the check run summary. The verdict becomes a heading with an icon. The counts become a table. A folded details block holds coverage, candidates and cost. The coverage logic is split into parts with a news flag."
+        },
+        {
+          "file": "src/output/table.ts",
+          "note": "Comment change only."
+        },
+        {
+          "file": "README.md",
+          "note": "Docs updated to match the new body and check run layout."
+        },
+        {
+          "file": "test/cli-run.test.ts",
+          "note": "Assertions moved from line-position checks to content checks."
+        },
+        {
+          "file": "test/github-post.test.ts",
+          "note": "Assertions updated to match the counts table."
+        },
+        {
+          "file": "test/github-review-body.test.ts",
+          "note": "New tests for the heading, counts table, details block, and cost and candidate lines. Existing tests adjusted."
+        }
+      ],
+      "summary": "The change redesigns the GitHub review body. The marker now sits alone on line 1. The verdict becomes a heading with an icon. The counts become a markdown table. Coverage, candidate findings and cost move into a folded details block, and only coverage parts with news are listed. The check run summary gets the same bullets. Tests and README are updated to match."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: Changes the logic that renders the GitHub review body and check run output, which other code and tests parse, so the change needs a full review.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/github/review-body.ts",
+            "start_line": 121,
+            "end_line": 122,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The new comment joins two statements with a semicolon instead of using short separate sentences.",
+            "evidence": "// \"none\" or \"0\" carries no news; \"news\" says so.",
+            "suggested_fix": "Split it into two sentences: \"A part whose value is none or 0 carries no news. The news field tells this.\"",
+            "explanation": "CLAUDE.md rule 5 asks for ASD-STE100 prose in comments: short sentences with one statement each.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5216,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 12353,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0012453,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 362,
+              "cacheReadInputTokens": 4996,
+              "cacheCreationInputTokens": 11859,
+              "webSearchRequests": 0,
+              "costUSD": 0.1031192,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1043645
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5535,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 12359,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0012469,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 465,
+              "cacheReadInputTokens": 4954,
+              "cacheCreationInputTokens": 11865,
+              "webSearchRequests": 0,
+              "costUSD": 0.1052188,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 210,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1064657
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/github/review-body.ts",
+            "start_line": 240,
+            "end_line": 243,
+            "category": "bug",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The open-blocking note and the 'Review of changes since' line have no blank line between them, so markdown joins them into one paragraph.",
+            "evidence": "    ...carriedNote(record),\n  ];\n  if (input.sinceHead !== undefined) {\n    lines.push(`Review of changes since ${input.sinceHead.slice(0, 7)}`);",
+            "suggested_fix": "Push a blank line after the carried note, or before the 'Review of changes since' line.",
+            "explanation": "In markdown, consecutive lines with no blank line between them render as one paragraph, so the two separate statements show as a single run-on line.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 8220,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 12371,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0012476000000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 742,
+              "cacheReadInputTokens": 21675,
+              "cacheCreationInputTokens": 12581,
+              "webSearchRequests": 0,
+              "costUSD": 0.119839,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 298,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1210866
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/github/review-body.ts",
+            "start_line": 240,
+            "end_line": 243,
+            "category": "bug",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The open-blocking line from earlier runs is followed directly by the 'Review of changes since' line, so markdown joins the two lines into one paragraph.",
+            "evidence": "    ...carriedNote(record),\n  ];\n  if (input.sinceHead !== undefined) {\n    lines.push(`Review of changes since ${input.sinceHead.slice(0, 7)}`);",
+            "suggested_fix": "Push a blank line after the carriedNote line when it is not empty.",
+            "explanation": "Markdown treats two lines with no blank line between them as one paragraph, so the two notes render as one run-on sentence.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 8691,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 12357,
+              "outputTokens": 17,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0012442000000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 767,
+              "cacheReadInputTokens": 4899,
+              "cacheCreationInputTokens": 11863,
+              "webSearchRequests": 0,
+              "costUSD": 0.1112318,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 291,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.112476
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "docs/design/high-level-design.md",
+            "start_line": 154,
+            "end_line": 154,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The design says the review body carries a coverage line, but the body now holds a folded bullet list that leaves out the empty parts.",
+            "evidence": "- Failures are visible. The review always posts, and its body carries a coverage line: reviewers that ran, reviewers that failed, findings dropped because a verifier call failed.",
+            "suggested_fix": "Say that the body carries a folded coverage block that lists the reviewers that ran and each failure or drop that occurred.",
+            "explanation": "After the change, the body lists only the coverage parts with news, in a folded details block, not on one coverage line.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7259,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 12365,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0012475,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 584,
+              "cacheReadInputTokens": 21683,
+              "cacheCreationInputTokens": 12900,
+              "webSearchRequests": 0,
+              "costUSD": 0.1192326,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 184,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1204801
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6148,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 25228,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0025333000000000005,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 506,
+              "cacheReadInputTokens": 5021,
+              "cacheCreationInputTokens": 24734,
+              "webSearchRequests": 0,
+              "costUSD": 0.2090042,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 193,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.2115375
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7461,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 12365,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.001247,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 408,
+              "cacheReadInputTokens": 4997,
+              "cacheCreationInputTokens": 11871,
+              "webSearchRequests": 0,
+              "costUSD": 0.10413539999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 169,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.10538239999999999
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4173,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 12363,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0012463,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 280,
+              "cacheReadInputTokens": 4997,
+              "cacheCreationInputTokens": 11869,
+              "webSearchRequests": 0,
+              "costUSD": 0.1015594,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 95,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1028057
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "test/cli-run.test.ts",
+            "start_line": 1299,
+            "end_line": 1299,
+            "category": "test",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The assertion on the verdict is looser than before: it no longer checks that the verdict is the heading.",
+            "evidence": "expect(review.body).toContain(\"Would approve\");",
+            "suggested_fix": "Assert on \"## ✅ Would approve\".",
+            "explanation": "The tier reason or other text could contain \"Would approve\", so this assertion can pass even when the heading is missing.",
+            "needs_context": false
+          },
+          {
+            "file": "src/github/review-body.ts",
+            "start_line": 291,
+            "end_line": 294,
+            "category": "test",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "No test checks the layout of the check run summary when a carried note sits before the coverage bullets, which are joined with no blank line between them.",
+            "evidence": "      ...carriedNote(record),\n      ...coverageBullets(record),",
+            "explanation": "The tests check only the order of the parts. They do not check the markdown rendering, so the note can merge into the bullet list without any test failing.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5989,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 12347,
+              "outputTokens": 16,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0012427,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 519,
+              "cacheReadInputTokens": 4926,
+              "cacheCreationInputTokens": 11853,
+              "webSearchRequests": 0,
+              "costUSD": 0.1061972,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1074399
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "src/github/review-body.ts",
+          "start_line": 121,
+          "end_line": 122,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The new comment joins two statements with a semicolon instead of using short separate sentences.",
+          "evidence": "// \"none\" or \"0\" carries no news; \"news\" says so.",
+          "suggested_fix": "Split it into two sentences: \"A part whose value is none or 0 carries no news. The news field tells this.\"",
+          "explanation": "CLAUDE.md rule 5 asks for ASD-STE100 prose in comments: short sentences with one statement each.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "// \"none\" or \"0\" carries no news; \"news\" says so."
+          ],
+          "rationale": "CLAUDE.md rule 5 requires ASD-STE100 prose with short sentences, one instruction each, in every code comment. The new comment joins two statements with a semicolon. It is a real but minor style violation, and the PR added it.",
+          "score": 62,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "// \"none\" or \"0\" carries no news; \"news\" says so.",
+            "5. **Write ASD-STE100 prose.** Use it in every markdown file and every code comment. Write short sentences in active voice, with one instruction each."
+          ],
+          "rationale": "The new comment does join two statements with a semicolon, and CLAUDE.md asks for short ASD-STE100 sentences in comments. Splitting it is only a small wording change that does not affect behaviour.",
+          "score": 48,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "// \"none\" or \"0\" carries no news; \"news\" says so.",
+            "5. **Write ASD-STE100 prose.** Use it in every markdown file and every code comment. Write short sentences in active voice, with one instruction each."
+          ],
+          "rationale": "The new comment does join two statements with a semicolon, and CLAUDE.md asks for short ASD-STE100 sentences in comments. Splitting it is only a small wording change that does not affect behaviour.",
+          "score": 48,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "docs/design/high-level-design.md",
+          "start_line": 154,
+          "end_line": 154,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The design says the review body carries a coverage line, but the body now holds a folded bullet list that leaves out the empty parts.",
+          "evidence": "- Failures are visible. The review always posts, and its body carries a coverage line: reviewers that ran, reviewers that failed, findings dropped because a verifier call failed.",
+          "suggested_fix": "Say that the body carries a folded coverage block that lists the reviewers that ran and each failure or drop that occurred.",
+          "explanation": "After the change, the body lists only the coverage parts with news, in a folded details block, not on one coverage line.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- Failures are visible. The review always posts, and its body carries a coverage line: reviewers that ran, reviewers that failed, findings dropped because a verifier call failed.",
+            "\"<details><summary>Coverage and cost</summary>\",",
+            "// The coverage as bullets. Only the parts that carry news are listed."
+          ],
+          "rationale": "The design doc line 154 still says the body carries a \"coverage line\", while the code now renders a folded details block of bullets that shows only the parts with news. The doc is stale because of this change, but the change did not touch the file, and the design doc is a high-level draft. Only the table output still has a coverage line, so the wording is a minor drift.",
+          "score": 45,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- Failures are visible. The review always posts, and its body carries a coverage line: reviewers that ran, reviewers that failed, findings dropped because a verifier call failed.",
+            "\"<details><summary>Coverage and cost</summary>\",",
+            "// The coverage as bullets. Only the parts that carry news are listed."
+          ],
+          "rationale": "The design doc line 154 still says the body carries a \"coverage line\", while the code now renders a folded details block of bullets that shows only the parts with news. The doc is stale because of this change, but the change did not touch the file, and the design doc is a high-level draft. Only the table output still has a coverage line, so the wording is a minor drift.",
+          "score": 45,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "src/github/review-body.ts",
+          "start_line": 240,
+          "end_line": 243,
+          "category": "bug",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The open-blocking line from earlier runs is followed directly by the 'Review of changes since' line, so markdown joins the two lines into one paragraph.",
+          "evidence": "    ...carriedNote(record),\n  ];\n  if (input.sinceHead !== undefined) {\n    lines.push(`Review of changes since ${input.sinceHead.slice(0, 7)}`);",
+          "suggested_fix": "Push a blank line after the carriedNote line when it is not empty.",
+          "explanation": "Markdown treats two lines with no blank line between them as one paragraph, so the two notes render as one run-on sentence.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "    ...carriedNote(record),\n  ];\n  if (input.sinceHead !== undefined) {\n    lines.push(`Review of changes since ${input.sinceHead.slice(0, 7)}`);"
+          ],
+          "rationale": "The two lines are adjacent with no blank line between them, but this body is posted as a GitHub review comment. GitHub renders a single newline in comments as a line break, so the two notes show on separate lines and don't run together. The old code also put \"Review of changes since\" on its own line right after the counts line, so this PR didn't introduce the layout. The finding is at most a cosmetic suggestion.",
+          "score": 12,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": false,
+          "quotes": [
+            "    ...carriedNote(record),\n  ];",
+            "    lines.push(`Review of changes since ${input.sinceHead.slice(0, 7)}`);",
+            "  return n > 0 ? [`Open from earlier runs: ${n} blocking.`] : [];"
+          ],
+          "rationale": "The finding is correct: when both notes appear, no blank line separates them, so markdown shows them as one paragraph. Before this change, the old body also put them in one paragraph, together with the counts and coverage. The carried note ends with a period, so the result reads \"Open from earlier runs: 1 blocking. Review of changes since abc1234\", which is only a small formatting issue.",
+          "score": 35,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": false,
+          "quotes": [
+            "    ...carriedNote(record),\n  ];",
+            "    lines.push(`Review of changes since ${input.sinceHead.slice(0, 7)}`);",
+            "  return n > 0 ? [`Open from earlier runs: ${n} blocking.`] : [];"
+          ],
+          "rationale": "The finding is correct: when both notes appear, no blank line separates them, so markdown shows them as one paragraph. Before this change, the old body also put them in one paragraph, together with the counts and coverage. The carried note ends with a period, so the result reads \"Open from earlier runs: 1 blocking. Review of changes since abc1234\", which is only a small formatting issue.",
+          "score": 35,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "test/cli-run.test.ts",
+          "start_line": 1299,
+          "end_line": 1299,
+          "category": "test",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The assertion on the verdict is looser than before: it no longer checks that the verdict is the heading.",
+          "evidence": "expect(review.body).toContain(\"Would approve\");",
+          "suggested_fix": "Assert on \"## ✅ Would approve\".",
+          "explanation": "The tier reason or other text could contain \"Would approve\", so this assertion can pass even when the heading is missing.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(review.body).toContain(\"Would approve\");",
+            "`## ${VERDICT_ICON[posted.verdict]} ${VERDICT_TEXT[posted.verdict]}`"
+          ],
+          "rationale": "The assertion was loosened from \\\"**Would approve**\\\" on line 0 to a bare substring anywhere in the body. But no other body text emits \\\"Would approve\\\" here, and the surrounding assertions pin the new shape, so the risk is minor.",
+          "score": 30,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(review.body).toContain(\"Would approve\");",
+            "`## ${VERDICT_ICON[posted.verdict]} ${VERDICT_TEXT[posted.verdict]}`"
+          ],
+          "rationale": "The assertion was loosened from \\\"**Would approve**\\\" on line 0 to a bare substring anywhere in the body. But no other body text emits \\\"Would approve\\\" here, and the surrounding assertions pin the new shape, so the risk is minor.",
+          "score": 30,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "src/github/review-body.ts",
+          "start_line": 291,
+          "end_line": 294,
+          "category": "test",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "No test checks the layout of the check run summary when a carried note sits before the coverage bullets, which are joined with no blank line between them.",
+          "evidence": "      ...carriedNote(record),\n      ...coverageBullets(record),",
+          "explanation": "The tests check only the order of the parts. They do not check the markdown rendering, so the note can merge into the bullet list without any test failing.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "      ...carriedNote(record),\n      ...coverageBullets(record),"
+          ],
+          "rationale": "The tests only compare `indexOf` positions and none checks the blank line, but the finding names no real defect. In GitHub-flavoured markdown a bullet list can interrupt a paragraph, so the note renders correctly above the bullets. It is a minor test-gap remark.",
+          "score": 22,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "      ...carriedNote(record),\n      ...coverageBullets(record),"
+          ],
+          "rationale": "The tests only compare `indexOf` positions and none checks the blank line, but the finding names no real defect. In GitHub-flavoured markdown a bullet list can interrupt a paragraph, so the note renders correctly above the bullets. It is a minor test-gap remark.",
+          "score": 22,
+          "severity": "nit"
+        },
+        "passed": false
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5539831800,
+      "review_url": "https://github.com/jerridan/pr-review/pull/6#pullrequestreview-5539831800",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 116667227506
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 5547,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11480,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011585000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 792,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 10994,
+            "webSearchRequests": 0,
+            "costUSD": 0.0520262,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0531847
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5216,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 12353,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012453,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 362,
+            "cacheReadInputTokens": 4996,
+            "cacheCreationInputTokens": 11859,
+            "webSearchRequests": 0,
+            "costUSD": 0.1031192,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1043645
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5535,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 12359,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012469,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 465,
+            "cacheReadInputTokens": 4954,
+            "cacheCreationInputTokens": 11865,
+            "webSearchRequests": 0,
+            "costUSD": 0.1052188,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 210,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1064657
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7259,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 12365,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012475,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 584,
+            "cacheReadInputTokens": 21683,
+            "cacheCreationInputTokens": 12900,
+            "webSearchRequests": 0,
+            "costUSD": 0.1192326,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 184,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1204801
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 8691,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 12357,
+            "outputTokens": 17,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012442000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 767,
+            "cacheReadInputTokens": 4899,
+            "cacheCreationInputTokens": 11863,
+            "webSearchRequests": 0,
+            "costUSD": 0.1112318,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 291,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.112476
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 8220,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 12371,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012476000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 742,
+            "cacheReadInputTokens": 21675,
+            "cacheCreationInputTokens": 12581,
+            "webSearchRequests": 0,
+            "costUSD": 0.119839,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 298,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1210866
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6148,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 25228,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0025333000000000005,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 506,
+            "cacheReadInputTokens": 5021,
+            "cacheCreationInputTokens": 24734,
+            "webSearchRequests": 0,
+            "costUSD": 0.2090042,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 193,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.2115375
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 4173,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 12363,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012463,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 280,
+            "cacheReadInputTokens": 4997,
+            "cacheCreationInputTokens": 11869,
+            "webSearchRequests": 0,
+            "costUSD": 0.1015594,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 95,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1028057
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7461,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 12365,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.001247,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 408,
+            "cacheReadInputTokens": 4997,
+            "cacheCreationInputTokens": 11871,
+            "webSearchRequests": 0,
+            "costUSD": 0.10413539999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 169,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.10538239999999999
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 4984,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11728,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011823,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 533,
+            "cacheReadInputTokens": 19020,
+            "cacheCreationInputTokens": 11708,
+            "webSearchRequests": 0,
+            "costUSD": 0.054072,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 80,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0552543
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5989,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 12347,
+            "outputTokens": 16,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012427,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 519,
+            "cacheReadInputTokens": 4926,
+            "cacheCreationInputTokens": 11853,
+            "webSearchRequests": 0,
+            "costUSD": 0.1061972,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1074399
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 7447,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11783,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011873,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1063,
+            "cacheReadInputTokens": 3889,
+            "cacheCreationInputTokens": 11297,
+            "webSearchRequests": 0,
+            "costUSD": 0.056210899999999994,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 369,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.057398199999999996
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6004,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11730,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011840000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 564,
+            "cacheReadInputTokens": 19014,
+            "cacheCreationInputTokens": 11502,
+            "webSearchRequests": 0,
+            "costUSD": 0.1071148,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 110,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1082988
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 11384,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16916,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0017021000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 1158,
+            "cacheReadInputTokens": 45755,
+            "cacheCreationInputTokens": 19233,
+            "webSearchRequests": 0,
+            "costUSD": 0.0930995,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 521,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0948016
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 9231,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11698,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011813000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 1007,
+            "cacheReadInputTokens": 18990,
+            "cacheCreationInputTokens": 14289,
+            "webSearchRequests": 0,
+            "costUSD": 0.069133,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 523,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0703143
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 8422,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11783,
+            "outputTokens": 17,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011868000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 873,
+            "cacheReadInputTokens": 3889,
+            "cacheCreationInputTokens": 11289,
+            "webSearchRequests": 0,
+            "costUSD": 0.10855780000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 469,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.10974460000000001
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 16440,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 30433,
+            "outputTokens": 217,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0031518000000000006,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 191,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 1201,
+            "cacheReadInputTokens": 72047,
+            "cacheCreationInputTokens": 30831,
+            "webSearchRequests": 0,
+            "costUSD": 0.14255070000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 587,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1457025
+      }
+    ],
+    "total_cost_usd": 1.7867374000000003,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 55,
+      "gather": 127,
+      "triage": 6756,
+      "find_verify": 35979,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
