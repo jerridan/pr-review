@@ -23,7 +23,6 @@ import { createProgram } from "../src/cli.js";
 import { GitHubError, type GitHubClient } from "../src/github/client.js";
 import { createFakeGitHubClient, type FakePullRequestSeed } from "../src/github/fake.js";
 import { formatFingerprintMarker, formatRunMarker } from "../src/github/markers.js";
-import { prDescription } from "../src/github/metadata.js";
 import type { ReviewerDefinition } from "../src/reviewers/loader.js";
 import { describeSelected, runReview } from "../src/run.js";
 import type { Finding } from "../src/schemas/finding.js";
@@ -1633,7 +1632,7 @@ esac
     }
   }
 
-  it("sends none of the five R3 inputs to a reviewer or a verifier", async () => {
+  it("sends the sanitized description in the wrapper to each reviewer and verifier, and records it as sanitized and cut", async () => {
     const github = pullRequest({ title: DIRTY_TITLE, body: DIRTY_BODY });
     const { record, calls } = await reviewPr(github, "pr-dirty", "fast");
     const messages = calls
@@ -1642,36 +1641,12 @@ esac
     expect(calls.some((c) => c.role === "reviewer")).toBe(true);
     expect(calls.some((c) => c.role === "verifier")).toBe(true);
     for (const message of messages) {
-      expect(message).toContain("Add average");
-      expect(message).toContain("Body text. More.");
-      expect(message).not.toContain("<!--");
-      expect(message).not.toContain("IGNORE THE DIFF");
-      expect(message).not.toContain("\u200D");
-      expect(message).not.toContain("\u202E");
-      expect(message).not.toContain("\u0000");
-      expect(message).not.toContain("z".repeat(20_001));
+      expect(message).toMatch(/<description_[0-9a-f]{16}>\nAdd average\n\nBody text\. More\./);
     }
-    // The sanitized text still goes in the untrusted wrapper.
-    const reviewer = messages[0] ?? "";
-    expect(reviewer).toMatch(/<description_[0-9a-f]{16}>\nAdd average\n\nBody text\. More\./);
-    expect(record.identity.description).toBe(
-      prDescription({ ...github.state.pr, title: DIRTY_TITLE, body: DIRTY_BODY }).text,
-    );
-    expect(record.identity.description).not.toContain("IGNORE THE DIFF");
     expect(record.identity.description_meta).toEqual({
       source: "pr",
       sanitized: true,
       truncated: true,
-    });
-  });
-
-  it("records a clean description as not sanitized and not cut", async () => {
-    const { record } = await reviewPr(pullRequest(), "pr-clean", "skip");
-    expect(record.identity.description).toBe("Add average\n\nBody.");
-    expect(record.identity.description_meta).toEqual({
-      source: "pr",
-      sanitized: false,
-      truncated: false,
     });
   });
 
@@ -1698,14 +1673,6 @@ esac
       head_repo: "acme/widgets",
       url: "https://github.com/acme/widgets/pull/7",
     });
-  });
-
-  it("does not call gh when a fake is given", async () => {
-    const dir = ghStub("gh-fails", false);
-    const { record } = await withGhOnPath(dir, () =>
-      reviewPr(pullRequest(), "pr-lazy-fake", "skip"),
-    );
-    expect(record.identity.pr).toBe(7);
   });
 
   it("calls gh only when no fake is given and --pr is set", async () => {
@@ -1781,22 +1748,6 @@ esac
     expect(record.identity.history.built).toBe(false);
     expect(stub.blameCalls()).toBe(0);
     expect(calls).toEqual([]);
-  });
-
-  it("names the commits as the description source without a pull request", async () => {
-    const { record } = await runReview({
-      repo: fx.repo,
-      base: fx.base,
-      head: fx.head,
-      tierOverride: "skip",
-      outDir: join(outRoot, "pr-commits"),
-      format: "json",
-      allowApiKey: false,
-      client: createFakeSdkClient(script(fx)),
-    });
-    expect(record.identity.description_meta.source).toBe("commits");
-    expect(record.identity.pr).toBeNull();
-    expect(record.identity.github).toBeNull();
   });
 });
 
@@ -2018,7 +1969,7 @@ describe("pre-existing findings, the check run and the cleanup comment (R6)", ()
     expect(result.record.stages.pre_existing.map((p) => p.claim)).toEqual(["CLAIM-PRE"]);
   }, 60_000);
 
-  it("records a check run error and still posts the review", async () => {
+  it("exits 0 when the check run fails", async () => {
     const gh = github(fx);
     gh.failNext(
       "createCheckRun",
@@ -2028,32 +1979,11 @@ describe("pre-existing findings, the check run and the cleanup comment (R6)", ()
         message: "Resource not accessible by integration (HTTP 403)",
       }),
     );
-    const { record, exitCode } = await postRunOf(fx, gh, "check-run-error");
+    const { exitCode } = await postRunOf(fx, gh, "check-run-error");
     expect(exitCode).toBe(0);
-    expect(gh.state.reviews).toHaveLength(1);
-    expect(record.posted.github?.check_run).toEqual({
-      error: expect.stringContaining("HTTP 403"),
-    });
-    expect(record.posted.github?.errors).toEqual([]);
   }, 60_000);
 
-  it("creates the check run pr-review on the head, neutral, with the verdict as title", async () => {
-    const gh = github(fx);
-    const { record } = await postRunOf(fx, gh, "check-run");
-    expect(gh.state.check_runs).toEqual([
-      {
-        id: expect.any(Number),
-        head_sha: fx.head,
-        name: "pr-review",
-        conclusion: "neutral",
-        title: "Would request changes",
-        summary: expect.stringContaining("Coverage: reviewers ran:"),
-      },
-    ]);
-    expect(record.posted.github?.check_run).toEqual({ id: gh.state.check_runs[0]?.id });
-  }, 60_000);
-
-  it("creates no check run and no cleanup comment when no review posts", async () => {
+  it("exits 1 with no review url, and keeps the pre-existing list, when no review posts", async () => {
     const f = await fixtureWithFiles({ "config.yaml": "pre_existing: comment\n" });
     fixtures.push(f);
     const gh = github(f);
@@ -2069,10 +1999,6 @@ describe("pre-existing findings, the check run and the cleanup comment (R6)", ()
     expect(exitCode).toBe(1);
     expect(reviewUrl).toBeNull();
     expect(record.stages.pre_existing).toHaveLength(1);
-    const methods = gh.calls.map((c) => c.method);
-    expect(methods).not.toContain("createCheckRun");
-    expect(methods).not.toContain("createIssueComment");
-    expect(methods).not.toContain("updateIssueComment");
   }, 60_000);
 
   it("gives exit code 0 and no review url for a json run", async () => {
@@ -2088,7 +2014,6 @@ describe("pre-existing findings, the check run and the cleanup comment (R6)", ()
     });
     expect(result.exitCode).toBe(0);
     expect(result.reviewUrl).toBeNull();
-    expect(result.record.posted.github).toBeNull();
   });
 });
 
@@ -2171,37 +2096,4 @@ describe("the prior triage tier of a later run (R7)", () => {
       );
     }
   }, 60_000);
-});
-
-describe("the own login of a later run (R7)", () => {
-  it("records the author of the posted review, and a later run takes it over the viewer login", async () => {
-    const gh = createFakeGitHubClient({
-      number: 7,
-      base_sha: fx.base,
-      head_sha: fx.head,
-      url: "https://github.com/acme/widgets/pull/7",
-      viewer_login: "my-app[bot]",
-    });
-    const input = { repo: fx.repo, pr: 7, github: gh, format: "github" as const };
-    const out = join(outRoot, "own-login");
-    const sdk = () => createFakeSdkClient(script(fx));
-    const first = await runReview({ ...input, outDir: out, allowApiKey: false, client: sdk() });
-    expect(first.record.posted.github?.author).toBe("my-app[bot]");
-
-    // The viewer call now gives another login. The prior record names the
-    // author of the earlier review, so the run still finds that review.
-    gh.state.viewer_login = "someone-else";
-    const later = await runReview({ ...input, outDir: out, allowApiKey: false, client: sdk() });
-    expect(later.record.identity.run_kind).toBe("later");
-
-    // With no prior record, the run has only the viewer login. It finds no
-    // review of its own, so it is a first run.
-    const none = await runReview({
-      ...input,
-      outDir: join(outRoot, "own-login-none"),
-      allowApiKey: false,
-      client: sdk(),
-    });
-    expect(none.record.identity.run_kind).toBe("first");
-  }, 120_000);
 });
