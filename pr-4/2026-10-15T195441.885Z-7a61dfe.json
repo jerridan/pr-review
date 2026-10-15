@@ -1,0 +1,1871 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 4,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Add the consumer workflow so the reviewer runs on this repo",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/4"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "ac77cb388a34686d0299d257e26f669d2546288c",
+    "head": "7a61dfe6a1bb8d9fd830328c73ce0981c7c3745e",
+    "started_at": "2026-10-15T19:54:41.885Z",
+    "tool_version": "0.1.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Add the consumer workflow so the reviewer runs on this repo\n\nThe repo ships the reusable workflow but had no workflow of its own, so its pull requests got no review. This PR adds `.github/workflows/pr-review.yml`, the file the README's \"Set up CI\" section tells a consumer to save.\n\nA test in `test/packaging.test.ts` keeps the file equal to the README snippet and checks that the snippet calls a workflow this repo holds.\n\nThis PR is the first run of the reviewer on this repo.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01KFgKDUH5g8JkJwwpZsR1X4\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": ".github/workflows/pr-review.yml",
+        "hunks": 1
+      },
+      {
+        "path": "test/packaging.test.ts",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [
+      ".github/workflows/pr-review.yml"
+    ],
+    "triage": {
+      "tier": "full",
+      "reason": "Adds a new CI workflow with pull_request_target, issue_comment triggers, contents:write permissions and inherited secrets, which is security-sensitive configuration.",
+      "confidence": "high",
+      "categories": [
+        "security",
+        "bug",
+        "test",
+        "other"
+      ],
+      "hotspots": [
+        ".github/workflows/pr-review.yml: pull_request_target and issue_comment triggers with secrets: inherit",
+        ".github/workflows/pr-review.yml: contents: write permission",
+        ".github/workflows/pr-review.yml: reusable workflow pinned to mutable tag @v1",
+        "test/packaging.test.ts: readmeSnippet parsing fragile indexOf logic and exact match to README"
+      ],
+      "file_notes": [
+        {
+          "file": ".github/workflows/pr-review.yml",
+          "note": "New consumer workflow. Uses privileged triggers (pull_request_target, issue_comment), write permissions, secrets inherited, and a tag-pinned reusable workflow. Check that fork PRs and comment authors cannot abuse it."
+        },
+        {
+          "file": "test/packaging.test.ts",
+          "note": "New tests. One checks the workflow file equals the README yaml snippet. One checks the reusable workflow path exists in the repo. The snippet parsing breaks if the README heading or code fence is missing, and the path check depends on how the `uses` string is stripped."
+        }
+      ],
+      "summary": "Adds a GitHub Actions workflow that runs the PR review reusable workflow on pull request, label, and comment events, with write permissions and inherited secrets. Adds packaging tests that check the file matches the README snippet and that the referenced reusable workflow exists locally. The security posture of the triggers and permissions is the main concern."
+    },
+    "tier": "full",
+    "tier_reason": "Sensitive paths set a floor of full: .github/workflows/pr-review.yml.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 2442,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 2738,
+              "outputTokens": 19,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0002833,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 53,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 7239,
+              "webSearchRequests": 0,
+              "costUSD": 0.05898,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0592633
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": ".github/workflows/pr-review.yml",
+            "start_line": 15,
+            "end_line": 15,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The description says this PR is the first run of the reviewer on this repo, but the workflow calls the reviewer at the `@v1` tag. So the run uses the released v1 code, not the code at the head of this PR.",
+            "evidence": "uses: jerridan/pr-review/.github/workflows/review.yml@v1",
+            "suggested_fix": "Say in the description that the run uses the `v1` release, or make sure the `v1` tag exists.",
+            "explanation": "The workflow calls the reviewer at the `v1` tag, so the review comes from the release and not from this branch. If `v1` does not exist yet, the run fails.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5699,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 2734,
+              "outputTokens": 18,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0002824,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 464,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 4134,
+              "webSearchRequests": 0,
+              "costUSD": 0.0429718,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 144,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0432542
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "test/packaging.test.ts",
+            "start_line": 1010,
+            "end_line": 1014,
+            "category": "bug",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "readmeSnippet does not check that indexOf finds the heading or the fence, so a missing marker silently selects the wrong text.",
+            "evidence": "const section = readme.slice(readme.indexOf(\"### The consumer workflow\"));",
+            "suggested_fix": "Assert that each indexOf result is not -1 before you slice.",
+            "explanation": "indexOf returns -1 on a miss, and slice(-1) or a start of 7 yields an unrelated substring.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6372,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 2740,
+              "outputTokens": 19,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0002835,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 469,
+              "cacheReadInputTokens": 10203,
+              "cacheCreationInputTokens": 4471,
+              "webSearchRequests": 0,
+              "costUSD": 0.0472046,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 90,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.047488100000000005
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "test/packaging.test.ts",
+            "start_line": 1010,
+            "end_line": 1015,
+            "category": "bug",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "readmeSnippet does not check indexOf results, so a missing heading or fence makes it slice the wrong text instead of failing clearly.",
+            "evidence": "const start = section.indexOf(\"```yaml\\n\") + \"```yaml\\n\".length;",
+            "suggested_fix": "Assert that each indexOf result is not -1 before you slice.",
+            "explanation": "indexOf returns -1 when there is no match, so slice(-1) or -1+8 silently picks the wrong substring.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 8018,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 2740,
+              "outputTokens": 19,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0002835,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 655,
+              "cacheReadInputTokens": 10203,
+              "cacheCreationInputTokens": 4733,
+              "webSearchRequests": 0,
+              "costUSD": 0.0530206,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 154,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.05330409999999999
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6895,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 2730,
+              "outputTokens": 19,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0002825,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 354,
+              "cacheReadInputTokens": 10200,
+              "cacheCreationInputTokens": 4311,
+              "webSearchRequests": 0,
+              "costUSD": 0.043623999999999996,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 166,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.043906499999999994
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1840,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3086,
+              "outputTokens": 19,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.00031810000000000003,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 71,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 4553,
+              "webSearchRequests": 0,
+              "costUSD": 0.0384638,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0387819
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": ".github/workflows/pr-review.yml",
+            "start_line": 5,
+            "end_line": 16,
+            "category": "security",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "pull_request_target and issue_comment triggers run with base-repo secrets and write tokens on events from untrusted forks or commenters, and secrets: inherit passes all secrets to the called workflow.",
+            "evidence": "  pull_request_target:\n    types: [labeled]",
+            "suggested_fix": "Pass only the needed secrets explicitly, and make sure the reusable workflow gates on author association and never executes PR head code.",
+            "explanation": "Privileged triggers combined with inherited secrets and write permissions expose secrets if the reusable workflow checks out or processes PR head content.",
+            "needs_context": true
+          },
+          {
+            "file": ".github/workflows/pr-review.yml",
+            "start_line": 14,
+            "end_line": 14,
+            "category": "security",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "The job grants contents: write, which a review job probably does not need.",
+            "evidence": "      contents: write",
+            "suggested_fix": "Use contents: read unless a write is required.",
+            "explanation": "Wider token permissions than needed increase the damage if the workflow is compromised.",
+            "needs_context": true
+          },
+          {
+            "file": ".github/workflows/pr-review.yml",
+            "start_line": 15,
+            "end_line": 15,
+            "category": "security",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The reusable workflow is pinned to a mutable tag while it receives inherited secrets.",
+            "evidence": "    uses: jerridan/pr-review/.github/workflows/review.yml@v1",
+            "suggested_fix": "Pin to a commit SHA.",
+            "explanation": "A moved tag changes the code that runs with secrets and does not change this file.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6723,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 2730,
+              "outputTokens": 19,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0002825,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 696,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 4173,
+              "webSearchRequests": 0,
+              "costUSD": 0.047923799999999996,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 49,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.048206299999999994
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [
+          {
+            "file": ".github/workflows/pr-review.yml",
+            "start_line": 5,
+            "end_line": 16,
+            "category": "security",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "The pull_request_target and issue_comment triggers run with base-repo secrets inherited and write permissions, so fork PRs or any commenter can start a privileged run.",
+            "evidence": "  pull_request_target:\n    types: [labeled]\n  issue_comment:\n    types: [created]",
+            "suggested_fix": "Make sure review.yml checks author_association or a maintainer label, and pass only the secrets it needs instead of using `secrets: inherit`.",
+            "explanation": "These triggers run in the base repo context with secrets, so the called workflow must check the actor's authorization and must not run untrusted PR code.",
+            "needs_context": true
+          },
+          {
+            "file": ".github/workflows/pr-review.yml",
+            "start_line": 14,
+            "end_line": 14,
+            "category": "security",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "The job grants contents: write, which a review job probably does not need.",
+            "evidence": "      contents: write",
+            "suggested_fix": "Use contents: read unless the workflow really needs write access.",
+            "explanation": "A token with more scope than needed lets a compromised or prompt-injected run push to the repo.",
+            "needs_context": true
+          },
+          {
+            "file": ".github/workflows/pr-review.yml",
+            "start_line": 15,
+            "end_line": 16,
+            "category": "security",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "The reusable workflow is pinned to the mutable tag @v1 and gets all secrets through secrets: inherit.",
+            "evidence": "    uses: jerridan/pr-review/.github/workflows/review.yml@v1\n    secrets: inherit",
+            "suggested_fix": "Pin to a commit SHA, or use a local `./.github/workflows/review.yml` reference, and pass secrets explicitly.",
+            "explanation": "Anyone who can move the v1 tag can change the code that runs with every repo secret.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7514,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 2734,
+              "outputTokens": 18,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0002824,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 771,
+              "cacheReadInputTokens": 4997,
+              "cacheCreationInputTokens": 2239,
+              "webSearchRequests": 0,
+              "costUSD": 0.0343394,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 48,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0346218
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7315,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 2734,
+              "outputTokens": 18,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0002824,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 556,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 4106,
+              "webSearchRequests": 0,
+              "costUSD": 0.0445878,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 258,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0448702
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": ".github/workflows/pr-review.yml",
+          "start_line": 15,
+          "end_line": 15,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The description says this PR is the first run of the reviewer on this repo, but the workflow calls the reviewer at the `@v1` tag. So the run uses the released v1 code, not the code at the head of this PR.",
+          "evidence": "uses: jerridan/pr-review/.github/workflows/review.yml@v1",
+          "suggested_fix": "Say in the description that the run uses the `v1` release, or make sure the `v1` tag exists.",
+          "explanation": "The workflow calls the reviewer at the `v1` tag, so the review comes from the release and not from this branch. If `v1` does not exist yet, the run fails.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "uses: jerridan/pr-review/.github/workflows/review.yml@v1"
+          ],
+          "rationale": "The workflow does pin `@v1`, but this matches the README snippet that a test enforces. \"First run of the reviewer on this repo\" is still true, because it is the first run here, even though it uses the released code. The finding shows no actual contradiction or bug. It only guesses that the `v1` tag may not exist, and it has no evidence for that.",
+          "score": 8,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "uses: jerridan/pr-review/.github/workflows/review.yml@v1",
+            "uses: jerridan/pr-review@v1"
+          ],
+          "rationale": "The description never says the run uses this branch's code. \"First run of the reviewer on this repo\" just means this repo's PRs get reviewed for the first time. Pinning to `@v1` is on purpose: it matches the README snippet that the test keeps the file equal to, and the reusable workflow's own `jerridan/pr-review@v1` step, so nothing contradicts the description.",
+          "score": 8,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "uses: jerridan/pr-review/.github/workflows/review.yml@v1",
+            "uses: jerridan/pr-review@v1"
+          ],
+          "rationale": "The description never says the run uses this branch's code. \"First run of the reviewer on this repo\" just means this repo's PRs get reviewed for the first time. Pinning to `@v1` is on purpose: it matches the README snippet that the test keeps the file equal to, and the reusable workflow's own `jerridan/pr-review@v1` step, so nothing contradicts the description.",
+          "score": 8,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "test/packaging.test.ts",
+          "start_line": 1010,
+          "end_line": 1014,
+          "category": "bug",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "readmeSnippet does not check that indexOf finds the heading or the fence, so a missing marker silently selects the wrong text.",
+          "evidence": "const section = readme.slice(readme.indexOf(\"### The consumer workflow\"));",
+          "suggested_fix": "Assert that each indexOf result is not -1 before you slice.",
+          "explanation": "indexOf returns -1 on a miss, and slice(-1) or a start of 7 yields an unrelated substring.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const section = readme.slice(readme.indexOf(\"### The consumer workflow\"));",
+            "expect(readText(\".github/workflows/pr-review.yml\")).toBe(readmeSnippet());"
+          ],
+          "rationale": "The indexOf results are unchecked, but a missing marker does not pass silently. The snippet would then be unrelated text, and the toBe comparison with the real workflow file would fail. The README heading exists, so the failure would only be a confusing message. This is a small robustness point, not a bug.",
+          "score": 12,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const section = readme.slice(readme.indexOf(\"### The consumer workflow\"));",
+            "expect(readText(\".github/workflows/pr-review.yml\")).toBe(readmeSnippet());"
+          ],
+          "rationale": "The indexOf results are unchecked, but a missing marker does not pass silently. The snippet would then be unrelated text, and the toBe comparison with the real workflow file would fail. The README heading exists, so the failure would only be a confusing message. This is a small robustness point, not a bug.",
+          "score": 12,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "test/packaging.test.ts",
+          "start_line": 1010,
+          "end_line": 1015,
+          "category": "bug",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "readmeSnippet does not check indexOf results, so a missing heading or fence makes it slice the wrong text instead of failing clearly.",
+          "evidence": "const start = section.indexOf(\"```yaml\\n\") + \"```yaml\\n\".length;",
+          "suggested_fix": "Assert that each indexOf result is not -1 before you slice.",
+          "explanation": "indexOf returns -1 when there is no match, so slice(-1) or -1+8 silently picks the wrong substring.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const section = readme.slice(readme.indexOf(\"### The consumer workflow\"));",
+            "const start = section.indexOf(\"```yaml\\n\") + \"```yaml\\n\".length;",
+            "return section.slice(start, section.indexOf(\"```\", start));"
+          ],
+          "rationale": "The indexOf results are unchecked, so the claim is technically true. The heading exists in the README, and a missing heading or fence would still make the equality assertion fail, not pass, so the effect is only a less clear failure message.",
+          "score": 22,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const section = readme.slice(readme.indexOf(\"### The consumer workflow\"));",
+            "const start = section.indexOf(\"```yaml\\n\") + \"```yaml\\n\".length;",
+            "return section.slice(start, section.indexOf(\"```\", start));"
+          ],
+          "rationale": "The indexOf results are unchecked, so the claim is technically true. The heading exists in the README, and a missing heading or fence would still make the equality assertion fail, not pass, so the effect is only a less clear failure message.",
+          "score": 22,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": ".github/workflows/pr-review.yml",
+          "start_line": 5,
+          "end_line": 16,
+          "category": "security",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "pull_request_target and issue_comment triggers run with base-repo secrets and write tokens on events from untrusted forks or commenters, and secrets: inherit passes all secrets to the called workflow.",
+          "evidence": "  pull_request_target:\n    types: [labeled]",
+          "suggested_fix": "Pass only the needed secrets explicitly, and make sure the reusable workflow gates on author association and never executes PR head code.",
+          "explanation": "Privileged triggers combined with inherited secrets and write permissions expose secrets if the reusable workflow checks out or processes PR head content.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "    uses: jerridan/pr-review/.github/workflows/review.yml@v1\n    secrets: inherit",
+            "      || (github.event_name == 'pull_request_target'\n        && github.event.action == 'labeled'\n        && startsWith(github.event.label.name, 'review:')",
+            "        && contains(fromJSON('[\"OWNER\",\"MEMBER\",\"COLLABORATOR\"]'),\n          github.event.comment.author_association))",
+            "persist-credentials: false"
+          ],
+          "rationale": "The reusable workflow already gates pull_request_target on a maintainer-applied review: label and issue_comment on author association, and it treats the PR checkout as data. The finding is generic speculation; the setup matches the documented design, with at most a minor hardening point on secrets: inherit.",
+          "score": 12,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "  pull_request_target:\n    types: [labeled]",
+            "    secrets: inherit",
+            "&& contains(fromJSON('[\"OWNER\",\"MEMBER\",\"COLLABORATOR\"]'),\n          github.event.comment.author_association))",
+            "# - The checkout of the pull request is data. No step runs npm, make, sh or\n#   another script or build from the workspace.",
+            "          persist-credentials: false",
+            "          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
+          ],
+          "rationale": "The called workflow already does what the suggested fix asks. It accepts a comment only from an OWNER, MEMBER or COLLABORATOR. A pull_request_target run needs a \"review:\" label, which only a user with triage permission can add. The PR checkout is treated as data and never run, and persist-credentials is false. The finding is a speculative \"if\" that the code already guards against, and narrowing `secrets: inherit` would only harden things a little.",
+          "score": 15,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "  pull_request_target:\n    types: [labeled]",
+            "    secrets: inherit",
+            "&& contains(fromJSON('[\"OWNER\",\"MEMBER\",\"COLLABORATOR\"]'),\n          github.event.comment.author_association))",
+            "# - The checkout of the pull request is data. No step runs npm, make, sh or\n#   another script or build from the workspace.",
+            "          persist-credentials: false",
+            "          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
+          ],
+          "rationale": "The called workflow already does what the suggested fix asks. It accepts a comment only from an OWNER, MEMBER or COLLABORATOR. A pull_request_target run needs a \"review:\" label, which only a user with triage permission can add. The PR checkout is treated as data and never run, and persist-credentials is false. The finding is a speculative \"if\" that the code already guards against, and narrowing `secrets: inherit` would only harden things a little.",
+          "score": 15,
+          "severity": "suggestion"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": ".github/workflows/pr-review.yml",
+          "start_line": 14,
+          "end_line": 14,
+          "category": "security",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "The job grants contents: write, which a review job probably does not need.",
+          "evidence": "      contents: write",
+          "suggested_fix": "Use contents: read unless a write is required.",
+          "explanation": "Wider token permissions than needed increase the damage if the workflow is compromised.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "      contents: write",
+            "# The records push needs contents: write."
+          ],
+          "rationale": "The reusable workflow pushes review records to the `pr-review-records` branch, so `contents: write` is required. The README and the design doc say so, and the called workflow's own permissions block asks for it. A job that calls a reusable workflow can't pass on more than the caller grants, so lowering it to read would break the push.",
+          "score": 3,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "      contents: write",
+            "      # The records push needs contents: write.",
+            "The push needs `contents: write` on the job token."
+          ],
+          "rationale": "The reusable workflow that this job calls pushes review records to the `pr-review-records` branch, and that push needs `contents: write`. A reusable workflow can only use permissions the calling job grants, so changing this to `contents: read` would break the records push.",
+          "score": 5,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "      contents: write",
+            "      # The records push needs contents: write.",
+            "The push needs `contents: write` on the job token."
+          ],
+          "rationale": "The reusable workflow that this job calls pushes review records to the `pr-review-records` branch, and that push needs `contents: write`. A reusable workflow can only use permissions the calling job grants, so changing this to `contents: read` would break the records push.",
+          "score": 5,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": ".github/workflows/pr-review.yml",
+          "start_line": 15,
+          "end_line": 15,
+          "category": "security",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The reusable workflow is pinned to a mutable tag while it receives inherited secrets.",
+          "evidence": "    uses: jerridan/pr-review/.github/workflows/review.yml@v1",
+          "suggested_fix": "Pin to a commit SHA.",
+          "explanation": "A moved tag changes the code that runs with secrets and does not change this file.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "uses: jerridan/pr-review/.github/workflows/review.yml@v1",
+            "secrets: inherit"
+          ],
+          "rationale": "The workflow does reference a mutable `@v1` tag with `secrets: inherit`. But it is the repo owner's own workflow, and it uses the tag the README tells consumers to use. A test keeps the two identical, so this is generic hardening advice, not a defect.",
+          "score": 25,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "uses: jerridan/pr-review/.github/workflows/review.yml@v1",
+            "secrets: inherit"
+          ],
+          "rationale": "The workflow does reference a mutable `@v1` tag with `secrets: inherit`. But it is the repo owner's own workflow, and it uses the tag the README tells consumers to use. A test keeps the two identical, so this is generic hardening advice, not a defect.",
+          "score": 25,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": ".github/workflows/pr-review.yml",
+          "start_line": 15,
+          "end_line": 16,
+          "category": "security",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "The reusable workflow is pinned to the mutable tag @v1 and gets all secrets through secrets: inherit.",
+          "evidence": "    uses: jerridan/pr-review/.github/workflows/review.yml@v1\n    secrets: inherit",
+          "suggested_fix": "Pin to a commit SHA, or use a local `./.github/workflows/review.yml` reference, and pass secrets explicitly.",
+          "explanation": "Anyone who can move the v1 tag can change the code that runs with every repo secret.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "uses: jerridan/pr-review/.github/workflows/review.yml@v1",
+            "secrets: inherit"
+          ],
+          "rationale": "The file does use the mutable @v1 tag with secrets: inherit. But the called workflow belongs to the same owner's repo, and this is the documented consumer snippet that a test keeps equal to the README. The risk is theoretical, and the suggested fix would contradict the intended design.",
+          "score": 22,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "uses: jerridan/pr-review/.github/workflows/review.yml@v1",
+            "secrets: inherit"
+          ],
+          "rationale": "The file does use the mutable @v1 tag with secrets: inherit. But the called workflow belongs to the same owner's repo, and this is the documented consumer snippet that a test keeps equal to the README. The risk is theoretical, and the suggested fix would contradict the intended design.",
+          "score": 22,
+          "severity": "nit"
+        },
+        "passed": false
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5539085207,
+      "review_url": "https://github.com/jerridan/pr-review/pull/4#pullrequestreview-5539085207",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 116638675745
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 5443,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 2174,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00022640000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 703,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 2949,
+            "webSearchRequests": 0,
+            "costUSD": 0.01883,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0190564
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 2442,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 2738,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0002833,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 53,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 7239,
+            "webSearchRequests": 0,
+            "costUSD": 0.05898,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0592633
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "model": "claude-opus-5-5",
+        "duration_ms": 1840,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3086,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00031810000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 71,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 4553,
+            "webSearchRequests": 0,
+            "costUSD": 0.0384638,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0387819
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5699,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 2734,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0002824,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 464,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 4134,
+            "webSearchRequests": 0,
+            "costUSD": 0.0429718,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 144,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0432542
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6372,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 2740,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0002835,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 469,
+            "cacheReadInputTokens": 10203,
+            "cacheCreationInputTokens": 4471,
+            "webSearchRequests": 0,
+            "costUSD": 0.0472046,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 90,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.047488100000000005
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6895,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 2730,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0002825,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 354,
+            "cacheReadInputTokens": 10200,
+            "cacheCreationInputTokens": 4311,
+            "webSearchRequests": 0,
+            "costUSD": 0.043623999999999996,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 166,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.043906499999999994
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 8018,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 2740,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0002835,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 655,
+            "cacheReadInputTokens": 10203,
+            "cacheCreationInputTokens": 4733,
+            "webSearchRequests": 0,
+            "costUSD": 0.0530206,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 154,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.05330409999999999
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6723,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 2730,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0002825,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 696,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 4173,
+            "webSearchRequests": 0,
+            "costUSD": 0.047923799999999996,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 49,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.048206299999999994
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7514,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 2734,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0002824,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 771,
+            "cacheReadInputTokens": 4997,
+            "cacheCreationInputTokens": 2239,
+            "webSearchRequests": 0,
+            "costUSD": 0.0343394,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 48,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0346218
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7315,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 2734,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0002824,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 556,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 4106,
+            "webSearchRequests": 0,
+            "costUSD": 0.0445878,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 258,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0448702
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 5747,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 22399,
+            "outputTokens": 28,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0022539,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 570,
+            "cacheReadInputTokens": 25801,
+            "cacheCreationInputTokens": 26081,
+            "webSearchRequests": 0,
+            "costUSD": 0.1126121,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 88,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.11486600000000001
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 7478,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 2345,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00024400000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 785,
+            "cacheReadInputTokens": 5747,
+            "cacheCreationInputTokens": 6681,
+            "webSearchRequests": 0,
+            "costUSD": 0.0351567,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 218,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.03540070000000001
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6766,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 22404,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0022499,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 631,
+            "cacheReadInputTokens": 29695,
+            "cacheCreationInputTokens": 22259,
+            "webSearchRequests": 0,
+            "costUSD": 0.0983235,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 150,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1005734
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6079,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 2259,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0002369,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 613,
+            "cacheReadInputTokens": 9550,
+            "cacheCreationInputTokens": 2162,
+            "webSearchRequests": 0,
+            "costUSD": 0.015740999999999998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 214,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0159779
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6107,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 2312,
+            "outputTokens": 267,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0003647,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 241,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 641,
+            "cacheReadInputTokens": 9603,
+            "cacheCreationInputTokens": 3063,
+            "webSearchRequests": 0,
+            "costUSD": 0.0196303,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 202,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.019995
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 8583,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 2234,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0002324,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 455,
+            "cacheReadInputTokens": 9525,
+            "cacheCreationInputTokens": 2480,
+            "webSearchRequests": 0,
+            "costUSD": 0.015430500000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 27,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0156629
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 10233,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 2335,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00024249999999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 1157,
+            "cacheReadInputTokens": 17338,
+            "cacheCreationInputTokens": 6018,
+            "webSearchRequests": 0,
+            "costUSD": 0.0373878,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 454,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.037630300000000005
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7567,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 2345,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00024450000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 632,
+            "cacheReadInputTokens": 5739,
+            "cacheCreationInputTokens": 6562,
+            "webSearchRequests": 0,
+            "costUSD": 0.06629979999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 193,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0665443
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6608,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 2232,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0002322,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 552,
+            "cacheReadInputTokens": 9515,
+            "cacheCreationInputTokens": 3148,
+            "webSearchRequests": 0,
+            "costUSD": 0.038142999999999996,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 53,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0383752
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 11083,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 2349,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00024390000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 898,
+            "cacheReadInputTokens": 15549,
+            "cacheCreationInputTokens": 6277,
+            "webSearchRequests": 0,
+            "costUSD": 0.0713098,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 217,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0715537
+      }
+    ],
+    "total_cost_usd": 0.9493322,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 55,
+      "gather": 44,
+      "triage": 6449,
+      "find_verify": 40160,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
