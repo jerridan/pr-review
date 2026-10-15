@@ -1,0 +1,1402 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 5,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Teach the tests reviewer the five checks of a behaviour test",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/5"
+    },
+    "run_kind": "later",
+    "prior": {
+      "head": "22222498e07e84a3fb33424149c7068189052d6d",
+      "source": "record",
+      "record": "/home/runner/work/_temp/pr-review-records/pr-5/2026-10-15T201740.505Z-2222249.json",
+      "open": [],
+      "dismissed": [],
+      "fetch_failed": false
+    },
+    "base": "0114492ff342babf138342b499295af351d385da",
+    "head": "28c0f51ab4fe4126d3fb359dad16cc4ec86f6e78",
+    "started_at": "2026-10-15T20:41:21.730Z",
+    "tool_version": "0.1.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Teach the tests reviewer the five checks of a behaviour test\n\nThe tests reviewer at `prompts/reviewers/tests.md` looked for three things: a missing test, a weakened test and a test that passes for the wrong reason. It now also applies the checks from the testing research behind CLAUDE.md rule 2:\n\n- a test that cannot fail when the behaviour breaks,\n- a test that asserts an internal, such as a call count or an argument list between modules of the same repo,\n- a double on a fast and deterministic module of the same repo,\n- a test that restates the code,\n- a test of a double or a fixture for its own sake,\n- a duplicate of a test with a smaller scope,\n- one test that covers several behaviours.\n\nA \"Severity\" section ranks each kind, and \"Do not flag\" excludes a double at an awkward boundary and a test the diff does not touch. The frontmatter is unchanged.\n\nThe change is prose in a prompt file, so no test is added. The reviewer loader tests still read the frontmatter. The full suite, lint, typecheck and build pass.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01KFgKDUH5g8JkJwwpZsR1X4\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": "prompts/reviewers/tests.md",
+        "hunks": 2
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "The change edits an LLM reviewer prompt, which is read by code and changes the behavior and severity rules of the tests reviewer.",
+      "confidence": "medium",
+      "categories": [
+        "other",
+        "test",
+        "docs"
+      ],
+      "hotspots": [
+        "prompts/reviewers/tests.md: new Look for bullets",
+        "prompts/reviewers/tests.md: new Severity section",
+        "prompts/reviewers/tests.md: Do not flag list"
+      ],
+      "file_notes": [
+        {
+          "file": "prompts/reviewers/tests.md",
+          "note": "Prompt change. Adds a test-quality rule, new finding types (internals, doubles, restated code, duplicates), a severity section and new exclusions. Check the rules for contradictions and the front-matter description for consistency."
+        }
+      ],
+      "summary": "The change extends the tests reviewer prompt. It adds a rule for what makes a good test and new things to flag: tests of internals, doubles of same-repo modules, tests that restate the code, tests of fixtures and duplicate tests. It also adds severity guidance and new \"do not flag\" exclusions, and it updates the description in the front matter."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: The change edits an LLM reviewer prompt, which is read by code and changes the behavior and severity rules of the tests reviewer.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "prompts/reviewers/tests.md",
+            "start_line": 22,
+            "end_line": 22,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The new rule sentence is long and joins three conditions and two instructions, which goes against the ASD-STE100 short-sentence rule.",
+            "evidence": "A test earns its place when it names one behaviour that a user or a caller can observe, fails when that behaviour breaks, and passes after any change that keeps that behaviour at the boundary it observes.",
+            "suggested_fix": "Split the sentence into a short list of the three conditions.",
+            "explanation": "CLAUDE.md rule 5 asks for short sentences in every markdown file, with one instruction in each.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7164,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3456,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0003561,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 543,
+              "cacheReadInputTokens": 12954,
+              "cacheCreationInputTokens": 4089,
+              "webSearchRequests": 0,
+              "costUSD": 0.04617879999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 140,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0465349
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "prompts/reviewers/tests.md",
+            "start_line": 3,
+            "end_line": 3,
+            "category": "docs",
+            "severity_estimate": "suggestion",
+            "confidence": "high",
+            "claim": "The description says the frontmatter is unchanged, but the diff rewrites the frontmatter description field.",
+            "evidence": "description: Finds behaviour changes in the diff that have no test, tests that the diff weakens or makes pass for the wrong reason, and tests that assert an internal, fake a module of the same repo, restate the code or duplicate a smaller test.",
+            "suggested_fix": "Say in the description that the frontmatter description field is updated.",
+            "explanation": "The frontmatter description field changed, so the claim that the frontmatter is unchanged is false.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4411,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3462,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0003567,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 336,
+              "cacheReadInputTokens": 4954,
+              "cacheCreationInputTokens": 2968,
+              "webSearchRequests": 0,
+              "costUSD": 0.0314628,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0318195
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "prompts/reviewers/tests.md",
+            "start_line": 53,
+            "end_line": 53,
+            "category": "bug",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "The new exclusion of untouched tests conflicts with the scope rule and the 'weakens' bullet, so the reviewer may skip an existing test that the diff makes vacuous through a changed helper, fixture or production code.",
+            "evidence": "- a test that the diff does not touch; a test that the diff removes or skips is in scope,",
+            "suggested_fix": "Add an exception: 'unless the diff makes it pass for the wrong reason or weakens it, for example through a changed helper or fixture'.",
+            "explanation": "The Scope section keeps untouched code in scope when the diff makes its problem worse, but this bullet excludes every untouched test except removed or skipped ones.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6867,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3462,
+              "outputTokens": 25,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0003587,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 577,
+              "cacheReadInputTokens": 4899,
+              "cacheCreationInputTokens": 2968,
+              "webSearchRequests": 0,
+              "costUSD": 0.0362718,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 237,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.036630499999999996
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5875,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3450,
+              "outputTokens": 25,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0003575,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 472,
+              "cacheReadInputTokens": 4899,
+              "cacheCreationInputTokens": 2956,
+              "webSearchRequests": 0,
+              "costUSD": 0.034075799999999996,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 186,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.03443329999999999
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5244,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3458,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.00035630000000000004,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 196,
+              "cacheReadInputTokens": 12776,
+              "cacheCreationInputTokens": 3402,
+              "webSearchRequests": 0,
+              "costUSD": 0.0337072,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 65,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.034063500000000003
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "prompts/reviewers/tests.md",
+            "start_line": 54,
+            "end_line": 54,
+            "category": "other",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "The new exclusion of every untouched test conflicts with the scope rule, which keeps code that the diff makes worse in scope. One example is an existing test that a code change makes pass for the wrong reason.",
+            "evidence": "- a test that the diff does not touch; a test that the diff removes or skips is in scope,",
+            "suggested_fix": "Add: 'unless the diff makes that test pass for the wrong reason or stop covering the behaviour'.",
+            "explanation": "A code change can make an untouched test vacuous. The scope line from commit e3f9424 keeps that case in scope, but the new bullet tells the model not to flag it.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 9370,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 4663,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0004768,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 589,
+              "cacheReadInputTokens": 5021,
+              "cacheCreationInputTokens": 4169,
+              "webSearchRequests": 0,
+              "costUSD": 0.046144199999999996,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 265,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.046620999999999996
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5605,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3454,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.00035590000000000003,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 424,
+              "cacheReadInputTokens": 4997,
+              "cacheCreationInputTokens": 2960,
+              "webSearchRequests": 0,
+              "costUSD": 0.0331674,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 106,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0335233
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4530,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3462,
+              "outputTokens": 23,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0003577,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 308,
+              "cacheReadInputTokens": 4997,
+              "cacheCreationInputTokens": 2968,
+              "webSearchRequests": 0,
+              "costUSD": 0.030911400000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 87,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0312691
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 3910,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3458,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.00035630000000000004,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 249,
+              "cacheReadInputTokens": 12816,
+              "cacheCreationInputTokens": 3308,
+              "webSearchRequests": 0,
+              "costUSD": 0.0340232,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 106,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0343795
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "prompts/reviewers/tests.md",
+          "start_line": 3,
+          "end_line": 3,
+          "category": "docs",
+          "severity_estimate": "suggestion",
+          "confidence": "high",
+          "claim": "The description says the frontmatter is unchanged, but the diff rewrites the frontmatter description field.",
+          "evidence": "description: Finds behaviour changes in the diff that have no test, tests that the diff weakens or makes pass for the wrong reason, and tests that assert an internal, fake a module of the same repo, restate the code or duplicate a smaller test.",
+          "suggested_fix": "Say in the description that the frontmatter description field is updated.",
+          "explanation": "The frontmatter description field changed, so the claim that the frontmatter is unchanged is false.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "description: Finds behaviour changes in the diff that have no test, tests that the diff weakens or makes pass for the wrong reason, and tests that assert an internal, fake a module of the same repo, restate the code or duplicate a smaller test."
+          ],
+          "rationale": "The diff rewrites the frontmatter description line, so the PR text \"The frontmatter is unchanged\" is inaccurate. The error is real but trivial, and it is in the PR text, not the code.",
+          "score": 50,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "description: Finds behaviour changes in the diff that have no test, tests that the diff weakens or makes pass for the wrong reason, and tests that assert an internal, fake a module of the same repo, restate the code or duplicate a smaller test."
+          ],
+          "rationale": "The diff rewrites the frontmatter description line, so the PR text \"The frontmatter is unchanged\" is inaccurate. The error is real but trivial, and it is in the PR text, not the code.",
+          "score": 50,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "prompts/reviewers/tests.md",
+          "start_line": 53,
+          "end_line": 53,
+          "category": "bug",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "The new exclusion of untouched tests conflicts with the scope rule and the 'weakens' bullet, so the reviewer may skip an existing test that the diff makes vacuous through a changed helper, fixture or production code.",
+          "evidence": "- a test that the diff does not touch; a test that the diff removes or skips is in scope,",
+          "suggested_fix": "Add an exception: 'unless the diff makes it pass for the wrong reason or weakens it, for example through a changed helper or fixture'.",
+          "explanation": "The Scope section keeps untouched code in scope when the diff makes its problem worse, but this bullet excludes every untouched test except removed or skipped ones.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- a test that the diff does not touch; a test that the diff removes or skips is in scope,",
+            "Code that the diff does not touch is out of scope, unless the diff makes its problem worse."
+          ],
+          "rationale": "The \"Do not flag\" bullet matches the Scope section's rule that untouched code is out of scope. The only gap is a narrow edge case, an untouched test made vacuous by a changed helper, and the reviewer can still catch that through the \"makes worse\" clause and the \"passes for the wrong reason\" bullet. Adding an exception would also weaken the line's purpose of cutting noise.",
+          "score": 30,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- a test that the diff does not touch; a test that the diff removes or skips is in scope,",
+            "Code that the diff does not touch is out of scope, unless the diff makes its problem worse."
+          ],
+          "rationale": "The \"Do not flag\" bullet matches the Scope section's rule that untouched code is out of scope. The only gap is a narrow edge case, an untouched test made vacuous by a changed helper, and the reviewer can still catch that through the \"makes worse\" clause and the \"passes for the wrong reason\" bullet. Adding an exception would also weaken the line's purpose of cutting noise.",
+          "score": 30,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "prompts/reviewers/tests.md",
+          "start_line": 22,
+          "end_line": 22,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The new rule sentence is long and joins three conditions and two instructions, which goes against the ASD-STE100 short-sentence rule.",
+          "evidence": "A test earns its place when it names one behaviour that a user or a caller can observe, fails when that behaviour breaks, and passes after any change that keeps that behaviour at the boundary it observes.",
+          "suggested_fix": "Split the sentence into a short list of the three conditions.",
+          "explanation": "CLAUDE.md rule 5 asks for short sentences in every markdown file, with one instruction in each.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "A test earns its place when it names one behaviour that a user or a caller can observe, fails when that behaviour breaks, and passes after any change that keeps that behaviour at the boundary it observes.",
+            "Write short sentences in active voice, with one instruction each."
+          ],
+          "rationale": "The sentence is long (about 35 words) and chains three conditions, which goes against CLAUDE.md rule 5 (short sentences, one instruction each). The rule is real, but the problem is a minor style issue, and the sentence is still readable.",
+          "score": 50,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "A test earns its place when it names one behaviour that a user or a caller can observe, fails when that behaviour breaks, and passes after any change that keeps that behaviour at the boundary it observes.",
+            "Write short sentences in active voice, with one instruction each."
+          ],
+          "rationale": "The sentence is long (about 35 words) and chains three conditions, which goes against CLAUDE.md rule 5 (short sentences, one instruction each). The rule is real, but the problem is a minor style issue, and the sentence is still readable.",
+          "score": 50,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "prompts/reviewers/tests.md",
+          "start_line": 54,
+          "end_line": 54,
+          "category": "other",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "The new exclusion of every untouched test conflicts with the scope rule, which keeps code that the diff makes worse in scope. One example is an existing test that a code change makes pass for the wrong reason.",
+          "evidence": "- a test that the diff does not touch; a test that the diff removes or skips is in scope,",
+          "suggested_fix": "Add: 'unless the diff makes that test pass for the wrong reason or stop covering the behaviour'.",
+          "explanation": "A code change can make an untouched test vacuous. The scope line from commit e3f9424 keeps that case in scope, but the new bullet tells the model not to flag it.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- a test that the diff does not touch; a test that the diff removes or skips is in scope,",
+            "Code that the diff does not touch is out of scope, unless the diff makes its problem worse."
+          ],
+          "rationale": "The new \"Do not flag\" bullet is unconditional, while the Scope paragraph keeps untouched code in scope when the diff makes its problem worse. A source change can make an untouched test pass for the wrong reason, and the bullet could suppress that case. This is a real but narrow ambiguity in a prompt file, and a model would probably resolve it with the Scope line, so it adds little.",
+          "score": 45,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- a test that the diff does not touch; a test that the diff removes or skips is in scope,",
+            "Code that the diff does not touch is out of scope, unless the diff makes its problem worse."
+          ],
+          "rationale": "The new \"Do not flag\" bullet is unconditional, while the Scope paragraph keeps untouched code in scope when the diff makes its problem worse. A source change can make an untouched test pass for the wrong reason, and the bullet could suppress that case. This is a real but narrow ambiguity in a prompt file, and a model would probably resolve it with the Scope line, so it adds little.",
+          "score": 45,
+          "severity": "suggestion"
+        },
+        "passed": false
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5539629564,
+      "review_url": "https://github.com/jerridan/pr-review/pull/5#pullrequestreview-5539629564",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 116660156431
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 4818,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 2751,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0002861,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 506,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 2265,
+            "webSearchRequests": 0,
+            "costUSD": 0.014250200000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0145363
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "model": "claude-opus-5-5",
+        "duration_ms": 4411,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3462,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0003567,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 336,
+            "cacheReadInputTokens": 4954,
+            "cacheCreationInputTokens": 2968,
+            "webSearchRequests": 0,
+            "costUSD": 0.0314628,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0318195
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5244,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3458,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00035630000000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 196,
+            "cacheReadInputTokens": 12776,
+            "cacheCreationInputTokens": 3402,
+            "webSearchRequests": 0,
+            "costUSD": 0.0337072,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 65,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.034063500000000003
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5875,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3450,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0003575,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 472,
+            "cacheReadInputTokens": 4899,
+            "cacheCreationInputTokens": 2956,
+            "webSearchRequests": 0,
+            "costUSD": 0.034075799999999996,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 186,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.03443329999999999
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6867,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3462,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0003587,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 577,
+            "cacheReadInputTokens": 4899,
+            "cacheCreationInputTokens": 2968,
+            "webSearchRequests": 0,
+            "costUSD": 0.0362718,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 237,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.036630499999999996
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7164,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3456,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0003561,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 543,
+            "cacheReadInputTokens": 12954,
+            "cacheCreationInputTokens": 4089,
+            "webSearchRequests": 0,
+            "costUSD": 0.04617879999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 140,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0465349
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5605,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3454,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00035590000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 424,
+            "cacheReadInputTokens": 4997,
+            "cacheCreationInputTokens": 2960,
+            "webSearchRequests": 0,
+            "costUSD": 0.0331674,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 106,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0335233
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 4530,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3462,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0003577,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 308,
+            "cacheReadInputTokens": 4997,
+            "cacheCreationInputTokens": 2968,
+            "webSearchRequests": 0,
+            "costUSD": 0.030911400000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 87,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0312691
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "model": "claude-opus-5-5",
+        "duration_ms": 3910,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3458,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00035630000000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 249,
+            "cacheReadInputTokens": 12816,
+            "cacheCreationInputTokens": 3308,
+            "webSearchRequests": 0,
+            "costUSD": 0.0340232,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 106,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0343795
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 4497,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5403,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005528,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 476,
+            "cacheReadInputTokens": 3889,
+            "cacheCreationInputTokens": 4917,
+            "webSearchRequests": 0,
+            "costUSD": 0.0248209,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 138,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0253737
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "model": "claude-opus-5-5",
+        "duration_ms": 9370,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 4663,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0004768,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 589,
+            "cacheReadInputTokens": 5021,
+            "cacheCreationInputTokens": 4169,
+            "webSearchRequests": 0,
+            "costUSD": 0.046144199999999996,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 265,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.046620999999999996
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 5576,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5418,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005538,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 552,
+            "cacheReadInputTokens": 12710,
+            "cacheCreationInputTokens": 5264,
+            "webSearchRequests": 0,
+            "costUSD": 0.027855,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 19,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0284088
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6298,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5426,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005541000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 728,
+            "cacheReadInputTokens": 3889,
+            "cacheCreationInputTokens": 4940,
+            "webSearchRequests": 0,
+            "costUSD": 0.0274329,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 347,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.027986999999999998
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6133,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5442,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005552,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 730,
+            "cacheReadInputTokens": 3889,
+            "cacheCreationInputTokens": 4956,
+            "webSearchRequests": 0,
+            "costUSD": 0.0275169,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 344,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0280721
+      }
+    ],
+    "total_cost_usd": 0.45365249999999996,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 50,
+      "gather": 40,
+      "scope": 3,
+      "triage": 6100,
+      "find_verify": 23937,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
