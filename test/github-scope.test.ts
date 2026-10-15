@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ensureCommit, newHunks } from "../src/github/scope.js";
 
 const run = promisify(execFile);
@@ -36,6 +36,10 @@ describe("newHunks (R7)", () => {
     expect(newHunks(file("src/a.ts", HUNK_A_MOVED), prior).files).toEqual([]);
     // The same text in another file is new.
     expect(newHunks(file("src/b.ts", HUNK_A), prior).files).toEqual(["src/b.ts"]);
+    // A hunk that moves past another hunk is not new.
+    expect(
+      newHunks(file("src/a.ts", HUNK_A_MOVED, HUNK_B), file("src/a.ts", HUNK_B, HUNK_A)),
+    ).toEqual({ diff: "", files: [] });
   });
 
   it("treats a changed hunk as new", () => {
@@ -57,12 +61,6 @@ describe("newHunks (R7)", () => {
     expect(out.diff).toBe(file("src/a.ts", HUNK_A_MOVED));
   });
 
-  it("keeps a moved hunk as not new", () => {
-    const prior = file("src/a.ts", HUNK_B, HUNK_A);
-    const head = file("src/a.ts", HUNK_A_MOVED, HUNK_B);
-    expect(newHunks(head, prior)).toEqual({ diff: "", files: [] });
-  });
-
   it("reports no hunk when two prior hunks and two head hunks share one key", () => {
     const prior = file("src/a.ts", HUNK_A, HUNK_A_MOVED);
     const head = file("src/a.ts", HUNK_A_MOVED, HUNK_A);
@@ -81,20 +79,31 @@ describe("ensureCommit (R7)", () => {
   const git = (repo: string, ...args: string[]) =>
     run("git", ["-C", repo, "-c", "user.name=t", "-c", "user.email=t@t", ...args]);
 
-  it("is true for a commit in the store, fetches a missing one, and is false when the fetch fails", async () => {
-    const origin = join(root, "origin");
-    const clone = join(root, "clone");
+  // The clone has the commit "present". Only the origin has "missing".
+  const origin = join(root, "origin");
+  const clone = join(root, "clone");
+  let present = "";
+  let missing = "";
+  beforeAll(async () => {
     await run("git", ["init", "-q", origin]);
     await git(origin, "commit", "-q", "--allow-empty", "-m", "one");
     await run("git", ["clone", "-q", origin, clone]);
-    const present = (await git(origin, "rev-parse", "HEAD")).stdout.trim();
+    present = (await git(origin, "rev-parse", "HEAD")).stdout.trim();
     await git(origin, "checkout", "-q", "-b", "side");
     await git(origin, "commit", "-q", "--allow-empty", "-m", "two");
-    const missing = (await git(origin, "rev-parse", "HEAD")).stdout.trim();
+    missing = (await git(origin, "rev-parse", "HEAD")).stdout.trim();
+  });
 
+  it("is true for a commit in the store", async () => {
     expect(await ensureCommit(clone, present)).toBe(true);
+  });
+
+  it("fetches a missing commit, and is true", async () => {
     expect(await ensureCommit(clone, missing)).toBe(true);
     await expect(git(clone, "cat-file", "-e", `${missing}^{commit}`)).resolves.toBeDefined();
+  });
+
+  it("is false when the fetch fails", async () => {
     expect(await ensureCommit(clone, "e".repeat(40))).toBe(false);
     // A repo with no remote cannot fetch.
     expect(await ensureCommit(origin, "e".repeat(40))).toBe(false);
