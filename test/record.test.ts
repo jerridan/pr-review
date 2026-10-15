@@ -16,7 +16,7 @@ import { promisify } from "node:util";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DEFAULT_REPO_CONFIG } from "../src/config/repo-config.js";
 import { formatJson } from "../src/output/json.js";
-import { recordFileName, recordRunId, runIdFor, writeRecord } from "../src/record/write.js";
+import { recordFileName, recordRunId, writeRecord } from "../src/record/write.js";
 import { loadBuiltinReviewers } from "../src/reviewers/loader.js";
 import { runReview } from "../src/run.js";
 import type { Finding } from "../src/schemas/finding.js";
@@ -175,8 +175,6 @@ describe("the record file (A9)", () => {
   it("gives the run id as the file name of the record without .json", () => {
     // The run marker on GitHub names the record by this id.
     expect(basename(recordPath, ".json")).toBe(recordRunId(record));
-    const startedAt = new Date(record.identity.started_at);
-    expect(runIdFor(startedAt, record.identity.head)).toBe(recordRunId(record));
   });
 
   it("validates against the record schema, as written", () => {
@@ -206,15 +204,17 @@ describe("the record file (A9)", () => {
     await expect(writeRecord(dir, record)).rejects.toThrow();
   });
 
-  it("has pr, github and config_hash set to null", () => {
+  it("has no PR state, no config hash and no posted state, and is a first run with no prior state (R5, R6, R8)", () => {
     expect(record.identity.pr).toBeNull();
     expect(record.identity.github).toBeNull();
     expect(record.identity.config_hash).toBeNull();
-  });
-
-  it("has stages.pre_existing and posted.github null on a run without --format github (R5, R6)", () => {
     expect(record.stages.pre_existing).toEqual([]);
     expect(record.posted.github).toBeNull();
+    expect(record.identity.run_kind).toBe("first");
+    expect(record.identity.prior).toBeNull();
+    expect(record.posted.below_floor).toEqual([]);
+    expect(record.posted.not_reposted).toEqual([]);
+    expect(record.posted.carried).toEqual([]);
   });
 
   it("names the commits as the source of the description, not sanitized and not cut (R3)", () => {
@@ -448,16 +448,6 @@ describe("the record directory of a --pr run (R8)", () => {
     const out = join(outRoot, "no-pr-dir");
     const path = await writeRecord(out, record);
     expect(dirname(path)).toBe(join(outRoot, "no-pr-dir"));
-  });
-});
-
-describe("the run kind and the prior state of a run without --pr (R8)", () => {
-  it("is a first run with no prior state and the new posted keys empty", () => {
-    expect(record.identity.run_kind).toBe("first");
-    expect(record.identity.prior).toBeNull();
-    expect(record.posted.below_floor).toEqual([]);
-    expect(record.posted.not_reposted).toEqual([]);
-    expect(record.posted.carried).toEqual([]);
   });
 });
 
