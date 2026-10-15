@@ -1,0 +1,152 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 4,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Add the consumer workflow so the reviewer runs on this repo",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/4"
+    },
+    "run_kind": "later",
+    "prior": {
+      "head": "7a61dfe6a1bb8d9fd830328c73ce0981c7c3745e",
+      "source": "record",
+      "record": "/home/runner/work/_temp/pr-review-records/pr-4/2026-10-15T195441.885Z-7a61dfe.json",
+      "open": [],
+      "dismissed": [],
+      "fetch_failed": false
+    },
+    "base": "ac77cb388a34686d0299d257e26f669d2546288c",
+    "head": "d7c0f09dfae4cdc4944f4a5eb6f6439f03fa5cd0",
+    "started_at": "2026-10-15T20:04:23.227Z",
+    "tool_version": "0.1.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Add the consumer workflow so the reviewer runs on this repo\n\nThe repo ships the reusable workflow but had no workflow of its own, so its pull requests got no review. This PR adds `.github/workflows/pr-review.yml`, the file the README's \"Set up CI\" section tells a consumer to save.\n\nThis PR is the first run of the reviewer on this repo.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01KFgKDUH5g8JkJwwpZsR1X4\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": false,
+      "truncated": false
+    },
+    "injected": [],
+    "changed_files": [
+      {
+        "path": ".github/workflows/pr-review.yml",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [
+      ".github/workflows/pr-review.yml"
+    ],
+    "triage": null,
+    "tier": "skip",
+    "tier_reason": "No new hunks since 7a61dfe.",
+    "selected_reviewers": [],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [],
+    "verifications": [],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "skipped",
+    "coverage": {
+      "reviewers_ran": [],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0
+    },
+    "findings": [],
+    "github": null,
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [],
+    "total_cost_usd": 0,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 38,
+      "gather": 18,
+      "scope": 3,
+      "find_verify": 4,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
