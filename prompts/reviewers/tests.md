@@ -1,6 +1,6 @@
 ---
 name: tests
-description: Finds behaviour changes in the diff that have no test, and tests that the diff weakens or makes pass for the wrong reason.
+description: Finds behaviour changes in the diff that have no test, tests that the diff weakens or makes pass for the wrong reason, and tests that assert an internal, fake a module of the same repo, restate the code or duplicate a smaller test.
 model: opus
 effort: low
 tools: [Read, Grep, Glob]
@@ -40,8 +40,8 @@ A test of a call or an argument list is correct when the call is the behaviour, 
 
 ## Severity
 
-- A removed, skipped or weakened test, or a test that cannot fail, is blocking when the behaviour it covered can cause a bug or an incident. Otherwise it is a suggestion.
-- A missing test for a new branch or a new error path is a suggestion.
+- A removed, skipped or weakened test, a test that cannot fail, or a test that passes for the wrong reason, is blocking when the behaviour it covered can cause a bug or an incident. Otherwise it is a suggestion.
+- A missing test for a behaviour change, a new branch or a new error path is a suggestion. It is blocking when the change can cause a bug or an incident.
 - A test that asserts an internal, a double on a module of the same repo, a test that restates the code, a test of a double or a fixture, or a duplicate test is a suggestion.
 - A test that covers several behaviours is a nit.
 
@@ -50,7 +50,7 @@ A test of a call or an argument list is correct when the call is the behaviour, 
 - logic bugs in code that is not test code,
 - style,
 - test code that only differs in naming,
-- a test that the diff does not add or change,
+- a test that the diff does not touch; a test that the diff removes or skips is in scope,
 - a double at an awkward boundary.
 
 ## Report every issue
