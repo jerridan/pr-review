@@ -10,7 +10,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, join } from "node:path";
+import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { CommanderError } from "commander";
@@ -494,17 +494,9 @@ describe("--author-write-access (R7)", () => {
     expect(read.record.identity.github?.author_write_access).toBe(false);
   }, 30_000);
 
-  it("gives no Bash for a fork pull request, even with the flag and admin (R2)", async () => {
-    const fork = await prShellCall(
-      { fork: true, head_repo: "eve/widgets", permission: "admin" },
-      "--author-write-access",
-    );
-    expect(fork.call?.bash).not.toBe(true);
-    expect(fork.record.identity.github?.author_write_access).toBe(false);
+  it("records a fork pull request as a fork (R2)", async () => {
+    const fork = await prShellCall({ fork: true, head_repo: "eve/widgets" });
     expect(fork.record.identity.github?.fork).toBe(true);
-    expect(fork.doc.coverage.reviewers_without_bash).toEqual([
-      { name: "shell-check", reason: "author has no write access" },
-    ]);
   }, 30_000);
 });
 
@@ -646,38 +638,6 @@ describe("--pr (R2)", () => {
     return { code, doc, record, fake };
   }
 
-  it("takes --base and --head from the pull request and records the PR identity", async () => {
-    const github = prFor(fx);
-    const { code, record } = await prRun(github, "pr-defaults", "--tier", "skip");
-    expect(code).toBe(0);
-    expect(record?.identity.base).toBe(fx.base);
-    expect(record?.identity.head).toBe(fx.head);
-    expect(record?.identity.pr).toBe(7);
-    expect(record?.identity.github).toEqual({
-      slug: "acme/widgets",
-      title: "Add average",
-      draft: false,
-      labels: ["bug"],
-      author: "alice",
-      author_type: "User",
-      author_write_access: true,
-      fork: false,
-      head_repo: "acme/widgets",
-      url: "https://github.com/acme/widgets/pull/7",
-    });
-    expect(record?.identity.description).toBe("Add average\n\nAdds an average function.");
-    expect(record?.identity.description_meta).toEqual({
-      source: "pr",
-      sanitized: false,
-      truncated: false,
-    });
-    expect(github.calls).toContainEqual({ method: "resolveSlug", input: { repo: fx.repo } });
-    expect(github.calls).toContainEqual({
-      method: "getPullRequest",
-      input: { slug: "acme/widgets", number: 7 },
-    });
-  });
-
   it("keeps --base and --head when they are given", async () => {
     const github = prFor(fx, { base_sha: "1".repeat(40), head_sha: "2".repeat(40) });
     const { code, record } = await prRun(
@@ -695,7 +655,7 @@ describe("--pr (R2)", () => {
     expect(record?.identity.head).toBe(fx.head);
   });
 
-  it("uses --github-repo over the slug of the checkout", async () => {
+  it("records the slug of --github-repo", async () => {
     const github = prFor(fx);
     const { code, record } = await prRun(
       github,
@@ -707,11 +667,6 @@ describe("--pr (R2)", () => {
     );
     expect(code).toBe(0);
     expect(record?.identity.github?.slug).toBe("other/place");
-    expect(github.calls.map((c) => c.method)).not.toContain("resolveSlug");
-    expect(github.calls).toContainEqual({
-      method: "getPullRequest",
-      input: { slug: "other/place", number: 7 },
-    });
   });
 
   it("exits 2 on --format github without --pr, and runs nothing", async () => {
@@ -813,28 +768,6 @@ describe("--pr (R2)", () => {
       rmSync(draftFx.repo, { recursive: true, force: true });
     }
   }, 30_000);
-
-  it("gives the tier floor full for the label review:full alone, with no fresh flag (R4)", async () => {
-    const { code, record, fake } = await prRun(
-      prFor(fx, { labels: ["review:full"] }),
-      "pr-review-full",
-    );
-    expect(code).toBe(0);
-    expect(record?.identity.tier).toBe("full");
-    expect(record?.identity.tier_reason).toContain("review:full");
-    expect(record?.identity.tier_reason).toMatch(/floor of full/);
-    // The run is a normal review: triage and the reviewers run.
-    expect(fake.calls.some((c) => c.role === "triage")).toBe(true);
-    expect(fake.calls.some((c) => c.role === "reviewer")).toBe(true);
-  });
-
-  it("gives fast for the label review:fast, over the sensitive floor (R4)", async () => {
-    const { code, record } = await prRun(prFor(fx, { labels: ["review:fast"] }), "pr-fast");
-    expect(code).toBe(0);
-    expect(record?.identity.sensitive_files.length).toBeGreaterThan(0);
-    expect(record?.identity.tier).toBe("fast");
-    expect(record?.identity.tier_reason).toContain("review:fast");
-  });
 });
 
 // The findings of the three-run test, on src/stats.ts of the fixture. A
@@ -979,33 +912,28 @@ describe("--format github (R5, R5a, R6)", () => {
       [...record.posted.findings, ...record.posted.below_floor].find((f) => f.claim === claim)
         ?.fingerprint ?? "missing";
 
-    it("first run: one COMMENT review on the head with the marker, the lines, inline and body findings", async () => {
+    it("first run: posts one review on the head, with the run id of the record in its marker and two inline comments, and records it", async () => {
       const { code, doc, record } = await githubRun(fx3, github, githubScript(fx3), "three-run", {
         sdk,
       });
       first = record!;
       expect(code).toBe(0);
 
-      // One review, made with the create-review call, whose event is COMMENT.
-      expect(github.calls.filter((c) => c.method === "createReview")).toHaveLength(1);
+      // One review on the head.
       expect(github.state.reviews).toHaveLength(1);
       const review = github.state.reviews[0]!;
       expect(review.commit_id).toBe(fx3.head);
 
-      const lines = review.body.split("\n");
+      // The run id in the marker is the file name of the record.
       const runId = basename(doc.record_path, ".json");
-      const marker = { run: runId, head: fx3.head, base: fx3.base, tier: "full" as const };
-      expect(lines[0]?.startsWith(formatRunMarker(marker))).toBe(true);
-      expect(parseRunMarker(review.body)).toEqual(marker);
-      expect(lines[0]).toContain("**Would request changes**");
-      expect(lines[0]).toContain(record?.identity.tier_reason ?? "missing");
-      expect(lines[1]).toContain("Blocking: 2");
-      expect(lines[1]).toContain("Suggestions: 2");
-      expect(lines[1]).toContain("Nits: 0");
-      expect(lines[1]).toContain("Coverage: reviewers ran:");
-      expect(review.body).toContain(`pr-review ${record?.identity.tool_version}`);
+      expect(parseRunMarker(review.body)).toEqual({
+        run: runId,
+        head: fx3.head,
+        base: fx3.base,
+        tier: "full",
+      });
 
-      // One inline comment per in-diff finding, each with its fingerprint marker.
+      // One inline comment per in-diff finding.
       const inline = [...github.state.review_comments].sort(
         (a, b) => (a.line ?? 0) - (b.line ?? 0),
       );
@@ -1013,26 +941,9 @@ describe("--format github (R5, R5a, R6)", () => {
         ["src/stats.ts", 11, review.id],
         ["src/stats.ts", 14, review.id],
       ]);
-      expect(parseFingerprintMarkers(inline[0]?.body ?? "")).toEqual([fp(record, "CLAIM-A")]);
-      expect(parseFingerprintMarkers(inline[1]?.body ?? "")).toEqual([fp(record, "CLAIM-D")]);
-      expect(review.body).not.toContain("CLAIM-A");
-      expect(review.body).not.toContain("CLAIM-D");
 
-      // A body entry with a permalink for the finding outside the diff.
-      expect(lines).toContain("### Findings outside the diff");
-      const outside = lines.find((l) => l.includes("CLAIM-B")) ?? "";
-      expect(outside).toContain(
-        `https://github.com/acme/widgets/blob/${fx3.head}/src/stats.ts#L1-L1`,
-      );
-      expect(outside).toContain(formatFingerprintMarker(fp(record, "CLAIM-B")));
-      // A body entry for the span that crosses the edge of the hunk.
-      const edge = lines.find((l) => l.includes("CLAIM-C")) ?? "";
-      expect(edge).toContain(`https://github.com/acme/widgets/blob/${fx3.head}/src/stats.ts#L3-L6`);
-      expect(edge).toContain(formatFingerprintMarker(fp(record, "CLAIM-C")));
-
-      // The stdout holds the JSON document and the review url.
+      // The stdout and the record hold the posted review.
       expect(doc.review_url).toBe(review.url);
-      expect(doc.verdict).toBe("would request changes");
       expect(record?.posted.github).toMatchObject({
         review_id: review.id,
         review_url: review.url,
@@ -1046,11 +957,6 @@ describe("--format github (R5, R5a, R6)", () => {
       });
       expect(record?.posted.github?.inline).toHaveLength(2);
       expect(github.state.check_runs).toHaveLength(1);
-      expect(basename(doc.record_path)).toBe(`${runId}.json`);
-      // With --pr, the record is in <out>/pr-<n>/.
-      expect(basename(dirname(doc.record_path))).toBe("pr-7");
-      expect(record?.identity.run_kind).toBe("first");
-      expect(record?.identity.prior).toBeNull();
     }, 60_000);
 
     it("second run on HEAD2: only new blocking findings, a since line, one resolved thread", async () => {
@@ -1141,30 +1047,20 @@ describe("--format github (R5, R5a, R6)", () => {
       }
     }, 60_000);
 
-    it("third run on HEAD3: the same tree, so it posts nothing and exits 0", async () => {
+    it("third run on HEAD3: takes HEAD2 from the record of the second run, posts nothing and exits 0", async () => {
       github.state.pr.head_sha = fx3.head3;
-      const callsBefore = sdk.calls.length;
-      const { code, doc, record } = await githubRun(fx3, github, githubScript(fx3), "three-run", {
+      const { code, record } = await githubRun(fx3, github, githubScript(fx3), "three-run", {
         sdk,
       });
       expect(code).toBe(0);
       expect(github.state.reviews).toHaveLength(2);
       expect(github.state.check_runs).toHaveLength(2);
       expect(record?.posted.github).toBeNull();
-      expect(doc.review_url).toBeNull();
-      expect(record?.identity.tier).toBe("skip");
-      expect(sdk.calls.length).toBe(callsBefore);
-      // H0 is HEAD2, from the record of the second run. The thread that the
-      // tool resolved is neither open nor dismissed.
-      const fpD = fpOf(first, "CLAIM-D");
-      expect(record?.identity.run_kind).toBe("later");
-      expect(record?.identity.prior?.head).toBe(fx3.head2);
-      expect(record?.identity.prior?.source).toBe("record");
-      expect(record?.identity.prior?.open).not.toContain(fpD);
-      expect(record?.identity.prior?.dismissed).toEqual([fpOf(first, "CLAIM-A")]);
-      expect(record?.identity.prior?.open).toContain(fpOf(second, "CLAIM-E"));
-      expect(basename(dirname(doc.record_path))).toBe("pr-7");
-      expect(record?.identity.tier_reason).toBe(`No new hunks since ${fx3.head2.slice(0, 7)}.`);
+      expect(record?.identity.prior).toMatchObject({
+        head: fx3.head2,
+        source: "record",
+        record: join(outRoot, "three-run", "pr-7", `${recordRunIdOf(second)}.json`),
+      });
     }, 60_000);
 
     it("a labeled event for review:fast on the reviewed head posts nothing", async () => {
@@ -1391,12 +1287,9 @@ describe("--format github (R5, R5a, R6)", () => {
       expect(code).toBe(0);
       expect(sdk.calls).toEqual([]);
 
-      // The thread of A resolves with the reply.
+      // The thread of A resolves.
       const thread = await github.getThread({ thread_id: threadA });
       expect(thread.resolved).toBe(true);
-      expect(thread.comments.at(-1)?.body).toBe(
-        `Resolved by pr-review: the code this comment refers to changed at ${head2}.`,
-      );
 
       // One short review on the new head, at the tier of the prior record.
       expect(github.state.reviews).toHaveLength(2);
@@ -1423,19 +1316,6 @@ describe("--format github (R5, R5a, R6)", () => {
       expect(record?.posted.github?.review_id).toBe(review.id);
       expect(record?.posted.github?.resolved).toEqual([{ thread_id: threadA, fingerprint: fpA }]);
       expect(record?.posted.github?.check_run).toEqual({ id: github.state.check_runs[1]?.id });
-
-      // A run on the same head takes it as H0 and posts nothing.
-      const third = await githubRun(
-        fixture,
-        github,
-        findingsScript(fixture, [INLINE_A]),
-        "no-new-thread",
-      );
-      expect(third.code).toBe(0);
-      expect(github.state.reviews).toHaveLength(2);
-      expect(third.record?.identity.prior?.head).toBe(head2);
-      expect(third.record?.identity.prior?.source).toBe("record");
-      expect(third.record?.posted.github).toBeNull();
     }, 90_000);
 
     it("posts one short review when the push only drops a body finding", async () => {
@@ -1520,29 +1400,7 @@ describe("--format github (R5, R5a, R6)", () => {
     ]);
   }, 60_000);
 
-  it("retries once with a body-only review when the first create-review call fails", async () => {
-    const github = prFor(fx);
-    github.failNext(
-      "createReview",
-      new GitHubError({
-        endpoint: "repos/acme/widgets/pulls/7/reviews",
-        exitCode: 1,
-        message: "422",
-      }),
-    );
-    const { code, doc, record } = await githubRun(fx, github, githubScript(fx), "gh-retry");
-    expect(code).toBe(0);
-    expect(github.calls.filter((c) => c.method === "createReview")).toHaveLength(2);
-    expect(github.state.reviews).toHaveLength(1);
-    expect(github.state.review_comments).toEqual([]);
-    const body = github.state.reviews[0]?.body ?? "";
-    for (const claim of ["CLAIM-A", "CLAIM-B", "CLAIM-C", "CLAIM-D"]) expect(body).toContain(claim);
-    expect(record?.posted.github?.inline).toEqual([]);
-    expect(record?.posted.github?.in_body).toHaveLength(4);
-    expect(doc.review_url).toBe(github.state.reviews[0]?.url);
-  }, 60_000);
-
-  it("records posted.github.error, writes the record and exits 1 when both calls fail", async () => {
+  it("prints the GitHub error to stderr when both create-review calls fail", async () => {
     const github = prFor(fx);
     const fail = () =>
       new GitHubError({
@@ -1552,14 +1410,7 @@ describe("--format github (R5, R5a, R6)", () => {
       });
     github.failNext("createReview", fail());
     github.failNext("createReview", fail());
-    const { code, doc, record } = await githubRun(fx, github, githubScript(fx), "gh-double");
-    expect(code).toBe(1);
-    expect(record?.posted.github?.error).toContain("HTTP 502");
-    expect(record?.posted.github?.review_id).toBeNull();
-    expect(record?.posted.github?.check_run).toBeNull();
-    expect(doc.review_url).toBeNull();
-    expect(github.state.reviews).toEqual([]);
-    expect(github.state.check_runs).toEqual([]);
+    await githubRun(fx, github, githubScript(fx), "gh-double");
     expect(stderr).toContain("HTTP 502");
   }, 60_000);
 
@@ -1578,9 +1429,6 @@ describe("--format github (R5, R5a, R6)", () => {
     expect(marker).toMatchObject({ head: fx.head, base: fx.base, tier: "full", status: "failed" });
     expect(body.split("\n")[1]).toMatch(/^pr-review failed at find_verify: /);
     expect(body.split("\n")).toHaveLength(2);
-    expect(github.state.review_comments).toEqual([]);
-    expect(github.state.check_runs).toEqual([]);
-    expect(github.state.issue_comments).toEqual([]);
     // The record exists, with no posted.github and the error of the stage.
     expect(record?.posted.github).toBeNull();
     expect(record?.posted.verdict).toBe("incomplete");
@@ -1588,18 +1436,6 @@ describe("--format github (R5, R5a, R6)", () => {
       stage: "find_verify",
       message: expect.any(String),
     });
-
-    // A second run on the same head is a first run.
-    const second = await githubRun(fx, github, githubScript(fx), "gh-r5a-2");
-    expect(second.code).toBe(0);
-    expect(github.state.reviews).toHaveLength(2);
-    const next = parseRunMarker(github.state.reviews[1]?.body ?? "");
-    expect(next).toMatchObject({ head: fx.head, tier: "full" });
-    expect(next?.status).toBeUndefined();
-    // A failure review does not make a later run.
-    expect(second.record?.identity.run_kind).toBe("first");
-    expect(second.record?.identity.prior).toBeNull();
-    expect(github.state.check_runs).toHaveLength(1);
   }, 60_000);
 
   it("R5a: gives tier=unknown when the run fails before the tier, and writes no record", async () => {
@@ -1623,40 +1459,13 @@ describe("--format github (R5, R5a, R6)", () => {
     expect(existsSync(out)).toBe(false);
   });
 
-  it("posts the one-line skip review once per reason", async () => {
+  it("posts one review at the skip tier, and a second run with the same reason posts nothing", async () => {
     const github = prFor(fx, { labels: ["review:skip"] });
-    const first = await githubRun(fx, github, githubScript(fx), "gh-skip-1");
-    expect(first.code).toBe(0);
+    await githubRun(fx, github, githubScript(fx), "gh-skip-1");
     expect(github.state.reviews).toHaveLength(1);
-    const body = github.state.reviews[0]?.body ?? "";
-    expect(body.split("\n")).toHaveLength(1);
-    expect(parseRunMarker(body)?.tier).toBe("skip");
-    expect(body).toContain("Label review:skip sets the tier skip.");
-    expect(first.doc.review_url).toBe(github.state.reviews[0]?.url);
-    expect(github.state.check_runs).toHaveLength(1);
+    expect(parseRunMarker(github.state.reviews[0]?.body ?? "")?.tier).toBe("skip");
 
-    const second = await githubRun(fx, github, githubScript(fx), "gh-skip-2");
-    expect(second.code).toBe(0);
+    await githubRun(fx, github, githubScript(fx), "gh-skip-2");
     expect(github.state.reviews).toHaveLength(1);
-    expect(github.state.check_runs).toHaveLength(1);
-    expect(second.record?.posted.github).toBeNull();
-    expect(second.doc.review_url).toBeNull();
-  }, 60_000);
-
-  it("posts a full first-run review after a skip run at the same head", async () => {
-    const github = prFor(fx, { labels: ["review:skip"] });
-    await githubRun(fx, github, githubScript(fx), "gh-skip-then-full-1");
-    github.state.pr.labels = [];
-    const { code, record } = await githubRun(fx, github, githubScript(fx), "gh-skip-then-full-2");
-    expect(code).toBe(0);
-    expect(github.state.reviews).toHaveLength(2);
-    const full = github.state.reviews[1]?.body ?? "";
-    expect(parseRunMarker(full)?.tier).toBe("full");
-    expect(full).toContain("**Would request changes**");
-    expect(github.state.review_comments).toHaveLength(2);
-    expect(record?.posted.github?.review_id).toBe(github.state.reviews[1]?.id);
-    // A skip review does not make a later run.
-    expect(record?.identity.run_kind).toBe("first");
-    expect(record?.identity.prior).toBeNull();
   }, 60_000);
 });

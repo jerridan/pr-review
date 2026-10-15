@@ -1676,11 +1676,28 @@ esac
   });
 
   it("takes the base and the head from the pull request, and records the PR identity", async () => {
-    const { record } = await reviewPr(pullRequest({ labels: ["bug"] }), "pr-identity", "skip");
+    const github = pullRequest({
+      labels: ["bug"],
+      author: "alice",
+      head_repo: "acme/widgets",
+      permission: "write",
+    });
+    const { record } = await reviewPr(github, "pr-identity", "skip");
     expect(record.identity.base).toBe(fx.base);
     expect(record.identity.head).toBe(fx.head);
     expect(record.identity.pr).toBe(7);
-    expect(record.identity.github).toMatchObject({ slug: "acme/widgets", labels: ["bug"] });
+    expect(record.identity.github).toEqual({
+      slug: "acme/widgets",
+      title: "Add average",
+      draft: false,
+      labels: ["bug"],
+      author: "alice",
+      author_type: "User",
+      author_write_access: true,
+      fork: false,
+      head_repo: "acme/widgets",
+      url: "https://github.com/acme/widgets/pull/7",
+    });
   });
 
   it("does not call gh when a fake is given", async () => {
