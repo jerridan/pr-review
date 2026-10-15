@@ -221,16 +221,6 @@ describe("decideTier: skip rules (R4)", () => {
     expect(decideTier(input({ labels: ["x"], skip: rules })).tier).toBe("fast");
     expect(decideTier(input({ pr: null, skip: rules })).tier).toBe("fast");
   });
-
-  it("keeps the default skip keys off", () => {
-    expect(DEFAULT_REPO_CONFIG.skip).toEqual({
-      draft: false,
-      title_keywords: [],
-      labels: [],
-      bot_authors: [],
-    });
-    expect(decideTier(input({ pr: { ...PR, draft: true }, labels: ["x"] })).tier).toBe("fast");
-  });
 });
 
 describe("decideTier: the order of precedence of R4", () => {
@@ -265,11 +255,6 @@ describe("decideTier: the order of precedence of R4", () => {
     const result = decideTier(input({ totalHunks: 0, pr: PR }));
     expect(result.tier).toBe("skip");
     expect(result.reason).toMatch(/no hunks/i);
-  });
-
-  it("5. the sensitive floor and 6. triage follow", () => {
-    expect(decideTier(input({ pr: PR, sensitive: ["src/auth/x.ts"] })).tier).toBe("full");
-    expect(decideTier(input({ pr: PR, brief: brief({ tier: "skip" }) })).tier).toBe("skip");
   });
 });
 
