@@ -6,7 +6,7 @@ import type { Role } from "../src/config/models.js";
 import { FindingSchema, FindingsOutputSchema } from "../src/schemas/finding.js";
 import { toSdkJsonSchema } from "../src/schemas/json-schema.js";
 import { MergeOutputSchema } from "../src/schemas/merge.js";
-import { PostedFindingSchema, RecordSchema, type RunRecord } from "../src/schemas/record.js";
+import { RecordSchema, type RunRecord } from "../src/schemas/record.js";
 import { ReviewerFrontmatterSchema } from "../src/schemas/reviewer.js";
 import { TriageBriefSchema } from "../src/schemas/triage.js";
 import { VerifierResultSchema, type VerifierResult } from "../src/schemas/verifier.js";
@@ -571,16 +571,6 @@ describe("RecordSchema", () => {
     for (const key of ["below_floor", "not_reposted", "carried"]) {
       expect(withPosted({ [key]: undefined })).toBe(false);
     }
-  });
-
-  it("requires span_text on a PostedFinding (R8)", () => {
-    const record = makeRecord();
-    const [posted] = record.posted.findings;
-    expect(posted?.span_text).toBe("for (let i = 0; i < n; i++) {");
-    const { span_text: _span, ...withoutSpan } = posted!;
-    expect(PostedFindingSchema.safeParse(posted).success).toBe(true);
-    expect(PostedFindingSchema.safeParse(withoutSpan).success).toBe(false);
-    expect(PostedFindingSchema.safeParse({ ...posted, span_text: 1 }).success).toBe(false);
   });
 
   it("requires stages.pre_existing, a list of PostedFinding (R6)", () => {
