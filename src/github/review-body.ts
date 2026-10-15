@@ -92,10 +92,18 @@ function permalink(slug: string, head: string, f: PostedFinding): string {
   return `https://github.com/${slug}/blob/${head}/${encodeURI(f.file)}#L${f.start_line}-L${f.end_line}`;
 }
 
-function counts(findings: PostedFinding[]): string {
-  const n = (severity: PostedFinding["severity"]) =>
-    findings.filter((f) => f.severity === severity).length;
-  return `Blocking: ${n("blocking")}; Suggestions: ${n("suggestion")}; Nits: ${n("nit")}`;
+// The counts of the posted findings, by severity.
+function countBy(findings: PostedFinding[], severity: PostedFinding["severity"]): number {
+  return findings.filter((f) => f.severity === severity).length;
+}
+
+// The counts as a markdown table.
+function countsTable(findings: PostedFinding[]): string[] {
+  return [
+    "| Blocking | Suggestions | Nits |",
+    "|---|---|---|",
+    `| ${countBy(findings, "blocking")} | ${countBy(findings, "suggestion")} | ${countBy(findings, "nit")} |`,
+  ];
 }
 
 // The open blocking findings of earlier runs also set the verdict. Name
@@ -110,29 +118,90 @@ function list(names: string[]): string {
   return names.length > 0 ? names.join(", ") : "none";
 }
 
-/** The coverage line. The table output and the review body both use it. */
-export function renderCoverage(record: RunRecord): string {
+// Each part of the coverage, as "<label>: <value>". A part whose value is
+// "none" or "0" carries no news; "news" says so.
+function coverageParts(record: RunRecord): { text: string; news: boolean }[] {
   const c = record.posted.coverage;
   const prior = record.identity.prior;
-  const skipped = list(
-    c.reviewers_skipped.map(
-      (s) => `${s.name} (${s.reason}${s.pass !== undefined ? `, pass ${s.pass}` : ""})`,
-    ),
+  const skipped = c.reviewers_skipped.map(
+    (s) => `${s.name} (${s.reason}${s.pass !== undefined ? `, pass ${s.pass}` : ""})`,
   );
-  const withoutBash = list(c.reviewers_without_bash.map((r) => `${r.name} (${r.reason})`));
+  const withoutBash = c.reviewers_without_bash.map((r) => `${r.name} (${r.reason})`);
+  const named = (label: string, names: string[]): { text: string; news: boolean } => ({
+    text: `${label}: ${list(names)}`,
+    news: names.length > 0,
+  });
   return [
-    `Coverage: reviewers ran: ${list(c.reviewers_ran)}`,
-    `reviewers failed: ${list(c.reviewers_failed)}`,
-    `reviewers skipped: ${skipped}`,
-    `reviewers without Bash: ${withoutBash}`,
-    `sensitive paths without hunks: ${list(c.sensitive_without_hunks)}`,
-    `findings dropped by failed verifier calls: ${c.findings_dropped_by_failed_verifier}`,
+    { text: `reviewers ran: ${list(c.reviewers_ran)}`, news: true },
+    named("reviewers failed", c.reviewers_failed),
+    named("reviewers skipped", skipped),
+    named("reviewers without Bash", withoutBash),
+    named("sensitive paths without hunks", c.sensitive_without_hunks),
+    {
+      text: `findings dropped by failed verifier calls: ${c.findings_dropped_by_failed_verifier}`,
+      news: c.findings_dropped_by_failed_verifier > 0,
+    },
     // A later run with no prior record, or a fresh run that could not
     // fetch the last reviewed head, says so (R7).
-    ...(prior?.source === "marker" && !prior.fetch_failed ? ["no prior record"] : []),
-    ...(prior?.fetch_failed ? [`fresh run: could not fetch ${prior.head.slice(0, 7)}`] : []),
-  ].join("; ");
+    ...(prior?.source === "marker" && !prior.fetch_failed
+      ? [{ text: "no prior record", news: true }]
+      : []),
+    ...(prior?.fetch_failed
+      ? [{ text: `fresh run: could not fetch ${prior.head.slice(0, 7)}`, news: true }]
+      : []),
+  ];
 }
+
+/** The coverage line of the table output: every part, on one line. */
+export function renderCoverage(record: RunRecord): string {
+  return `Coverage: ${coverageParts(record)
+    .map((p) => p.text)
+    .join("; ")}`;
+}
+
+// The coverage as bullets. Only the parts that carry news are listed.
+function coverageBullets(record: RunRecord): string[] {
+  return coverageParts(record)
+    .filter((p) => p.news)
+    .map((p) => `- ${p.text.charAt(0).toUpperCase()}${p.text.slice(1)}`);
+}
+
+// How many findings the reviewers raised, and how many the verifier dropped.
+function candidatesLine(record: RunRecord): string {
+  const all = record.stages.verifications;
+  if (all.length === 0) return "- No candidate finding raised";
+  const dropped = all.filter((v) => !v.passed).length;
+  const noun = all.length === 1 ? "candidate finding" : "candidate findings";
+  return `- ${all.length} ${noun} raised, ${dropped} dropped by the verifier`;
+}
+
+// The cost in dollars and the time the stages took.
+function costLine(record: RunRecord): string {
+  const { total_cost_usd, stage_ms } = record.cost;
+  const cost = total_cost_usd === null ? "Cost unknown" : `Cost $${total_cost_usd.toFixed(2)}`;
+  const ms = Object.values(stage_ms).reduce((sum, n) => sum + n, 0);
+  return `- ${cost}, ${Math.round(ms / 1000)} s of run time`;
+}
+
+// The folded block at the end of the body: coverage, candidates and cost.
+function detailsBlock(record: RunRecord): string[] {
+  return [
+    "<details><summary>Coverage and cost</summary>",
+    "",
+    ...coverageBullets(record),
+    candidatesLine(record),
+    costLine(record),
+    "",
+    "</details>",
+  ];
+}
+
+const VERDICT_ICON: Record<RunRecord["posted"]["verdict"], string> = {
+  "would approve": "\u2705",
+  "would request changes": "\u274c",
+  incomplete: "\u26a0\ufe0f",
+  skipped: "",
+};
 
 /** The text after the marker of a skip review. */
 export function renderSkipLine(reason: string): string {
@@ -140,11 +209,12 @@ export function renderSkipLine(reason: string): string {
 }
 
 /**
- * The review body. Line 1: the run marker, the verdict in bold, the tier
- * and the tier reason. Line 2: the counts, the open blocking findings of
- * earlier runs (when there are any) and the coverage line. Then the
- * findings outside the diff, the carried markers and the tool version. At
- * the skip tier, the body is one line: the marker and the reason.
+ * The review body. Line 1: the run marker. Then the verdict as a heading
+ * with its icon, the tier and the tier reason, the counts as a table, the
+ * open blocking findings of earlier runs (when there are any), the
+ * findings outside the diff, the carried markers, a folded block with the
+ * coverage, the candidates and the cost, and the tool version. At the
+ * skip tier, the body is one line: the marker and the reason.
  */
 export function renderReviewBody(input: {
   marker: RunMarker;
@@ -160,8 +230,14 @@ export function renderReviewBody(input: {
     return `${formatRunMarker(marker)} ${renderSkipLine(identity.tier_reason)}`;
   }
   const lines = [
-    `${formatRunMarker(marker)} **${VERDICT_TEXT[posted.verdict]}** at tier ${identity.tier}: ${escapeText(oneLine(identity.tier_reason))}`,
-    [`${counts(posted.findings)}.`, ...carriedNote(record), renderCoverage(record)].join(" "),
+    formatRunMarker(marker),
+    `## ${VERDICT_ICON[posted.verdict]} ${VERDICT_TEXT[posted.verdict]}`,
+    "",
+    `**Tier** ${identity.tier}. ${escapeText(oneLine(identity.tier_reason))}`,
+    "",
+    ...countsTable(posted.findings),
+    "",
+    ...carriedNote(record),
   ];
   if (input.sinceHead !== undefined) {
     lines.push(`Review of changes since ${input.sinceHead.slice(0, 7)}`);
@@ -174,7 +250,7 @@ export function renderReviewBody(input: {
     }
   }
   if (input.carriedMarkers.length > 0) lines.push("", ...input.carriedMarkers);
-  lines.push("", `pr-review ${identity.tool_version}`);
+  lines.push("", ...detailsBlock(record), "", `<sub>pr-review ${identity.tool_version}</sub>`);
   return lines.join("\n");
 }
 
@@ -197,16 +273,25 @@ export function renderInlineComment(f: PostedFinding): InlineComment {
   };
 }
 
-/** The check run text: the verdict as title; the counts, the severity line and the coverage. */
+/**
+ * The check run text: the verdict as title; the number of posted
+ * findings, the counts as a table, the open blocking findings of earlier
+ * runs, and the coverage, the candidates and the cost as bullets.
+ */
 export function renderCheckRun(record: RunRecord): { title: string; summary: string } {
   const n = record.posted.findings.length;
   return {
     title: VERDICT_TEXT[record.posted.verdict],
     summary: [
       `${n} ${n === 1 ? "finding" : "findings"} posted.`,
-      [counts(record.posted.findings), ...carriedNote(record)].join(". "),
-      renderCoverage(record),
-    ].join("\n\n"),
+      "",
+      ...countsTable(record.posted.findings),
+      "",
+      ...carriedNote(record),
+      ...coverageBullets(record),
+      candidatesLine(record),
+      costLine(record),
+    ].join("\n"),
   };
 }
 

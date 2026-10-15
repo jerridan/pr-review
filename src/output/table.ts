@@ -47,7 +47,7 @@ export function formatTable(record: RunRecord): string {
     `Tier: ${identity.tier}`,
     `Reason: ${identity.tier_reason}`,
     `Verdict: ${posted.verdict}`,
-    // The review body of --format github has the same coverage line.
+    // The review body of --format github folds the same parts in a details block.
     renderCoverage(record),
     `Excluded files: ${excluded(identity.excluded_files)}`,
     `Cost: ${costLine(cost)}`,

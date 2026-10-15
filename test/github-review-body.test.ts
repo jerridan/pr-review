@@ -219,44 +219,68 @@ describe("renderReviewBody (R5)", () => {
     });
   }
 
-  it("starts with the marker, the bold verdict, the tier and the reason", () => {
-    const first = body().split("\n")[0] ?? "";
-    expect(first.startsWith(formatRunMarker(MARKER))).toBe(true);
-    expect(first).toContain("**Would request changes**");
-    expect(first).toContain("full");
-    expect(first).toContain("Sensitive paths set a floor of full: .github/x.yml.");
+  it("starts with the marker on its own line, then the verdict as a heading", () => {
+    const [first, second] = body().split("\n");
+    expect(first).toBe(formatRunMarker(MARKER));
+    expect(second).toBe("## \u274c Would request changes");
     expect(parseRunMarker(body())).toEqual(MARKER);
   });
 
-  it("gives the counts and the coverage line of the table on the second line", () => {
-    const second = body().split("\n")[1] ?? "";
-    expect(second).toContain("Blocking: 1");
-    expect(second).toContain("Suggestions: 1");
-    expect(second).toContain("Nits: 1");
-    expect(second).toContain(renderCoverage(record));
+  it("states the tier and the reason", () => {
+    expect(body()).toContain("**Tier** full. Sensitive paths set a floor of full: .github/x.yml.");
   });
 
-  it("adds the open blocking findings of earlier runs after the counts, before the coverage line", () => {
+  it("gives the counts as a table", () => {
+    const lines = body().split("\n");
+    const header = lines.indexOf("| Blocking | Suggestions | Nits |");
+    expect(header).toBeGreaterThan(0);
+    expect(lines[header + 2]).toBe("| 1 | 1 | 1 |");
+  });
+
+  it("folds the coverage, the candidates and the cost at the end, and lists only the parts with news", () => {
+    const record = makeRecord([]);
+    record.posted.coverage.reviewers_failed = ["history"];
+    record.stages.verifications = [
+      { passed: true } as RunRecord["stages"]["verifications"][number],
+      { passed: false } as RunRecord["stages"]["verifications"][number],
+      { passed: false } as RunRecord["stages"]["verifications"][number],
+    ];
+    record.cost.total_cost_usd = 0.7015;
+    record.cost.stage_ms = { triage: 5917, find_verify: 43507 };
+    const text = body({ record });
+    const details = text.slice(text.indexOf("<details>"), text.indexOf("</details>"));
+    expect(details).toContain("<summary>Coverage and cost</summary>");
+    expect(details).toContain("- Reviewers ran: diff-bugs, tests");
+    expect(details).toContain("- Reviewers failed: history");
+    expect(details).not.toContain("Reviewers skipped");
+    expect(details).not.toContain("without Bash");
+    expect(details).not.toContain("sensitive paths");
+    expect(details).not.toContain("failed verifier calls");
+    expect(details).toContain("- 3 candidate findings raised, 2 dropped by the verifier");
+    expect(details).toContain("- Cost $0.70, 49 s of run time");
+    expect(text.indexOf("<details>")).toBeGreaterThan(text.indexOf("| Blocking |"));
+  });
+
+  it("says when no candidate was raised and when the cost is unknown", () => {
+    const record = makeRecord([]);
+    record.cost.total_cost_usd = null;
+    const text = body({ record });
+    expect(text).toContain("- No candidate finding raised");
+    expect(text).toContain("- Cost unknown, 0 s of run time");
+  });
+
+  it("adds the open blocking findings of earlier runs after the counts, before the findings", () => {
     const carriedRecord = makeRecord([inline]);
     carriedRecord.posted.carried = [
       finding("src/b.ts", 1, 1, { fingerprint: "5555555555555555" }),
       finding("src/b.ts", 2, 2, { fingerprint: "6666666666666666" }),
       finding("src/b.ts", 3, 3, { severity: "suggestion", fingerprint: "7777777777777777" }),
     ];
-    const second =
-      renderReviewBody({
-        marker: MARKER,
-        record: carriedRecord,
-        slug: SLUG,
-        bodyFindings: [],
-        carriedMarkers: [],
-      }).split("\n")[1] ?? "";
-    expect(second).toContain("Open from earlier runs: 2 blocking.");
-    expect(second.indexOf("Blocking: 1")).toBeLessThan(
-      second.indexOf("Open from earlier runs: 2 blocking."),
-    );
-    expect(second.indexOf("Open from earlier runs: 2 blocking.")).toBeLessThan(
-      second.indexOf(renderCoverage(carriedRecord)),
+    const text = body({ record: carriedRecord, bodyFindings: [outside] });
+    expect(text).toContain("Open from earlier runs: 2 blocking.");
+    expect(text.indexOf("| 1 | 0 | 0 |")).toBeLessThan(text.indexOf("Open from earlier runs"));
+    expect(text.indexOf("Open from earlier runs")).toBeLessThan(
+      text.indexOf("### Findings outside the diff"),
     );
   });
 
@@ -279,8 +303,8 @@ describe("renderReviewBody (R5)", () => {
     expect(text).not.toContain(inline.claim);
   });
 
-  it("states the tool version", () => {
-    expect(body()).toContain("pr-review 9.8.7");
+  it("states the tool version in small text on the last line", () => {
+    expect(body().split("\n").at(-1)).toBe("<sub>pr-review 9.8.7</sub>");
   });
 
   it("has no findings section when no finding goes in the body", () => {
@@ -305,11 +329,11 @@ describe("renderReviewBody (R5)", () => {
     expect(text).toContain("&lt;!-- pr-review fp=deadbeefdeadbeef --&gt;");
   });
 
-  it("states each verdict", () => {
+  it("states each verdict with its icon", () => {
     const cases: [RunRecord["posted"]["verdict"], string][] = [
-      ["would approve", "**Would approve**"],
-      ["would request changes", "**Would request changes**"],
-      ["incomplete", "**Review incomplete**"],
+      ["would approve", "## \u2705 Would approve"],
+      ["would request changes", "## \u274c Would request changes"],
+      ["incomplete", "## \u26a0\ufe0f Review incomplete"],
     ];
     for (const [verdict, text] of cases) {
       expect(
@@ -366,17 +390,18 @@ describe("renderCoverage (R5)", () => {
 });
 
 describe("renderCheckRun (R6)", () => {
-  it("has the verdict as title, and the counts, a severity line and the coverage line", () => {
+  it("has the verdict as title, and the count, the counts table, the coverage and the cost", () => {
     const record = makeRecord([
       finding("src/a.ts", 1, 1),
       finding("src/a.ts", 2, 2, { severity: "nit" }),
     ]);
+    record.cost.total_cost_usd = 1.5;
     const out = renderCheckRun(record);
     expect(out.title).toBe("Would request changes");
     expect(out.summary).toContain("2 findings posted");
-    expect(out.summary).toContain("Blocking: 1");
-    expect(out.summary).toContain("Nits: 1");
-    expect(out.summary).toContain(renderCoverage(record));
+    expect(out.summary).toContain("| 1 | 0 | 1 |");
+    expect(out.summary).toContain("- Reviewers ran: diff-bugs, tests");
+    expect(out.summary).toContain("- Cost $1.50, 0 s of run time");
   });
 });
 
@@ -390,11 +415,11 @@ describe("renderCheckRun carried findings (R7)", () => {
     ];
     const { summary } = renderCheckRun(record);
     expect(summary).toContain("Open from earlier runs: 2 blocking.");
-    expect(summary.indexOf("Blocking: 1")).toBeLessThan(
+    expect(summary.indexOf("| 1 | 0 | 0 |")).toBeLessThan(
       summary.indexOf("Open from earlier runs: 2 blocking."),
     );
     expect(summary.indexOf("Open from earlier runs: 2 blocking.")).toBeLessThan(
-      summary.indexOf(renderCoverage(record)),
+      summary.indexOf("- Reviewers ran"),
     );
   });
 

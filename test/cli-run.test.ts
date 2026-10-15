@@ -1116,7 +1116,7 @@ describe("--format github (R5, R5a, R6)", () => {
         fetch_failed: false,
       });
       const review = github.state.reviews[1]!;
-      expect(review.body.split("\n")[1]).toMatch(/; no prior record$/);
+      expect(review.body).toContain("- No prior record");
       // It dedupes against the comment fingerprints, resolves no thread, and
       // carries no full finding.
       const fpB = first.posted.findings.find((f) => f.claim === "CLAIM-B")?.fingerprint;
@@ -1296,13 +1296,12 @@ describe("--format github (R5, R5a, R6)", () => {
       const review = github.state.reviews[1]!;
       expect(review.commit_id).toBe(head2);
       expect(parseRunMarker(review.body)).toMatchObject({ head: head2, tier: "fast" });
-      const lines = review.body.split("\n");
-      expect(lines[0]).toContain("**Would approve**");
-      expect(lines[0]).toContain(
+      expect(review.body).toContain("Would approve");
+      expect(review.body).toContain(
         `No new hunks since ${fixture.head.slice(0, 7)}; 1 thread resolved.`,
       );
-      expect(lines[1]).toContain("Blocking: 0");
-      expect(lines[1]).toContain("Coverage: reviewers ran:");
+      expect(review.body).toContain("| 0 | 0 | 0 |");
+      expect(review.body).toContain("- Reviewers ran:");
       expect(review.body).toContain(`Review of changes since ${fixture.head.slice(0, 7)}`);
       expect(github.state.review_comments.filter((c) => c.review_id === review.id)).toEqual([]);
       expect(github.state.check_runs).toHaveLength(2);
@@ -1334,9 +1333,8 @@ describe("--format github (R5, R5a, R6)", () => {
       expect(github.state.reviews).toHaveLength(2);
       const review = github.state.reviews[1]!;
       expect(parseRunMarker(review.body)).toMatchObject({ head: head2, tier: "fast" });
-      const line = review.body.split("\n")[0] ?? "";
-      expect(line).toContain("**Would approve**");
-      expect(line).toContain(
+      expect(review.body).toContain("Would approve");
+      expect(review.body).toContain(
         `No new hunks since ${fixture.head.slice(0, 7)}; 1 body finding closed.`,
       );
       // The dropped body finding is not carried.
@@ -1389,7 +1387,7 @@ describe("--format github (R5, R5a, R6)", () => {
     });
     expect(github.state.reviews).toHaveLength(2);
     const body = github.state.reviews[1]?.body ?? "";
-    expect(body.split("\n")[1]).toContain("fresh run: could not fetch eeeeeee");
+    expect(body).toContain("- Fresh run: could not fetch eeeeeee");
     expect(body).not.toContain("Review of changes since");
     // A fresh run posts every severity.
     expect(record?.posted.findings.map((f) => f.claim).sort()).toEqual([

@@ -139,7 +139,7 @@ When someone adds `review:fast` or `review:skip` to a head that has a review, th
 With `--format github`, the run posts in this order:
 
 1. One review with event COMMENT on the head sha. See [The review body](#the-review-body).
-2. One check run named `pr-review` on the head sha. Its status is `completed` and its conclusion is `neutral`. The title is the verdict. The summary holds the counts, a severity line and the coverage line.
+2. One check run named `pr-review` on the head sha. Its status is `completed` and its conclusion is `neutral`. The title is the verdict. The summary holds the number of posted findings, the counts table, the coverage, the candidate findings and the cost.
 3. With `pre_existing: comment`, one issue comment titled "Cleanup opportunities". It holds the marker `<!-- pr-review cleanup -->`. A later run replaces the body of that comment. It updates only a comment by the login of the tool.
 
 A verified pre-existing finding is a true finding about code that the PR did not add, change or aggravate. Its quote must be in the head file. The record lists these findings under `stages.pre_existing`. With `pre_existing: off`, the run posts nothing for them.
@@ -173,11 +173,14 @@ With `--pr`, the description is the sanitized title, a blank line and the saniti
 
 ## The review body
 
-The review body has four parts:
+The review body has these parts, in this order:
 
-- **Line 1.** The marker, then the verdict in bold, then the tier and the tier reason. The verdict is "Would approve", "Would request changes" or "Review incomplete".
-- **Line 2.** The counts of blocking findings, suggestions and nits, and the coverage line. The table output uses the same line.
+- **Line 1.** The marker.
+- **The verdict.** A heading with an icon: "Would approve", "Would request changes" or "Review incomplete".
+- **The tier and the tier reason.**
+- **The counts.** A table of blocking findings, suggestions and nits. When earlier runs hold open blocking findings, a line names how many.
 - **Findings outside the diff.** One entry for each posted finding that does not go inline. An entry holds the severity in bold, the title, the claim, a permalink and a fingerprint marker.
+- **Coverage and cost.** A folded block. It lists the reviewers that ran, each coverage part that is not empty, the number of candidate findings and how many the verifier dropped, the cost and the run time. The table output holds the same coverage parts on one line.
 - **The tool version.**
 
 A finding goes inline when every line of its span is a right-side line of one hunk. The hunk is in the PR diff at the head. An added line and a context line are right-side lines. Any other finding goes in the body.
