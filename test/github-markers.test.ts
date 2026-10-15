@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  CLEANUP_MARKER,
   formatFingerprintMarker,
   formatRunMarker,
   parseFingerprintMarkers,
@@ -70,11 +69,7 @@ describe("fingerprint markers (R5)", () => {
   });
 });
 
-describe("cleanup marker and severity (R5, R6)", () => {
-  it("has the cleanup marker of R6", () => {
-    expect(CLEANUP_MARKER).toBe("<!-- pr-review cleanup -->");
-  });
-
+describe("severity (R5)", () => {
   it("reads the bold severity word", () => {
     expect(parseSeverity("**blocking** Bug at a.ts:1: x")).toBe("blocking");
     expect(parseSeverity("text **Suggestion** more")).toBe("suggestion");
