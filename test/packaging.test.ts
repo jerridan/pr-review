@@ -1005,3 +1005,26 @@ describe("the plugin and the /review command (R11)", () => {
     expect(line).not.toContain("--head");
   });
 });
+
+describe(".github/workflows/pr-review.yml, the consumer workflow of this repo", () => {
+  function readmeSnippet(): string {
+    const readme = readText("README.md");
+    const section = readme.slice(readme.indexOf("### The consumer workflow"));
+    const start = section.indexOf("```yaml\n") + "```yaml\n".length;
+    return section.slice(start, section.indexOf("```", start));
+  }
+
+  it("is the file the README tells a consumer to save", () => {
+    expect(readText(".github/workflows/pr-review.yml")).toBe(readmeSnippet());
+  });
+
+  it("calls the reusable workflow that this repo ships", () => {
+    const file = parse(readText(".github/workflows/pr-review.yml")) as {
+      jobs: Record<string, { uses: string }>;
+    };
+    const uses = Object.values(file.jobs).map((job) => job.uses);
+    expect(uses).toHaveLength(1);
+    const path = uses[0]?.replace(/^jerridan\/pr-review\//, "").split("@")[0] ?? "";
+    expect(existsSync(join(ROOT, path))).toBe(true);
+  });
+});
