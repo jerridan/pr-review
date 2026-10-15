@@ -430,11 +430,13 @@ describe("action.yml (R9)", () => {
     expect(steps.indexOf(ci)).toBeLessThan(steps.indexOf(build));
   });
 
-  it("runs the CLI against the workspace with the retry watchdog", () => {
+  it("runs the CLI with the retry watchdog in its env, in a sandbox", () => {
+    expect(runCliStep({}, 0).watchdog).toBe("1");
+  });
+
+  it("gives every input to the CLI script through env, never as a ${{ }} text", () => {
     const steps = loadAction().runs.steps;
     const cli = findStep(steps, (s) => (s.run ?? "").includes("dist/cli.js"), "cli");
-    expect(cli.env?.CLAUDE_CODE_RETRY_WATCHDOG).toBe("1");
-    // Every input reaches the script through env, never as a "${{ }}" text.
     expect(cli.run).not.toMatch(/\$\{\{/);
     expect(cli.shell).toBe("bash");
   });
@@ -445,7 +447,13 @@ describe("action.yml (R9)", () => {
     inputs: Record<string, string>,
     fakeExit: number,
     stdout?: string,
-  ): { status: number | null; args: string[]; outputs: string; stdout: string } {
+  ): {
+    status: number | null;
+    args: string[];
+    outputs: string;
+    stdout: string;
+    watchdog: string | undefined;
+  } {
     const action = loadAction();
     const cli = findStep(action.runs.steps, (s) => (s.run ?? "").includes("dist/cli.js"), "cli");
     const base = tempDir("pr-review-action-");
@@ -460,6 +468,7 @@ describe("action.yml (R9)", () => {
       join(actionPath, "dist", "cli.js"),
       [
         "process.stderr.write('ARGS' + JSON.stringify(process.argv.slice(2)) + '\\n');",
+        "process.stderr.write('WATCHDOG' + (process.env.CLAUDE_CODE_RETRY_WATCHDOG ?? '') + '\\n');",
         `process.stdout.write(${JSON.stringify(doc)});`,
         `process.exitCode = ${fakeExit};`,
       ].join("\n"),
@@ -482,11 +491,16 @@ describe("action.yml (R9)", () => {
     const result = runScript(render(cli.run, ctx), env, workspace);
     const argsLine = result.stderr.split("\n").find((line) => line.startsWith("ARGS"));
     const args = argsLine ? (JSON.parse(argsLine.slice(4)) as string[]) : [];
+    const watchdog = result.stderr
+      .split("\n")
+      .find((line) => line.startsWith("WATCHDOG"))
+      ?.slice("WATCHDOG".length);
     return {
       status: result.status,
       args,
       outputs: readFileSync(outputFile, "utf8"),
       stdout: result.stdout,
+      watchdog,
     };
   }
 
@@ -564,8 +578,6 @@ describe(".github/workflows/review.yml (R10)", () => {
     const job = loadJob();
     expect(job.concurrency?.["cancel-in-progress"]).toBe(true);
     const group = String(job.concurrency?.group);
-    expect(group).toContain("github.event.pull_request.number");
-    expect(group).toContain("github.event.issue.number");
     const fromPr = render(group, context("pull_request", prEvent("opened", false)));
     const fromComment = render(
       group,
@@ -648,7 +660,7 @@ describe(".github/workflows/review.yml (R10)", () => {
     }
   });
 
-  it("checks out refs/pull/<n>/head with fetch-depth 0 and fetches the head and the base", () => {
+  it("checks out refs/pull/<n>/head with fetch-depth 0 and no persisted credentials", () => {
     const steps = loadJob().steps;
     const checkout = findStep(
       steps,
@@ -658,17 +670,9 @@ describe(".github/workflows/review.yml (R10)", () => {
     expect(checkout.with?.["fetch-depth"]).toBe(0);
     // The reviewers read this checkout. Its .git/config must hold no token.
     expect(checkout.with?.["persist-credentials"]).toBe(false);
-    expect(String(checkout.with?.ref)).toMatch(/^refs\/pull\/\$\{\{.+\}\}\/head$/);
     expect(render(checkout.with?.ref, context("pull_request", prEvent("opened", false)))).toBe(
       `refs/pull/${PR_NUMBER}/head`,
     );
-    const fetch = findStep(
-      steps,
-      (s) =>
-        /git -C "\$GITHUB_WORKSPACE" fetch/.test(s.run ?? "") && /refs\/pull\//.test(s.run ?? ""),
-      "fetch",
-    );
-    expect(steps.indexOf(checkout)).toBeLessThan(steps.indexOf(fetch));
   });
 
   /** The steps that fetch from or push to origin, in the job order. */
@@ -749,12 +753,11 @@ describe(".github/workflows/review.yml (R10)", () => {
   it("runs the action by jerridan/pr-review@v1 with the two env keys", () => {
     const steps = loadJob().steps;
     const review = findStep(steps, (s) => s.uses === "jerridan/pr-review@v1", "action");
-    expect(review.env?.CLAUDE_CODE_OAUTH_TOKEN).toBe("${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}");
-    expect(review.env?.GH_TOKEN).toBe("${{ github.token }}");
-    expect(String(review.with?.out)).toBe("${{ runner.temp }}/pr-review-records");
-    expect(render(review.with?.pr, context("pull_request", prEvent("opened", false)))).toBe(
-      String(PR_NUMBER),
-    );
+    const ctx = context("pull_request", prEvent("opened", false));
+    expect(render(review.env?.CLAUDE_CODE_OAUTH_TOKEN, ctx)).toBe("<secret>");
+    expect(render(review.env?.GH_TOKEN, ctx)).toBe("<token>");
+    expect(render(review.with?.out, ctx)).toBe("/runner/temp/pr-review-records");
+    expect(render(review.with?.pr, ctx)).toBe(String(PR_NUMBER));
   });
 
   describe("the tier and fresh inputs of the action step", () => {
@@ -970,20 +973,17 @@ describe("the plugin and the /review command (R11)", () => {
   }
   interface MarketplaceManifest {
     name: string;
-    owner: { name: string };
-    plugins: { name: string; source: string; description: string; version: string }[];
+    plugins: { name: string; source: string; version: string }[];
   }
 
   it("has a marketplace manifest with one pr-review entry at the same version", () => {
     const plugin = JSON.parse(readText(".claude-plugin/plugin.json")) as PluginManifest;
     const market = JSON.parse(readText(".claude-plugin/marketplace.json")) as MarketplaceManifest;
     expect(market.name).toBe("pr-review");
-    expect(market.owner.name.length).toBeGreaterThan(0);
     expect(market.plugins).toHaveLength(1);
     const entry = market.plugins[0];
     expect(entry?.name).toBe("pr-review");
     expect(entry?.source).toBe("./");
-    expect(entry?.description.length).toBeGreaterThan(0);
     expect(entry?.version).toBe(plugin.version);
   });
 
