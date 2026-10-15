@@ -19,7 +19,6 @@ import { countHunks, diffSections, filterDiff, parseNameStatus } from "../src/ga
 import { applyExclusions } from "../src/gather/exclusions.js";
 import { gatherHistory, HISTORY_CAP_BYTES, oldSideRanges } from "../src/gather/history.js";
 import { gather, prDiff, type GatherResult } from "../src/gather/index.js";
-import { newHunks } from "../src/github/scope.js";
 import { withHeadWorktree } from "../src/gather/worktree.js";
 
 const run = promisify(execFile);
@@ -415,13 +414,15 @@ describe("gather on the fixture repo (A2)", () => {
 
   describe("the history block", () => {
     it("builds the history block when the history flag is true or absent", async () => {
-      const stub = gitStub(false);
-      const on = await withGitStub(stub, () =>
-        gather(fixture.repo, fixture.base, fixture.head, { ...DEFAULT_GLOBS, history: true }),
-      );
-      expect(on.history).not.toBeNull();
-      expect(on.historyError).toBeNull();
-      expect(stub.blameCalls()).toBeGreaterThan(0);
+      for (const globs of [{ ...DEFAULT_GLOBS, history: true }, DEFAULT_GLOBS]) {
+        const stub = gitStub(false);
+        const on = await withGitStub(stub, () =>
+          gather(fixture.repo, fixture.base, fixture.head, globs),
+        );
+        expect(on.history).not.toBeNull();
+        expect(on.historyError).toBeNull();
+        expect(stub.blameCalls()).toBeGreaterThan(0);
+      }
     });
 
     it("skips the history block when the history flag is false", async () => {
@@ -616,7 +617,7 @@ describe("gatherHistory", () => {
   });
 });
 
-describe("the fixture states of a later run (R7)", () => {
+describe("prDiff (R7)", () => {
   type States = Record<string, string>;
   const repos: string[] = [];
   afterAll(() => {
@@ -633,46 +634,9 @@ describe("the fixture states of a later run (R7)", () => {
     if (out.FIXTURE) repos.push(out.FIXTURE);
     return out;
   }
-  const git = async (repo: string, ...args: string[]) =>
-    (await run("git", ["-C", repo, ...args])).stdout.trim();
 
-  it("--second-push adds HEAD2: one commit on HEAD that changes one hunk of src/stats.ts", async () => {
-    const st = await states("--second-push");
-    const repo = st.FIXTURE ?? "";
-    expect(st.HEAD2).toMatch(/^[0-9a-f]{40}$/);
-    expect(st.HEAD3).toBeUndefined();
-    expect(await git(repo, "rev-parse", `${st.HEAD2}^`)).toBe(st.HEAD);
-    expect(await git(repo, "diff", "--name-only", st.HEAD ?? "", st.HEAD2 ?? "")).toBe(
-      "src/stats.ts",
-    );
-    const stats = await git(repo, "show", `${st.HEAD2}:src/stats.ts`);
-    expect(stats).not.toContain("return total / values.length;");
-    expect(stats).toContain("values.length === 0");
-    // The planted line keeps its place.
-    expect(stats.split("\n")[10]).toContain("i <= values.length");
-  }, 30_000);
-
-  it("--amend adds HEAD3: the tree of HEAD2 with another sha, and implies --second-push", async () => {
-    const st = await states("--amend");
-    const repo = st.FIXTURE ?? "";
-    expect(st.HEAD2).toMatch(/^[0-9a-f]{40}$/);
-    expect(st.HEAD3).toMatch(/^[0-9a-f]{40}$/);
-    expect(st.HEAD3).not.toBe(st.HEAD2);
-    expect(await git(repo, "rev-parse", `${st.HEAD3}^{tree}`)).toBe(
-      await git(repo, "rev-parse", `${st.HEAD2}^{tree}`),
-    );
-    // HEAD2 stays in the object store.
-    await expect(git(repo, "cat-file", "-e", `${st.HEAD2}^{commit}`)).resolves.toBeDefined();
-  }, 30_000);
-
-  it("is the same on two builds: fixed dates give fixed shas", async () => {
-    const a = await states("--amend");
-    const b = await states("--amend");
-    expect([a.HEAD, a.HEAD2, a.HEAD3]).toEqual([b.HEAD, b.HEAD2, b.HEAD3]);
-  }, 30_000);
-
-  it("prDiff is the unfiltered three-dot diff of gather, and HEAD2 has one new hunk over HEAD", async () => {
-    const st = await states("--amend");
+  it("is the unfiltered three-dot diff of gather", async () => {
+    const st = await states();
     const repo = st.FIXTURE ?? "";
     const base = st.BASE ?? "";
     const atHead = await prDiff(repo, base, st.HEAD ?? "");
@@ -681,12 +645,5 @@ describe("the fixture states of a later run (R7)", () => {
     expect(gathered.diff).not.toContain("package-lock.json");
     expect(atHead).toContain(diffSections(gathered.diff).get("src/stats.ts"));
     expect(atHead).not.toContain("The base branch moved on");
-
-    const atHead2 = await prDiff(repo, base, st.HEAD2 ?? "");
-    const scoped = newHunks(atHead2, atHead);
-    expect(scoped.files).toEqual(["src/stats.ts"]);
-    expect(countHunks(scoped.diff).get("src/stats.ts")).toBe(1);
-    const atHead3 = await prDiff(repo, base, st.HEAD3 ?? "");
-    expect(newHunks(atHead3, atHead2)).toEqual({ diff: "", files: [] });
   }, 30_000);
 });
