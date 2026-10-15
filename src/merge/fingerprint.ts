@@ -12,11 +12,20 @@ function spanText(f: Finding, headFileText: string | null): string | null {
 }
 
 /**
+ * Give the text that the fingerprint hashes: the span of the finding in the
+ * head file, with each run of whitespace collapsed. When the head file or
+ * the span is missing, the evidence quote takes the place of the span.
+ */
+export function fingerprintSpanText(f: Finding, headFileText: string | null): string {
+  return normalizeWs(spanText(f, headFileText) ?? f.evidence);
+}
+
+/**
  * Give a stable fingerprint. When the head file or the span is missing,
  * the evidence quote takes the place of the span text.
  */
 export function fingerprint(f: Finding, headFileText: string | null): string {
-  const span = normalizeWs(spanText(f, headFileText) ?? f.evidence);
+  const span = fingerprintSpanText(f, headFileText);
   return createHash("sha256")
     .update([f.file, span, f.category].join("\0"))
     .digest("hex")

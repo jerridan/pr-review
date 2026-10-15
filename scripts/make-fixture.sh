@@ -12,18 +12,29 @@
 # Options, each for the base commit after the fork (the BASE commit):
 #   --pr-review-dir <dir>  copy <dir> to .pr-review/
 #   --claude-md <file>     copy <file> to CLAUDE.md
+# Options for the later states of the head branch:
+#   --second-push          add a second commit on HEAD (HEAD2). It changes
+#                          one hunk of src/stats.ts: line 14 gets a guard
+#                          for an empty list, so the old text of line 14
+#                          is gone.
+#   --amend                amend HEAD2 with a new message only (HEAD3). The
+#                          tree of HEAD3 is the tree of HEAD2. This option
+#                          implies --second-push.
 # With no option, the output does not change.
 #
-# Output lines: FIXTURE=<path>, BASE=<sha>, HEAD=<sha>, PLANTED=<file>:<line>.
+# Output lines: FIXTURE=<path>, BASE=<sha>, HEAD=<sha>, PLANTED=<file>:<line>,
+# and HEAD2=<sha> with --second-push, HEAD3=<sha> with --amend.
 set -euo pipefail
 
 usage() {
-  echo "usage: $0 [--pr-review-dir <dir>] [--claude-md <file>]" >&2
+  echo "usage: $0 [--pr-review-dir <dir>] [--claude-md <file>] [--second-push] [--amend]" >&2
   exit 2
 }
 
 pr_review_dir=""
 claude_md=""
+second_push=""
+amend=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --pr-review-dir)
@@ -37,6 +48,15 @@ while [ "$#" -gt 0 ]; do
       [ -f "$2" ] || { echo "make-fixture: $2 is not a file" >&2; exit 2; }
       claude_md="$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"
       shift 2
+      ;;
+    --second-push)
+      second_push=1
+      shift
+      ;;
+    --amend)
+      second_push=1
+      amend=1
+      shift
       ;;
     *)
       usage
@@ -148,6 +168,35 @@ git add -A
 git commit --quiet -m "Head: add average, move format helpers, bump lockfile, add CI"
 head_sha="$(git rev-parse HEAD)"
 
+head2_sha=""
+head3_sha=""
+if [ -n "$second_push" ]; then
+  # Write the whole file, so the result does not depend on a sed variant.
+  cat > src/stats.ts <<'TS'
+export function sum(values: number[]): number {
+  let total = 0;
+  for (let i = 0; i < values.length; i++) {
+    total += values[i];
+  }
+  return total;
+}
+
+export function average(values: number[]): number {
+  let total = 0;
+  for (let i = 0; i <= values.length; i++) {
+    total += values[i];
+  }
+  return values.length === 0 ? 0 : total / values.length;
+}
+TS
+  git commit --quiet -am "Head 2: return 0 for an empty list"
+  head2_sha="$(git rev-parse HEAD)"
+fi
+if [ -n "$amend" ]; then
+  git commit --quiet --amend -m "Head 2: return 0 for an empty list in average"
+  head3_sha="$(git rev-parse HEAD)"
+fi
+
 git checkout --quiet main
 cat >> README.md <<'MD'
 
@@ -177,3 +226,5 @@ echo "FIXTURE=$repo"
 echo "BASE=$base_sha"
 echo "HEAD=$head_sha"
 echo "PLANTED=src/stats.ts:$planted_line"
+if [ -n "$head2_sha" ]; then echo "HEAD2=$head2_sha"; fi
+if [ -n "$head3_sha" ]; then echo "HEAD3=$head3_sha"; fi

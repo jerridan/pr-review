@@ -1,18 +1,6 @@
 # Tickets
 
-Work that remains after D1, the local walking skeleton, and D2, the full reviewer set and repo configuration. Each ticket is one deliverable: one branch, one PR. The design is `docs/design/high-level-design.md`; section numbers below refer to it.
-
-## D3: GitHub review posting and CI packaging
-
-Goal: the tool runs in CI and posts one review per run, as section 3.7 and 3.9 describe.
-
-- `--format github` with `--pr <n>`: one pull request review with event COMMENT, a short body with the verdict and the coverage line, inline comments on diff lines, findings outside the diff in the body with full-SHA permalinks, a neutral check run with the counts.
-- Later runs: scope to the diff since the last reviewed head from the merge base, severity floor blocking, re-verify open threads and resolve the ones that no longer hold, never repost a dismissed fingerprint (section 7). Verdict recomputed from all open blocking findings. A push with no changed hunks posts nothing.
-- Overrides: labels `review:full`, `review:fast`, `review:skip` and the comment `@pr-review full`.
-- Records: upload as a workflow artifact and push to a `pr-review-records` branch.
-- Packaging (section 9.2): a composite action that runs from source, a reusable workflow that wraps it with the trigger list, permissions, comment filter and fork gate, and the Actions setting that lets your other repos use it. A Claude Code `/review` command in your plugin marketplace that calls the CLI.
-- Sanitize PR title and body (HTML comments, invisible characters) before they enter a prompt.
-- Acceptance: the second half of the charter criterion. On a PR in a repo you own, the command posts exactly one review whose body states the verdict.
+Work that remains after D1, the local walking skeleton, D2, the full reviewer set and repo configuration, and D3, the GitHub review posting and CI packaging. Each ticket is one deliverable: one branch, one PR. The design is `docs/design/high-level-design.md`; section numbers below refer to it.
 
 ## D4: Evaluation harness
 
@@ -29,12 +17,23 @@ Goal: measure a change to a prompt, a threshold or a model before it ships (sect
 - The verifier prompt and the merge prompt have not been tuned on real findings. Review them against the first ten records.
 - `pr-review smoke` uses Sonnet 5.5; consider Haiku 5.5 to make the check cheaper.
 - The fixture's head commit touches `.github/workflows/`, so every acceptance run takes the full tier by the sensitive floor. Add a second fixture without a sensitive path to exercise triage.
-- The default record directory `./pr-review-records` sits inside the repo under review (skeptical review nit, declined for D1); D3 moves records to workflow artifacts and a branch.
 - The verifier message numbers every line and the quote check strips the prefixes back off; an alternative is to ask for quotes by line span and compare against the span text, to be measured in D4.
 - The acceptance run on 2026-10-13 cost about $0.61 for one reviewer pass and one verification on a 2-file fixture. Track this per run in D4.
 - `docs/research/passes-recall.md` holds the first run of `scripts/measure-passes.sh`: both arms found the one planted bug in every run, so the fixture cannot separate one pass from two. Repeat it in the D4 harness on a harder case set, and set the diff-bugs `passes` default from that.
-- The skip fields and `pre_existing` in `.pr-review/config.yaml` are parsed and recorded but not applied; D3 applies them when it has the PR metadata.
 - Cross-pass dedupe keys on the fingerprint (file, span text, category), so a second pass that reports a different claim on the same span and category never reaches the verifier. Measure how often this happens in the D4 harness before changing the key.
 - When the history block fails to build, the history reviewer still runs with the no-history text and the verdict is unchanged. Skip the reviewer instead and list it under `reviewers_skipped` with a reason, or make the verdict `incomplete`.
 - Suppressions apply after verification, so a suppressed finding still costs one or two verifier calls. Check the rule in `onFinding` before verification and record the finding as suppressed without a query; design section 3.6 moves accordingly.
 - The defaults for the caps, the verify threshold and the band are stated both in `RepoConfigSchema` and in `DEFAULT_CAPS`, `DEFAULT_VERIFY_CONFIG` and `DEFAULT_BAND`. Keep one source.
+
+## Smaller follow-ups found during D3
+
+- The workflow uploads `pr-<n>/` of the records branch as the artifact, so the artifact holds every record of the pull request. Upload the new file alone when that grows too large.
+- `viewerLogin` reads the GraphQL `viewer` field. Under the Actions token the run uses `github-actions[bot]` and never calls it, so the call is untested against an installation token. Check it once with a real token before a local bot login depends on it.
+- A later run posts nothing when the pull request has no new hunk, also with `--tier` or a label. Only `--fresh`, the `@pr-review full` comment or the `review:full` label event starts a new review. Decide whether `--tier full` on a reviewed head should force a fresh run too.
+- A thread whose span text changed is resolved without a verifier call. D4 measures whether a verifier re-run on the new span posts fewer wrong resolutions.
+- The GitHub text sanitizer caps at 20000 characters and removes HTML comments and format characters. Measure in D4 whether a prompt injection in a PR body still reaches a reviewer through the untrusted wrapper.
+- A later run with no new hunk that resolved a stale thread posts a short review and writes a record with `identity.triage: null`, so the next run has no prior triage tier from that record. Carry the prior triage tier into that record, or read it from the record before it.
+- Triage runs on the whole diff also when `--tier` or a label fixes the tier, for the categories of the brief. On a large pull request that query can reach its budget. Skip triage under an override, or raise its budget.
+- A direct use of `action.yml` with a token other than the job token is unsupported: the viewer login is fixed to `github-actions[bot]` under GITHUB_ACTIONS. Read the login from the token instead.
+- A reviewer subprocess runs with the head checkout as its cwd and `CLAUDE_CODE_OAUTH_TOKEN` in its env. The workspace keeps no git token now (`persist-credentials: false`). Whether `Read(./**)` follows a symlink out of the checkout is still unverified; add a test that no reviewer subprocess can reach `CLAUDE_CODE_OAUTH_TOKEN` through a symlink.
+- A later run resolves a stale thread before it replies. When the reply then fails, the next run reads the thread as resolved by a person and marks the fingerprint dismissed. Record the resolved thread ids in the record and read them back, so a failed reply does not change the meaning of a resolve.

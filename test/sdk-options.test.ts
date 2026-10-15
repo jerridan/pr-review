@@ -224,6 +224,23 @@ describe("A13: query options for every role", () => {
     expect(env.CLAUDE_CODE_DISABLE_AUTO_MEMORY).toBe("1");
   });
 
+  it("removes GH_TOKEN and GITHUB_TOKEN from the SDK env, with or without allowApiKey", () => {
+    for (const allowApiKey of [true, false]) {
+      const options = runOptions(allowApiKey);
+      options.env.GH_TOKEN = "x";
+      options.env.GITHUB_TOKEN = "x";
+      options.env.UNRELATED_VAR = "keep";
+      const env = buildQueryOptions(request("reviewer"), options).env as Record<
+        string,
+        string | undefined
+      >;
+      expect(env, String(allowApiKey)).not.toHaveProperty("GH_TOKEN");
+      expect(env, String(allowApiKey)).not.toHaveProperty("GITHUB_TOKEN");
+      expect(env.UNRELATED_VAR).toBe("keep");
+      expect(env.PATH).toBe("/usr/bin:/bin");
+    }
+  });
+
   it("does not change the caller's env", () => {
     const options = runOptions(false);
     buildQueryOptions(request("reviewer"), options);

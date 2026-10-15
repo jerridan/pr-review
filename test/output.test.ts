@@ -28,6 +28,7 @@ function posted(
   return {
     ...finding,
     fingerprint: "0123456789abcdef",
+    span_text: "e",
     severity,
     score,
     verifier: {
@@ -56,6 +57,9 @@ function record(
     identity: {
       repo: "/repo",
       pr: null,
+      github: null,
+      run_kind: "first",
+      prior: null,
       base: "a".repeat(40),
       head: "b".repeat(40),
       started_at: "2026-10-13T12:00:00.000Z",
@@ -63,6 +67,7 @@ function record(
       config_hash: null,
       config: { files: [], values: DEFAULT_REPO_CONFIG, custom_reviewers: [] },
       description: "Fix the loop bound.",
+      description_meta: { source: "commits", sanitized: false, truncated: false },
       history: { built: true, truncated: false },
       injected: [{ path: "CLAUDE.md", truncated: false }],
       changed_files: [{ path: "src/stats.ts", hunks: 1 }],
@@ -89,7 +94,14 @@ function record(
         smoke: { model: "claude-sonnet-5-5", effort: "low" },
       },
     },
-    stages: { reviewers: [], verifications: [], merges: [], capped: [], suppressed: [] },
+    stages: {
+      reviewers: [],
+      verifications: [],
+      merges: [],
+      capped: [],
+      suppressed: [],
+      pre_existing: [],
+    },
     posted: {
       verdict: findings.some((f) => f.severity === "blocking")
         ? "would request changes"
@@ -103,6 +115,10 @@ function record(
         findings_dropped_by_failed_verifier: 0,
       },
       findings,
+      github: null,
+      below_floor: [],
+      not_reposted: [],
+      carried: [],
       ...overrides,
     },
     cost: {
@@ -127,6 +143,45 @@ const WITH_FINDINGS = record([
   posted("src/format.ts", 3, 7, "suggestion", 84, "The percent rounds before it divides."),
   posted("src/a-very/long/path/name.ts", 120, 120, "nit", 81, "The name hides the unit."),
 ]);
+
+describe("the coverage line of a later run (R7)", () => {
+  const prior = {
+    head: "e".repeat(40),
+    source: "marker" as const,
+    record: null,
+    open: [],
+    dismissed: [],
+    fetch_failed: false,
+  };
+  const coverageLine = (r: RunRecord) =>
+    formatTable(r)
+      .split("\n")
+      .find((l) => l.startsWith("Coverage:")) ?? "";
+
+  it("says no prior record when the prior state came from the markers", () => {
+    const base = record([]);
+    const r = { ...base, identity: { ...base.identity, run_kind: "later" as const, prior } };
+    expect(coverageLine(r)).toMatch(/; no prior record$/);
+  });
+
+  it("says a fresh run could not fetch H0", () => {
+    const base = record([]);
+    const r = {
+      ...base,
+      identity: {
+        ...base.identity,
+        run_kind: "fresh" as const,
+        prior: { ...prior, source: "record" as const, record: "/x.json", fetch_failed: true },
+      },
+    };
+    expect(coverageLine(r)).toMatch(/; fresh run: could not fetch eeeeeee$/);
+    expect(coverageLine(r)).not.toContain("no prior record");
+  });
+
+  it("adds nothing for a first run", () => {
+    expect(coverageLine(record([]))).not.toMatch(/prior record|fresh run/);
+  });
+});
 
 describe("table output (A10)", () => {
   it("matches the snapshot for a run with findings", () => {

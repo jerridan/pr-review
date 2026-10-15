@@ -74,6 +74,7 @@ const GATHERED: GatherResult = {
   totalHunks: 1,
   mergeBase: "c".repeat(40),
   description: "DESC-adds-average",
+  descriptionMeta: { sanitized: false, truncated: false },
   history: { text: "HISTORY-blame-and-log", truncated: false },
 };
 

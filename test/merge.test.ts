@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { DEFAULT_REPO_CONFIG, type Suppression } from "../src/config/repo-config.js";
 import { applyCap, DEFAULT_CAPS, nonBlockingCap } from "../src/merge/cap.js";
-import { fingerprint } from "../src/merge/fingerprint.js";
+import { fingerprint, fingerprintSpanText } from "../src/merge/fingerprint.js";
 import { groupFindings, mergeFindings } from "../src/merge/index.js";
 import { applySuppressions } from "../src/merge/suppress.js";
 import { loadPrompt } from "../src/prompts/load.js";
@@ -140,9 +140,24 @@ describe("mergeFindings (A7)", () => {
         severity: "suggestion",
         score: 90,
         verifier: result(90, "suggestion"),
+        span_text: fingerprintSpanText(f, FILE_TEXT),
       },
     ]);
     expect(out.merges).toEqual([]);
+  });
+
+  it("gives each posted finding the normalized span text that the fingerprint hashes (R8)", async () => {
+    const f = finding(3, 4);
+    const out = await mergeFindings(
+      noMergeClient(),
+      OPTIONS,
+      [{ finding: f, result: result(90, "blocking") }],
+      ctx(),
+    );
+    expect(out.posted[0]?.span_text).toBe("const line3 = 3; const line4 = 4;");
+    expect(fingerprintSpanText(f, FILE_TEXT)).toBe("const line3 = 3; const line4 = 4;");
+    // With no head file, the evidence takes the place of the span.
+    expect(fingerprintSpanText({ ...f, evidence: "  a\n  b " }, null)).toBe("a b");
   });
 
   it("merges a group into its highest-scoring member, with the new wording", async () => {
@@ -419,7 +434,14 @@ describe("cap", () => {
 
   function posted(severity: Severity, score: number, n: number): PostedFinding {
     const f = finding(n, n);
-    return { ...f, fingerprint: `fp${n}`, severity, score, verifier: result(score, severity) };
+    return {
+      ...f,
+      fingerprint: `fp${n}`,
+      severity,
+      score,
+      verifier: result(score, severity),
+      span_text: "s",
+    };
   }
 
   it("fills suggestions before nits", () => {

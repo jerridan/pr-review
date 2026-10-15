@@ -56,6 +56,7 @@ const GATHERED: GatherResult = {
   totalHunks: 1,
   mergeBase: "c".repeat(40),
   description: "",
+  descriptionMeta: { sanitized: false, truncated: false },
   history: null,
 };
 
@@ -87,7 +88,14 @@ function vresult(score: number, severity: Severity = "blocking"): VerifierResult
 }
 
 function posted(severity: Severity): PostedFinding {
-  return { ...finding(1), fingerprint: "fp", severity, score: 90, verifier: vresult(90, severity) };
+  return {
+    ...finding(1),
+    fingerprint: "fp",
+    severity,
+    score: 90,
+    verifier: vresult(90, severity),
+    span_text: "s",
+  };
 }
 
 function run(name: string, status: "ok" | "failed", pass = 1, failure?: QueryFailure): ReviewerRun {
@@ -103,6 +111,29 @@ function run(name: string, status: "ok" | "failed", pass = 1, failure?: QueryFai
 }
 
 const thrown: QueryFailure = { kind: "thrown", message: "x" };
+
+describe("decideVerdict with open blocking findings of earlier runs (R7)", () => {
+  const base = {
+    tier: "full" as const,
+    reviewerRuns: [run("diff-bugs", "ok")],
+    verifierFailures: 0,
+    refusals: 0,
+    posted: [] as PostedFinding[],
+  };
+
+  it("requests changes while a blocking thread or body finding is still open", () => {
+    expect(decideVerdict({ ...base, openBlocking: 1 })).toBe("would request changes");
+    expect(decideVerdict({ ...base, openBlocking: 0 })).toBe("would approve");
+    expect(decideVerdict({ ...base, posted: [posted("suggestion")], openBlocking: 0 })).toBe(
+      "would approve",
+    );
+  });
+
+  it("keeps the earlier rules first", () => {
+    expect(decideVerdict({ ...base, openBlocking: 2, verifierFailures: 1 })).toBe("incomplete");
+    expect(decideVerdict({ ...base, openBlocking: 2, tier: "skip" })).toBe("skipped");
+  });
+});
 
 describe("decideVerdict (A8)", () => {
   const base = {
@@ -207,11 +238,23 @@ describe("coverage (A8)", () => {
     const counts = verificationCounts(
       [run("diff-bugs", "ok"), run("security", "failed", 1, refusal)],
       [
-        { first: vresult(90), final: vresult(90), passed: true },
-        { first: thrown, final: null, passed: false },
-        { first: refusal, final: null, passed: false },
-        { first: vresult(70), escalated: thrown, final: vresult(70), passed: false },
-        { first: vresult(70), escalated: refusal, final: vresult(70), passed: false },
+        { first: vresult(90), final: vresult(90), passed: true, pre_existing: false },
+        { first: thrown, final: null, passed: false, pre_existing: false },
+        { first: refusal, final: null, passed: false, pre_existing: false },
+        {
+          first: vresult(70),
+          escalated: thrown,
+          final: vresult(70),
+          passed: false,
+          pre_existing: false,
+        },
+        {
+          first: vresult(70),
+          escalated: refusal,
+          final: vresult(70),
+          passed: false,
+          pre_existing: false,
+        },
       ],
     );
     // A failed or refused escalation drops its finding too.
@@ -229,10 +272,11 @@ describe("coverage (A8)", () => {
       first: vresult(90),
       final: vresult(90),
       passed: false,
+      pre_existing: false,
       rejected: "No quote of the verifier is in the head file of the finding.",
     };
     const counts = verificationCounts(runs, [
-      { first: vresult(90), final: vresult(90), passed: true },
+      { first: vresult(90), final: vresult(90), passed: true, pre_existing: false },
       rejected,
       { ...rejected, first: vresult(70), escalated: vresult(90) },
     ]);
@@ -309,6 +353,7 @@ describe("the query failure rule: each condition and each stage outcome (A8)", (
           sensitive: [],
           brief: out.brief,
           triageFailed: out.failure !== null,
+          skip: DEFAULT_REPO_CONFIG.skip,
         }).tier,
       ).toBe("full");
     });
@@ -354,7 +399,7 @@ describe("the query failure rule: each condition and each stage outcome (A8)", (
           config: DEFAULT_VERIFY_CONFIG,
         },
       );
-      expect(out).toEqual({ first: failure, final: null, passed: false });
+      expect(out).toEqual({ first: failure, final: null, passed: false, pre_existing: false });
       const counts = verificationCounts([run("diff-bugs", "ok")], [out]);
       expect(counts.droppedByFailedVerifier).toBe(1);
       expect(
@@ -387,6 +432,7 @@ describe("the query failure rule: each condition and each stage outcome (A8)", (
         escalated: failure,
         final: null,
         passed: false,
+        pre_existing: false,
       });
       const runs = [run("diff-bugs", "ok")];
       const counts = verificationCounts(runs, [out]);

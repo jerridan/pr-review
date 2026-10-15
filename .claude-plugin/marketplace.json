@@ -1,0 +1,14 @@
+{
+  "name": "pr-review",
+  "owner": {
+    "name": "Jerridan Quiring"
+  },
+  "plugins": [
+    {
+      "name": "pr-review",
+      "source": "./",
+      "description": "The /review command. It reviews the current branch with the pr-review CLI and shows the findings as a table.",
+      "version": "0.1.0"
+    }
+  ]
+}

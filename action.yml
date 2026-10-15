@@ -1,0 +1,96 @@
+# The pr-review composite action. It builds the CLI from this repo and
+# reviews one pull request of the repo in the workspace.
+#
+# The action reads no secret. The caller sets CLAUDE_CODE_OAUTH_TOKEN and
+# GH_TOKEN in the env of the step that uses this action. GH_TOKEN must be
+# the job token: the run reads the state of earlier runs as the login
+# github-actions[bot], so another token finds no earlier review.
+name: pr-review
+description: Review a pull request with Claude agents and post the review to GitHub.
+author: Jerridan Quiring
+
+inputs:
+  pr:
+    description: The number of the pull request to review.
+    required: true
+  tier:
+    description: The tier, full, fast or skip. When empty, the CLI selects the tier.
+    required: false
+    default: ""
+  fresh:
+    description: When true, review the whole pull request again as a first run.
+    required: false
+    default: "false"
+  out:
+    description: The record directory. A relative path starts at the workspace.
+    required: false
+    default: pr-review-records
+  allow-api-key:
+    description: When true, keep ANTHROPIC_API_KEY in the environment of the SDK.
+    required: false
+    default: "false"
+
+outputs:
+  record:
+    description: The path of the run record.
+    value: ${{ steps.review.outputs.record }}
+  verdict:
+    description: The verdict of the review.
+    value: ${{ steps.review.outputs.verdict }}
+
+runs:
+  using: composite
+  steps:
+    # No npm cache: a cache-dependency-path outside the workspace fails, and hashFiles() has the same limit.
+    - name: Set up Node 20
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+
+    # Install and build in the action path. Never install or build in the
+    # workspace: the workspace is the repo under review, and it is data.
+    - name: Install the dependencies of pr-review
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: npm ci
+
+    - name: Build pr-review
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: npm run build
+
+    # The inputs go to the script through env, never as text in the script.
+    # The step keeps the exit code of the CLI. It writes the outputs before
+    # it exits, so the outputs are also set when the review cannot post.
+    - name: Review the pull request
+      id: review
+      shell: bash
+      env:
+        CLAUDE_CODE_RETRY_WATCHDOG: "1"
+        INPUT_PR: ${{ inputs.pr }}
+        INPUT_TIER: ${{ inputs.tier }}
+        INPUT_FRESH: ${{ inputs.fresh }}
+        INPUT_OUT: ${{ inputs.out }}
+        INPUT_ALLOW_API_KEY: ${{ inputs.allow-api-key }}
+      run: |
+        args=(run --format github --pr "$INPUT_PR" --repo "$GITHUB_WORKSPACE" --out "$INPUT_OUT")
+        if [ -n "$INPUT_TIER" ]; then args+=(--tier "$INPUT_TIER"); fi
+        if [ "$INPUT_FRESH" = "true" ]; then args+=(--fresh); fi
+        if [ "$INPUT_ALLOW_API_KEY" = "true" ]; then args+=(--allow-api-key); fi
+        stdout_file="$RUNNER_TEMP/pr-review-stdout-$$.json"
+        status=0
+        node "$GITHUB_ACTION_PATH/dist/cli.js" "${args[@]}" > "$stdout_file" || status=$?
+        cat "$stdout_file"
+        node --input-type=module -e '
+          import { appendFileSync, readFileSync } from "node:fs";
+          const [file, target] = process.argv.slice(1);
+          try {
+            const doc = JSON.parse(readFileSync(file, "utf8"));
+            const record = doc.record_path ?? "";
+            const verdict = doc.verdict ?? "";
+            appendFileSync(target, `record=${record}\nverdict=${verdict}\n`);
+          } catch (err) {
+            process.stderr.write(`pr-review: stdout holds no JSON document: ${err.message}\n`);
+          }
+        ' "$stdout_file" "$GITHUB_OUTPUT"
+        exit "$status"

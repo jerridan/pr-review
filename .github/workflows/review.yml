@@ -1,0 +1,209 @@
+# The pr-review reusable workflow. A consumer repo calls it with
+# "secrets: inherit". The consumer holds the trigger list, because GitHub
+# reads "on:" only from the repo of the event.
+#
+# Security rules for this file:
+# - The checkout of the pull request is data. No step runs npm, make, sh or
+#   another script or build from the workspace.
+# - No "run:" command line holds a token.
+# - The checkout keeps no token in the workspace .git/config. The reviewers
+#   read the workspace, so they must find no token there.
+# - The gh credential helper gives git the job token. The helper reads
+#   GH_TOKEN from the env of each git command. Only the steps that fetch or
+#   push get GH_TOKEN. The reviewer subprocesses get no GH_TOKEN.
+# - Event values go to a script through env, never as text in the script.
+name: pr-review
+
+on:
+  workflow_call: {}
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      checks: write
+      # The records push needs contents: write.
+      contents: write
+    # A job that the "if" below skips does not enter this group, so a comment without the trigger text cannot cancel a review.
+    concurrency:
+      group: pr-review-${{ github.event.pull_request.number || github.event.issue.number }}
+      cancel-in-progress: true
+    # The gate, with the fork gate in the same expression:
+    # - A pull_request event runs when the head is not a fork. A label event
+    #   runs only for a label that starts with "review:".
+    # - A pull_request_target event runs only for a "labeled" event with a
+    #   "review:" label. For a fork, the label must be review:full or
+    #   review:fast. Only a user with triage permission or more can add a
+    #   label, so the event needs no association check.
+    # - An issue_comment event runs when the issue is a pull request, the
+    #   body holds "@pr-review full", and the author is an owner, a member or
+    #   a collaborator.
+    if: >-
+      (github.event_name == 'pull_request'
+        && !github.event.pull_request.head.repo.fork
+        && (!github.event.label
+          || (github.event.action == 'labeled'
+            && startsWith(github.event.label.name, 'review:'))))
+      || (github.event_name == 'pull_request_target'
+        && github.event.action == 'labeled'
+        && startsWith(github.event.label.name, 'review:')
+        && (!github.event.pull_request.head.repo.fork
+          || github.event.label.name == 'review:full'
+          || github.event.label.name == 'review:fast'))
+      || (github.event_name == 'issue_comment'
+        && github.event.issue.pull_request
+        && contains(github.event.comment.body, '@pr-review full')
+        && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'),
+          github.event.comment.author_association))
+    steps:
+      - name: Read the pull request number
+        id: pr
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+        run: |
+          case "$PR_NUMBER" in
+            '' | *[!0-9]*)
+              echo "The event holds no pull request number." >&2
+              exit 1
+              ;;
+          esac
+          echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Check out the pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ steps.pr.outputs.number }}/head
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Set the gh credential helper in the global git configuration. This
+      # step writes no token to a file. Skip it when GH_TOKEN is not set.
+      - name: Give git the gh credential helper
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -n "${GH_TOKEN:-}" ]; then
+            gh auth setup-git
+          fi
+
+      # Make the head sha and the base sha present on every event. An
+      # issue_comment event names no base branch, so that event fetches
+      # every branch.
+      - name: Fetch the pull request head and the base branch
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git -C "$GITHUB_WORKSPACE" fetch --no-tags origin \
+            "+refs/pull/${PR_NUMBER}/head:refs/remotes/origin/pr/${PR_NUMBER}"
+          if [ -n "$BASE_REF" ]; then
+            git -C "$GITHUB_WORKSPACE" fetch --no-tags origin \
+              "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+          else
+            git -C "$GITHUB_WORKSPACE" fetch --no-tags origin \
+              "+refs/heads/*:refs/remotes/origin/*"
+          fi
+
+      # Put the records branch at the record directory, outside the
+      # workspace, so the prior records are present. When the branch is
+      # absent, start an empty orphan branch there.
+      - name: Check out the records branch
+        id: records
+        env:
+          RECORDS_DIR: ${{ runner.temp }}/pr-review-records
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          found=0
+          git -C "$GITHUB_WORKSPACE" ls-remote --exit-code --heads origin pr-review-records \
+            > /dev/null || found=$?
+          if [ "$found" -eq 0 ]; then
+            git -C "$GITHUB_WORKSPACE" fetch --no-tags origin \
+              "+refs/heads/pr-review-records:refs/remotes/origin/pr-review-records"
+            git -C "$GITHUB_WORKSPACE" worktree add -B pr-review-records \
+              "$RECORDS_DIR" origin/pr-review-records
+          elif [ "$found" -eq 2 ]; then
+            echo "The pr-review-records branch is absent. Start it as an orphan branch."
+            git -C "$GITHUB_WORKSPACE" worktree add --detach "$RECORDS_DIR"
+            git -C "$RECORDS_DIR" checkout -q --orphan pr-review-records
+            git -C "$RECORDS_DIR" rm -rfq --ignore-unmatch .
+          else
+            echo "Cannot read the branches of origin." >&2
+            exit "$found"
+          fi
+
+      - name: Review the pull request
+        id: review
+        uses: jerridan/pr-review@v1
+        with:
+          pr: ${{ steps.pr.outputs.number }}
+          out: ${{ runner.temp }}/pr-review-records
+          # The comment gives tier full. A label event gives the tier of
+          # its label. Other events give no tier, and the CLI selects it.
+          tier: >-
+            ${{ github.event_name == 'issue_comment' && 'full'
+            || github.event.action == 'labeled' && github.event.label.name == 'review:full' && 'full'
+            || github.event.action == 'labeled' && github.event.label.name == 'review:fast' && 'fast'
+            || github.event.action == 'labeled' && github.event.label.name == 'review:skip' && 'skip'
+            || '' }}
+          # The comment and the event that adds review:full give a fresh run.
+          fresh: >-
+            ${{ github.event_name == 'issue_comment'
+            || (github.event.action == 'labeled' && github.event.label.name == 'review:full') }}
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+
+      # Upload the records of this pull request only, from pr-<n>/ in the
+      # records worktree. Do this also after a failed run.
+      - name: Upload the record
+        if: always() && steps.pr.outputs.number != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-review-record-${{ steps.pr.outputs.number }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/pr-review-records/pr-${{ steps.pr.outputs.number }}
+          if-no-files-found: warn
+
+      # Commit the new files in pr-<n>/ and push them, also after a failed
+      # run. On a non-fast-forward refusal, fetch, rebase and push again, up
+      # to 3 times.
+      - name: Commit and push the new records
+        if: always() && steps.records.outcome == 'success'
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          RECORDS_DIR: ${{ runner.temp }}/pr-review-records
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          dir="pr-${PR_NUMBER}"
+          if [ ! -d "$RECORDS_DIR/$dir" ]; then
+            echo "There is no record directory. Skip the commit and the push."
+            exit 0
+          fi
+          git -C "$RECORDS_DIR" add -- "$dir"
+          if git -C "$RECORDS_DIR" diff --cached --quiet; then
+            echo "There is no new record. Skip the commit and the push."
+            exit 0
+          fi
+          bot=(-c "user.name=github-actions[bot]"
+            -c "user.email=41898282+github-actions[bot]@users.noreply.github.com")
+          git -C "$RECORDS_DIR" "${bot[@]}" commit -q \
+            -m "Add the pr-review record of pull request ${PR_NUMBER}"
+          retries=0
+          while ! output=$(git -C "$RECORDS_DIR" push origin HEAD:refs/heads/pr-review-records 2>&1); do
+            echo "$output" >&2
+            case "$output" in
+              *"[rejected]"* | *non-fast-forward* | *"fetch first"*) ;;
+              *) exit 1 ;;
+            esac
+            if [ "$retries" -ge 3 ]; then
+              echo "The push failed after 3 retries." >&2
+              exit 1
+            fi
+            retries=$((retries + 1))
+            echo "Another run pushed first. Fetch, rebase and push again (retry $retries of 3)."
+            git -C "$RECORDS_DIR" fetch --no-tags origin \
+              "+refs/heads/pr-review-records:refs/remotes/origin/pr-review-records"
+            git -C "$RECORDS_DIR" "${bot[@]}" rebase -q origin/pr-review-records
+          done
+          echo "$output"

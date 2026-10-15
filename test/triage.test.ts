@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_REPO_CONFIG, type RepoConfig } from "../src/config/repo-config.js";
 import type { GatherResult } from "../src/gather/index.js";
 import { loadPrompt } from "../src/prompts/load.js";
 import type { TriageBrief } from "../src/schemas/triage.js";
@@ -28,7 +29,20 @@ function brief(overrides: Partial<TriageBrief> = {}): TriageBrief {
 type Input = Parameters<typeof decideTier>[0];
 
 function input(overrides: Partial<Input> = {}): Input {
-  return { totalHunks: 3, sensitive: [], brief: brief(), triageFailed: false, ...overrides };
+  return {
+    totalHunks: 3,
+    sensitive: [],
+    brief: brief(),
+    triageFailed: false,
+    skip: DEFAULT_REPO_CONFIG.skip,
+    ...overrides,
+  };
+}
+
+const PR = { draft: false, title: "Add average", author: "alice" };
+
+function skipRules(overrides: Partial<RepoConfig["skip"]> = {}): RepoConfig["skip"] {
+  return { ...DEFAULT_REPO_CONFIG.skip, ...overrides };
 }
 
 describe("decideTier: order of precedence (A3)", () => {
@@ -102,7 +116,161 @@ describe("decideTier: order of precedence (A3)", () => {
   });
 });
 
+describe("decideTier: labels (R4)", () => {
+  it("review:skip gives skip, and triage does not run", () => {
+    const result = decideTier(input({ labels: ["review:skip"], pr: PR }));
+    expect(result.tier).toBe("skip");
+    expect(result.reason).toContain("review:skip");
+    expect(result.triageRan).toBe(false);
+  });
+
+  it("review:fast gives fast, over the sensitive floor", () => {
+    const result = decideTier(
+      input({ labels: ["review:fast"], pr: PR, sensitive: ["src/auth/x.ts"], brief: brief() }),
+    );
+    expect(result.tier).toBe("fast");
+    expect(result.reason).toContain("review:fast");
+    expect(result.triageRan).toBe(true);
+  });
+
+  it("review:full alone gives the tier floor full, over a triage result of skip", () => {
+    const result = decideTier(
+      input({ labels: ["review:full"], pr: PR, brief: brief({ tier: "skip" }) }),
+    );
+    expect(result.tier).toBe("full");
+    expect(result.reason).toContain("review:full");
+    expect(result.reason).toMatch(/floor of full/);
+    expect(result.triageRan).toBe(true);
+  });
+
+  it("takes the first label in the order review:skip, review:fast, review:full", () => {
+    expect(decideTier(input({ labels: ["review:full", "review:skip"], pr: PR })).tier).toBe("skip");
+    expect(decideTier(input({ labels: ["review:full", "review:fast"], pr: PR })).tier).toBe("fast");
+  });
+
+  it("compares labels without regard to case, and ignores other labels", () => {
+    expect(decideTier(input({ labels: ["Review:Skip"], pr: PR })).tier).toBe("skip");
+    const other = decideTier(input({ labels: ["bug", "review"], pr: PR }));
+    expect(other.tier).toBe("fast");
+    expect(other.reason).toMatch(/^Triage:/);
+  });
+});
+
+describe("decideTier: skip rules (R4)", () => {
+  it("skip.draft skips a draft pull request, and names the rule", () => {
+    const result = decideTier(
+      input({ pr: { ...PR, draft: true }, skip: skipRules({ draft: true }) }),
+    );
+    expect(result.tier).toBe("skip");
+    expect(result.reason).toContain("skip.draft");
+    expect(result.triageRan).toBe(false);
+  });
+
+  it("skip.draft does not skip a draft when it is false, nor a ready pull request", () => {
+    expect(decideTier(input({ pr: { ...PR, draft: true } })).tier).toBe("fast");
+    expect(decideTier(input({ pr: PR, skip: skipRules({ draft: true }) })).tier).toBe("fast");
+  });
+
+  it("skip.title_keywords matches the title without regard to case, and names the keyword", () => {
+    const result = decideTier(
+      input({
+        pr: { ...PR, title: "[wip] Add average" },
+        skip: skipRules({ title_keywords: ["nope", "[WIP]"] }),
+      }),
+    );
+    expect(result.tier).toBe("skip");
+    expect(result.reason).toContain("skip.title_keywords");
+    expect(result.reason).toContain("[WIP]");
+    expect(
+      decideTier(input({ pr: PR, skip: skipRules({ title_keywords: ["wip", ""] }) })).tier,
+    ).toBe("fast");
+  });
+
+  it("skip.labels matches a label, and names it", () => {
+    const result = decideTier(
+      input({ labels: ["Dependencies"], pr: PR, skip: skipRules({ labels: ["dependencies"] }) }),
+    );
+    expect(result.tier).toBe("skip");
+    expect(result.reason).toContain("skip.labels");
+    expect(result.reason).toContain("dependencies");
+  });
+
+  it("skip.bot_authors matches the author login only, and names it", () => {
+    const result = decideTier(
+      input({
+        pr: { ...PR, author: "dependabot[bot]" },
+        skip: skipRules({ bot_authors: ["dependabot[bot]"] }),
+      }),
+    );
+    expect(result.tier).toBe("skip");
+    expect(result.reason).toContain("skip.bot_authors");
+    expect(result.reason).toContain("dependabot[bot]");
+    // A title that holds the login is not a match.
+    expect(
+      decideTier(
+        input({
+          pr: { ...PR, title: "dependabot[bot] bumps x" },
+          skip: skipRules({ bot_authors: ["dependabot[bot]"] }),
+        }),
+      ).tier,
+    ).toBe("fast");
+  });
+
+  it("applies the skip rules only with a pull request", () => {
+    const rules = skipRules({ labels: ["x"], title_keywords: ["a"], bot_authors: ["alice"] });
+    expect(decideTier(input({ labels: ["x"], skip: rules })).tier).toBe("fast");
+    expect(decideTier(input({ pr: null, skip: rules })).tier).toBe("fast");
+  });
+});
+
+describe("decideTier: the order of precedence of R4", () => {
+  const draftSkip = skipRules({ draft: true });
+  const draft = { ...PR, draft: true };
+
+  it("1. --tier wins over a label and a skip rule", () => {
+    const result = decideTier(
+      input({ override: "full", labels: ["review:skip"], pr: draft, skip: draftSkip }),
+    );
+    expect(result.tier).toBe("full");
+    expect(result.reason).toMatch(/--tier full/);
+  });
+
+  it("2. a label wins over a skip rule", () => {
+    const result = decideTier(input({ labels: ["review:full"], pr: draft, skip: draftSkip }));
+    expect(result.tier).toBe("full");
+    expect(result.reason).toContain("review:full");
+  });
+
+  it("3. a skip rule wins over zero hunks and over the sensitive floor", () => {
+    const zero = decideTier(input({ totalHunks: 0, pr: draft, skip: draftSkip }));
+    expect(zero.reason).toContain("skip.draft");
+    const sensitive = decideTier(
+      input({ sensitive: ["src/auth/x.ts"], pr: draft, skip: draftSkip }),
+    );
+    expect(sensitive.tier).toBe("skip");
+    expect(sensitive.reason).toContain("skip.draft");
+  });
+
+  it("4. zero hunks still gives skip with a pull request and no rule", () => {
+    const result = decideTier(input({ totalHunks: 0, pr: PR }));
+    expect(result.tier).toBe("skip");
+    expect(result.reason).toMatch(/no hunks/i);
+  });
+});
+
 describe("shouldRunTriage", () => {
+  it("is false when a label or a skip rule gives skip", () => {
+    expect(shouldRunTriage({ totalHunks: 5, labels: ["review:skip"], pr: PR })).toBe(false);
+    expect(
+      shouldRunTriage({
+        totalHunks: 5,
+        pr: { ...PR, draft: true },
+        skip: skipRules({ draft: true }),
+      }),
+    ).toBe(false);
+    expect(shouldRunTriage({ totalHunks: 5, labels: ["review:fast"], pr: PR })).toBe(true);
+  });
+
   it("is false when --tier skip is set", () => {
     expect(shouldRunTriage({ override: "skip", totalHunks: 5 })).toBe(false);
   });
@@ -152,6 +320,7 @@ const GATHERED: GatherResult = {
   totalHunks: 2,
   mergeBase: "c".repeat(40),
   description: "",
+  descriptionMeta: { sanitized: false, truncated: false },
   history: null,
 };
 
@@ -245,5 +414,49 @@ describe("runTriage", () => {
     expect(result.brief).toBeNull();
     expect(result.failure).toEqual({ kind: "thrown", message: "socket closed" });
     expect(result.meta).toBeNull();
+  });
+});
+
+describe("decideTier: the prior triage tier of a later run (R7)", () => {
+  it("keeps the higher prior triage tier, and says so", () => {
+    const result = decideTier(
+      input({ brief: brief({ tier: "fast", reason: "Small change." }), priorTriageTier: "full" }),
+    );
+    expect(result.tier).toBe("full");
+    expect(result.reason).toBe("Triage: Small change. The tier stays full from the prior record.");
+  });
+
+  it("takes this run's triage tier when it is the same or higher", () => {
+    const up = decideTier(input({ brief: brief({ tier: "full" }), priorTriageTier: "fast" }));
+    expect(up.tier).toBe("full");
+    expect(up.reason).not.toContain("prior record");
+    const same = decideTier(input({ brief: brief({ tier: "fast" }), priorTriageTier: "fast" }));
+    expect(same.tier).toBe("fast");
+    expect(same.reason).not.toContain("prior record");
+    const fromSkip = decideTier(input({ brief: brief({ tier: "fast" }), priorTriageTier: "skip" }));
+    expect(fromSkip.tier).toBe("fast");
+    expect(decideTier(input({ brief: brief({ tier: "fast" }), priorTriageTier: null })).tier).toBe(
+      "fast",
+    );
+  });
+
+  it("lets --tier, a label, a skip rule, zero hunks and the sensitive floor win over it", () => {
+    const prior = { priorTriageTier: "full" as const, brief: brief({ tier: "fast" }) };
+    expect(decideTier(input({ ...prior, override: "fast" })).tier).toBe("fast");
+    expect(decideTier(input({ ...prior, labels: ["review:fast"], pr: PR })).tier).toBe("fast");
+    expect(
+      decideTier(input({ ...prior, pr: { ...PR, draft: true }, skip: skipRules({ draft: true }) }))
+        .tier,
+    ).toBe("skip");
+    expect(decideTier(input({ ...prior, totalHunks: 0 })).tier).toBe("skip");
+    const sensitive = decideTier(input({ ...prior, sensitive: ["src/auth/x.ts"] }));
+    expect(sensitive.tier).toBe("full");
+    expect(sensitive.reason).toMatch(/sensitive/i);
+  });
+
+  it("does not lower a triage failure, which gives full", () => {
+    expect(
+      decideTier(input({ brief: null, triageFailed: true, priorTriageTier: "skip" })).tier,
+    ).toBe("full");
   });
 });

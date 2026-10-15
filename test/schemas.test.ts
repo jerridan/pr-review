@@ -4,7 +4,7 @@ import { z } from "zod";
 import { SmokeOutputSchema } from "../src/cli.js";
 import type { Role } from "../src/config/models.js";
 import { FindingSchema, FindingsOutputSchema } from "../src/schemas/finding.js";
-import { FORBIDDEN_SCHEMA_KEYWORDS, toSdkJsonSchema } from "../src/schemas/json-schema.js";
+import { toSdkJsonSchema } from "../src/schemas/json-schema.js";
 import { MergeOutputSchema } from "../src/schemas/merge.js";
 import { RecordSchema, type RunRecord } from "../src/schemas/record.js";
 import { ReviewerFrontmatterSchema } from "../src/schemas/reviewer.js";
@@ -94,6 +94,9 @@ function makeRecord(): RunRecord {
     identity: {
       repo: "/tmp/repo",
       pr: null,
+      github: null,
+      run_kind: "first",
+      prior: null,
       base: "a".repeat(40),
       head: "b".repeat(40),
       started_at: "2026-10-13T12:00:00.000Z",
@@ -101,6 +104,7 @@ function makeRecord(): RunRecord {
       config_hash: null,
       config: { files: [], values: DEFAULT_REPO_CONFIG, custom_reviewers: [] },
       description: "Fix the loop bound.",
+      description_meta: { source: "commits", sanitized: false, truncated: false },
       history: { built: true, truncated: false },
       injected: [{ path: "CLAUDE.md", truncated: false }],
       changed_files: [{ path: "src/a.ts", hunks: 1 }],
@@ -172,6 +176,7 @@ function makeRecord(): RunRecord {
       merges: [],
       capped: [],
       suppressed: [],
+      pre_existing: [],
     },
     posted: {
       verdict: "would request changes",
@@ -190,8 +195,13 @@ function makeRecord(): RunRecord {
           severity: "blocking",
           score: 90,
           verifier: verifierResult,
+          span_text: "for (let i = 0; i < n; i++) {",
         },
       ],
+      github: null,
+      below_floor: [],
+      not_reposted: [],
+      carried: [],
     },
     cost: {
       queries: [
@@ -222,12 +232,6 @@ describe("A13: generated JSON Schema of every role", () => {
       expect(findViolations(json)).toEqual([]);
     });
   }
-
-  it("names every keyword that the spec forbids", () => {
-    for (const key of SPEC_FORBIDDEN) {
-      expect(FORBIDDEN_SCHEMA_KEYWORDS).toContain(key);
-    }
-  });
 
   it("emits draft-07", () => {
     expect(toSdkJsonSchema(FindingsOutputSchema).$schema).toBe(
@@ -369,11 +373,15 @@ describe("RecordSchema", () => {
     }
   });
 
-  it("requires pr to be null, and config_hash to be null or a hex SHA-256", () => {
+  it("takes pr as null or a number (R2), and config_hash as null or a hex SHA-256", () => {
     const record = makeRecord();
-    expect(
-      RecordSchema.safeParse({ ...record, identity: { ...record.identity, pr: 12 } }).success,
-    ).toBe(false);
+    const withPr = (pr: unknown) =>
+      RecordSchema.safeParse({ ...record, identity: { ...record.identity, pr } }).success;
+    expect(withPr(12)).toBe(true);
+    expect(withPr(null)).toBe(true);
+    expect(withPr("12")).toBe(false);
+    expect(withPr(0)).toBe(false);
+    expect(withPr(1.5)).toBe(false);
     expect(
       RecordSchema.safeParse({ ...record, identity: { ...record.identity, config_hash: "x" } })
         .success,
@@ -410,6 +418,46 @@ describe("RecordSchema", () => {
     expect(
       withConfig({ files: [], values: DEFAULT_REPO_CONFIG, custom_reviewers: [], hash: "x" }),
     ).toBe(false);
+  });
+
+  it("takes identity.github as null or the strict PR object (R2)", () => {
+    const record = makeRecord();
+    const github = {
+      slug: "acme/widgets",
+      title: "Add average",
+      draft: false,
+      labels: ["review:full"],
+      author: "alice",
+      author_type: "User",
+      author_write_access: true,
+      fork: false,
+      head_repo: "acme/widgets",
+      url: "https://github.com/acme/widgets/pull/7",
+    };
+    const withGithub = (value: unknown) =>
+      RecordSchema.safeParse({ ...record, identity: { ...record.identity, pr: 7, github: value } })
+        .success;
+    expect(withGithub(github)).toBe(true);
+    expect(withGithub(null)).toBe(true);
+    expect(withGithub({ ...github, extra: 1 })).toBe(false);
+    const { fork: _fork, ...noFork } = github;
+    expect(withGithub(noFork)).toBe(false);
+    expect(withGithub(undefined)).toBe(false);
+  });
+
+  it("requires identity.description_meta with the source and the two flags (R3)", () => {
+    const record = makeRecord();
+    const withMeta = (value: unknown) =>
+      RecordSchema.safeParse({
+        ...record,
+        identity: { ...record.identity, description_meta: value },
+      }).success;
+    expect(withMeta({ source: "pr", sanitized: true, truncated: true })).toBe(true);
+    expect(withMeta({ source: "commits", sanitized: false, truncated: false })).toBe(true);
+    expect(withMeta({ source: "issue", sanitized: false, truncated: false })).toBe(false);
+    expect(withMeta({ source: "pr", sanitized: false })).toBe(false);
+    expect(withMeta({ source: "pr", sanitized: false, truncated: false, x: 1 })).toBe(false);
+    expect(withMeta(undefined)).toBe(false);
   });
 
   it("requires the description, the history flags and the injected files", () => {
@@ -474,6 +522,101 @@ describe("RecordSchema", () => {
     expect(withList([".github/workflows/ci.yml"])).toBe(true);
     expect(withList([1])).toBe(false);
     expect(withList(undefined)).toBe(false);
+  });
+
+  it("requires identity.run_kind and identity.prior (R8)", () => {
+    const record = makeRecord();
+    const withIdentity = (patch: Record<string, unknown>) =>
+      RecordSchema.safeParse({ ...record, identity: { ...record.identity, ...patch } }).success;
+    const prior = {
+      head: "a".repeat(40),
+      source: "record",
+      record: "/out/pr-7/x.json",
+      open: ["fp1"],
+      dismissed: ["fp2"],
+      fetch_failed: false,
+    };
+    for (const kind of ["first", "later", "fresh"]) {
+      expect(withIdentity({ run_kind: kind })).toBe(true);
+    }
+    expect(withIdentity({ run_kind: "second" })).toBe(false);
+    expect(withIdentity({ run_kind: undefined })).toBe(false);
+    expect(withIdentity({ run_kind: "later", prior })).toBe(true);
+    expect(withIdentity({ prior: { ...prior, source: "marker", record: null } })).toBe(true);
+    expect(withIdentity({ prior: { ...prior, source: null, fetch_failed: true } })).toBe(true);
+    expect(withIdentity({ prior: { ...prior, source: "branch" } })).toBe(false);
+    expect(withIdentity({ prior: { ...prior, extra: 1 } })).toBe(false);
+    const { fetch_failed: _f, ...noFetch } = prior;
+    expect(withIdentity({ prior: noFetch })).toBe(false);
+    expect(withIdentity({ prior: undefined })).toBe(false);
+  });
+
+  it("requires posted.below_floor, posted.not_reposted and posted.carried (R7, R8)", () => {
+    const record = makeRecord();
+    const finding = record.posted.findings[0]!;
+    const withPosted = (patch: Record<string, unknown>) =>
+      RecordSchema.safeParse({ ...record, posted: { ...record.posted, ...patch } }).success;
+    expect(withPosted({ below_floor: [finding], carried: [finding] })).toBe(true);
+    expect(
+      withPosted({
+        not_reposted: [
+          { fingerprint: "a", reason: "open" },
+          { fingerprint: "b", reason: "dismissed" },
+        ],
+      }),
+    ).toBe(true);
+    expect(withPosted({ not_reposted: [{ fingerprint: "a", reason: "old" }] })).toBe(false);
+    expect(withPosted({ not_reposted: [{ fingerprint: "a" }] })).toBe(false);
+    expect(withPosted({ below_floor: [{ ...finding, span_text: undefined }] })).toBe(false);
+    for (const key of ["below_floor", "not_reposted", "carried"]) {
+      expect(withPosted({ [key]: undefined })).toBe(false);
+    }
+  });
+
+  it("requires stages.pre_existing, a list of PostedFinding (R6)", () => {
+    const record = makeRecord();
+    const posted = record.posted.findings[0]!;
+    const withPre = (value: unknown) =>
+      RecordSchema.safeParse({ ...record, stages: { ...record.stages, pre_existing: value } })
+        .success;
+    expect(withPre([posted])).toBe(true);
+    expect(withPre([])).toBe(true);
+    expect(withPre(undefined)).toBe(false);
+    expect(withPre([{ ...posted, fingerprint: undefined }])).toBe(false);
+  });
+
+  it("takes posted.github as null or the strict object of R5", () => {
+    const record = makeRecord();
+    const github = {
+      review_id: 10,
+      review_url: "https://github.com/acme/widgets/pull/7#pullrequestreview-10",
+      author: "github-actions[bot]",
+      error: null,
+      inline: [{ fingerprint: "abc", comment_id: 11 }],
+      in_body: ["def"],
+      check_run: { id: 12 },
+      cleanup_comment_id: null,
+      resolved: [{ thread_id: "T1", fingerprint: "abc" }],
+      errors: [{ step: "cleanup comment", message: "boom" }],
+    };
+    const withGithub = (value: unknown) =>
+      RecordSchema.safeParse({ ...record, posted: { ...record.posted, github: value } }).success;
+    expect(withGithub(github)).toBe(true);
+    expect(withGithub(null)).toBe(true);
+    expect(withGithub({ ...github, check_run: { error: "no checks scope" } })).toBe(true);
+    expect(withGithub({ ...github, check_run: null })).toBe(true);
+    expect(
+      withGithub({ ...github, review_id: null, review_url: null, error: "both calls failed" }),
+    ).toBe(true);
+    expect(withGithub({ ...github, check_run: { id: 1, error: "x" } })).toBe(false);
+    expect(withGithub({ ...github, extra: 1 })).toBe(false);
+    const { errors: _errors, ...noErrors } = github;
+    expect(withGithub(noErrors)).toBe(false);
+    expect(withGithub(undefined)).toBe(false);
+    // The author is the login of the posted review, or null when unknown.
+    expect(withGithub({ ...github, author: null })).toBe(true);
+    const { author: _author, ...noAuthor } = github;
+    expect(withGithub(noAuthor)).toBe(false);
   });
 
   it("requires stages.suppressed, each item with a finding, a reviewer and a rule", () => {

@@ -10,13 +10,13 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, isAbsolute, join } from "node:path";
+import { basename, dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DEFAULT_REPO_CONFIG } from "../src/config/repo-config.js";
 import { formatJson } from "../src/output/json.js";
-import { recordFileName, writeRecord } from "../src/record/write.js";
+import { recordFileName, recordRunId, writeRecord } from "../src/record/write.js";
 import { loadBuiltinReviewers } from "../src/reviewers/loader.js";
 import { runReview } from "../src/run.js";
 import type { Finding } from "../src/schemas/finding.js";
@@ -148,6 +148,7 @@ beforeAll(async () => {
     base: fx.base,
     head: fx.head,
     outDir: join(outRoot, "records"),
+    format: "json",
     allowApiKey: false,
     client: fake,
     now: () => new Date("2026-10-13T12:34:56.789Z"),
@@ -171,6 +172,11 @@ describe("the record file (A9)", () => {
     expect(isAbsolute(recordPath)).toBe(true);
   });
 
+  it("gives the run id as the file name of the record without .json", () => {
+    // The run marker on GitHub names the record by this id.
+    expect(basename(recordPath, ".json")).toBe(recordRunId(record));
+  });
+
   it("validates against the record schema, as written", () => {
     const written = JSON.parse(readFileSync(recordPath, "utf8"));
     expect(RecordSchema.safeParse(written).error).toBeUndefined();
@@ -187,7 +193,7 @@ describe("the record file (A9)", () => {
 
   it("is not written when it does not validate", async () => {
     const dir = join(outRoot, "invalid");
-    const broken = { ...record, identity: { ...record.identity, pr: 7 } } as unknown as RunRecord;
+    const broken = { ...record, identity: { ...record.identity, pr: "7" } } as unknown as RunRecord;
     await expect(writeRecord(dir, broken)).rejects.toThrow();
     expect(existsSync(dir) ? readdirSync(dir) : []).toEqual([]);
   });
@@ -198,9 +204,25 @@ describe("the record file (A9)", () => {
     await expect(writeRecord(dir, record)).rejects.toThrow();
   });
 
-  it("has pr and config_hash set to null", () => {
+  it("has no PR state, no config hash and no posted state, and is a first run with no prior state (R5, R6, R8)", () => {
     expect(record.identity.pr).toBeNull();
+    expect(record.identity.github).toBeNull();
     expect(record.identity.config_hash).toBeNull();
+    expect(record.stages.pre_existing).toEqual([]);
+    expect(record.posted.github).toBeNull();
+    expect(record.identity.run_kind).toBe("first");
+    expect(record.identity.prior).toBeNull();
+    expect(record.posted.below_floor).toEqual([]);
+    expect(record.posted.not_reposted).toEqual([]);
+    expect(record.posted.carried).toEqual([]);
+  });
+
+  it("names the commits as the source of the description, not sanitized and not cut (R3)", () => {
+    expect(record.identity.description_meta).toEqual({
+      source: "commits",
+      sanitized: false,
+      truncated: false,
+    });
   });
 
   it("holds the description, the history flags and no injected file (R9)", () => {
@@ -269,6 +291,7 @@ describe("the config hash of a fixture with config (R4)", () => {
       head: configFx.head,
       tierOverride: "fast",
       outDir: join(outRoot, "config-records"),
+      format: "json",
       allowApiKey: false,
       client: fake,
     });
@@ -372,6 +395,7 @@ describe("a sensitive path with no text hunk (R9)", () => {
         base: zeroFx.base,
         head: zeroFx.head,
         outDir: join(outRoot, "zero-records"),
+        format: "json",
         allowApiKey: false,
         client: fake,
       })
@@ -401,6 +425,29 @@ describe("a sensitive path with no text hunk (R9)", () => {
 
   it("lists nothing for the default fixture, whose sensitive path has a hunk", () => {
     expect(record.posted.coverage.sensitive_without_hunks).toEqual([]);
+  });
+});
+
+describe("the record directory of a --pr run (R8)", () => {
+  it("writes a record with a pr number under <out>/pr-<n>/, with the same file name", async () => {
+    const out = join(outRoot, "pr-dir");
+    const withPr = { ...record, identity: { ...record.identity, pr: 12 } };
+    const path = await writeRecord(out, withPr);
+    expect(path).toBe(
+      join(
+        outRoot,
+        "pr-dir",
+        "pr-12",
+        recordFileName(new Date(record.identity.started_at), record.identity.head),
+      ),
+    );
+    expect(existsSync(path)).toBe(true);
+  });
+
+  it("writes a record with no pr number in <out>/", async () => {
+    const out = join(outRoot, "no-pr-dir");
+    const path = await writeRecord(out, record);
+    expect(dirname(path)).toBe(join(outRoot, "no-pr-dir"));
   });
 });
 

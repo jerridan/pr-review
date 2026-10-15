@@ -10,7 +10,8 @@ import type { Verification } from "./verify/index.js";
  * tier; incomplete when a reviewer failed, a verifier call failed, code
  * rejected a verifier result, a reviewer or verifier call was refused, or
  * a reviewer pass did not start because of the token ceiling; would
- * request changes with a blocking finding; else would approve.
+ * request changes with a blocking finding, or with an open blocking
+ * finding of an earlier run; else would approve.
  * "verifierFailures" counts the failed calls and the rejected results.
  * "ceilingSkips" counts the passes that the token ceiling stopped.
  */
@@ -21,6 +22,11 @@ export function decideVerdict(input: {
   refusals: number;
   posted: PostedFinding[];
   ceilingSkips?: number;
+  /**
+   * The open blocking findings of earlier runs: a thread or a body finding
+   * that is still open on a later run (R7). Absent means 0.
+   */
+  openBlocking?: number;
 }): RunRecord["posted"]["verdict"] {
   if (input.tier === "skip") return "skipped";
   const reviewerFailed = input.reviewerRuns.some((run) => run.status === "failed");
@@ -29,6 +35,7 @@ export function decideVerdict(input: {
     return "incomplete";
   }
   if (input.posted.some((p) => p.severity === "blocking")) return "would request changes";
+  if ((input.openBlocking ?? 0) > 0) return "would request changes";
   return "would approve";
 }
 

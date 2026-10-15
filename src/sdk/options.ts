@@ -57,6 +57,15 @@ export const PROVIDER_ENV_VARS: readonly string[] = [
   "CLAUDE_CODE_USE_FOUNDRY",
 ];
 
+/**
+ * GitHub tokens. In CI the workflow sets a write-scoped job token for the
+ * CLI's own "gh" calls. The SDK does not need it, and a reviewer or a
+ * verifier subprocess runs in the PR head checkout. Thus the run always
+ * removes these from the SDK env, also when the user allows an API key.
+ * The CLI process keeps them.
+ */
+export const GITHUB_ENV_VARS: readonly string[] = ["GH_TOKEN", "GITHUB_TOKEN"];
+
 /** The tool that a trusted custom reviewer can get. No other query gets it. */
 const BASH = "Bash";
 
@@ -91,10 +100,12 @@ export function buildQueryOptions(req: QueryRequest, options: RunOptions): Recor
   // The SDK replaces the subprocess environment with "env", so spread the
   // parent environment. An API key, another token or another provider wins
   // over the subscription login, so remove them unless the user allows it.
+  // Always remove the GitHub tokens.
   const env: Record<string, string | undefined> = {
     ...options.env,
     CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1",
   };
+  for (const name of GITHUB_ENV_VARS) delete env[name];
   if (!options.allowApiKey) {
     for (const name of PROVIDER_ENV_VARS) delete env[name];
   }
