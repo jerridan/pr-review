@@ -1,6 +1,6 @@
 // Build the SDK options for one query. This module is pure and does not
 // import the SDK, so tests can check every option without it.
-import { ROLE_DEFAULTS, resolveModel } from "../config/models.js";
+import { resolveModel, roleConfig } from "../config/models.js";
 import { toSdkJsonSchema } from "../schemas/json-schema.js";
 import type { QueryRequest } from "./client.js";
 
@@ -88,7 +88,7 @@ export const ALWAYS_DISALLOWED_TOOLS: readonly string[] = [
  * "fallbackModel" or a thinking option: effort controls thinking.
  */
 export function buildQueryOptions(req: QueryRequest, options: RunOptions): Record<string, unknown> {
-  const role = ROLE_DEFAULTS[req.role];
+  const role = roleConfig(req.role);
   const model = resolveModel(req.overrides?.model ?? role.model);
   const effort = req.overrides?.effort ?? role.effort;
   // A role with no tools gets none. A read-only role gets the read-only

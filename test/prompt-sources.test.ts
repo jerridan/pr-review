@@ -8,7 +8,8 @@ import ts from "typescript";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { DEFAULT_REPO_CONFIG } from "../src/config/repo-config.js";
 import { createProgram } from "../src/cli.js";
-import type { Role } from "../src/config/models.js";
+import type { QueryRole } from "../src/config/models.js";
+import { scoreRecord } from "../src/eval/score.js";
 import { runReviewers } from "../src/find/index.js";
 import type { GatherResult } from "../src/gather/index.js";
 import { loadPrompt, parseFrontmatter } from "../src/prompts/load.js";
@@ -29,6 +30,8 @@ const SRC = join(ROOT, "src");
 const PROMPTS = join(ROOT, "prompts");
 const SCRIPT = join(ROOT, "scripts/make-fixture.sh");
 const LIMIT = 200;
+// A line past the end of the fixture's src/stats.ts, for a golden span.
+const JUDGE_PAST_END = 20;
 
 function listFiles(dir: string, ext: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -218,13 +221,15 @@ describe("A13: every query takes its prompts from the prompt files", () => {
           return out({
             merged: [{ member_index: 0, claim: "merged", explanation: "e", severity: "blocking" }],
           });
+        case "judge":
+          return out({ same_issue: "no", reason: "r" });
         default:
           return out({ ok: true, word: "pong" });
       }
     });
     const outDir = mkdtempSync(join(tmpdir(), "pr-review-sources-"));
     try {
-      await runReview({
+      const { record } = await runReview({
         repo: fixture,
         base: value("BASE"),
         head: value("HEAD"),
@@ -233,6 +238,33 @@ describe("A13: every query takes its prompts from the prompt files", () => {
         allowApiKey: false,
         client: fake,
       });
+      // Score the record against two golden findings near the posted
+      // finding, so the judge gets one query for each. The second golden
+      // span is past the end of the file.
+      expect(record.posted.findings.length).toBeGreaterThan(0);
+      await scoreRecord(
+        record,
+        [
+          {
+            file: file ?? "",
+            start_line: 1,
+            end_line: 1,
+            category: "bug",
+            severity: "nit",
+            claim: "g1",
+          },
+          {
+            file: file ?? "",
+            start_line: JUDGE_PAST_END,
+            end_line: JUDGE_PAST_END,
+            category: "bug",
+            severity: "nit",
+            claim: "g2",
+          },
+        ],
+        fixture,
+        { client: fake, model: "claude-sonnet-5-5", options: { allowApiKey: false, env: {} } },
+      );
       const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
       try {
         await createProgram({ client: fake }).parseAsync(["node", "pr-review", "smoke"]);
@@ -250,14 +282,15 @@ describe("A13: every query takes its prompts from the prompt files", () => {
     if (fixture) rmSync(fixture, { recursive: true, force: true });
   });
 
-  it("covers every role", () => {
-    const roles: Role[] = [
+  it("covers every role, and the judge of the eval", () => {
+    const roles: QueryRole[] = [
       "triage",
       "reviewer",
       "verifier",
       "verifier-escalation",
       "merge",
       "smoke",
+      "judge",
     ];
     expect(new Set(calls.map((c) => c.role))).toEqual(new Set(roles));
   });
@@ -314,6 +347,17 @@ describe("A13: every query takes its prompts from the prompt files", () => {
     }
   });
 
+  it("sends the judge text for a span past the end of the head file from prompts/judge.md", () => {
+    const judges = calls.filter((c) => c.role === "judge");
+    expect(judges).toHaveLength(2);
+    expect(blocks(judges[0]?.userMessage ?? "").get("golden_span")).not.toBe(
+      field("judge.md", "no_span_text").trim(),
+    );
+    expect(blocks(judges[1]?.userMessage ?? "").get("golden_span")).toBe(
+      field("judge.md", "no_span_text").trim(),
+    );
+  });
+
   it("sends a user message that is a prompt-file template with only untrusted blocks put in", () => {
     const { templates } = promptSources();
     for (const call of calls) {
@@ -325,7 +369,12 @@ describe("A13: every query takes its prompts from the prompt files", () => {
 
 // The modules that build a user message. Model-facing text in them must
 // come from a prompt file, also short text that goes inside a block.
-const MESSAGE_BUILDERS = ["src/triage/index.ts", "src/find/index.ts", "src/verify/index.ts"];
+const MESSAGE_BUILDERS = [
+  "src/triage/index.ts",
+  "src/find/index.ts",
+  "src/verify/index.ts",
+  "src/eval/score.ts",
+];
 // Two words, or a word with a colon after it, is text for a reader.
 const PROSE = /[A-Za-z]+ [A-Za-z]+|[A-Za-z]:/;
 

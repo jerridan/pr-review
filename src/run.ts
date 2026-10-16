@@ -3,7 +3,14 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { withRepoGlobs } from "./config/globs.js";
-import { ROLE_DEFAULTS, ROLES, resolveModel, type Effort, type Role } from "./config/models.js";
+import {
+  ROLE_DEFAULTS,
+  ROLES,
+  resolveModel,
+  type Effort,
+  type QueryRole,
+  type Role,
+} from "./config/models.js";
 import {
   loadRepoConfig,
   type ConfigRole,
@@ -172,6 +179,7 @@ const CLIENT_OVERRIDE_ROLES: ReadonlySet<Role> = new Set<Role>([
 // Add the repo config's model and effort for the role of the request.
 // An override that the request sets itself wins.
 function withRoleOverrides(req: QueryRequest, config: RepoConfig): QueryRequest {
+  if (req.role === "judge") return req;
   if (!CLIENT_OVERRIDE_ROLES.has(req.role) || !isConfigRole(req.role)) return req;
   const set = config.models[req.role];
   if (!set || (set.model === undefined && set.effort === undefined)) return req;
@@ -183,6 +191,13 @@ function withRoleOverrides(req: QueryRequest, config: RepoConfig): QueryRequest 
       ...req.overrides,
     },
   };
+}
+
+// Give the run role of a query. The judge is a role of the eval, so a
+// judge query in a run is a bug.
+function runRole(role: QueryRole): Role {
+  if (role === "judge") throw new Error("A run does not make a judge query.");
+  return role;
 }
 
 // Wrap the client so that each query gives one cost entry, also a query
@@ -199,6 +214,7 @@ function recordingClient(
 ): SdkClient {
   return {
     async query<T>(original: QueryRequest, options: RunOptions): Promise<QueryOutcome<T>> {
+      const role = runRole(original.role);
       const req = withRoleOverrides(original, config);
       const start = performance.now();
       let outcome: QueryOutcome<T> | null = null;
@@ -212,9 +228,9 @@ function recordingClient(
         // its semaphore slot is free for the next query.
         counter.tokens += usageTokens(raw?.usage);
         entries.push({
-          role: req.role,
+          role,
           ...(req.reviewerName !== undefined ? { reviewer: req.reviewerName } : {}),
-          model: raw?.model ?? resolveModel(req.overrides?.model ?? ROLE_DEFAULTS[req.role].model),
+          model: raw?.model ?? resolveModel(req.overrides?.model ?? ROLE_DEFAULTS[role].model),
           duration_ms: raw?.durationMs ?? Math.round(performance.now() - start),
           stop_reason: raw?.stopReason ?? null,
           subtype,
