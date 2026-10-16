@@ -173,8 +173,8 @@ describe("postRun: the review (R5)", () => {
     expect(
       input.body.startsWith(`<!-- pr-review run=${RUN_ID} head=${HEAD} base=${BASE} tier=full -->`),
     ).toBe(true);
-    expect(input.body).toContain("**Would request changes**");
-    expect(input.body).toContain("Blocking: 3");
+    expect(input.body).toContain("Would request changes");
+    expect(input.body).toContain("| 3 | 0 | 0 |");
     expect(parseFingerprintMarkers(input.body)).toEqual([OUTSIDE.fingerprint]);
     expect(input.comments).toHaveLength(2);
 
@@ -283,7 +283,7 @@ describe("postRun: the check run (R6)", () => {
         name: "pr-review",
         conclusion: "neutral",
         title: "Would request changes",
-        summary: expect.stringContaining("Blocking: 3"),
+        summary: expect.stringContaining("| 3 | 0 | 0 |"),
       },
     ]);
   });
