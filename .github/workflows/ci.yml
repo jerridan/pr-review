@@ -114,7 +114,7 @@ jobs:
             console.error("eval/cases.json: ref is not a full commit sha.");
             process.exit(1);
           }
-          appendFileSync(process.env.GITHUB_OUTPUT, `repo=${pin.repo}\nref=${pin.ref}\n`);
+          appendFileSync(process.env.GITHUB_OUTPUT, "repo=" + pin.repo + "\nref=" + pin.ref + "\n");
           '
 
       - name: Check out the cases repo
