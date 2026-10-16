@@ -1,0 +1,1944 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 5,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Teach the tests reviewer the five checks of a behaviour test",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/5"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "0114492ff342babf138342b499295af351d385da",
+    "head": "22222498e07e84a3fb33424149c7068189052d6d",
+    "started_at": "2026-10-15T20:17:40.505Z",
+    "tool_version": "0.1.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [60, 85]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Teach the tests reviewer the five checks of a behaviour test\n\nThe tests reviewer at `prompts/reviewers/tests.md` looked for three things: a missing test, a weakened test and a test that passes for the wrong reason. It now also applies the checks from the testing research behind CLAUDE.md rule 2:\n\n- a test that cannot fail when the behaviour breaks,\n- a test that asserts an internal, such as a call count or an argument list between modules of the same repo,\n- a double on a fast and deterministic module of the same repo,\n- a test that restates the code,\n- a test of a double or a fixture for its own sake,\n- a duplicate of a test with a smaller scope,\n- one test that covers several behaviours.\n\nA \"Severity\" section ranks each kind, and \"Do not flag\" excludes a double at an awkward boundary and a test the diff does not touch. The frontmatter is unchanged.\n\nThe change is prose in a prompt file, so no test is added. The reviewer loader tests still read the frontmatter. The full suite, lint, typecheck and build pass.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01KFgKDUH5g8JkJwwpZsR1X4\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": "prompts/reviewers/tests.md",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "The change edits an LLM reviewer prompt that directly controls what the test-review agent flags and at what severity, so it changes behavior rather than documentation.",
+      "confidence": "medium",
+      "categories": ["other", "test", "docs"],
+      "hotspots": [
+        "prompts/reviewers/tests.md: new 'Look for' bullets (internals, doubles, restating code)",
+        "prompts/reviewers/tests.md: new Severity section",
+        "prompts/reviewers/tests.md: Do not flag list additions and conflicts with the new bullets"
+      ],
+      "file_notes": [
+        {
+          "file": "prompts/reviewers/tests.md",
+          "note": "Prompt content that agents read. It adds a test-quality rule, six new checks, a severity section and two new do-not-flag items. Check the rules for internal consistency and for conflicts with the output schema or severity names used elsewhere."
+        }
+      ],
+      "summary": "The change extends the test-reviewer prompt. It adds a definition of a good test, new categories of weak tests to flag (internal assertions, doubles on same-repo modules, tests that restate code, duplicates, multi-behaviour tests), severity rules, and extra do-not-flag items. No executable code changes, but the prompt shapes the reviewer agent's output."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: The change edits an LLM reviewer prompt that directly controls what the test-review agent flags and at what severity, so it changes behavior rather than documentation.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4211,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3267,
+              "outputTokens": 25,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0003392,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 254,
+              "cacheReadInputTokens": 4996,
+              "cacheCreationInputTokens": 2773,
+              "webSearchRequests": 0,
+              "costUSD": 0.028271199999999996,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 88,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.028610399999999998
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "prompts/reviewers/tests.md",
+            "start_line": 40,
+            "end_line": 40,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The description says \"Do not flag\" excludes two things: a double at an awkward boundary and a test that the diff does not touch. The diff also adds a third exclusion, for a test of a call or an argument list when the call is the behaviour, and the description does not mention it.",
+            "evidence": "A test of a call or an argument list is correct when the call is the behaviour, such as a request that leaves the process. Do not flag it.",
+            "suggested_fix": "Add this exclusion to the description.",
+            "explanation": "The new rule tells the reviewer not to flag some call assertions, and the description does not say so.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5519,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3259,
+              "outputTokens": 28,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0003399000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 491,
+              "cacheReadInputTokens": 4954,
+              "cacheCreationInputTokens": 2765,
+              "webSearchRequests": 0,
+              "costUSD": 0.032938800000000004,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 160,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0332787
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "prompts/reviewers/tests.md",
+            "start_line": 43,
+            "end_line": 46,
+            "category": "bug",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "The Severity section gives no rank for a test that passes for the wrong reason, such as a mock that replaces the code under test.",
+            "evidence": "- A removed, skipped or weakened test, or a test that cannot fail, is blocking when the behaviour it covered can cause a bug or an incident. Otherwise it is a suggestion.",
+            "suggested_fix": "Add 'a test that passes for the wrong reason' to the first Severity bullet.",
+            "explanation": "One kind from the Look for list has no severity rule, so the model ranks it inconsistently.",
+            "needs_context": false
+          },
+          {
+            "file": "prompts/reviewers/tests.md",
+            "start_line": 53,
+            "end_line": 53,
+            "category": "bug",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The new do-not-flag item 'a test that the diff does not add or change' can make the model suppress removed tests, which the diff deletes and does not add or change.",
+            "evidence": "- a test that the diff does not add or change,",
+            "suggested_fix": "Write 'a test that the diff does not add, change or remove'.",
+            "explanation": "A removed test is neither added nor changed, so the exclusion conflicts with the 'removes, skips or weakens' bullet.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6872,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3267,
+              "outputTokens": 29,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.00034120000000000005,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 706,
+              "cacheReadInputTokens": 4899,
+              "cacheCreationInputTokens": 2773,
+              "webSearchRequests": 0,
+              "costUSD": 0.0372918,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 192,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.037633
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "prompts/reviewers/tests.md",
+            "start_line": 53,
+            "end_line": 53,
+            "category": "other",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "The new do-not-flag rule can make the reviewer skip tests that the diff deletes or skips. The 'Look for' list asks the reviewer to flag those tests.",
+            "evidence": "- a test that the diff does not add or change,",
+            "suggested_fix": "Change the line to 'a test that the diff does not add, change, skip or remove'.",
+            "explanation": "A model can read a deleted test as a test that the diff did not 'add or change', so it may stop reporting removed tests.",
+            "needs_context": false
+          },
+          {
+            "file": "prompts/reviewers/tests.md",
+            "start_line": 44,
+            "end_line": 44,
+            "category": "other",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The Severity section does not rank a behaviour change that has no test. It ranks only a new branch or a new error path.",
+            "evidence": "- A missing test for a new branch or a new error path is a suggestion.",
+            "suggested_fix": "Change the line to 'A missing test for a behaviour change, a new branch or a new error path is a suggestion.'",
+            "explanation": "The first 'Look for' bullet also covers 'a behaviour change'. That case has no severity rule, so the reviewer's rating for it may vary.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 9511,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3255,
+              "outputTokens": 25,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.00033800000000000003,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 968,
+              "cacheReadInputTokens": 4899,
+              "cacheCreationInputTokens": 2761,
+              "webSearchRequests": 0,
+              "costUSD": 0.042435799999999996,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 385,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.042773799999999994
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "prompts/reviewers/tests.md",
+            "start_line": 3,
+            "end_line": 3,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The frontmatter description still lists only the three original checks, so it no longer covers the new checks for internals, doubles, restated code and duplicates.",
+            "evidence": "description: Finds behaviour changes in the diff that have no test, and tests that the diff weakens or makes pass for the wrong reason.",
+            "suggested_fix": "Extend the description to mention tests that assert internals, restate the code or duplicate a smaller test.",
+            "explanation": "The prompt body now also flags tests that assert internals, doubles on modules of the same repo, tests that restate the code, duplicate tests and tests that cover several behaviours, but the description does not mention them.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7107,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3263,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0003368,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 6,
+              "outputTokens": 565,
+              "cacheReadInputTokens": 20581,
+              "cacheCreationInputTokens": 3540,
+              "webSearchRequests": 0,
+              "costUSD": 0.0437602,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.044097000000000004
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4367,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 4199,
+              "outputTokens": 27,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.00043339999999999996,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 346,
+              "cacheReadInputTokens": 5021,
+              "cacheCreationInputTokens": 3705,
+              "webSearchRequests": 0,
+              "costUSD": 0.0375722,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 144,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0380056
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "prompts/reviewers/tests.md",
+            "start_line": 53,
+            "end_line": 54,
+            "category": "security",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "The new do-not-flag item for tests the diff does not add or change can be read as excluding removed tests, which weakens the review of deleted tests.",
+            "evidence": "- a test that the diff does not add or change,",
+            "suggested_fix": "Write \"a test that the diff does not add, change or remove\".",
+            "explanation": "A removed test is neither added nor changed, so the exclusion conflicts with the bullet that asks to flag removed tests.",
+            "needs_context": false
+          },
+          {
+            "file": "prompts/reviewers/tests.md",
+            "start_line": 44,
+            "end_line": 44,
+            "category": "security",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The new rule makes a missing test for a new error path a suggestion in every case, so the reviewer can never block a change that leaves risky code untested.",
+            "evidence": "- A missing test for a new branch or a new error path is a suggestion.",
+            "suggested_fix": "Make it blocking when the untested path can cause a bug or an incident.",
+            "explanation": "A fixed low severity can hide an untested security-relevant path from the blocking gate.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6303,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3265,
+              "outputTokens": 27,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.00034,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 616,
+              "cacheReadInputTokens": 4997,
+              "cacheCreationInputTokens": 2771,
+              "webSearchRequests": 0,
+              "costUSD": 0.035495399999999996,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 149,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.035835399999999996
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6314,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3261,
+              "outputTokens": 27,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0003396,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 435,
+              "cacheReadInputTokens": 4997,
+              "cacheCreationInputTokens": 2767,
+              "webSearchRequests": 0,
+              "costUSD": 0.031843399999999994,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 192,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.032182999999999996
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "prompts/reviewers/tests.md",
+            "start_line": 41,
+            "end_line": 41,
+            "category": "test",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The diff changes the reviewer prompt but adds no vitest test, while CLAUDE.md rule 2 asks for a test with every change.",
+            "evidence": "## Severity",
+            "suggested_fix": "Accept this as a prose-only change, or add a loader test that checks the rendered prompt keeps its sections.",
+            "explanation": "Only the existing loader tests check this file, and they read the frontmatter, so nothing checks that the new prompt body still loads and renders.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6696,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3255,
+              "outputTokens": 25,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.00033800000000000003,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 465,
+              "cacheReadInputTokens": 12613,
+              "cacheCreationInputTokens": 3034,
+              "webSearchRequests": 0,
+              "costUSD": 0.0361106,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 73,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0364486
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "prompts/reviewers/tests.md",
+          "start_line": 40,
+          "end_line": 40,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The description says \"Do not flag\" excludes two things: a double at an awkward boundary and a test that the diff does not touch. The diff also adds a third exclusion, for a test of a call or an argument list when the call is the behaviour, and the description does not mention it.",
+          "evidence": "A test of a call or an argument list is correct when the call is the behaviour, such as a request that leaves the process. Do not flag it.",
+          "suggested_fix": "Add this exclusion to the description.",
+          "explanation": "The new rule tells the reviewer not to flag some call assertions, and the description does not say so.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "A test of a call or an argument list is correct when the call is the behaviour, such as a request that leaves the process. Do not flag it.",
+            "- a test that the diff does not add or change,\n- a double at an awkward boundary."
+          ],
+          "rationale": "The description says the \"Do not flag\" section excludes two things, and the section does list exactly those two. The call-assertion exclusion is a separate paragraph above the section, so the description is accurate. The omission is minor and the finding's line points at a blank line.",
+          "score": 12,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "A test of a call or an argument list is correct when the call is the behaviour, such as a request that leaves the process. Do not flag it.",
+            "- a test that the diff does not add or change,\n- a double at an awkward boundary."
+          ],
+          "rationale": "The description says the \"Do not flag\" section excludes two things, and the section does list exactly those two. The call-assertion exclusion is a separate paragraph above the section, so the description is accurate. The omission is minor and the finding's line points at a blank line.",
+          "score": 12,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "prompts/reviewers/tests.md",
+          "start_line": 43,
+          "end_line": 46,
+          "category": "bug",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "The Severity section gives no rank for a test that passes for the wrong reason, such as a mock that replaces the code under test.",
+          "evidence": "- A removed, skipped or weakened test, or a test that cannot fail, is blocking when the behaviour it covered can cause a bug or an incident. Otherwise it is a suggestion.",
+          "suggested_fix": "Add 'a test that passes for the wrong reason' to the first Severity bullet.",
+          "explanation": "One kind from the Look for list has no severity rule, so the model ranks it inconsistently.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- A removed, skipped or weakened test, or a test that cannot fail, is blocking when the behaviour it covered can cause a bug or an incident. Otherwise it is a suggestion.",
+            "- a test that passes for the wrong reason, for example an assertion that cannot fail or a mock that replaces the code under test,"
+          ],
+          "rationale": "The Severity section never names \"passes for the wrong reason\", so the claim is literally true. But the example \"an assertion that cannot fail\" is covered by the \"cannot fail\" bullet, and a mock replacing the code under test arguably cannot fail either. The gap is minor and does not cause a real bug.",
+          "score": 30,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- A removed, skipped or weakened test, or a test that cannot fail, is blocking when the behaviour it covered can cause a bug or an incident. Otherwise it is a suggestion.",
+            "- a test that passes for the wrong reason, for example an assertion that cannot fail or a mock that replaces the code under test,"
+          ],
+          "rationale": "The Severity section never names \"passes for the wrong reason\", so the claim is literally true. But the example \"an assertion that cannot fail\" is covered by the \"cannot fail\" bullet, and a mock replacing the code under test arguably cannot fail either. The gap is minor and does not cause a real bug.",
+          "score": 30,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "prompts/reviewers/tests.md",
+          "start_line": 53,
+          "end_line": 53,
+          "category": "bug",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The new do-not-flag item 'a test that the diff does not add or change' can make the model suppress removed tests, which the diff deletes and does not add or change.",
+          "evidence": "- a test that the diff does not add or change,",
+          "suggested_fix": "Write 'a test that the diff does not add, change or remove'.",
+          "explanation": "A removed test is neither added nor changed, so the exclusion conflicts with the 'removes, skips or weakens' bullet.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- a test that the diff does not add or change,",
+            "- a test that the diff removes, skips or weakens, for example a removed assertion or a looser match,"
+          ],
+          "rationale": "The new exclusion says \\\"add or change\\\", while the earlier bullet covers tests the diff removes. A removed test could be read as neither added nor changed, so the two lines are slightly ambiguous. Most readers would count a deletion as a change, and the description says \\\"does not touch\\\", so the practical risk is small.",
+          "score": 40,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- a test that the diff does not add or change,",
+            "- a test that the diff removes, skips or weakens, for example a removed assertion or a looser match,"
+          ],
+          "rationale": "The new exclusion says \\\"add or change\\\", while the earlier bullet covers tests the diff removes. A removed test could be read as neither added nor changed, so the two lines are slightly ambiguous. Most readers would count a deletion as a change, and the description says \\\"does not touch\\\", so the practical risk is small.",
+          "score": 40,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "prompts/reviewers/tests.md",
+          "start_line": 3,
+          "end_line": 3,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The frontmatter description still lists only the three original checks, so it no longer covers the new checks for internals, doubles, restated code and duplicates.",
+          "evidence": "description: Finds behaviour changes in the diff that have no test, and tests that the diff weakens or makes pass for the wrong reason.",
+          "suggested_fix": "Extend the description to mention tests that assert internals, restate the code or duplicate a smaller test.",
+          "explanation": "The prompt body now also flags tests that assert internals, doubles on modules of the same repo, tests that restate the code, duplicate tests and tests that cover several behaviours, but the description does not mention them.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "description: Finds behaviour changes in the diff that have no test, and tests that the diff weakens or makes pass for the wrong reason.",
+            "- a test that asserts an internal, for example a private function, a call count or an argument list between modules of the same repo"
+          ],
+          "rationale": "The frontmatter description is technically narrower than the new body. The PR says it left the frontmatter unchanged on purpose, and the description is only a short summary, so the gap is minor and few reviewers would post it.",
+          "score": 25,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "description: Finds behaviour changes in the diff that have no test, and tests that the diff weakens or makes pass for the wrong reason.",
+            "- a test that asserts an internal, for example a private function, a call count or an argument list between modules of the same repo"
+          ],
+          "rationale": "The frontmatter description is technically narrower than the new body. The PR says it left the frontmatter unchanged on purpose, and the description is only a short summary, so the gap is minor and few reviewers would post it.",
+          "score": 25,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "prompts/reviewers/tests.md",
+          "start_line": 53,
+          "end_line": 53,
+          "category": "other",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "The new do-not-flag rule can make the reviewer skip tests that the diff deletes or skips. The 'Look for' list asks the reviewer to flag those tests.",
+          "evidence": "- a test that the diff does not add or change,",
+          "suggested_fix": "Change the line to 'a test that the diff does not add, change, skip or remove'.",
+          "explanation": "A model can read a deleted test as a test that the diff did not 'add or change', so it may stop reporting removed tests.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- a test that the diff does not add or change,",
+            "- a test that the diff removes, skips or weakens, for example a removed assertion or a looser match,"
+          ],
+          "rationale": "The added exclusion \"a test that the diff does not add or change\" sits beside the \"Look for\" item on tests the diff removes or skips. A deleted test is literally not added or changed, so a model could read it as excluded. The risk is real but small, because a removal is arguably a change and the Scope section already limits findings to code the diff touches.",
+          "score": 45,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- a test that the diff does not add or change,",
+            "- a test that the diff removes, skips or weakens, for example a removed assertion or a looser match,"
+          ],
+          "rationale": "The added exclusion \"a test that the diff does not add or change\" sits beside the \"Look for\" item on tests the diff removes or skips. A deleted test is literally not added or changed, so a model could read it as excluded. The risk is real but small, because a removal is arguably a change and the Scope section already limits findings to code the diff touches.",
+          "score": 45,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "prompts/reviewers/tests.md",
+          "start_line": 44,
+          "end_line": 44,
+          "category": "other",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The Severity section does not rank a behaviour change that has no test. It ranks only a new branch or a new error path.",
+          "evidence": "- A missing test for a new branch or a new error path is a suggestion.",
+          "suggested_fix": "Change the line to 'A missing test for a behaviour change, a new branch or a new error path is a suggestion.'",
+          "explanation": "The first 'Look for' bullet also covers 'a behaviour change'. That case has no severity rule, so the reviewer's rating for it may vary.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- A missing test for a new branch or a new error path is a suggestion.",
+            "- a behaviour change, a new branch or a new error path with no test that covers it,"
+          ],
+          "rationale": "The Look-for bullet lists \"a behaviour change, a new branch or a new error path\", but the added Severity line names only the branch and the error path. The gap is real and the PR added it. The impact is small, because a model would most likely rate a missing behaviour-change test as a suggestion anyway.",
+          "score": 45,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- A missing test for a new branch or a new error path is a suggestion.",
+            "- a behaviour change, a new branch or a new error path with no test that covers it,"
+          ],
+          "rationale": "The Look-for bullet lists \"a behaviour change, a new branch or a new error path\", but the added Severity line names only the branch and the error path. The gap is real and the PR added it. The impact is small, because a model would most likely rate a missing behaviour-change test as a suggestion anyway.",
+          "score": 45,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "prompts/reviewers/tests.md",
+          "start_line": 53,
+          "end_line": 54,
+          "category": "security",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "The new do-not-flag item for tests the diff does not add or change can be read as excluding removed tests, which weakens the review of deleted tests.",
+          "evidence": "- a test that the diff does not add or change,",
+          "suggested_fix": "Write \"a test that the diff does not add, change or remove\".",
+          "explanation": "A removed test is neither added nor changed, so the exclusion conflicts with the bullet that asks to flag removed tests.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- a test that the diff does not add or change,",
+            "- a test that the diff removes, skips or weakens, for example a removed assertion or a looser match,"
+          ],
+          "rationale": "The wording \"add or change\" is literally ambiguous next to the bullet that asks to flag removed tests, but a deletion is naturally a change to the test suite and the description says \"does not touch\". The risk is small and the fix is cheap, so it is a minor wording nit at most.",
+          "score": 30,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- a test that the diff does not add or change,",
+            "- a test that the diff removes, skips or weakens, for example a removed assertion or a looser match,"
+          ],
+          "rationale": "The wording \"add or change\" is literally ambiguous next to the bullet that asks to flag removed tests, but a deletion is naturally a change to the test suite and the description says \"does not touch\". The risk is small and the fix is cheap, so it is a minor wording nit at most.",
+          "score": 30,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "prompts/reviewers/tests.md",
+          "start_line": 44,
+          "end_line": 44,
+          "category": "security",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The new rule makes a missing test for a new error path a suggestion in every case, so the reviewer can never block a change that leaves risky code untested.",
+          "evidence": "- A missing test for a new branch or a new error path is a suggestion.",
+          "suggested_fix": "Make it blocking when the untested path can cause a bug or an incident.",
+          "explanation": "A fixed low severity can hide an untested security-relevant path from the blocking gate.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": ["- A missing test for a new branch or a new error path is a suggestion."],
+          "rationale": "The line does fix missing-test severity at suggestion, but that is a deliberate ranking in the prompt. The \"security\" framing is unsupported, and the file is a reviewer prompt, so no code path is affected. It is a policy preference, not a defect.",
+          "score": 15,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- A missing test for a new branch or a new error path is a suggestion.",
+            "- severity_estimate: blocking (causes a real bug or an incident if merged), suggestion (makes the code safer or clearer) or nit.",
+            "Do not filter the issues for importance."
+          ],
+          "rationale": "The line was added by this change and does fix the tests reviewer's severity for missing tests at suggestion. But the finding overstates the effect: this is only the reviewer's severity_estimate, and a later verify step sets its own severity. Risky untested code is also the job of the bug and security reviewers, so ranking a missing test below blocking is a reasonable design choice, not a security hole.",
+          "score": 22,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- A missing test for a new branch or a new error path is a suggestion.",
+            "- severity_estimate: blocking (causes a real bug or an incident if merged), suggestion (makes the code safer or clearer) or nit.",
+            "Do not filter the issues for importance."
+          ],
+          "rationale": "The line was added by this change and does fix the tests reviewer's severity for missing tests at suggestion. But the finding overstates the effect: this is only the reviewer's severity_estimate, and a later verify step sets its own severity. Risky untested code is also the job of the bug and security reviewers, so ranking a missing test below blocking is a reasonable design choice, not a security hole.",
+          "score": 22,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "prompts/reviewers/tests.md",
+          "start_line": 41,
+          "end_line": 41,
+          "category": "test",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The diff changes the reviewer prompt but adds no vitest test, while CLAUDE.md rule 2 asks for a test with every change.",
+          "evidence": "## Severity",
+          "suggested_fix": "Accept this as a prose-only change, or add a loader test that checks the rendered prompt keeps its sections.",
+          "explanation": "Only the existing loader tests check this file, and they read the frontmatter, so nothing checks that the new prompt body still loads and renders.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": ["## Severity", "Every change has a vitest test."],
+          "rationale": "CLAUDE.md rule 2 says every change has a vitest test, and this prose-only prompt change adds none, so the claim is literally true. But the description states this openly, a test of prompt wording would only restate the prose, and the finding anchors on an arbitrary heading and offers to accept the gap. That makes it low value.",
+          "score": 30,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": false,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "## Severity",
+            "Every change has a vitest test.",
+            "Never test a fake for its own sake, and never restate the code."
+          ],
+          "rationale": "The diff is literally untested, but it only changes prompt prose and the frontmatter stays the same. A test that checks the prompt's sections would just restate the file, which rule 2 itself forbids. The description already says why no test was added, and the finding's own fix suggests accepting the change, so the finding is not worth posting.",
+          "score": 12,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": false,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "## Severity",
+            "Every change has a vitest test.",
+            "Never test a fake for its own sake, and never restate the code."
+          ],
+          "rationale": "The diff is literally untested, but it only changes prompt prose and the frontmatter stays the same. A test that checks the prompt's sections would just restate the file, which rule 2 itself forbids. The description already says why no test was added, and the finding's own fix suggests accepting the change, so the finding is not worth posting.",
+          "score": 12,
+          "severity": "nit"
+        },
+        "passed": false
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5539345815,
+      "review_url": "https://github.com/jerridan/pr-review/pull/5#pullrequestreview-5539345815",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 116649250364
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 4635,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 2531,
+            "outputTokens": 17,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00026159999999999996,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 553,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 2045,
+            "webSearchRequests": 0,
+            "costUSD": 0.0138402,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.014101800000000001
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 4211,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3267,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0003392,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 254,
+            "cacheReadInputTokens": 4996,
+            "cacheCreationInputTokens": 2773,
+            "webSearchRequests": 0,
+            "costUSD": 0.028271199999999996,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 88,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.028610399999999998
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5519,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3259,
+            "outputTokens": 28,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0003399000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 491,
+            "cacheReadInputTokens": 4954,
+            "cacheCreationInputTokens": 2765,
+            "webSearchRequests": 0,
+            "costUSD": 0.032938800000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 160,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0332787
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6872,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3267,
+            "outputTokens": 29,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00034120000000000005,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 706,
+            "cacheReadInputTokens": 4899,
+            "cacheCreationInputTokens": 2773,
+            "webSearchRequests": 0,
+            "costUSD": 0.0372918,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 192,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.037633
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7107,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3263,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0003368,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 565,
+            "cacheReadInputTokens": 20581,
+            "cacheCreationInputTokens": 3540,
+            "webSearchRequests": 0,
+            "costUSD": 0.0437602,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.044097000000000004
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "model": "claude-opus-5-5",
+        "duration_ms": 4367,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 4199,
+            "outputTokens": 27,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00043339999999999996,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 346,
+            "cacheReadInputTokens": 5021,
+            "cacheCreationInputTokens": 3705,
+            "webSearchRequests": 0,
+            "costUSD": 0.0375722,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 144,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0380056
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 9511,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3255,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00033800000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 968,
+            "cacheReadInputTokens": 4899,
+            "cacheCreationInputTokens": 2761,
+            "webSearchRequests": 0,
+            "costUSD": 0.042435799999999996,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 385,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.042773799999999994
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6303,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3265,
+            "outputTokens": 27,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00034,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 616,
+            "cacheReadInputTokens": 4997,
+            "cacheCreationInputTokens": 2771,
+            "webSearchRequests": 0,
+            "costUSD": 0.035495399999999996,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 149,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.035835399999999996
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6314,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3261,
+            "outputTokens": 27,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0003396,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 435,
+            "cacheReadInputTokens": 4997,
+            "cacheCreationInputTokens": 2767,
+            "webSearchRequests": 0,
+            "costUSD": 0.031843399999999994,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 192,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.032182999999999996
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6696,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3255,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00033800000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 465,
+            "cacheReadInputTokens": 12613,
+            "cacheCreationInputTokens": 3034,
+            "webSearchRequests": 0,
+            "costUSD": 0.0361106,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 73,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0364486
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 4778,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5086,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005201,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 599,
+            "cacheReadInputTokens": 3889,
+            "cacheCreationInputTokens": 4600,
+            "webSearchRequests": 0,
+            "costUSD": 0.0247829,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 253,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.025303
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 5038,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5095,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.000521,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 657,
+            "cacheReadInputTokens": 3889,
+            "cacheCreationInputTokens": 4609,
+            "webSearchRequests": 0,
+            "costUSD": 0.025398900000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 262,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.025919900000000003
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 4767,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5057,
+            "outputTokens": 27,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005191999999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 544,
+            "cacheReadInputTokens": 3889,
+            "cacheCreationInputTokens": 4571,
+            "webSearchRequests": 0,
+            "costUSD": 0.024116900000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 201,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.024636100000000005
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 4715,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5109,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005234,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 555,
+            "cacheReadInputTokens": 3889,
+            "cacheCreationInputTokens": 4623,
+            "webSearchRequests": 0,
+            "costUSD": 0.024434900000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 212,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.024958300000000003
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 4436,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5075,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.000519,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 498,
+            "cacheReadInputTokens": 3889,
+            "cacheCreationInputTokens": 4589,
+            "webSearchRequests": 0,
+            "costUSD": 0.0237289,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 158,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0242479
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 4729,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5049,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005168999999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 555,
+            "cacheReadInputTokens": 3889,
+            "cacheCreationInputTokens": 4563,
+            "webSearchRequests": 0,
+            "costUSD": 0.024194900000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 206,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.024711800000000003
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 4797,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5041,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005171,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 539,
+            "cacheReadInputTokens": 3889,
+            "cacheCreationInputTokens": 4555,
+            "webSearchRequests": 0,
+            "costUSD": 0.0240029,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 208,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.02452
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 3737,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5047,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005172000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 418,
+            "cacheReadInputTokens": 3889,
+            "cacheCreationInputTokens": 4561,
+            "webSearchRequests": 0,
+            "costUSD": 0.0228169,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 118,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0233341
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 9310,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5044,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005169,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 936,
+            "cacheReadInputTokens": 30075,
+            "cacheCreationInputTokens": 6030,
+            "webSearchRequests": 0,
+            "costUSD": 0.0365035,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 169,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0370204
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 9027,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5037,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005152000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 785,
+            "cacheReadInputTokens": 12321,
+            "cacheCreationInputTokens": 5192,
+            "webSearchRequests": 0,
+            "costUSD": 0.0597162,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 298,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0602314
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 10328,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5048,
+            "outputTokens": 27,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005183,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 683,
+            "cacheReadInputTokens": 20986,
+            "cacheCreationInputTokens": 5665,
+            "webSearchRequests": 0,
+            "costUSD": 0.06320120000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 147,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.06371950000000001
+      }
+    ],
+    "total_cost_usd": 0.7015697000000001,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 56,
+      "gather": 39,
+      "triage": 5917,
+      "find_verify": 43507,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
