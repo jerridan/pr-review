@@ -1005,3 +1005,412 @@ describe("the plugin and the /review command (R11)", () => {
     expect(line).not.toContain("--head");
   });
 });
+
+// ---------------------------------------------------------------------------
+
+interface CiWorkflow {
+  on: Record<string, unknown>;
+  permissions?: Record<string, string>;
+  concurrency?: { group: string; "cancel-in-progress": boolean };
+  jobs: Record<string, Job & { needs?: string | string[]; "runs-on"?: string }>;
+}
+
+// Parse the file once, so a step that two helpers find is the same object.
+let ciCache: CiWorkflow | null = null;
+function loadCi(): CiWorkflow {
+  ciCache ??= parse(readText(".github/workflows/ci.yml")) as CiWorkflow;
+  return ciCache;
+}
+
+function ciJob(name: "checks" | "eval"): CiWorkflow["jobs"][string] {
+  const job = loadCi().jobs[name];
+  if (!job) throw new Error(`no job ${name}`);
+  return job;
+}
+
+type StepWithFlags = Step & { "continue-on-error"?: unknown };
+
+const SAME_REPO = "jerridan/pr-review";
+
+function ciContext(
+  eventName: "pull_request" | "workflow_dispatch",
+  options: { headRepo?: string; repeat?: string; outputs?: Record<string, unknown> } = {},
+): Record<string, Value> {
+  const event =
+    eventName === "pull_request"
+      ? {
+          number: PR_NUMBER,
+          pull_request: {
+            number: PR_NUMBER,
+            base: { sha: "<base>" },
+            head: { sha: "<head>", repo: { full_name: options.headRepo ?? SAME_REPO } },
+          },
+        }
+      : { inputs: { repeat: options.repeat ?? "3" } };
+  return {
+    github: { event_name: eventName, event, repository: SAME_REPO, run_id: "4242" },
+    inputs: eventName === "workflow_dispatch" ? { repeat: options.repeat ?? "3" } : {},
+    secrets: { CLAUDE_CODE_OAUTH_TOKEN: "<oauth>", CASES_TOKEN: "<cases>" },
+    steps: options.outputs ?? {},
+  };
+}
+
+/** A git repo with a base commit and a head commit that adds "paths". */
+function changeSandbox(paths: string[]): { workspace: string; base: string; head: string } {
+  const workspace = tempDir("pr-review-ci-filter-");
+  git(workspace, "init", "-q", "-b", "main");
+  writeFileSync(join(workspace, "seed.txt"), "seed\n");
+  git(workspace, "add", ".");
+  git(workspace, "commit", "-q", "-m", "base");
+  const base = git(workspace, "rev-parse", "HEAD");
+  git(workspace, "checkout", "-q", "-b", "feature");
+  for (const path of paths) {
+    mkdirSync(dirname(join(workspace, path)), { recursive: true });
+    writeFileSync(join(workspace, path), "x\n");
+  }
+  git(workspace, "add", ".");
+  git(workspace, "commit", "-q", "-m", "head");
+  return { workspace, base, head: git(workspace, "rev-parse", "HEAD") };
+}
+
+function outputsOf(file: string): Record<string, string> {
+  const text = existsSync(file) ? readFileSync(file, "utf8") : "";
+  return Object.fromEntries(
+    text
+      .split("\n")
+      .filter((line) => line.includes("="))
+      .map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]),
+  );
+}
+
+describe(".github/workflows/ci.yml (R8)", () => {
+  const steps = () => ciJob("eval").steps as StepWithFlags[];
+  const filterStep = () =>
+    findStep(steps(), (s) => (s.run ?? "").includes("git diff --name-only"), "path filter");
+  const casesStep = () => findStep(steps(), (s) => s.with?.path === "eval/cases", "cases checkout");
+  const evalStep = () =>
+    findStep(steps(), (s) => (s.run ?? "").includes("dist/cli.js eval"), "eval");
+  const uploadStep = () =>
+    findStep(steps(), (s) => (s.uses ?? "").startsWith("actions/upload-artifact@"), "upload");
+
+  it("runs on every pull request and on dispatch, with the input repeat at 3 (R8.1)", () => {
+    const on = loadCi().on;
+    expect(Object.keys(on).sort()).toEqual(["pull_request", "workflow_dispatch"]);
+    const pr = (on.pull_request ?? {}) as { branches?: unknown; paths?: unknown };
+    expect(pr.branches).toBeUndefined();
+    expect(pr.paths).toBeUndefined();
+    const dispatch = on.workflow_dispatch as { inputs: Record<string, { default?: unknown }> };
+    expect(String(dispatch.inputs.repeat?.default)).toBe("3");
+  });
+
+  it("runs the five checks on Node 20, in order (R8.2)", () => {
+    const job = ciJob("checks");
+    expect(job.if).toBeUndefined();
+    const node = findStep(
+      job.steps,
+      (s) => (s.uses ?? "").startsWith("actions/setup-node@"),
+      "setup-node",
+    );
+    expect(String(node.with?.["node-version"])).toBe("20");
+    const commands = job.steps.flatMap((s) =>
+      (s.run ?? "")
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.startsWith("npm ")),
+    );
+    expect(commands).toEqual([
+      "npm ci",
+      "npm test",
+      "npm run lint",
+      "npm run typecheck",
+      "npm run build",
+    ]);
+    expect(job.steps.indexOf(node)).toBeLessThan(
+      job.steps.findIndex((s) => (s.run ?? "").includes("npm ci")),
+    );
+  });
+
+  describe("the eval job gate (R8.3)", () => {
+    const gate = (ctx: Record<string, Value>) => evaluateIf(String(ciJob("eval").if), ctx);
+
+    it("needs the checks job", () => {
+      expect([ciJob("eval").needs].flat()).toEqual(["checks"]);
+    });
+
+    it("runs on dispatch and on a pull request from the same repo", () => {
+      expect(gate(ciContext("workflow_dispatch"))).toBe(true);
+      expect(gate(ciContext("pull_request"))).toBe(true);
+    });
+
+    it("skips a pull request from a fork", () => {
+      expect(gate(ciContext("pull_request", { headRepo: "someone/pr-review" }))).toBe(false);
+    });
+  });
+
+  describe("the path filter (R8.3)", () => {
+    function filter(paths: string[]): string {
+      const sandbox = changeSandbox(paths);
+      const out = join(tempDir("pr-review-ci-out-"), "output");
+      const ctx = ciContext("pull_request");
+      const event = (ctx.github as { event: { pull_request: Record<string, Value> } }).event;
+      event.pull_request.base = { sha: sandbox.base };
+      event.pull_request.head = { sha: sandbox.head, repo: { full_name: SAME_REPO } };
+      const result = runStep(
+        filterStep(),
+        ctx,
+        { workspace: sandbox.workspace, temp: sandbox.workspace },
+        { GITHUB_OUTPUT: out, PATH: process.env.PATH ?? "" },
+      );
+      expect(result.status, result.stderr).toBe(0);
+      return outputsOf(out).run ?? "";
+    }
+
+    it.each([
+      "src/a.ts",
+      "prompts/judge.md",
+      "eval/baseline.json",
+      "package.json",
+      "package-lock.json",
+    ])("runs the eval for a change to %s", (path) => {
+      expect(filter(["README.md", path])).toBe("true");
+    });
+
+    it("skips the eval for changes outside the five rules", () => {
+      expect(
+        filter([
+          "README.md",
+          "docs/a.md",
+          "test/a.test.ts",
+          "scripts/a.sh",
+          ".github/workflows/ci.yml",
+          "srcx/a.ts",
+          "a/src/b.ts",
+          "package.json.bak",
+          "docs/package-lock.json",
+        ]),
+      ).toBe("false");
+    });
+
+    it("always runs the eval on dispatch", () => {
+      const out = join(tempDir("pr-review-ci-out-"), "output");
+      const workspace = tempDir("pr-review-ci-empty-");
+      const result = runStep(
+        filterStep(),
+        ciContext("workflow_dispatch"),
+        { workspace, temp: workspace },
+        { GITHUB_OUTPUT: out, PATH: process.env.PATH ?? "" },
+      );
+      expect(result.status, result.stderr).toBe(0);
+      expect(outputsOf(out).run).toBe("true");
+    });
+
+    it("keys every later step of the job on the filter output", () => {
+      const all = steps();
+      const after = all.slice(all.indexOf(filterStep()) + 1);
+      expect(after.length).toBeGreaterThan(0);
+      for (const step of after) {
+        expect(step.if ?? "", step.name).toMatch(/steps\.\w+\.outputs\.run == 'true'/);
+      }
+    });
+  });
+
+  describe("the eval steps (R8.4)", () => {
+    it("checks out pr-review, then the cases, then installs and builds, then runs the eval, then uploads", () => {
+      const all = steps();
+      const checkout = all.findIndex(
+        (s) => (s.uses ?? "").startsWith("actions/checkout@") && s.with?.path === undefined,
+      );
+      const install = all.findIndex(
+        (s) => (s.run ?? "").includes("npm ci") && (s.run ?? "").includes("npm run build"),
+      );
+      const order = [
+        checkout,
+        all.indexOf(casesStep()),
+        install,
+        all.indexOf(evalStep()),
+        all.indexOf(uploadStep()),
+      ];
+      expect(order.every((i) => i >= 0)).toBe(true);
+      expect([...order].sort((a, b) => a - b)).toEqual(order);
+    });
+
+    it("checks out the cases repo from the pin, with CASES_TOKEN and no persisted credentials", () => {
+      const step = casesStep();
+      expect(step.uses).toMatch(/^actions\/checkout@v\d+$/);
+      expect(step.with?.["persist-credentials"]).toBe(false);
+      expect(step.with?.token).toBe("${{ secrets.CASES_TOKEN }}");
+      expect(String(step.with?.repository)).toMatch(/^\$\{\{\s*steps\.\w+\.outputs\.repo\s*\}\}$/);
+      expect(String(step.with?.ref)).toMatch(/^\$\{\{\s*steps\.\w+\.outputs\.ref\s*\}\}$/);
+    });
+
+    it("reads the repo and the ref of eval/cases.json into the outputs that the checkout uses", () => {
+      const step = casesStep();
+      const pinId = /steps\.(\w+)\.outputs/.exec(String(step.with?.repository))?.[1];
+      const pin = findStep(steps(), (s) => s.id === pinId, "pin");
+      const workspace = tempDir("pr-review-ci-pin-");
+      mkdirSync(join(workspace, "eval"));
+      const ref = "0123456789abcdef0123456789abcdef01234567";
+      writeFileSync(
+        join(workspace, "eval", "cases.json"),
+        JSON.stringify({ repo: "jerridan/pr-review-cases", ref }),
+      );
+      const out = join(workspace, "output");
+      const result = runStep(
+        pin,
+        ciContext("pull_request"),
+        { workspace, temp: workspace },
+        { GITHUB_OUTPUT: out, PATH: process.env.PATH ?? "" },
+      );
+      expect(result.status, result.stderr).toBe(0);
+      expect(outputsOf(out)).toEqual({ repo: "jerridan/pr-review-cases", ref });
+    });
+
+    it.each<[string, Record<string, unknown>]>([
+      ["a repo that is not owner/name", { repo: "a b", ref: "0".repeat(40) }],
+      ["a ref that is not a sha", { repo: "a/b", ref: "main; rm -rf /" }],
+    ])("fails the pin step for %s", (_label, pinValue) => {
+      const step = casesStep();
+      const pinId = /steps\.(\w+)\.outputs/.exec(String(step.with?.repository))?.[1];
+      const pin = findStep(steps(), (s) => s.id === pinId, "pin");
+      const workspace = tempDir("pr-review-ci-pin-");
+      mkdirSync(join(workspace, "eval"));
+      writeFileSync(join(workspace, "eval", "cases.json"), JSON.stringify(pinValue));
+      const out = join(workspace, "output");
+      const result = runStep(
+        pin,
+        ciContext("pull_request"),
+        { workspace, temp: workspace },
+        { GITHUB_OUTPUT: out, PATH: process.env.PATH ?? "" },
+      );
+      expect(result.status).not.toBe(0);
+      expect(outputsOf(out)).toEqual({});
+    });
+
+    function runEval(
+      ctx: Record<string, Value>,
+      exitCode: number,
+    ): { status: number | null; args: string; summary: string; tokenSet: boolean } {
+      const dir = tempDir("pr-review-ci-eval-");
+      const bin = join(dir, "bin");
+      mkdirSync(bin);
+      const log = join(dir, "node.log");
+      writeFileSync(
+        join(bin, "node"),
+        [
+          "#!/bin/sh",
+          `printf '%s\\n' "$*" > '${log}'`,
+          `if [ -n "\${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then echo token >> '${log}.token'; fi`,
+          "echo 'REPORT-TABLE'",
+          `exit ${exitCode}`,
+          "",
+        ].join("\n"),
+        { mode: 0o755 },
+      );
+      const summary = join(dir, "summary.md");
+      writeFileSync(summary, "BEFORE\n");
+      const result = runStep(
+        evalStep(),
+        ctx,
+        { workspace: dir, temp: dir },
+        { GITHUB_STEP_SUMMARY: summary, PATH: `${bin}:${process.env.PATH ?? ""}` },
+      );
+      return {
+        status: result.status,
+        args: existsSync(log) ? readFileSync(log, "utf8").trim() : "",
+        summary: readFileSync(summary, "utf8"),
+        tokenSet: existsSync(`${log}.token`),
+      };
+    }
+
+    it("runs the eval with the flags and repeat 3 on a pull request, and appends the table to the step summary", () => {
+      const result = runEval(ciContext("pull_request"), 0);
+      expect(result.status).toBe(0);
+      expect(result.args).toBe(
+        "dist/cli.js eval --cases eval/cases --repeat 3 --baseline eval/baseline.json --out pr-review-eval",
+      );
+      expect(result.summary).toBe("BEFORE\nREPORT-TABLE\n");
+      expect(result.tokenSet).toBe(true);
+      expect(evalStep().run).toContain("pipefail");
+      expect(evalStep().run).toContain("GITHUB_STEP_SUMMARY");
+    });
+
+    it("runs the eval with the input repeat on dispatch", () => {
+      expect(runEval(ciContext("workflow_dispatch", { repeat: "5" }), 0).args).toContain(
+        "--repeat 5",
+      );
+    });
+
+    it.each([1, 3])(
+      "fails the step with the exit code %i of the eval, and still writes the summary (R8.5)",
+      (code) => {
+        const result = runEval(ciContext("pull_request"), code);
+        expect(result.status).toBe(code);
+        expect(result.summary).toContain("REPORT-TABLE");
+      },
+    );
+
+    it("has no continue-on-error on the eval step, and uploads pr-review-eval/ also after a failure (R8.5)", () => {
+      expect((evalStep() as StepWithFlags)["continue-on-error"]).toBeUndefined();
+      const upload = uploadStep();
+      expect(upload.if ?? "").toMatch(/always\(\)/);
+      expect(String(upload.with?.path).replace(/\/$/, "")).toBe("pr-review-eval");
+    });
+  });
+
+  it("runs one workflow for each pull request and cancels the run in progress (R8.6)", () => {
+    const wf = loadCi();
+    expect(wf.concurrency?.["cancel-in-progress"]).toBe(true);
+    const group = String(wf.concurrency?.group);
+    const one = render(group, ciContext("pull_request"));
+    expect(one).toContain(String(PR_NUMBER));
+    const other = render(group, {
+      ...ciContext("pull_request"),
+      github: {
+        event_name: "pull_request",
+        repository: SAME_REPO,
+        run_id: "1",
+        event: { number: 8, pull_request: { number: 8 } },
+      },
+    });
+    expect(other).not.toBe(one);
+  });
+
+  describe("secrets and pins (R8.7, R2.8, R6.6)", () => {
+    it("pins every uses value to a major tag", () => {
+      const all = Object.values(loadCi().jobs).flatMap((job) => job.steps);
+      const uses = all.flatMap((s) => (s.uses ? [s.uses] : []));
+      expect(uses.length).toBeGreaterThan(0);
+      for (const value of uses) expect(value).toMatch(/@v\d+$/);
+    });
+
+    it("sets the permissions to contents: read only", () => {
+      const wf = loadCi();
+      expect(wf.permissions).toEqual({ contents: "read" });
+      for (const job of Object.values(wf.jobs)) expect(job.permissions).toBeUndefined();
+    });
+
+    it("holds no token-like string and never writes the baseline", () => {
+      const text = readText(".github/workflows/ci.yml");
+      expect(text).not.toMatch(/gh[pousr]_[A-Za-z0-9]{20,}|github_pat_|sk-ant-|AKIA[0-9A-Z]{16}/);
+      expect(text).not.toContain("write-baseline");
+    });
+
+    it("gives CASES_TOKEN to the cases checkout only, and CLAUDE_CODE_OAUTH_TOKEN to the eval step only", () => {
+      const text = readText(".github/workflows/ci.yml");
+      expect(text.match(/CASES_TOKEN/g)).toHaveLength(1);
+      expect(casesStep().with?.token).toBe("${{ secrets.CASES_TOKEN }}");
+      const env = evalStep().env ?? {};
+      const secretKeys = Object.entries(env)
+        .filter(([, value]) => String(value).includes("secrets."))
+        .map(([key]) => key);
+      expect(secretKeys).toEqual(["CLAUDE_CODE_OAUTH_TOKEN"]);
+      expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBe("${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}");
+      const all = Object.values(loadCi().jobs).flatMap((job) => job.steps) as StepWithFlags[];
+      for (const step of all) {
+        if (step === casesStep() || step === evalStep()) continue;
+        expect(JSON.stringify(step), step.name).not.toMatch(/secrets\./);
+      }
+      for (const step of all) expect(step.run ?? "").not.toMatch(/secrets\./);
+    });
+  });
+});
