@@ -315,10 +315,12 @@ Prompts follow Anthropic's current prompting guidance for the 5.5 family, summar
 
 ```
 pr-review run   [--base <sha>] [--head <sha>] [--pr <n>] [--github-repo <owner/repo>] [--fresh] [--tier full|fast|skip] [--format github|json|table|md]
-pr-review eval  [--cases <dir>] [--repeat 3]
+pr-review eval  --cases <dir> [--repeat <n>] [--baseline <file>] [--write-baseline] [--out <dir>] [--format table|json] [--tier full|fast|skip] [--judge-model <id>] [--allow-api-key] [--allow-same-judge]
 pr-review list  (reviewers that would run, with the trigger that selected them)
-pr-review explain <run.json>   (why each finding was kept or dropped)
+pr-review explain <record.json> [--format table|json]   (why each finding was kept or dropped)
 ```
+
+The `eval` and `explain` lines show the flags as built in D4a. `eval` defaults to `--repeat 3`, `--out pr-review-eval`, `--format table`, `--tier full` and the judge role model. `explain` defaults to `--format table`. Both exit 2 on a usage error. `eval` exits 1 for a failed repeat and 3 for a failed gate.
 
 A GitHub Action wraps `run`. A Claude Code `/review` command wraps `run` for local use. Without `--pr`, `--base` and `--head` are required. `--format github` needs `--pr`.
 
