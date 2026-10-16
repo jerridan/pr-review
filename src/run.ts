@@ -34,7 +34,7 @@ import {
 } from "./github/post.js";
 import { loadPriorState, type PriorOpen, type PriorState } from "./github/prior.js";
 import { ensureCommit, newHunks } from "./github/scope.js";
-import { sanitizeGitHubText } from "./github/sanitize.js";
+import { sanitizeGitHubText, type Sanitized } from "./github/sanitize.js";
 import { withHeadWorktree } from "./gather/worktree.js";
 import { mergeFindings, toPostedFinding } from "./merge/index.js";
 import { applySuppressions } from "./merge/suppress.js";
@@ -110,6 +110,13 @@ export interface RunInput {
    * gets it.
    */
   authorWriteAccess?: boolean;
+  /**
+   * The title and the body of the change, for a run without "pr". The eval
+   * gives the text of a case here. The run sanitizes it as the text of a
+   * pull request, and the record gives "pr" as the source. Absent means the
+   * description comes from the commit messages.
+   */
+  description?: { title: string; body: string };
   client?: SdkClient;
   now?: () => Date;
 }
@@ -190,6 +197,18 @@ function withRoleOverrides(req: QueryRequest, config: RepoConfig): QueryRequest 
       ...(set.effort !== undefined ? { effort: set.effort } : {}),
       ...req.overrides,
     },
+  };
+}
+
+// Sanitize a given title and body, and join them as the text of a pull
+// request.
+function givenDescription(given: { title: string; body: string }): Sanitized {
+  const title = sanitizeGitHubText(given.title);
+  const body = sanitizeGitHubText(given.body);
+  return {
+    text: `${title.text}\n\n${body.text}`,
+    sanitized: title.sanitized || body.sanitized,
+    truncated: title.truncated || body.truncated,
   };
 }
 
@@ -492,7 +511,11 @@ export async function runReview(input: RunInput): Promise<RunResult> {
     // With a pull request, the description is its sanitized title and body.
     // Else it is the sanitized commit messages that gather gives. Every
     // reviewer and verifier wraps it as untrusted text.
-    const prText = prContext ? prDescription(prContext.pr) : null;
+    const prText = prContext
+      ? prDescription(prContext.pr)
+      : input.description
+        ? givenDescription(input.description)
+        : null;
     const gathered: GatherResult = prText
       ? { ...commitsGathered, description: prText.text }
       : commitsGathered;
