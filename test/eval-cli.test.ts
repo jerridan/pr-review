@@ -226,7 +226,7 @@ function meta(costUsd: number): QueryMeta {
 type ScriptOptions = {
   /** In the even runs, the conventions reviewer reports the planted finding only. */
   vary?: boolean;
-  judgeAnswer?: "yes" | "no";
+  judgeAnswer?: "yes" | "no" | "fail";
   judgeCost?: number;
   /** Wait a moment in each query, so two runs at one time would overlap. */
   delay?: boolean;
@@ -306,6 +306,9 @@ function evalFake(opts: ScriptOptions = {}) {
           merged: [{ member_index: 0, claim: "merged", explanation: "e", severity: "blocking" }],
         });
       case "judge":
+        if (opts.judgeAnswer === "fail") {
+          return { ok: false, failure: { kind: "limit", message: "budget" }, raw: meta(0.25) };
+        }
         return out({ same_issue: opts.judgeAnswer ?? "yes", reason: "r" }, opts.judgeCost ?? 0.25);
       default:
         return out({ ok: true, word: "pong" });
@@ -810,6 +813,25 @@ describe("pr-review eval: the judge (R4.4, R5.2)", () => {
   );
 
   it(
+    "warns on stderr with the count of judge answers that are unknown",
+    async () => {
+      const cases = casesDir([
+        { name: "judged", golden: [{ ...PLANTED(), category: "security" }] },
+      ]);
+      const failing = await evalJson(evalFake({ judgeAnswer: "fail" }), cases, "--repeat", "1");
+      expect(failing.code, stderr).toBe(0);
+      expect(failing.report?.judge.unknown).toBe(1);
+      expect(stderr).toMatch(/warning: .*1 .*judge/);
+      stdout = "";
+      stderr = "";
+      const answered = await evalJson(evalFake({ judgeAnswer: "yes" }), cases, "--repeat", "1");
+      expect(answered.code, stderr).toBe(0);
+      expect(stderr).not.toMatch(/judge/);
+    },
+    RUN_TIMEOUT,
+  );
+
+  it(
     "sends the judge query to the model of --judge-model",
     async () => {
       const cases = casesDir([
@@ -852,17 +874,19 @@ describe("pr-review eval: the judge (R4.4, R5.2)", () => {
   );
 
   it(
-    "exits 2 after a run whose config gives a reviewer the judge model, with no judge query and no report",
+    "exits 2 before any query when a case config gives a reviewer the judge model",
     async () => {
       const cases = casesDir([
+        { name: "a-plain", golden: [PLANTED()] },
         { name: "same", from: sameJudgeTemplate, golden: [{ ...PLANTED(), category: "security" }] },
       ]);
       const fake = evalFake();
       const { code, out } = await evalCli(fake, cases, "--repeat", "2", "--format", "json");
       expect(code).toBe(2);
+      expect(stderr).toContain("same");
       expect(stderr).toContain("conventions");
-      expect(judgeCalls(fake)).toHaveLength(0);
-      expect(fake.calls.filter((c) => c.role === "triage")).toHaveLength(1);
+      expect(stderr).toContain("claude-sonnet-5-5");
+      expect(fake.calls).toHaveLength(0);
       expect(existsSync(join(out, "report.json"))).toBe(false);
       expect(stdout).toBe("");
     },
