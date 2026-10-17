@@ -32,11 +32,11 @@ fi
 
 # Print the string value of one key of the pin file, or fail.
 pin_value() {
-  PIN="$pin" KEY="$1" node -e '
-const { readFileSync } = require("node:fs");
+  PIN="$pin" KEY="$1" node --input-type=module -e '
+import { readFileSync } from "node:fs";
 const value = JSON.parse(readFileSync(process.env.PIN, "utf8"))[process.env.KEY];
 if (typeof value !== "string" || value === "") {
-  console.error(`fetch-cases: ${process.env.PIN} has no string "${process.env.KEY}"`);
+  console.error("fetch-cases: " + process.env.PIN + " has no string \"" + process.env.KEY + "\"");
   process.exit(1);
 }
 process.stdout.write(value);
