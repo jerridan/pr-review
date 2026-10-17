@@ -10,6 +10,7 @@ Goal: grow the case set of the eval beyond the starter set of D4a (section 8). A
 - Add cases by bug injection into jerridan/websites and jerridan/walle, with the source `injection`. Each injected bug is one golden finding.
 - Add cases from real records where a person acted on or dismissed a finding, with the source `record`.
 - Make each case with `scripts/make-case.sh` and add it to the cases repo as its README says. Move the pin in `eval/cases.json` and write a new baseline with `--write-baseline` in the same PR.
+- The gate margin tightens as the set grows, because a larger set has a smaller spread. Re-derive each margin from the new baseline run by the rule in the README.
 
 ## D4c: First experiments
 

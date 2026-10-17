@@ -600,7 +600,7 @@ The case set lives in a separate private repo, `jerridan/pr-review-cases`. Its R
 { "repo": "<owner>/<name>", "ref": "<sha>" }
 ```
 
-`scripts/fetch-cases.sh` brings the pinned case set to `eval/cases/`. Run it from the root of this repo. It uses `git` only, so `git` must reach the private repo, for example through `gh auth setup-git`. A second run fetches and checks out the new pin in place. The CLI never fetches the cases and never reads `eval/cases.json`. `eval/cases/` and `pr-review-eval/` are in `.gitignore`.
+`scripts/fetch-cases.sh` brings the pinned case set to `eval/cases/`. Run it from the root of this repo. It uses `git` only, so `git` must reach the private repo, for example through `gh auth setup-git`. The script takes a source url as its one argument. On a machine without a git credential helper, pass the ssh url: `scripts/fetch-cases.sh git@github.com:jerridan/pr-review-cases.git`. A second run fetches and checks out the new pin in place. The CLI never fetches the cases and never reads `eval/cases.json`. `eval/cases/` and `pr-review-eval/` are in `.gitignore`.
 
 ### Scoring
 
@@ -639,6 +639,15 @@ pr-review eval --cases eval/cases --repeat 3 --baseline eval/baseline.json --wri
 ```
 
 The write keeps the `margin` of the existing file, or uses 0.05 for each metric. It writes nothing when a repeat failed. No CI step writes the baseline.
+
+A margin smaller than the noise of the case set makes the gate fail on a run with no change. Pick each margin from the report of the baseline run:
+
+1. Take the spread of the metric: its aggregate `mean` minus its `min` over the repeats.
+2. Double the spread.
+3. Round up to the next multiple of 0.05.
+4. Use 0.05 when the result is smaller.
+
+For example, a precision with mean 0.667 and min 0.5 has a spread of 0.167. Twice the spread is 0.333, so the margin is 0.35. `--write-baseline` keeps an existing margin, so edit `margin` in the file after the run, then commit it.
 
 ### Explain a record
 
