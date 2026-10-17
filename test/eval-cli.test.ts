@@ -1066,6 +1066,27 @@ describe("pr-review eval: the gate and the baseline (R6)", () => {
   );
 
   it(
+    "names both cases refs in the table output when the baseline has another ref",
+    async () => {
+      const cases = twoCases();
+      await git(cases, ["init", "--quiet", "--initial-branch=main"]);
+      await git(cases, ["add", "-A"]);
+      await git(cases, ["-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "Cases"]);
+      const head = await git(cases, ["rev-parse", "HEAD"]);
+      const other = writeBaselineFile({ cases_ref: "d".repeat(40) });
+      const mismatch = await evalCli(evalFake(), cases, "--repeat", "1", "--baseline", other);
+      expect(mismatch.code, stderr).toBe(0);
+      expect(stdout).toContain(`Cases ref: ${head}; the baseline has ${"d".repeat(40)}`);
+      stdout = "";
+      const same = writeBaselineFile({ cases_ref: head });
+      const match = await evalCli(evalFake(), cases, "--repeat", "1", "--baseline", same);
+      expect(match.code, stderr).toBe(0);
+      expect(stdout).toMatch(new RegExp(`^Cases ref: ${head}$`, "m"));
+    },
+    RUN_TIMEOUT,
+  );
+
+  it(
     "reports a null cases ref for a plain directory inside a git work tree, with no warning",
     async () => {
       const inner = join(fx.repo, "eval-cases-plain");
