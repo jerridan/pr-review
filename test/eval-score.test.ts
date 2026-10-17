@@ -224,6 +224,29 @@ describe("scoreRecord: the exact pass (R4.1, R4.6)", () => {
     expect(result.matched).toEqual([{ posted: 0, golden: 0, via: "exact" }]);
   });
 
+  // One posted finding overlaps both goldens, and the other overlaps only
+  // the first. A greedy pass in posted order can match the wide finding
+  // to the first golden and leave the narrow one with no exact golden.
+  it.each<[string, PostedFinding[]]>([
+    ["the wide finding first", [posted("src/a.ts", 11, 14), posted("src/a.ts", 11, 11)]],
+    ["the narrow finding first", [posted("src/a.ts", 11, 11), posted("src/a.ts", 11, 14)]],
+  ])(
+    "finds the most exact matches whatever the posted order, with %s",
+    async (_label, findings) => {
+      const fake = judgeFake(["no", "no"]);
+      const result = await score(
+        findings,
+        [golden("src/a.ts", 11, 11), golden("src/a.ts", 14, 14)],
+        fake,
+      );
+      expect(result.matched).toHaveLength(2);
+      expect(result.matched.every((m) => m.via === "exact")).toBe(true);
+      expect(new Set(result.matched.map((m) => m.posted))).toEqual(new Set([0, 1]));
+      expect(new Set(result.matched.map((m) => m.golden))).toEqual(new Set([0, 1]));
+      expect(fake.calls).toHaveLength(0);
+    },
+  );
+
   it("resolves exact matches before it asks the judge about an earlier ambiguous pair", async () => {
     const fake = judgeFake(["yes"]);
     const result = await score(
