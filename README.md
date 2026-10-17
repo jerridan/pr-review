@@ -364,7 +364,7 @@ The workflow needs two repo secrets:
 | Secret | Content |
 |--------|---------|
 | `CLAUDE_CODE_OAUTH_TOKEN` | The token of `claude setup-token`. Only the eval step gets it. |
-| `CASES_TOKEN` | A fine-grained token with read access to the contents of `<cases-repo>` only. Only the checkout of the cases repo gets it, and the checkout keeps no token in `.git/config`. |
+| `CASES_TOKEN` | A fine-grained token with read access to the contents of `jerridan/pr-review-cases` only. Only the checkout of the cases repo gets it, and the checkout keeps no token in `.git/config`. |
 
 Set both with `gh secret set <name>`. The workflow has the permission `contents: read` and nothing more.
 
@@ -594,7 +594,7 @@ The script writes `case.json`, `repo.bundle` and `diff.patch`. It takes the titl
 
 ### The cases repo and the pin
 
-The case set lives in a separate private repo, `<cases-repo>`. Its README tells how to add a case. `eval/cases.json` pins it:
+The case set lives in a separate private repo, `jerridan/pr-review-cases`. Its README tells how to add a case. `eval/cases.json` pins it:
 
 ```json
 { "repo": "<owner>/<name>", "ref": "<sha>" }
