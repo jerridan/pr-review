@@ -7,6 +7,8 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { EXIT_FAILURE, EXIT_GATE, EXIT_OK, EXIT_USAGE, type ProgramDeps } from "../cli.js";
 import { JUDGE_DEFAULTS, ROLE_DEFAULTS, resolveModel } from "../config/models.js";
+import { loadRepoConfig } from "../config/repo-config.js";
+import { effectiveModel, loadBuiltinReviewers } from "../reviewers/loader.js";
 import { runReview } from "../run.js";
 import type { SdkClient } from "../sdk/client.js";
 import type { RunOptions } from "../sdk/options.js";
@@ -62,15 +64,67 @@ async function clientOf(deps: ProgramDeps): Promise<SdkClient> {
   return createSdkClient();
 }
 
+const TIER_RANK: Record<Tier, number> = { skip: 0, fast: 1, full: 2 };
+
+/**
+ * The reviewers of a case that can run at "tier" and that use the judge
+ * model. The run reads the .pr-review/ config from the base commit, so
+ * this check reads it there too. A reviewer that the config disables
+ * does not count. The check does not know the triage categories or the
+ * changed paths, so it counts every reviewer that the tier permits. A
+ * config that does not load gives no reviewer: the run of that case then
+ * fails as a failed repeat.
+ */
+async function judgeModelReviewers(
+  clone: string,
+  c: Case,
+  tier: Tier,
+  judgeModel: string,
+): Promise<string[]> {
+  if (tier === "skip") return [];
+  let loaded;
+  try {
+    loaded = await loadRepoConfig(clone, c.base);
+  } catch {
+    return [];
+  }
+  const { config } = loaded;
+  return [...loadBuiltinReviewers(), ...loaded.customReviewers]
+    .filter((def) => TIER_RANK[def.frontmatter.triggers.min_tier] <= TIER_RANK[tier])
+    .filter((def) => config.reviewers[def.frontmatter.name]?.enabled !== false)
+    .filter((def) => effectiveModel(def, config).model === judgeModel)
+    .map((def) => def.frontmatter.name);
+}
+
+type SameJudge = { case: string; reviewers: string[] };
+
 // Clone the bundle of each case once, so a sha that does not resolve
-// stops the eval before any model call.
-async function checkBundles(cases: Case[]): Promise<void> {
+// stops the eval before any model call. Unless --allow-same-judge is
+// given, give the first case whose reviewers use the judge model.
+async function checkCases(
+  cases: Case[],
+  opts: EvalOptions,
+  judgeModel: string,
+): Promise<SameJudge | null> {
   const root = await mkdtemp(join(tmpdir(), "pr-review-eval-check-"));
   try {
-    for (const c of cases) await cloneCase(c, join(root, c.name));
+    for (const c of cases) {
+      const clone = await cloneCase(c, join(root, c.name));
+      if (opts.allowSameJudge) continue;
+      const reviewers = await judgeModelReviewers(clone, c, opts.tier, judgeModel);
+      if (reviewers.length > 0) return { case: c.name, reviewers };
+    }
+    return null;
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+}
+
+function sameJudgeMessage(where: string, reviewers: string[], judgeModel: string): string {
+  return (
+    `${where}: the reviewers ${reviewers.join(", ")} use the judge model ${judgeModel}. ` +
+    "Give another --judge-model, or give --allow-same-judge."
+  );
 }
 
 // Read the baselines of the flags. "gate" is the baseline to compare with.
@@ -173,12 +227,17 @@ export async function runEval(opts: EvalOptions, deps: ProgramDeps): Promise<num
   }
 
   let cases: Case[];
+  let sameJudge: SameJudge | null;
   try {
     cases = await loadCases(opts.cases);
-    await checkBundles(cases);
+    sameJudge = await checkCases(cases, opts, judgeModel);
   } catch (err) {
     if (!(err instanceof CaseError)) throw err;
     say(err.message);
+    return EXIT_USAGE;
+  }
+  if (sameJudge !== null) {
+    say(sameJudgeMessage(`case ${sameJudge.case}`, sameJudge.reviewers, judgeModel));
     return EXIT_USAGE;
   }
 
@@ -206,11 +265,11 @@ export async function runEval(opts: EvalOptions, deps: ProgramDeps): Promise<num
     const repeats: RepeatMetrics[] = [];
     for (let repeat = 1; repeat <= opts.repeat; repeat++) {
       const outcome = await runRepeat(ctx, c, repeat);
+      // The pre-flight catches a config that gives a reviewer the judge
+      // model. This check stays as a safety net for a model that only the
+      // run can see.
       if (outcome.kind === "same-judge") {
-        say(
-          `case ${c.name}, repeat ${repeat}: the reviewers ${outcome.reviewers.join(", ")} ` +
-            `use the judge model ${judgeModel}. Give another --judge-model, or give --allow-same-judge.`,
-        );
+        say(sameJudgeMessage(`case ${c.name}, repeat ${repeat}`, outcome.reviewers, judgeModel));
         return EXIT_USAGE;
       }
       repeats.push(outcome.metrics);
