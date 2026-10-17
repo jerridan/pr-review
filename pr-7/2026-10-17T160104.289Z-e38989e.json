@@ -1,0 +1,2600 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 7,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Add the evaluation harness: pr-review eval, pr-review explain and the CI gate (D4a)",
+      "draft": true,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/7"
+    },
+    "run_kind": "later",
+    "prior": {
+      "head": "3682535444277fdc8f01568b9c4ebb5b8ae6c1d4",
+      "source": "record",
+      "record": "/home/runner/work/_temp/pr-review-records/pr-7/2026-10-17T040546.267Z-3682535.json",
+      "open": [],
+      "dismissed": [],
+      "fetch_failed": false
+    },
+    "base": "78fed5b4a279610f60daeb2b83ef53d7123d1cb7",
+    "head": "e38989e65edea6045047f71d04cbb0a0be8f3972",
+    "started_at": "2026-10-17T16:01:04.289Z",
+    "tool_version": "0.1.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Add the evaluation harness: pr-review eval, pr-review explain and the CI gate (D4a)\n\nImplements D4a of TICKETS.md: the evaluation harness. `pr-review eval` runs each case of a pinned case set, scores the posted findings against golden findings, reports recall, precision, findings per case, cost per case and the spread over repeats, and gates on a baseline. `pr-review explain` shows why each finding of a record was kept or dropped. A CI workflow runs the checks on every PR and the eval gate at repeat 3 on every PR that touches `prompts/`, `src/`, `eval/`, `package.json` or `package-lock.json`.\n\n## What landed\n\n- The case format, `loadCases`, `casesRef`, `cloneCase`, `scripts/make-case.sh` and `scripts/fetch-cases.sh`.\n- The judge role (Sonnet 5.5, effort high, no tools) in `src/config/models.ts`, `prompts/judge.md`, and the match-then-judge scorer in `src/eval/match.ts` and `src/eval/score.ts`.\n- `pr-review eval` with its flags, exit codes 0, 1, 2 and 3, the report document and the baseline gate.\n- `pr-review explain <record> [--format table|json]`.\n- `.github/workflows/ci.yml`, the README sections Evaluate and Continuous integration, the CLAUDE.md line, the D4b and D4c tickets, and design section 9.\n- `eval/cases.json` pins the case set and `eval/baseline.json` holds the first baseline.\n\n## The cases repo\n\nThe case set lives in the private repo https://github.com/jerridan/pr-review-cases, pinned at 31b9e32346052b5914ff0c3a23c51935f715cdab. It holds four starter cases: `fixture-off-by-one` from `scripts/make-fixture.sh`, and `pr-4-consumer-workflow`, `pr-5-tests-reviewer-checks` and `pr-6-review-body-summary` from this repo's merged PRs at the head each reviewed run saw. The principal reviewed every `golden.json` on 2026-10-16 and kept five of the seven prepared goldens: the planted bug of the fixture, the README-restating tests of PR 4, the two prompt defects of PR 5 fixed in 28c0f51, and the missing blank line in the review body of PR 6. The principal struck the stale frontmatter description of PR 5 and the design-doc line of PR 6, because a golden defines what the tool must find and neither is a finding the principal wants raised. The code-bug volume comes with D4b (ReviewBench, Martian, bug injection). The charter's criterion says \"a case set seeded from the three sources above\"; this PR delivers D4a, the cut the principal made, so the pinned set is the starter set of one fixture case and three PR cases from this repo, not the seeded set. TICKETS.md D4b holds the three sources.\n\nThe CI eval job checks the cases repo out with the `CASES_TOKEN` secret, a fine-grained read-only token on that repo, set by the principal. The checkout keeps no token.\n\n## The live check\n\n`node dist/cli.js eval --cases eval/cases --repeat 3 --baseline eval/baseline.json --write-baseline` against the real SDK, 12 records, no failed repeat, no judge call, about $24 of review cost:\n\n```\nCase: fixture-off-by-one\nrepeat  recall  precision  posted  cost\n1       1.000   0.500      2       $4.0310\n2       1.000   1.000      1       $0.8236\n3       1.000   0.500      2       $1.1214\n\nCase: pr-4-consumer-workflow\nrepeat  recall  precision  posted  cost\n1       0.000   -          0       $1.6151\n2       0.000   -          0       $3.3633\n3       0.000   -          0       $2.3344\n\nCase: pr-5-tests-reviewer-checks\nrepeat  recall  precision  posted  cost\n1       0.000   -          0       $1.6008\n2       0.000   -          0       $1.3806\n3       0.000   -          0       $0.7843\n\nCase: pr-6-review-body-summary\nrepeat  recall  precision  posted  cost\n1       0.000   -          0       $2.5202\n2       0.000   -          0       $2.7076\n3       0.000   -          0       $2.0004\n\nSummary over 3 repeats\nmetric             mean     min      max\nrecall             0.250    0.250    0.250\nprecision          0.667    0.500    1.000\nfindings per case  0.417    0.250    0.500\ncost per case      $2.0236  $1.5601  $2.4418\n```\n\n`eval/baseline.json` is what that run wrote: recall 0.25, precision 0.667, margin 0.05 each. The three PR cases posted nothing in nine runs, which is the recall gap the eval now measures: each of their goldens is a finding the verifier dropped by score.\n\n## Dependencies\n\n`package.json` gains no `dependencies` entry and no `devDependencies` entry.\n\n## Spec\n\n# Spec: D4a, the evaluation harness\n\nThe harness measures a change to a prompt, a threshold or a model before it ships, as design section 8 describes. It adds the command `pr-review eval`. That command reviews a set of frozen cases several times and scores the posted findings against golden findings. It adds the command `pr-review explain`, which shows why each finding of a run record was kept or dropped. It adds a CI gate that fails when recall or precision drops past a margin. The case set lives in a separate private repo that pr-review pins.\n\nD4a builds the harness and a starter case set from this repo. D4b adds cases from ReviewBench, Martian, bug injection into jerridan/websites and jerridan/walle, and cases derived from real records. D4c runs the five first experiments and writes the results to `docs/research/`. D4a does not change the behaviour of `pr-review run`, any prompt except the new judge prompt, or any threshold. A run record keeps the same shape: `identity.models` has the same keys as before D4a, and every record that a release before D4a wrote still passes the record schema, for `explain` and for the prior-record lookup of a later run.\n\n## Requirements\n\n### R1. The case format\n\nR1.1. A case is one directory. It holds the four files in this table. A missing file makes the case invalid, except `case.json`: a directory without it is not a case, as R1.9 says.\n\n| File | Content |\n|------|---------|\n| `case.json` | The case metadata. R1.2 lists the fields. |\n| `repo.bundle` | A git bundle. It holds `base`, `head` and the history between them. |\n| `diff.patch` | The three-dot diff from `base` to `head`, kept for a reader. |\n| `golden.json` | The golden findings. R1.5 lists the fields. |\n\nR1.2. `case.json` holds the fields in this table. The `name` field equals the name of the case directory.\n\n| Field | Content |\n|-------|---------|\n| `name` | The case name. |\n| `source` | One of `fixture`, `pr`, `reviewbench`, `martian`, `injection`, `record`. |\n| `base` | The base sha. |\n| `head` | The head sha. |\n| `title` | The title of the change. |\n| `body` | The body of the change. |\n| `origin` | Free text that says where the case came from, such as a PR url. |\n| `language` | The main language of the case. |\n\nR1.3. The schema of `source` accepts all six values. D4a ships cases with the sources `fixture` and `pr` only.\n\nR1.4. `git clone repo.bundle <dir>` gives a checkout in which both `base` and `head` resolve.\n\nR1.5. `golden.json` holds `findings[]`. Each entry holds the fields in this table. `start_line` is at least 1. `end_line` is at least `start_line`.\n\n| Field | Content |\n|-------|---------|\n| `file` | The path of the file. |\n| `start_line`, `end_line` | The line span of the finding. |\n| `category` | One of `bug`, `security`, `test`, `convention`, `docs`, `performance`, `other`. |\n| `severity` | One of `blocking`, `suggestion`, `nit`. |\n| `claim` | What the finding says. |\n| `note` | Optional. A note for the labeler. |\n\nR1.6. A zod schema validates `case.json` and `golden.json`.\n\nR1.7. The harness runs the CLI against the checkout from the bundle. It does not read the content of `diff.patch`.\n\nR1.8. A case with a missing file, an invalid schema, or a bundle in which a sha does not resolve fails the eval. The message names the case and the problem. The eval exits 2 before any model call. The eval validates every case before it starts the first run.\n\nR1.9. A cases directory holds one subdirectory per case. `--cases <dir>` points at that directory. The eval reads every subdirectory that holds `case.json`, in name order. A subdirectory without `case.json` is not a case. A cases directory with no case makes the eval exit 2 with a message.\n\nAccept when:\n\n- R1.1: a test that deletes each of `repo.bundle`, `diff.patch` and `golden.json` in turn from a valid case sees exit 2 each time, with the case name in the message.\n- R1.2: `case.json` with a missing field, a wrong type, or a `source` outside the six values exits 2. A `name` that differs from the directory name exits 2.\n- R1.3: a `case.json` for each of the six `source` values passes validation.\n- R1.4: `git clone repo.bundle` of each starter case succeeds, and `git rev-parse <base>^{commit}` and `git rev-parse <head>^{commit}` succeed in the clone.\n- R1.5: a `golden.json` with an unknown `category`, an unknown `severity`, a `start_line` below 1, or an `end_line` below `start_line` exits 2.\n- R1.6: the validation tests of R10.4 fail on each invalid file.\n- R1.7: a test that replaces the content of `diff.patch` with other text sees the same report.\n- R1.8: a bundle that lacks the `base` sha exits 2 with the case name in the message. The fake client records zero calls.\n- R1.9: a cases directory with two cases and one subdirectory without `case.json` gives a report of two cases, in name order. An empty cases directory exits 2.\n\n### R2. The cases repo and the pin\n\nR2.1. The case set lives in a separate private repo. This spec calls it `<cases-repo>`. The principal picks the name. The proposed name is `jerridan/pr-review-cases`.\n\nR2.2. The root of `<cases-repo>` holds one directory per case, in the R1 format, and a README that says how to add a case. A clone of the repo is a cases directory in the sense of R1.9.\n\nR2.3. pr-review pins `<cases-repo>` in `eval/cases.json`. The file holds `{ \"repo\": \"<owner>/<name>\", \"ref\": \"<sha>\" }`.\n\nR2.4. The CLI never fetches the cases and never reads `eval/cases.json`. The eval learns the ref of the case set from the cases directory itself: when `--cases <dir>` is the top level of a git work tree, the ref is the sha of its HEAD; otherwise the ref is null. A plain directory inside another repo's work tree, such as `eval/cases/` before a fetch, gives null and never the enclosing repo's HEAD. R6.4 and R6.5 use that ref.\n\nR2.5. The script `scripts/fetch-cases.sh [<source>]` brings the pinned case set to `eval/cases/` for a local run. It reads `repo` and `ref` from `eval/cases.json`, and both `eval/cases.json` and `eval/cases/` are relative to the current directory, so a user runs it from the repo root. It uses `git` only; `git` finds the user's own GitHub login through the credential helper that `gh auth setup-git` installs. `<source>` replaces the repo with a url or a local path, so a test can point the script at a local git repository. When `eval/cases/` does not exist, the script clones the source there and checks out the ref. When `eval/cases/` is a git work tree, the script fetches from the source and checks out the ref in place. When `eval/cases/` exists and is not a git work tree, the script exits non-zero with a message and changes nothing. After it runs, `eval/cases/` holds one directory per case, so `--cases eval/cases` finds the cases.\n\nR2.6. `eval/cases/` and `pr-review-eval/` are gitignored.\n\nR2.7. CI checks out `<cases-repo>` at the pinned sha. R8.4 states how.\n\nR2.8. Rule 4 of CLAUDE.md holds. The tool reads no token. The workflow passes the `CASES_TOKEN` secret to the checkout step only. The eval step runs with `CLAUDE_CODE_OAUTH_TOKEN` alone.\n\nR2.9. D4a seeds `<cases-repo>` with a starter set from this repo:\n\n- The case `fixture-off-by-one` is the repo that `scripts/make-fixture.sh` builds. Its golden is the planted bug. The file is `src/stats.ts`. The start line and the end line are the line in the `PLANTED` output. The category is `bug`.\n- At least three cases come from merged PRs of this repo. PR #4, #5 and #6 and the D3 PR #3 are the candidates.\n- The `head` of a PR case is the commit that the reviewed run saw, not the merge commit, so each golden finding exists at `head`. The goldens of the PR cases are the findings that the principal confirmed or fixed after that run. For PR #5 the head is 2222249 and the goldens are the three findings fixed in commit 28c0f51.\n- A person labels each golden by hand. The run asks the principal to review every `golden.json` before the PR opens, records the answer in `decisions.md`, and cites that entry in the PR body.\n\nR2.10. The script `scripts/make-case.sh <repo> <base> <head> <name>` writes `case.json`, `repo.bundle` and `diff.patch` into the directory `<name>` in the current directory. It fills `name`, `base` and `head`. It takes `title` and `body` from the head commit message. It sets `source` to `pr` and `origin` and `language` to empty strings. The labeler edits these fields and writes `golden.json`.\n\nR2.11. The run prepares the content of `<cases-repo>` as a directory in the layout of R2.2. The PR body names the path. Creating the repo on GitHub is the action of the principal. The run pushes the content to it. When the repo does not exist when the cases content is ready, the run stops and asks the principal, and the PR does not open before the push.\n\nR2.12. The principal owns three actions, and the run asks for each at the point it is needed:\n\n| Action | When |\n|--------|------|\n| Create `<cases-repo>` as a private repo | Before the cases package starts. The run pushes the content once the repo exists. |\n| Create `CASES_TOKEN`, a fine-grained token with read access to the contents of `<cases-repo>` only, and add it as a secret of pr-review | Before the D4a PR's own eval job can pass. That PR changes `src/` and `eval/`, so the job runs on it. |\n| Review every `golden.json` | Before the PR opens. |\n\nR2.13. At merge, `eval/cases.json` names the real repo and a sha that exists in it, and `eval/baseline.json` holds the result of a live eval at repeat 3 on that pinned set, written by `--write-baseline`.\n\nAccept when:\n\n- R2.1: the README, the PR body and the spec use one placeholder or one name for the repo. No file names a different repo.\n- R2.2: the prepared content has one directory per starter case and a README at its root. The README holds the steps to add a case.\n- R2.3: `eval/cases.json` parses as an object with the string keys `repo` and `ref`, and `repo` matches `<owner>/<name>`.\n- R2.4: `grep` finds no network call, no `gh` call and no `cases.json` read in the code of the `eval` command. A test that runs the eval on a cases directory that is a git checkout reports that checkout's HEAD sha as the ref; a test on a plain directory inside a git work tree reports null.\n- R2.5: a test runs the script in a temporary directory that holds its own `eval/cases.json`, with a local git repository as `<source>`, and finds `eval/cases/` at the pinned sha, with one case directory per case. A second run after a new commit in the source and a new pin checks out the new sha in place. A run with an unknown ref exits non-zero. A run with a plain file at `eval/cases` exits non-zero and leaves it.\n- R2.6: `git check-ignore eval/cases/x` and `git check-ignore pr-review-eval/x` exit 0.\n- R2.7: R8.4 passes.\n- R2.8: `grep -n \"CASES_TOKEN\" .github/workflows/ci.yml` finds the secret only in the `with` block of the cases checkout step. The eval step `env` holds `CLAUDE_CODE_OAUTH_TOKEN` and no other secret. A search of `src/` finds no read of `CASES_TOKEN`.\n- R2.9: the prepared content holds `fixture-off-by-one` and at least three PR cases. The golden of `fixture-off-by-one` names `src/stats.ts` and the line of `PLANTED`. `decisions.md` holds the principal's answer to the golden review, and the PR body cites it.\n- R2.10: a test runs the script on the fixture repo. `git clone repo.bundle` of the output resolves both shas. `diff.patch` equals `git diff <base>...<head>` of the source repo. `case.json` holds the arguments.\n- R2.11: the PR body names the url of the pushed repo, and the prepared content is at the path the PR body names.\n- R2.12: the record's `decisions.md` or `escalations` holds each of the three asks and its answer.\n- R2.13: `gh api repos/<repo>/commits/<ref>` exits 0 for the pinned sha, and `eval/baseline.json` has `repeat` 3 and a `cases_ref` equal to that sha.\n\n### R3. The `eval` command\n\nR3.1. The command is `pr-review eval --cases <dir> [--repeat <n>] [--baseline <file>] [--write-baseline] [--out <dir>] [--format table|json] [--tier full|fast|skip] [--judge-model <id>] [--allow-api-key] [--allow-same-judge]`. This table lists the flags.\n\n| Flag | Meaning | Default |\n|------|---------|---------|\n| `--cases <dir>` | The cases directory. Required. | none |\n| `--repeat <n>` | The number of runs of each case. A positive integer. | 3 |\n| `--baseline <file>` | The baseline file for the gate. R6 states the use. | none |\n| `--write-baseline` | Write the baseline file. R6.5 states the rules. | off |\n| `--out <dir>` | The directory for every run record and the report. | `./pr-review-eval` |\n| `--format table\\|json` | The format of the report on stdout. | `table` |\n| `--tier full\\|fast\\|skip` | The tier of every run. | `full` |\n| `--allow-api-key` | The flag of `pr-review run` with the same name. It also applies to the judge queries. | off |\n| `--judge-model <id>` | The model of the judge. An alias or an exact id, as `src/config/models.ts` resolves them. | the `judge` role default |\n| `--allow-same-judge` | Allow the judge model to equal a reviewer model. R4.4 states the rule. | off |\n\nR3.2. For each case in name order and for each repeat in order from 1, the eval clones the bundle into a temporary directory, checks out `head`, and runs the review. The runs go in sequence. The eval runs no two reviews at the same time.\n\nR3.3. The review runs in process through the same code path as `pr-review run --base <base> --head <head> --repo <tmp> --format json --out <out>/<case>/<repeat>/`.\n\nR3.4. The eval uses the SDK client of the program. A test gives a fake client through `createProgram(deps)`. The review queries and the judge queries use the same client.\n\nR3.5. The description of the change comes from the `title` and the `body` of `case.json`. The text takes the same sanitizer and the same untrusted wrapper as the title and body of a pull request, and the record's `description_meta.source` is `pr`, because the case text stands in for the pull request text. The eval makes no `gh` call and no GitHub request. It makes no network request except through the SDK client.\n\nR3.6. The tier of every run is `full`, so every case uses the same reviewer set. `--tier` overrides it.\n\nR3.7. Each run record is a normal record under `<out>/<case>/<repeat>/`. `pr-review explain` works on it. The records are eval samples.\n\nR3.8. A run that exits 1, or that throws, is a failed repeat. The report lists it and its metrics are null. The eval still finishes every other run. The eval exits 1 when any repeat failed.\n\nR3.9. A usage error exits 2. These are usage errors: no `--cases`, a `--repeat` that is not a positive integer, a `--format` outside the two values, a `--tier` outside the three values, and `--write-baseline` without `--baseline`.\n\nR3.10. This table lists the exit codes of `eval` and `explain`. The exit codes of `run` do not change. A case whose `.pr-review/` config is invalid makes its run exit 1, which is a failed repeat under R3.8.\n\n| Code | Meaning |\n|------|---------|\n| 0 | The command ran and, for `eval`, the gate passed or did not run. |\n| 1 | A failed repeat, or a run error. |\n| 2 | A usage error, an invalid case, or a configuration error such as a judge model equal to a reviewer model. |\n| 3 | The gate failed. |\n\nR3.11. When a failed repeat and a failed gate happen in one eval, the exit code is 1. The report still holds `gate`.\n\nAccept when:\n\n- R3.1: `pr-review eval --help` lists every flag in the table, with the defaults.\n- R3.2: a test with two cases and `--repeat 2` finds four record directories and four runs, and a fake that records the order of calls shows no overlap between two runs.\n- R3.3: a test runs `pr-review run --tier full` and `pr-review eval --repeat 1` on one checkout with one fake script. The two records are equal except for `identity.repo`, `i",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": true,
+      "truncated": true
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": ".github/workflows/ci.yml",
+        "hunks": 1
+      },
+      {
+        "path": ".gitignore",
+        "hunks": 1
+      },
+      {
+        "path": "CLAUDE.md",
+        "hunks": 1
+      },
+      {
+        "path": "README.md",
+        "hunks": 2
+      },
+      {
+        "path": "TICKETS.md",
+        "hunks": 2
+      },
+      {
+        "path": "docs/design/high-level-design.md",
+        "hunks": 1
+      },
+      {
+        "path": "eval/baseline.json",
+        "hunks": 1
+      },
+      {
+        "path": "eval/cases.json",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/judge.md",
+        "hunks": 1
+      },
+      {
+        "path": "scripts/fetch-cases.sh",
+        "hunks": 1
+      },
+      {
+        "path": "scripts/make-case.sh",
+        "hunks": 1
+      },
+      {
+        "path": "src/cli.ts",
+        "hunks": 6
+      },
+      {
+        "path": "src/config/models.ts",
+        "hunks": 2
+      },
+      {
+        "path": "src/eval/baseline.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/case.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/checkout.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/match.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/metrics.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/report.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/run.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/score.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/explain/format.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/explain/index.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/explain/tie.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/run.ts",
+        "hunks": 8
+      },
+      {
+        "path": "src/schemas/judge.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/sdk/client.ts",
+        "hunks": 2
+      },
+      {
+        "path": "src/sdk/options.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/eval-baseline.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/eval-case.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/eval-cli.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/eval-match.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/eval-metrics.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/eval-score.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/eval-scripts.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/explain.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/fixtures/record-pre-d4a.json",
+        "hunks": 1
+      },
+      {
+        "path": "test/packaging.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/prompt-sources.test.ts",
+        "hunks": 7
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [
+      ".github/workflows/ci.yml"
+    ],
+    "triage": null,
+    "tier": "full",
+    "tier_reason": "Sensitive paths set a floor of full: .github/workflows/ci.yml.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 9010,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 40257,
+              "outputTokens": 24,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0040377,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 511,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 44758,
+              "webSearchRequests": 0,
+              "costUSD": 0.368292,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 205,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.3723297
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "eval/cases.json",
+            "start_line": 3,
+            "end_line": 3,
+            "category": "docs",
+            "severity_estimate": "suggestion",
+            "confidence": "high",
+            "claim": "The description says the cases repo is pinned at 31b9e32346052b5914ff0c3a23c51935f715cdab, but the pin names another sha.",
+            "evidence": "\"ref\": \"ee190ec973e42ce10b1af47d149237eafac7ec2d\"",
+            "suggested_fix": "Make the description and the pin name the same sha.",
+            "explanation": "The pinned ref differs from the sha in the description.",
+            "needs_context": false
+          },
+          {
+            "file": "eval/baseline.json",
+            "start_line": 2,
+            "end_line": 3,
+            "category": "docs",
+            "severity_estimate": "suggestion",
+            "confidence": "high",
+            "claim": "The description says the baseline holds recall 0.25 and precision 0.667, which the live run wrote, but the file holds other values.",
+            "evidence": "\"recall\": 0.20833333333333334,",
+            "explanation": "The committed baseline does not match the live run in the description.",
+            "needs_context": false
+          },
+          {
+            "file": "eval/baseline.json",
+            "start_line": 4,
+            "end_line": 7,
+            "category": "docs",
+            "severity_estimate": "blocking",
+            "confidence": "high",
+            "claim": "The description says the margin is 0.05 for each metric, but the file sets 0.2 for recall and 0.6 for precision. The precision margin of 0.6 almost disables the precision gate.",
+            "evidence": "\"precision\": 0.6",
+            "suggested_fix": "Use the margins that the description states, or document and justify these margins.",
+            "explanation": "A margin of 0.6 against a baseline of 0.611 lets precision fall to near zero without a gate failure, and the description does not mention it.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 9971,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 40259,
+              "outputTokens": 23,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.004037400000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 1038,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 44718,
+              "webSearchRequests": 0,
+              "costUSD": 0.378512,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 105,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.38254940000000004
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "eval/baseline.json",
+            "start_line": 2,
+            "end_line": 8,
+            "category": "bug",
+            "severity_estimate": "blocking",
+            "confidence": "medium",
+            "claim": "The baseline margins of 0.2 for recall and 0.6 for precision make the CI gate almost unable to fail, and the file's values do not match the run in the description.",
+            "evidence": "    \"precision\": 0.6",
+            "suggested_fix": "Set margins by the README rule (2×(mean−min), rounded up to the next 0.05). Pin the baseline to the same cases_ref as eval/cases.json and the run in the description.",
+            "explanation": "The precision baseline is 0.611 and its margin is 0.6, so the gate passes even if precision falls to about 0.011. The description says the run wrote recall 0.25, precision 0.667, margins of 0.05 each and cases_ref 31b9e32..., but this file holds other values.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7851,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 40265,
+              "outputTokens": 23,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.004038000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 571,
+              "cacheReadInputTokens": 4899,
+              "cacheCreationInputTokens": 39770,
+              "webSearchRequests": 0,
+              "costUSD": 0.3305678,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 147,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.3346058
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "eval/baseline.json",
+            "start_line": 4,
+            "end_line": 7,
+            "category": "bug",
+            "severity_estimate": "blocking",
+            "confidence": "medium",
+            "claim": "The baseline margins (recall 0.2, precision 0.6) are nearly equal to the baseline values, so the gate almost never fails.",
+            "evidence": "    \"recall\": 0.2,\n    \"precision\": 0.6",
+            "suggested_fix": "Re-derive the margins by the README rule, for example 0.35 for precision.",
+            "explanation": "With a precision of 0.611 and a margin of 0.6, the gate fails only when precision drops below about 0.011, so it gives almost no protection.",
+            "needs_context": false
+          },
+          {
+            "file": "eval/baseline.json",
+            "start_line": 2,
+            "end_line": 8,
+            "category": "other",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "The committed baseline and pin do not match the live run that the description reports (ref 31b9e32, recall 0.25, precision 0.667).",
+            "evidence": "\"cases_ref\": \"ee190ec973e42ce10b1af47d149237eafac7ec2d\",",
+            "suggested_fix": "Re-run --write-baseline on the pinned set and update the description.",
+            "explanation": "The baseline may not be the result of a run on the case set that the description states.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 11741,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 40263,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0040368,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 1182,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 44667,
+              "webSearchRequests": 0,
+              "costUSD": 0.380984,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 185,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.3850208
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 9972,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 40259,
+              "outputTokens": 19,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.004035400000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 774,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 44670,
+              "webSearchRequests": 0,
+              "costUSD": 0.372848,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 339,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.37688340000000004
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "eval/baseline.json",
+            "start_line": 4,
+            "end_line": 7,
+            "category": "bug",
+            "severity_estimate": "blocking",
+            "confidence": "high",
+            "claim": "The baseline margins of 0.2 for recall and 0.6 for precision almost equal the baseline values, so the CI gate cannot catch a real drop.",
+            "evidence": "    \"precision\": 0.6",
+            "suggested_fix": "Set each margin by the README rule from the baseline run's spread, for example 0.05 for recall and 0.35 for precision.",
+            "explanation": "Precision 0.611 with margin 0.6 means the gate fails only if precision drops below about 0.011. The PR description says margin 0.05 each, and the README rule gives at most 0.35. The file's values and cases_ref also differ from the run that the PR describes (0.25/0.667 at 31b9e32).",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 9748,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 56869,
+              "outputTokens": 19,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.005696400000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 776,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 58336,
+              "webSearchRequests": 0,
+              "costUSD": 0.4828278,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 122,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.48852419999999996
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "eval/baseline.json",
+            "start_line": 4,
+            "end_line": 7,
+            "category": "security",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "The baseline margins of 0.2 for recall and 0.6 for precision almost disable the CI eval gate. The PR body says that both margins are 0.05.",
+            "evidence": "    \"precision\": 0.6",
+            "suggested_fix": "Set each margin by the README rule from the baseline run spread, for example 0.05 for recall and 0.35 for precision. Make the values match the PR description.",
+            "explanation": "With precision 0.611 and margin 0.6, precision can fall to about 0.011 before the gate fails. The recall margin of 0.2 permits nearly the full 0.208 baseline to be lost. So a regression in the prompt or the model can pass CI unnoticed.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7158,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 40253,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0040358,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 496,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 41696,
+              "webSearchRequests": 0,
+              "costUSD": 0.34410779999999996,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 155,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.34814359999999994
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "eval/baseline.json",
+            "start_line": 4,
+            "end_line": 7,
+            "category": "security",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "The baseline margins are so wide that the CI eval gate almost never fails. The values also contradict the PR body, which says margin 0.05, recall 0.25, precision 0.667 and a different cases ref.",
+            "evidence": "    \"recall\": 0.2,\n    \"precision\": 0.6",
+            "suggested_fix": "Set each margin by the README rule from the baseline run's spread. Make the file match the run that the PR body reports, or update the PR body.",
+            "explanation": "With precision 0.611 and margin 0.6, the gate fails only when precision drops below about 0.011. With recall 0.208 and margin 0.2, it fails only when recall drops below about 0.008. So the gate guards nothing in practice.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 8637,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 40261,
+              "outputTokens": 19,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0040356,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 517,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 41704,
+              "webSearchRequests": 0,
+              "costUSD": 0.3445918,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 164,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.34862740000000003
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/run.ts",
+            "start_line": 306,
+            "end_line": 314,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "No test covers the error path where writeBaseline throws and the eval should exit 1.",
+            "evidence": "      } catch (err) {\n        runError = messageOf(err);\n      }",
+            "suggested_fix": "Point --baseline at a path in a directory that cannot be written, run with --write-baseline, and assert exit 1 and the stderr message.",
+            "explanation": "If this path broke, a failed baseline write could exit 0 without notice, and no test would fail.",
+            "needs_context": false
+          },
+          {
+            "file": "src/eval/run.ts",
+            "start_line": 177,
+            "end_line": 182,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "No test covers the same-judge check that runs after each review, which should exit 2 when a record shows a reviewer on the judge model.",
+            "evidence": "    if (same.length > 0 && !ctx.opts.allowSameJudge) {\n      return { kind: \"same-judge\", reviewers: same.map((r) => r.name) };\n    }",
+            "suggested_fix": "Add a case whose model only the run can see, then assert exit 2 and a message that names the case and the repeat.",
+            "explanation": "The check before the runs catches every case the tests build, so this branch never runs in a test.",
+            "needs_context": true
+          },
+          {
+            "file": "test/eval-cli.test.ts",
+            "start_line": 389,
+            "end_line": 414,
+            "category": "test",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "One test checks recall, precision, findings, cost, spread, the judge totals, the key list and severity agreement together.",
+            "evidence": "    \"gives recall, precision, findings, cost and spread from the script, over two cases and two repeats\",",
+            "suggested_fix": "Split the test, for example one test for the per-repeat metrics and one for severity agreement.",
+            "explanation": "When this test fails, the failure does not show which metric broke.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 13279,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 40249,
+              "outputTokens": 19,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0040344000000000005,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 6,
+              "outputTokens": 1078,
+              "cacheReadInputTokens": 94224,
+              "cacheCreationInputTokens": 42953,
+              "webSearchRequests": 0,
+              "costUSD": 0.38405279999999997,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 138,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.38808719999999997
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "eval/baseline.json",
+          "start_line": 2,
+          "end_line": 8,
+          "category": "bug",
+          "severity_estimate": "blocking",
+          "confidence": "medium",
+          "claim": "The baseline margins of 0.2 for recall and 0.6 for precision make the CI gate almost unable to fail, and the file's values do not match the run in the description.",
+          "evidence": "    \"precision\": 0.6",
+          "suggested_fix": "Set margins by the README rule (2×(mean−min), rounded up to the next 0.05). Pin the baseline to the same cases_ref as eval/cases.json and the run in the description.",
+          "explanation": "The precision baseline is 0.611 and its margin is 0.6, so the gate passes even if precision falls to about 0.011. The description says the run wrote recall 0.25, precision 0.667, margins of 0.05 each and cases_ref 31b9e32..., but this file holds other values.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"precision\": 0.611111111111111,",
+            "\"precision\": 0.6",
+            "\"cases_ref\": \"ee190ec973e42ce10b1af47d149237eafac7ec2d\","
+          ],
+          "rationale": "The file's values (recall 0.208, precision 0.611, margins 0.2/0.6, cases_ref ee190ec) differ from the description's run (0.25, 0.667, 0.05, 31b9e32). A 0.6 precision margin lets the gate pass at about 0.01 precision. The margins may follow the README rule, 2×spread rounded up, if that run was noisier. So the weak gate may be intended, and the real defect is that the description and file disagree. The cases_ref matches eval/cases.json, so the file is internally consistent.",
+          "score": 52,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"precision\": 0.611111111111111,",
+            "\"precision\": 0.6",
+            "\"cases_ref\": \"ee190ec973e42ce10b1af47d149237eafac7ec2d\","
+          ],
+          "rationale": "The file's values (recall 0.208, precision 0.611, margins 0.2/0.6, cases_ref ee190ec) differ from the description's run (0.25, 0.667, 0.05, 31b9e32). A 0.6 precision margin lets the gate pass at about 0.01 precision. The margins may follow the README rule, 2×spread rounded up, if that run was noisier. So the weak gate may be intended, and the real defect is that the description and file disagree. The cases_ref matches eval/cases.json, so the file is internally consistent.",
+          "score": 52,
+          "severity": "suggestion"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "eval/cases.json",
+          "start_line": 3,
+          "end_line": 3,
+          "category": "docs",
+          "severity_estimate": "suggestion",
+          "confidence": "high",
+          "claim": "The description says the cases repo is pinned at 31b9e32346052b5914ff0c3a23c51935f715cdab, but the pin names another sha.",
+          "evidence": "\"ref\": \"ee190ec973e42ce10b1af47d149237eafac7ec2d\"",
+          "suggested_fix": "Make the description and the pin name the same sha.",
+          "explanation": "The pinned ref differs from the sha in the description.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"ref\": \"ee190ec973e42ce10b1af47d149237eafac7ec2d\"",
+            "\"cases_ref\": \"ee190ec973e42ce10b1af47d149237eafac7ec2d\""
+          ],
+          "rationale": "The pin is ee190ec… while the description says 31b9e32…, so the mismatch is real. But eval/baseline.json's cases_ref equals the pin, so the code is consistent and only the PR description looks stale. That makes this a minor note, not a defect in the change.",
+          "score": 35,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"ref\": \"ee190ec973e42ce10b1af47d149237eafac7ec2d\"",
+            "\"cases_ref\": \"ee190ec973e42ce10b1af47d149237eafac7ec2d\""
+          ],
+          "rationale": "The pin is ee190ec… while the description says 31b9e32…, so the mismatch is real. But eval/baseline.json's cases_ref equals the pin, so the code is consistent and only the PR description looks stale. That makes this a minor note, not a defect in the change.",
+          "score": 35,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "eval/baseline.json",
+          "start_line": 2,
+          "end_line": 3,
+          "category": "docs",
+          "severity_estimate": "suggestion",
+          "confidence": "high",
+          "claim": "The description says the baseline holds recall 0.25 and precision 0.667, which the live run wrote, but the file holds other values.",
+          "evidence": "\"recall\": 0.20833333333333334,",
+          "explanation": "The committed baseline does not match the live run in the description.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"recall\": 0.20833333333333334,",
+            "\"precision\": 0.611111111111111,",
+            "\"recall\": 0.2,",
+            "\"precision\": 0.6"
+          ],
+          "rationale": "The description says the baseline holds recall 0.25, precision 0.667 and margin 0.05 each. The committed file has recall 0.208, precision 0.611 and margins 0.2 and 0.6, so it doesn't match. The precision margin of 0.6 also makes the gate almost useless. The file is new in this PR.",
+          "score": 78,
+          "severity": "suggestion"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"recall\": 0.20833333333333334,",
+            "\"precision\": 0.611111111111111,",
+            "\"recall\": 0.2,",
+            "\"precision\": 0.6",
+            "\"cases_ref\": \"ee190ec973e42ce10b1af47d149237eafac7ec2d\","
+          ],
+          "rationale": "The committed baseline holds recall 0.208, precision 0.611, margins 0.2/0.6 and cases_ref ee190ec. The description says the live run wrote recall 0.25, precision 0.667 and margins of 0.05, with the pin at 31b9e32. So the description is stale, and the much wider margins, which the description does not explain, matter for the gate.",
+          "score": 80,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"recall\": 0.20833333333333334,",
+            "\"precision\": 0.611111111111111,",
+            "\"recall\": 0.2,",
+            "\"precision\": 0.6",
+            "\"cases_ref\": \"ee190ec973e42ce10b1af47d149237eafac7ec2d\","
+          ],
+          "rationale": "The committed baseline holds recall 0.208, precision 0.611, margins 0.2/0.6 and cases_ref ee190ec. The description says the live run wrote recall 0.25, precision 0.667 and margins of 0.05, with the pin at 31b9e32. So the description is stale, and the much wider margins, which the description does not explain, matter for the gate.",
+          "score": 80,
+          "severity": "suggestion"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "eval/baseline.json",
+          "start_line": 4,
+          "end_line": 7,
+          "category": "docs",
+          "severity_estimate": "blocking",
+          "confidence": "high",
+          "claim": "The description says the margin is 0.05 for each metric, but the file sets 0.2 for recall and 0.6 for precision. The precision margin of 0.6 almost disables the precision gate.",
+          "evidence": "\"precision\": 0.6",
+          "suggested_fix": "Use the margins that the description states, or document and justify these margins.",
+          "explanation": "A margin of 0.6 against a baseline of 0.611 lets precision fall to near zero without a gate failure, and the description does not mention it.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"precision\": 0.6",
+            "\"recall\": 0.2,",
+            "drop !== null && drop <= margin + TOLERANCE;",
+            "const DEFAULT_MARGIN = { recall: 0.05, precision: 0.05 };"
+          ],
+          "rationale": "The file sets margins 0.2/0.6 while the description says 0.05 each (and the baseline values 0.208/0.611 differ from the stated 0.25/0.667). The gate passes while the absolute drop is within the margin, so precision 0.611 with margin 0.6 effectively disables the precision gate. Recall 0.2 against 0.208 is also nearly disabled.",
+          "score": 82,
+          "severity": "suggestion"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"precision\": 0.6",
+            "\"recall\": 0.2,",
+            "const DEFAULT_MARGIN = { recall: 0.05, precision: 0.05 };",
+            "drop !== null && drop <= margin + TOLERANCE;"
+          ],
+          "rationale": "The new baseline file has margins of 0.2 for recall and 0.6 for precision. The description says 0.05 each, and 0.05 is also what `--write-baseline` writes by default. The gate passes while each drop stays within its margin, so precision can fall from 0.611 to about 0.011, and recall from 0.208 to about 0.008, without the gate failing. That leaves the CI gate this PR adds almost disabled.",
+          "score": 90,
+          "severity": "blocking"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"precision\": 0.6",
+            "\"recall\": 0.2,",
+            "const DEFAULT_MARGIN = { recall: 0.05, precision: 0.05 };",
+            "drop !== null && drop <= margin + TOLERANCE;"
+          ],
+          "rationale": "The new baseline file has margins of 0.2 for recall and 0.6 for precision. The description says 0.05 each, and 0.05 is also what `--write-baseline` writes by default. The gate passes while each drop stays within its margin, so precision can fall from 0.611 to about 0.011, and recall from 0.208 to about 0.008, without the gate failing. That leaves the CI gate this PR adds almost disabled.",
+          "score": 90,
+          "severity": "blocking"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "eval/baseline.json",
+          "start_line": 4,
+          "end_line": 7,
+          "category": "bug",
+          "severity_estimate": "blocking",
+          "confidence": "medium",
+          "claim": "The baseline margins (recall 0.2, precision 0.6) are nearly equal to the baseline values, so the gate almost never fails.",
+          "evidence": "    \"recall\": 0.2,\n    \"precision\": 0.6",
+          "suggested_fix": "Re-derive the margins by the README rule, for example 0.35 for precision.",
+          "explanation": "With a precision of 0.611 and a margin of 0.6, the gate fails only when precision drops below about 0.011, so it gives almost no protection.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"precision\": 0.611111111111111,",
+            "\"precision\": 0.6",
+            "The gate fails when the baseline value minus the mean is more than the margin."
+          ],
+          "rationale": "The margins sit almost at the baseline values (0.6 against 0.611 precision, 0.2 against 0.208 recall), so the gate fails only if the metric falls to roughly zero. The margins may still follow the README rule on a noisy run, and the suggested 0.35 is the README's example, not a value derived from this baseline. The weakness is real but may be intended.",
+          "score": 52,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"precision\": 0.611111111111111,",
+            "\"precision\": 0.6",
+            "The gate fails when the baseline value minus the mean is more than the margin."
+          ],
+          "rationale": "The margins sit almost at the baseline values (0.6 against 0.611 precision, 0.2 against 0.208 recall), so the gate fails only if the metric falls to roughly zero. The margins may still follow the README rule on a noisy run, and the suggested 0.35 is the README's example, not a value derived from this baseline. The weakness is real but may be intended.",
+          "score": 52,
+          "severity": "suggestion"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "eval/baseline.json",
+          "start_line": 2,
+          "end_line": 8,
+          "category": "other",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "The committed baseline and pin do not match the live run that the description reports (ref 31b9e32, recall 0.25, precision 0.667).",
+          "evidence": "\"cases_ref\": \"ee190ec973e42ce10b1af47d149237eafac7ec2d\",",
+          "suggested_fix": "Re-run --write-baseline on the pinned set and update the description.",
+          "explanation": "The baseline may not be the result of a run on the case set that the description states.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"cases_ref\": \"ee190ec973e42ce10b1af47d149237eafac7ec2d\",",
+            "\"recall\": 0.20833333333333334,",
+            "\"precision\": 0.611111111111111,",
+            "\"ref\": \"ee190ec973e42ce10b1af47d149237eafac7ec2d\""
+          ],
+          "rationale": "The committed baseline (recall 0.208, precision 0.611, margins 0.2/0.6, ref ee190ec) differs from the description (ref 31b9e32, recall 0.25, precision 0.667, margin 0.05). However, baseline and eval/cases.json agree with each other, so the description is the stale part, and the finding's wording (\"baseline and pin do not match\") is imprecise. The margins of 0.2 and 0.6 are far looser than the stated 0.05, which weakens the gate, so the discrepancy is worth a comment.",
+          "score": 55,
+          "severity": "suggestion"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"recall\": 0.20833333333333334,",
+            "\"precision\": 0.611111111111111,",
+            "\"recall\": 0.2,",
+            "\"precision\": 0.6",
+            "\"cases_ref\": \"ee190ec973e42ce10b1af47d149237eafac7ec2d\",",
+            "\"ref\": \"ee190ec973e42ce10b1af47d149237eafac7ec2d\""
+          ],
+          "rationale": "The description says the pin is 31b9e32 and that `eval/baseline.json` is what the reported run wrote (recall 0.25, precision 0.667, margin 0.05 each). The committed file instead has recall 0.208, precision 0.611, margins 0.2/0.6 and ref ee190ec, which matches `eval/cases.json` but not the description. So the description's claim that the baseline came from that run is false, and the 0.2/0.6 margins are suspiciously close to the baseline values themselves.",
+          "score": 80,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"recall\": 0.20833333333333334,",
+            "\"precision\": 0.611111111111111,",
+            "\"recall\": 0.2,",
+            "\"precision\": 0.6",
+            "\"cases_ref\": \"ee190ec973e42ce10b1af47d149237eafac7ec2d\",",
+            "\"ref\": \"ee190ec973e42ce10b1af47d149237eafac7ec2d\""
+          ],
+          "rationale": "The description says the pin is 31b9e32 and that `eval/baseline.json` is what the reported run wrote (recall 0.25, precision 0.667, margin 0.05 each). The committed file instead has recall 0.208, precision 0.611, margins 0.2/0.6 and ref ee190ec, which matches `eval/cases.json` but not the description. So the description's claim that the baseline came from that run is false, and the 0.2/0.6 margins are suspiciously close to the baseline values themselves.",
+          "score": 80,
+          "severity": "suggestion"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "eval/baseline.json",
+          "start_line": 4,
+          "end_line": 7,
+          "category": "security",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "The baseline margins of 0.2 for recall and 0.6 for precision almost disable the CI eval gate. The PR body says that both margins are 0.05.",
+          "evidence": "    \"precision\": 0.6",
+          "suggested_fix": "Set each margin by the README rule from the baseline run spread, for example 0.05 for recall and 0.35 for precision. Make the values match the PR description.",
+          "explanation": "With precision 0.611 and margin 0.6, precision can fall to about 0.011 before the gate fails. The recall margin of 0.2 permits nearly the full 0.208 baseline to be lost. So a regression in the prompt or the model can pass CI unnoticed.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"recall\": 0.2,",
+            "\"precision\": 0.6",
+            "A margin smaller than the noise of the case set makes the gate fail on a run with no change. Pick each margin from the report of the baseline run:",
+            "The gate fails when the baseline value minus the mean is more than the margin."
+          ],
+          "rationale": "The baseline file sets margins of 0.2 recall and 0.6 precision. Against baselines of 0.208 and 0.611, the gate fails only if recall falls below about 0.008 or precision below about 0.011. This contradicts the PR description (0.05 each) and the README rule, which gives about 0.35 for precision and 0.05 for recall.",
+          "score": 88,
+          "severity": "blocking"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"recall\": 0.2,",
+            "\"precision\": 0.6",
+            "A margin smaller than the noise of the case set makes the gate fail on a run with no change. Pick each margin from the report of the baseline run:",
+            "The gate fails when the baseline value minus the mean is more than the margin."
+          ],
+          "rationale": "The baseline file sets margins of 0.2 recall and 0.6 precision. Against baselines of 0.208 and 0.611, the gate fails only if recall falls below about 0.008 or precision below about 0.011. This contradicts the PR description (0.05 each) and the README rule, which gives about 0.35 for precision and 0.05 for recall.",
+          "score": 88,
+          "severity": "blocking"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "eval/baseline.json",
+          "start_line": 4,
+          "end_line": 7,
+          "category": "bug",
+          "severity_estimate": "blocking",
+          "confidence": "high",
+          "claim": "The baseline margins of 0.2 for recall and 0.6 for precision almost equal the baseline values, so the CI gate cannot catch a real drop.",
+          "evidence": "    \"precision\": 0.6",
+          "suggested_fix": "Set each margin by the README rule from the baseline run's spread, for example 0.05 for recall and 0.35 for precision.",
+          "explanation": "Precision 0.611 with margin 0.6 means the gate fails only if precision drops below about 0.011. The PR description says margin 0.05 each, and the README rule gives at most 0.35. The file's values and cases_ref also differ from the run that the PR describes (0.25/0.667 at 31b9e32).",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"precision\": 0.611111111111111,",
+            "\"recall\": 0.2,",
+            "\"precision\": 0.6",
+            "The gate fails when the baseline value minus the mean is more than the margin."
+          ],
+          "rationale": "The gate fails only when the drop exceeds the margin, so a precision margin of 0.6 against a baseline of 0.611 and a recall margin of 0.2 against 0.208 let any drop short of near-zero pass. The values may follow the README's noise rule for a very noisy run, and the PR description is stale (0.25/0.667 and 0.05), so this is worth raising but isn't a clear bug.",
+          "score": 62,
+          "severity": "suggestion"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"recall\": 0.20833333333333334,",
+            "\"precision\": 0.611111111111111,",
+            "\"recall\": 0.2,",
+            "\"precision\": 0.6",
+            "The gate fails when the baseline value minus the mean is more than the margin.",
+            "For example, a precision with mean 0.667 and min 0.5 has a spread of 0.167. Twice the spread is 0.333, so the margin is 0.35."
+          ],
+          "rationale": "The finding is correct. The new baseline sets margins of 0.2 and 0.6 against means of 0.208 and 0.611. Because the README gate fails only when the drop is more than the margin, the gate fails only if recall goes below about 0.008 or precision below about 0.011, so in practice it never fires. The margins also do not match the PR description's \"margin 0.05 each\" or the README's margin rule. One part of the finding is wrong: cases_ref matches the pin in eval/cases.json, so calling the cases_ref a mismatch is overstated.",
+          "score": 85,
+          "severity": "blocking"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"recall\": 0.20833333333333334,",
+            "\"precision\": 0.611111111111111,",
+            "\"recall\": 0.2,",
+            "\"precision\": 0.6",
+            "The gate fails when the baseline value minus the mean is more than the margin.",
+            "For example, a precision with mean 0.667 and min 0.5 has a spread of 0.167. Twice the spread is 0.333, so the margin is 0.35."
+          ],
+          "rationale": "The finding is correct. The new baseline sets margins of 0.2 and 0.6 against means of 0.208 and 0.611. Because the README gate fails only when the drop is more than the margin, the gate fails only if recall goes below about 0.008 or precision below about 0.011, so in practice it never fires. The margins also do not match the PR description's \"margin 0.05 each\" or the README's margin rule. One part of the finding is wrong: cases_ref matches the pin in eval/cases.json, so calling the cases_ref a mismatch is overstated.",
+          "score": 85,
+          "severity": "blocking"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "src/eval/run.ts",
+          "start_line": 306,
+          "end_line": 314,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "No test covers the error path where writeBaseline throws and the eval should exit 1.",
+          "evidence": "      } catch (err) {\n        runError = messageOf(err);\n      }",
+          "suggested_fix": "Point --baseline at a path in a directory that cannot be written, run with --write-baseline, and assert exit 1 and the stderr message.",
+          "explanation": "If this path broke, a failed baseline write could exit 0 without notice, and no test would fail.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "      } catch (err) {\n        runError = messageOf(err);\n      }",
+            "if (failed || runError !== null) return EXIT_FAILURE;"
+          ],
+          "rationale": "The catch around writeBaseline sets runError, which makes the eval exit 1. The baseline tests in test/eval-cli.test.ts cover a new baseline, a replaced baseline and a failed repeat. None makes writeBaseline throw, and a grep of the tests for unwritable paths found nothing. The gap is real but minor, and the evidence quote is at lines 301-303, not the cited 306-314.",
+          "score": 50,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "      } catch (err) {\n        runError = messageOf(err);\n      }",
+            "if (failed || runError !== null) return EXIT_FAILURE;"
+          ],
+          "rationale": "The catch around writeBaseline sets runError, which makes the eval exit 1. The baseline tests in test/eval-cli.test.ts cover a new baseline, a replaced baseline and a failed repeat. None makes writeBaseline throw, and a grep of the tests for unwritable paths found nothing. The gap is real but minor, and the evidence quote is at lines 301-303, not the cited 306-314.",
+          "score": 50,
+          "severity": "suggestion"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "src/eval/run.ts",
+          "start_line": 177,
+          "end_line": 182,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "No test covers the same-judge check that runs after each review, which should exit 2 when a record shows a reviewer on the judge model.",
+          "evidence": "    if (same.length > 0 && !ctx.opts.allowSameJudge) {\n      return { kind: \"same-judge\", reviewers: same.map((r) => r.name) };\n    }",
+          "suggested_fix": "Add a case whose model only the run can see, then assert exit 2 and a message that names the case and the repeat.",
+          "explanation": "The check before the runs catches every case the tests build, so this branch never runs in a test.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (same.length > 0 && !ctx.opts.allowSameJudge) {\n      return { kind: \"same-judge\", reviewers: same.map((r) => r.name) };\n    }",
+            "// model. This check stays as a safety net for a model that only the\n      // run can see.",
+            "\"exits 2 before any query when a case config gives a reviewer the judge model\""
+          ],
+          "rationale": "The tests only cover the pre-flight same-judge check, which exits 2 with zero fake-client calls. Nothing exercises the post-run branch, which the code calls a safety net. That branch is hard to reach because the pre-flight already catches the cases the tests build, so a test for it has limited value.",
+          "score": 45,
+          "severity": "suggestion"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (same.length > 0 && !ctx.opts.allowSameJudge) {\n      return { kind: \"same-judge\", reviewers: same.map((r) => r.name) };\n    }",
+            "say(sameJudgeMessage(`case ${c.name}, repeat ${repeat}`, outcome.reviewers, judgeModel));",
+            "// The pre-flight catches a config that gives a reviewer the judge\n      // model. This check stays as a safety net for a model that only the\n      // run can see.",
+            "exits 2 before any query when a case config gives a reviewer the judge model",
+            "expect(fake.calls).toHaveLength(0);"
+          ],
+          "rationale": "The claim holds: the only same-judge config test exits during the pre-flight with zero calls, and no test checks for the \"case X, repeat N\" message, so the safety-net branch added by this change has no test. It is a small test gap on a defensive path that may be hard to reach, so its value is modest.",
+          "score": 50,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (same.length > 0 && !ctx.opts.allowSameJudge) {\n      return { kind: \"same-judge\", reviewers: same.map((r) => r.name) };\n    }",
+            "say(sameJudgeMessage(`case ${c.name}, repeat ${repeat}`, outcome.reviewers, judgeModel));",
+            "// The pre-flight catches a config that gives a reviewer the judge\n      // model. This check stays as a safety net for a model that only the\n      // run can see.",
+            "exits 2 before any query when a case config gives a reviewer the judge model",
+            "expect(fake.calls).toHaveLength(0);"
+          ],
+          "rationale": "The claim holds: the only same-judge config test exits during the pre-flight with zero calls, and no test checks for the \"case X, repeat N\" message, so the safety-net branch added by this change has no test. It is a small test gap on a defensive path that may be hard to reach, so its value is modest.",
+          "score": 50,
+          "severity": "suggestion"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "test/eval-cli.test.ts",
+          "start_line": 389,
+          "end_line": 414,
+          "category": "test",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "One test checks recall, precision, findings, cost, spread, the judge totals, the key list and severity agreement together.",
+          "evidence": "    \"gives recall, precision, findings, cost and spread from the script, over two cases and two repeats\",",
+          "suggested_fix": "Split the test, for example one test for the per-repeat metrics and one for severity agreement.",
+          "explanation": "When this test fails, the failure does not show which metric broke.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"gives recall, precision, findings, cost and spread from the script, over two cases and two repeats\",",
+            "expect(report.judge).toEqual({ calls: 0, unknown: 0, cost_usd: 0 });"
+          ],
+          "rationale": "The test does bundle many assertions, but each one is a different view of the same slow end-to-end eval run. Splitting it would repeat that run, and `toEqual` already shows which structure differs. A careful reviewer would likely not post this.",
+          "score": 15,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"gives recall, precision, findings, cost and spread from the script, over two cases and two repeats\",",
+            "expect(report.judge).toEqual({ calls: 0, unknown: 0, cost_usd: 0 });"
+          ],
+          "rationale": "The test does bundle many assertions, but each one is a different view of the same slow end-to-end eval run. Splitting it would repeat that run, and `toEqual` already shows which structure differs. A careful reviewer would likely not post this.",
+          "score": 15,
+          "severity": "nit"
+        },
+        "passed": false
+      }
+    ],
+    "merges": [
+      {
+        "group": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "result": {
+          "merged": [
+            {
+              "member_index": 1,
+              "claim": "The baseline margins of 0.2 for recall and 0.6 for precision almost disable the CI eval gate, and they differ from the 0.05 per metric that the description states.",
+              "explanation": "With precision 0.611 and margin 0.6, precision can fall to about 0.011 before the gate fails, and a 0.2 recall margin allows almost all of the 0.208 baseline to be lost, so regressions pass CI.",
+              "suggested_fix": "Set each margin by the README rule from the baseline run spread (for example 0.05 for recall and 0.35 for precision), and make the description match, or document and justify the chosen margins.",
+              "severity": "blocking"
+            },
+            {
+              "member_index": 2,
+              "claim": "The committed baseline values and cases_ref do not match the live run that the description reports (ref 31b9e32, recall 0.25, precision 0.667).",
+              "explanation": "The baseline file holds other numbers (for example recall 0.208) and a different pin, so it may not come from a run on the case set that the description states.",
+              "suggested_fix": "Re-run --write-baseline on the pinned set and update the description.",
+              "severity": "suggestion"
+            }
+          ]
+        }
+      }
+    ],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would request changes",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0
+    },
+    "findings": [
+      {
+        "file": "eval/baseline.json",
+        "start_line": 4,
+        "end_line": 7,
+        "category": "docs",
+        "severity_estimate": "blocking",
+        "confidence": "high",
+        "claim": "The baseline margins of 0.2 for recall and 0.6 for precision almost disable the CI eval gate, and they differ from the 0.05 per metric that the description states.",
+        "evidence": "\"precision\": 0.6",
+        "explanation": "With precision 0.611 and margin 0.6, precision can fall to about 0.011 before the gate fails, and a 0.2 recall margin allows almost all of the 0.208 baseline to be lost, so regressions pass CI.",
+        "needs_context": false,
+        "fingerprint": "ab74ca81031ea8c0",
+        "severity": "blocking",
+        "score": 90,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"precision\": 0.6",
+            "\"recall\": 0.2,",
+            "const DEFAULT_MARGIN = { recall: 0.05, precision: 0.05 };",
+            "drop !== null && drop <= margin + TOLERANCE;"
+          ],
+          "rationale": "The new baseline file has margins of 0.2 for recall and 0.6 for precision. The description says 0.05 each, and 0.05 is also what `--write-baseline` writes by default. The gate passes while each drop stays within its margin, so precision can fall from 0.611 to about 0.011, and recall from 0.208 to about 0.008, without the gate failing. That leaves the CI gate this PR adds almost disabled.",
+          "score": 90,
+          "severity": "blocking"
+        },
+        "span_text": "\"margin\": { \"recall\": 0.2, \"precision\": 0.6 },",
+        "suggested_fix": "Set each margin by the README rule from the baseline run spread (for example 0.05 for recall and 0.35 for precision), and make the description match, or document and justify the chosen margins."
+      }
+    ],
+    "github": {
+      "review_id": 5558650212,
+      "review_url": "https://github.com/jerridan/pr-review/pull/7#pullrequestreview-5558650212",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [
+        {
+          "fingerprint": "ab74ca81031ea8c0",
+          "comment_id": 4303373383
+        }
+      ],
+      "in_body": [],
+      "check_run": {
+        "id": 117439602161
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [
+      {
+        "file": "eval/baseline.json",
+        "start_line": 2,
+        "end_line": 8,
+        "category": "other",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "The committed baseline values and cases_ref do not match the live run that the description reports (ref 31b9e32, recall 0.25, precision 0.667).",
+        "evidence": "\"cases_ref\": \"ee190ec973e42ce10b1af47d149237eafac7ec2d\",",
+        "explanation": "The baseline file holds other numbers (for example recall 0.208) and a different pin, so it may not come from a run on the case set that the description states.",
+        "needs_context": true,
+        "fingerprint": "d3be874224af1ae6",
+        "severity": "suggestion",
+        "score": 80,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"recall\": 0.20833333333333334,",
+            "\"precision\": 0.611111111111111,",
+            "\"recall\": 0.2,",
+            "\"precision\": 0.6",
+            "\"cases_ref\": \"ee190ec973e42ce10b1af47d149237eafac7ec2d\",",
+            "\"ref\": \"ee190ec973e42ce10b1af47d149237eafac7ec2d\""
+          ],
+          "rationale": "The description says the pin is 31b9e32 and that `eval/baseline.json` is what the reported run wrote (recall 0.25, precision 0.667, margin 0.05 each). The committed file instead has recall 0.208, precision 0.611, margins 0.2/0.6 and ref ee190ec, which matches `eval/cases.json` but not the description. So the description's claim that the baseline came from that run is false, and the 0.2/0.6 margins are suspiciously close to the baseline values themselves.",
+          "score": 80,
+          "severity": "suggestion"
+        },
+        "span_text": "\"recall\": 0.20833333333333334, \"precision\": 0.611111111111111, \"margin\": { \"recall\": 0.2, \"precision\": 0.6 }, \"cases_ref\": \"ee190ec973e42ce10b1af47d149237eafac7ec2d\",",
+        "suggested_fix": "Re-run --write-baseline on the pinned set and update the description."
+      }
+    ],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 16180,
+        "stop_reason": null,
+        "subtype": "thrown",
+        "usage": null,
+        "cost_usd": null
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7851,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 40265,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.004038000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 571,
+            "cacheReadInputTokens": 4899,
+            "cacheCreationInputTokens": 39770,
+            "webSearchRequests": 0,
+            "costUSD": 0.3305678,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 147,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.3346058
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 9010,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 40257,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0040377,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 511,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 44758,
+            "webSearchRequests": 0,
+            "costUSD": 0.368292,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 205,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.3723297
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "model": "claude-opus-5-5",
+        "duration_ms": 9972,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 40259,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.004035400000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 774,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 44670,
+            "webSearchRequests": 0,
+            "costUSD": 0.372848,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 339,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.37688340000000004
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "model": "claude-opus-5-5",
+        "duration_ms": 9971,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 40259,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.004037400000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1038,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 44718,
+            "webSearchRequests": 0,
+            "costUSD": 0.378512,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 105,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.38254940000000004
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 11741,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 40263,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0040368,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1182,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 44667,
+            "webSearchRequests": 0,
+            "costUSD": 0.380984,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 185,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.3850208
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7158,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 40253,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0040358,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 496,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 41696,
+            "webSearchRequests": 0,
+            "costUSD": 0.34410779999999996,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 155,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.34814359999999994
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "model": "claude-opus-5-5",
+        "duration_ms": 9748,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 56869,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.005696400000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 776,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 58336,
+            "webSearchRequests": 0,
+            "costUSD": 0.4828278,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 122,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.48852419999999996
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 8637,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 40261,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0040356,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 517,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 41704,
+            "webSearchRequests": 0,
+            "costUSD": 0.3445918,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 164,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.34862740000000003
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 10516,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9693,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009823000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 1256,
+            "cacheReadInputTokens": 13095,
+            "cacheCreationInputTokens": 14186,
+            "webSearchRequests": 0,
+            "costUSD": 0.0706215,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 549,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0716038
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 4452,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9544,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009659000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 557,
+            "cacheReadInputTokens": 3889,
+            "cacheCreationInputTokens": 9057,
+            "webSearchRequests": 0,
+            "costUSD": 0.0421909,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 193,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0431568
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "model": "claude-opus-5-5",
+        "duration_ms": 13279,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 40249,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0040344000000000005,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 1078,
+            "cacheReadInputTokens": 94224,
+            "cacheCreationInputTokens": 42953,
+            "webSearchRequests": 0,
+            "costUSD": 0.38405279999999997,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 138,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.38808719999999997
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 7086,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9366,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009466,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 664,
+            "cacheReadInputTokens": 16657,
+            "cacheCreationInputTokens": 9235,
+            "webSearchRequests": 0,
+            "costUSD": 0.0452537,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 218,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0462003
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 7857,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9598,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009703000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 808,
+            "cacheReadInputTokens": 30773,
+            "cacheCreationInputTokens": 11483,
+            "webSearchRequests": 0,
+            "costUSD": 0.057101299999999994,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 94,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0580716
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 7587,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9608,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009723,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 921,
+            "cacheReadInputTokens": 16899,
+            "cacheCreationInputTokens": 9465,
+            "webSearchRequests": 0,
+            "costUSD": 0.0487679,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 304,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.049740200000000005
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 8161,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9675,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.000977,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 956,
+            "cacheReadInputTokens": 31280,
+            "cacheCreationInputTokens": 11477,
+            "webSearchRequests": 0,
+            "costUSD": 0.05860799999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 299,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.05958499999999999
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 10176,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9677,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009807000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 1257,
+            "cacheReadInputTokens": 32691,
+            "cacheCreationInputTokens": 13097,
+            "webSearchRequests": 0,
+            "costUSD": 0.0682391,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 457,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0692198
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 13744,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9616,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009710999999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 1672,
+            "cacheReadInputTokens": 45890,
+            "cacheCreationInputTokens": 12131,
+            "webSearchRequests": 0,
+            "costUSD": 0.069849,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 642,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0708201
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 9369,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9530,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009645000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 845,
+            "cacheReadInputTokens": 12924,
+            "cacheCreationInputTokens": 13220,
+            "webSearchRequests": 0,
+            "costUSD": 0.1252608,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 325,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1262253
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 5555,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 47683,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.004780800000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 500,
+            "cacheReadInputTokens": 3889,
+            "cacheCreationInputTokens": 47196,
+            "webSearchRequests": 0,
+            "costUSD": 0.1941769,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 155,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.19895770000000002
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 9299,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 20307,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0020407,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 1053,
+            "cacheReadInputTokens": 51952,
+            "cacheCreationInputTokens": 22235,
+            "webSearchRequests": 0,
+            "costUSD": 0.10467720000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 193,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.10671790000000002
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 9727,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9606,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009736,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 963,
+            "cacheReadInputTokens": 30757,
+            "cacheCreationInputTokens": 11430,
+            "webSearchRequests": 0,
+            "costUSD": 0.11687539999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 323,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.11784899999999998
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 16575,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 20267,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0020372000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 10,
+            "outputTokens": 1366,
+            "cacheReadInputTokens": 102829,
+            "cacheCreationInputTokens": 24030,
+            "webSearchRequests": 0,
+            "costUSD": 0.12008289999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 152,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1221201
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 11770,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9608,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009718000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 868,
+            "cacheReadInputTokens": 16891,
+            "cacheCreationInputTokens": 9329,
+            "webSearchRequests": 0,
+            "costUSD": 0.0953862,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 290,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.096358
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 9871,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9673,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009803,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 952,
+            "cacheReadInputTokens": 16956,
+            "cacheCreationInputTokens": 9848,
+            "webSearchRequests": 0,
+            "costUSD": 0.1012312,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 282,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.10221150000000001
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 15519,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 20295,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0020405,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 1143,
+            "cacheReadInputTokens": 77690,
+            "cacheCreationInputTokens": 22935,
+            "webSearchRequests": 0,
+            "costUSD": 0.22191,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 169,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.2239505
+      },
+      {
+        "role": "merge",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 5596,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 2562,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0002672,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 666,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 3137,
+            "webSearchRequests": 0,
+            "costUSD": 0.019212,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 235,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0194792
+      }
+    ],
+    "total_cost_usd": 5.0070383000000005,
+    "queries_without_cost": 1,
+    "stage_ms": {
+      "config": 49,
+      "gather": 243,
+      "scope": 14,
+      "triage": 16184,
+      "find_verify": 63593,
+      "merge": 6444
+    },
+    "errors": [
+      {
+        "stage": "triage",
+        "message": "thrown: Claude Code returned an error result: Reached maximum budget ($0.5)"
+      }
+    ]
+  }
+}
