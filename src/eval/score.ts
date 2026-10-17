@@ -82,6 +82,35 @@ function describeGolden(g: GoldenFinding): string {
 }
 
 /**
+ * A maximum matching of the pairs, by augmenting paths. Each posted finding
+ * goes in index order and tries its goldens in index order. A golden that
+ * is taken tries to move its posted finding to another free golden. So the
+ * result has the most pairs, and the same input always gives the same
+ * pairs. The pairs come back in posted order.
+ */
+function maximumMatching(postedCount: number, pairs: [number, number][]): [number, number][] {
+  const goldensOf: number[][] = Array.from({ length: postedCount }, () => []);
+  for (const [p, g] of pairs) goldensOf[p]?.push(g);
+  const ownerOf = new Map<number, number>();
+  const augment = (p: number, seen: Set<number>): boolean => {
+    for (const g of goldensOf[p] ?? []) {
+      if (seen.has(g)) continue;
+      seen.add(g);
+      const owner = ownerOf.get(g);
+      if (owner === undefined || augment(owner, seen)) {
+        ownerOf.set(g, p);
+        return true;
+      }
+    }
+    return false;
+  };
+  for (let p = 0; p < postedCount; p++) augment(p, new Set());
+  return [...ownerOf.entries()]
+    .map(([g, p]): [number, number] => [p, g])
+    .sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+}
+
+/**
  * Score "record" against "golden". Each posted finding and each golden
  * finding is in at most one match. The pairs go in the order of the posted
  * findings, then of the golden findings. All exact matches come first. The
@@ -113,9 +142,7 @@ export async function scoreRecord(
       row.flatMap((k, g): [number, number][] => (k === kind ? [[p, g]] : [])),
     );
 
-  for (const [p, g] of pairsOf("exact")) {
-    if (free(p, g)) take(p, g, "exact");
-  }
+  for (const [p, g] of maximumMatching(posted.length, pairsOf("exact"))) take(p, g, "exact");
 
   let judgeCalls = 0;
   let judgeUnknown = 0;
