@@ -141,7 +141,10 @@ jobs:
           npm run build
 
       # The eval exits 1 for a failed repeat and 3 for a failed gate.
-      # pipefail keeps that exit code through tee.
+      # pipefail keeps that exit code through tee. The step summary is
+      # markdown, so a code fence keeps the lines of the table apart. The
+      # step keeps the exit code of the eval and writes the closing fence
+      # also when the eval fails.
       - name: Run the eval
         if: steps.filter.outputs.run == 'true'
         env:
@@ -149,7 +152,11 @@ jobs:
           REPEAT: ${{ github.event_name == 'workflow_dispatch' && inputs.repeat || '3' }}
         run: |
           set -o pipefail
-          node dist/cli.js eval --cases eval/cases --repeat "$REPEAT" --baseline eval/baseline.json --out pr-review-eval | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          status=0
+          node dist/cli.js eval --cases eval/cases --repeat "$REPEAT" --baseline eval/baseline.json --out pr-review-eval | tee -a "$GITHUB_STEP_SUMMARY" || status=$?
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
 
       # Upload the report and every record, also after a failed eval.
       - name: Upload the eval output
