@@ -2,8 +2,8 @@
   "recall": 0.16666666666666666,
   "precision": 1,
   "margin": {
-    "recall": 0.05,
-    "precision": 0.05
+    "recall": 0.1,
+    "precision": 0.35
   },
   "cases_ref": "c768827c33c9634c4697c4154f329931a85f657d",
   "repeat": 3,

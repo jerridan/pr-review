@@ -643,15 +643,15 @@ The write keeps the `margin` of the existing file, or uses 0.05 for each metric.
 
 A margin smaller than the noise of the case set makes the gate fail on a run with no change. Pick each margin from the report of the baseline run:
 
-1. Take the spread of the metric: its aggregate `mean` minus its `min` over the repeats.
+1. Take the spread of the metric: its aggregate `mean` minus its `min` over the repeats. Use the larger spread of the recent baseline runs, not only the last run. A single calm run understates the noise.
 2. Double the spread.
 3. Round up to the next multiple of 0.05.
 4. Use 0.05 when the result is smaller.
-5. When a margin reaches the baseline value, the gate checks nothing for that metric. Say so in the PR that writes it.
+5. Keep the margin at least 0.05 below the baseline value, so the gate still fails on a collapse. Lower the margin to the largest multiple of 0.05 that obeys this. A margin that reaches the baseline value checks nothing for that metric. Say so in the PR that writes it.
 
 For example, a precision with mean 0.667 and min 0.5 has a spread of 0.167. Twice the spread is 0.333, so the margin is 0.35. `--write-baseline` keeps an existing margin, so edit `margin` in the file after the run, then commit it.
 
-The starter set is small, so its spread is large. Its committed margins make the gate fail only when recall or precision is 0. Until D4b grows the set, read the step summary of the eval job. Do not read only the check status.
+The starter set is small, so its spread is large. Its baseline recall is 0.167 with a margin of 0.10. So the recall gate fails when the mean recall drops below about 0.07. On this set, that means the fixture matches none of its three goldens, and no other case matches a golden. Its baseline precision is 1.0 with a margin of 0.35. So the precision gate fails when more than about one posted finding in three is wrong. Until D4b grows the set, both gates are collapse checks. Read the numbers in the step summary of the eval job. Do not read only the check status.
 
 ### Explain a record
 
