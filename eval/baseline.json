@@ -1,0 +1,12 @@
+{
+  "recall": 0.25,
+  "precision": 0.6666666666666666,
+  "margin": {
+    "recall": 0.05,
+    "precision": 0.05
+  },
+  "cases_ref": "31b9e32346052b5914ff0c3a23c51935f715cdab",
+  "repeat": 3,
+  "written_at": "2026-10-17T01:51:35.011Z",
+  "tool_version": "0.1.0"
+}
