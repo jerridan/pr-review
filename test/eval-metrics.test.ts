@@ -136,6 +136,7 @@ describe("metrics (R5.1, R5.2)", () => {
       recall: 0.5,
       precision: 0.25,
       posted: 4,
+      matched: 1,
       cost_usd: 0.3,
       run_ms: 150,
       judge_calls: 2,
@@ -174,6 +175,7 @@ describe("failedMetrics (R3.8)", () => {
       recall: null,
       precision: null,
       posted: 0,
+      matched: 0,
       cost_usd: null,
       run_ms: 40,
       judge_calls: 0,
@@ -184,14 +186,19 @@ describe("failedMetrics (R3.8)", () => {
   });
 });
 
+// The metrics of one repeat. "matched" follows from the precision and the
+// posted count, unless the test gives it.
 function rm(repeat: number, parts: Partial<RepeatMetrics> = {}): RepeatMetrics {
+  const posted = parts.posted ?? 1;
+  const precision = parts.precision === undefined ? 1 : parts.precision;
   return {
     repeat,
     failed: false,
     error: null,
     recall: 1,
-    precision: 1,
-    posted: 1,
+    precision,
+    posted,
+    matched: precision === null ? 0 : precision * posted,
     cost_usd: 0.1,
     run_ms: 10,
     judge_calls: 0,
@@ -220,32 +227,53 @@ describe("buildReport (R5.3, R5.4, R5.6)", () => {
     },
   ];
 
-  it("gives the mean over the cases of each repeat, and skips a null value", () => {
+  it("gives the mean over the cases of recall and findings, and the pooled precision, for each repeat", () => {
     const { repeats } = buildReport(cases, null, null);
+    // Repeat 1: 1 matched of 2 posted, and a case with none posted: 0.5.
+    // Repeat 2: 1 matched of 1 posted, and 0 matched of 3 posted: 1 of 4.
     expect(repeats.map(({ cost_per_case: _cost, ...rest }) => rest)).toEqual([
       { repeat: 1, recall: 0.5, precision: 0.5, findings_per_case: 1 },
-      { repeat: 2, recall: 0.5, precision: 0.5, findings_per_case: 2 },
+      { repeat: 2, recall: 0.5, precision: 0.25, findings_per_case: 2 },
     ]);
     expect(repeats[0]?.cost_per_case).toBeCloseTo(0.3, 10);
     expect(repeats[1]?.cost_per_case).toBeCloseTo(0.3, 10);
   });
 
-  it("gives the mean, the minimum and the maximum of the per-repeat means", () => {
+  it("pools the precision of a repeat: 1 matched of 1 and 0 matched of 3 give 0.25, not 0.5", () => {
+    const pooled = [
+      { name: "a-case", repeats: [rm(1, { precision: 1, posted: 1, matched: 1 })] },
+      { name: "b-case", repeats: [rm(1, { precision: 0, posted: 3, matched: 0 })] },
+    ];
+    expect(buildReport(pooled, null, null).repeats[0]?.precision).toBe(0.25);
+  });
+
+  it("gives null pooled precision for a repeat where no case posted a finding", () => {
+    const none = [
+      { name: "a-case", repeats: [rm(1, { precision: null, posted: 0 })] },
+      { name: "b-case", repeats: [rm(1, { precision: null, posted: 0 })] },
+    ];
+    expect(buildReport(none, null, null).repeats[0]?.precision).toBeNull();
+  });
+
+  it("gives the mean, the minimum and the maximum of the per-repeat values", () => {
     const varied = [
       {
         name: "a-case",
-        repeats: [rm(1, { precision: 0.25, posted: 2 }), rm(2, { precision: 0.75, posted: 4 })],
+        repeats: [rm(1, { precision: 0.25, posted: 4 }), rm(2, { precision: 0.75, posted: 8 })],
       },
     ];
     const { aggregate } = buildReport(varied, null, null);
     expect(aggregate.precision).toEqual({ mean: 0.5, min: 0.25, max: 0.75 });
-    expect(aggregate.findings_per_case).toEqual({ mean: 3, min: 2, max: 4 });
+    expect(aggregate.findings_per_case).toEqual({ mean: 6, min: 4, max: 8 });
     expect(aggregate.recall).toEqual({ mean: 1, min: 1, max: 1 });
   });
 
   it("gives null for a mean of no value", () => {
     const none = [
-      { name: "a-case", repeats: [rm(1, { precision: null }), rm(2, { precision: null })] },
+      {
+        name: "a-case",
+        repeats: [rm(1, { precision: null, posted: 0 }), rm(2, { precision: null, posted: 0 })],
+      },
     ];
     const report = buildReport(none, null, null);
     expect(report.repeats.map((r) => r.precision)).toEqual([null, null]);
@@ -330,8 +358,9 @@ describe("renderTable (R5.5)", () => {
     const header = lines.find((l) => /mean/.test(l) && /min/.test(l) && /max/.test(l));
     expect(header).toBeDefined();
     // Recall per repeat: (1 + 1) / 2 = 1 and 0.5, so the mean is 0.75.
+    // Pooled precision per repeat: (1 + 1) / (2 + 1) = 0.667 and 1 / 1 = 1.
     expect(lines.some((l) => /^recall\s+0\.750\s+0\.500\s+1\.000\s*$/.test(l))).toBe(true);
-    expect(lines.some((l) => /^precision\s+0\.875\s+0\.750\s+1\.000\s*$/.test(l))).toBe(true);
+    expect(lines.some((l) => /^precision\s+0\.833\s+0\.667\s+1\.000\s*$/.test(l))).toBe(true);
     expect(lines.some((l) => /^findings per case\s+1\.250\s+1\.000\s+1\.500\s*$/.test(l))).toBe(
       true,
     );
