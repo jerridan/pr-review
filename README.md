@@ -646,8 +646,11 @@ A margin smaller than the noise of the case set makes the gate fail on a run wit
 2. Double the spread.
 3. Round up to the next multiple of 0.05.
 4. Use 0.05 when the result is smaller.
+5. When a margin reaches the baseline value, the gate checks nothing for that metric. Say so in the PR that writes it.
 
 For example, a precision with mean 0.667 and min 0.5 has a spread of 0.167. Twice the spread is 0.333, so the margin is 0.35. `--write-baseline` keeps an existing margin, so edit `margin` in the file after the run, then commit it.
+
+The starter set is small, so its spread is large. Its committed margins make the gate fail only when recall or precision is 0. Until D4b grows the set, read the step summary of the eval job. Do not read only the check status.
 
 ### Explain a record
 
