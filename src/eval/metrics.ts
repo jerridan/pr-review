@@ -9,6 +9,8 @@ export type RepeatMetrics = {
   recall: number | null;
   precision: number | null;
   posted: number;
+  /** The posted findings that match a golden finding. */
+  matched: number;
   cost_usd: number | null;
   run_ms: number;
   judge_calls: number;
@@ -38,6 +40,7 @@ export function metrics(
     recall: goldenCount === 0 ? null : matched / goldenCount,
     precision: posted === 0 ? null : matched / posted,
     posted,
+    matched,
     cost_usd: record.cost.total_cost_usd,
     run_ms: Object.values(record.cost.stage_ms).reduce((sum, ms) => sum + ms, 0),
     judge_calls: score.judgeCalls,
@@ -56,6 +59,7 @@ export function failedMetrics(repeat: number, error: string, run_ms: number): Re
     recall: null,
     precision: null,
     posted: 0,
+    matched: 0,
     cost_usd: null,
     run_ms,
     judge_calls: 0,

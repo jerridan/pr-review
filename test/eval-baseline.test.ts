@@ -33,14 +33,18 @@ function baseline(parts: Partial<Baseline> = {}): Baseline {
   };
 }
 
+// One repeat whose pooled precision is "precision". A null precision means
+// that no finding posted.
 function repeat(n: number, recall: number | null, precision: number | null): RepeatMetrics {
+  const posted = precision === null ? 0 : 2;
   return {
     repeat: n,
     failed: false,
     error: null,
     recall,
     precision,
-    posted: 2,
+    posted,
+    matched: precision === null ? 0 : precision * posted,
     cost_usd: 0.1,
     run_ms: 1,
     judge_calls: 0,

@@ -42,6 +42,18 @@ function spread(values: (number | null)[]): Spread {
 }
 
 /**
+ * The precision of a repeat, pooled over its cases: the matched posted
+ * findings divided by the posted findings. Null when no case posted a
+ * finding. One case with one wrong finding then moves the repeat by its
+ * share of the findings, not by a whole case.
+ */
+function pooledPrecision(repeats: RepeatMetrics[]): number | null {
+  const posted = repeats.reduce((sum, r) => sum + r.posted, 0);
+  if (posted === 0) return null;
+  return repeats.reduce((sum, r) => sum + r.matched, 0) / posted;
+}
+
+/**
  * Build the report. A failed repeat has no metric values, so it is not in
  * any mean. The judge counts are sums over every repeat.
  */
@@ -57,7 +69,7 @@ export function buildReport(
     return {
       repeat,
       recall: mean(ok.map((r) => r.recall)),
-      precision: mean(ok.map((r) => r.precision)),
+      precision: pooledPrecision(ok),
       findings_per_case: mean(ok.map((r) => r.posted)),
       cost_per_case: mean(ok.map((r) => r.cost_usd)),
     };

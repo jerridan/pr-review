@@ -610,7 +610,7 @@ The match pass pairs each posted finding with each golden finding:
 - The same file and spans within 10 lines give an ambiguous pair when the spans do not overlap or the categories differ.
 - Every other pair is no match.
 
-The judge gets one query for each ambiguous pair. Its answer `yes` is a match. The answers `no` and `unknown` are not. A failed judge query counts as `unknown`. Each finding is in one match at most. The judge runs on `claude-sonnet-5-5` at high effort, with no tools. The eval exits 2 when the judge model equals the model of the `reviewer` role, or the model of a reviewer in a run record. `--allow-same-judge` permits this.
+The judge gets one query for each ambiguous pair. Its answer `yes` is a match. The answers `no` and `unknown` are not. A failed judge query counts as `unknown`. Each finding is in one match at most. The judge runs on `claude-sonnet-5-5` at high effort, with no tools. The eval exits 2 before any model call when the judge model equals the model of the `reviewer` role. It also exits 2 when the `.pr-review/` config of a case gives a reviewer the judge model. `--allow-same-judge` permits this.
 
 ### The report
 
@@ -621,12 +621,13 @@ The report gives these metrics for each case and each repeat:
 | `recall` | The matched goldens divided by the goldens. Null for a case with no golden. |
 | `precision` | The matched posted findings divided by the posted findings. Null when no finding posted. |
 | `posted` | The number of posted findings. |
+| `matched` | The posted findings that match a golden finding. |
 | `cost_usd` | The cost of the review. It holds no judge cost. |
 | `run_ms` | The run time of the review. |
 | `judge_calls`, `judge_cost_usd` | The judge queries of the run and their cost. |
 | `severity_agreement` | The matched pairs with the same severity, and all matched pairs. |
 
-For each repeat, the report gives the mean over the cases of recall, precision, findings per case and cost per case. A mean leaves out null values. The aggregate gives the mean, the minimum and the maximum of those per-repeat means. `--format table` prints one table per case and a summary. `--format json` prints the same document that the eval writes to `<out>/report.json`. The report lists a failed repeat in `failed_repeats`, with null metrics.
+For each repeat, the report gives the mean over the cases of recall, findings per case and cost per case. A mean leaves out null values. The report pools the precision of a repeat over its cases: the sum of `matched` divided by the sum of `posted`. It is null when no case posted a finding. So one case with one wrong finding moves the precision by its share of the findings, not by a whole case. The aggregate gives the mean, the minimum and the maximum of those per-repeat values. `--format table` prints one table per case and a summary. `--format json` prints the same document that the eval writes to `<out>/report.json`. The report lists a failed repeat in `failed_repeats`, with null metrics.
 
 ### The gate and the baseline
 
