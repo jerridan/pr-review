@@ -116,8 +116,11 @@ function columns(rows: string[][]): string[] {
 /**
  * Render the report as text: one table for each case, with a row for each
  * repeat, then the summary with the mean, the minimum and the maximum.
+ * "baselineCasesRef" is the cases ref of the baseline that the gate used.
+ * When it and the cases ref of the report are both known and differ, the
+ * "Cases ref" line names both, so the step summary shows the mismatch.
  */
-export function renderTable(report: Report): string {
+export function renderTable(report: Report, baselineCasesRef: string | null = null): string {
   const lines: string[] = [];
   for (const c of report.cases) {
     lines.push(`Case: ${c.name}`);
@@ -172,6 +175,11 @@ export function renderTable(report: Report): string {
       `Gate: ${g.passed ? "passed" : "failed"} (recall drop ${ratio(g.recall_drop)}, precision drop ${ratio(g.precision_drop)})`,
     );
   }
-  lines.push(`Cases ref: ${report.cases_ref ?? "unknown"}`);
+  const mismatch =
+    baselineCasesRef !== null && report.cases_ref !== null && baselineCasesRef !== report.cases_ref;
+  lines.push(
+    `Cases ref: ${report.cases_ref ?? "unknown"}` +
+      (mismatch ? `; the baseline has ${baselineCasesRef}` : ""),
+  );
   return `${lines.join("\n")}\n`;
 }

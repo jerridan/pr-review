@@ -307,7 +307,9 @@ export async function runEval(opts: EvalOptions, deps: ProgramDeps): Promise<num
   const json = `${JSON.stringify(report, null, 2)}\n`;
   await mkdir(out, { recursive: true });
   await writeFile(join(out, "report.json"), json);
-  process.stdout.write(opts.format === "json" ? json : renderTable(report));
+  process.stdout.write(
+    opts.format === "json" ? json : renderTable(report, base.gate?.cases_ref ?? null),
+  );
 
   for (const f of report.failed_repeats) {
     say(`case ${f.case}, repeat ${f.repeat} failed: ${f.error}`);
