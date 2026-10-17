@@ -313,6 +313,14 @@ export async function runEval(opts: EvalOptions, deps: ProgramDeps): Promise<num
     say(`case ${f.case}, repeat ${f.repeat} failed: ${f.error}`);
   }
   if (runError !== null) say(runError);
+  // A judge answer of "unknown", or a judge query that failed, counts as no
+  // match. Say so, because it lowers recall and precision with no other sign.
+  if (report.judge.unknown > 0) {
+    say(
+      `warning: ${report.judge.unknown} of ${report.judge.calls} judge queries gave no answer. ` +
+        "The eval counts each one as no match.",
+    );
+  }
   if (report.gate && !report.gate.passed) say(gateMessage(report.gate));
   if (failed || runError !== null) return EXIT_FAILURE;
   if (report.gate && !report.gate.passed) return EXIT_GATE;
