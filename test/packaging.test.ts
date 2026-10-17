@@ -1083,6 +1083,9 @@ function outputsOf(file: string): Record<string, string> {
   );
 }
 
+// A markdown code fence line.
+const FENCE = "```";
+
 describe(".github/workflows/ci.yml (R8)", () => {
   const steps = () => ciJob("eval").steps as StepWithFlags[];
   const filterStep = () =>
@@ -1328,7 +1331,7 @@ describe(".github/workflows/ci.yml (R8)", () => {
       expect(result.args).toBe(
         "dist/cli.js eval --cases eval/cases --repeat 3 --baseline eval/baseline.json --out pr-review-eval",
       );
-      expect(result.summary).toBe("BEFORE\nREPORT-TABLE\n");
+      expect(result.summary).toBe(`BEFORE\n${FENCE}\nREPORT-TABLE\n${FENCE}\n`);
       expect(result.tokenSet).toBe(true);
       expect(evalStep().run).toContain("pipefail");
       expect(evalStep().run).toContain("GITHUB_STEP_SUMMARY");
@@ -1346,6 +1349,17 @@ describe(".github/workflows/ci.yml (R8)", () => {
         const result = runEval(ciContext("pull_request"), code);
         expect(result.status).toBe(code);
         expect(result.summary).toContain("REPORT-TABLE");
+      },
+    );
+
+    // GitHub renders the step summary as markdown. Without a fence, the
+    // lines of the table join into one paragraph.
+    it.each([0, 1, 3])(
+      "puts the table in a code fence in the step summary, and keeps the exit code %i",
+      (code) => {
+        const result = runEval(ciContext("pull_request"), code);
+        expect(result.status).toBe(code);
+        expect(result.summary).toBe(`BEFORE\n${FENCE}\nREPORT-TABLE\n${FENCE}\n`);
       },
     );
 
