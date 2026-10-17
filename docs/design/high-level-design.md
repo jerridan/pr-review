@@ -306,7 +306,7 @@ Prompts follow Anthropic's current prompting guidance for the 5.5 family, summar
 - Golden set: start with 20 to 50 cases from the user's own repos, taken from real misses and real false positives, plus a ReviewBench subset for breadth. Each case is a frozen checkout, a diff and a list of golden findings with severity and category.
 - Contract: the harness runs the same CLI with `--format json` against the frozen checkout, no network.
 - Scoring: match each finding to a golden item by file and span. One judge call, with thinking on and on a different model from the reviewers under test, only for pairs that overlap but do not match exactly. No holistic score.
-- Metrics: grounded recall on golden findings, precision on posted findings, findings per PR, cost per PR. Run each case three times and report the spread.
+- Metrics: grounded recall on golden findings, precision on posted findings, findings per PR, cost per PR. Run each case three times and report the spread. The eval pools the precision of a repeat over the cases: the matched posted findings divided by all posted findings.
 - Gate: a change to a prompt or threshold needs the eval run in CI. Fail when recall or precision drops past a set margin.
 - Online: track addressed rate by re-running the verifier on the next push, and reaction counts. Compare to offline before trusting offline alone.
 - With few cases: record every run from day one, local runs included, so the set grows on its own. Seed the first set three ways: ReviewBench and Martian cases for breadth, bug injection into merged PRs of the user's own repos for known-answer recall, and findings dismissed or acted on in real runs for precision. Synthetic cases overstate absolute scores, so use the harness for regression between two versions, not for an absolute number, until the real set reaches about 30 cases.
@@ -315,10 +315,12 @@ Prompts follow Anthropic's current prompting guidance for the 5.5 family, summar
 
 ```
 pr-review run   [--base <sha>] [--head <sha>] [--pr <n>] [--github-repo <owner/repo>] [--fresh] [--tier full|fast|skip] [--format github|json|table|md]
-pr-review eval  [--cases <dir>] [--repeat 3]
+pr-review eval  --cases <dir> [--repeat <n>] [--baseline <file>] [--write-baseline] [--out <dir>] [--format table|json] [--tier full|fast|skip] [--judge-model <id>] [--allow-api-key] [--allow-same-judge]
 pr-review list  (reviewers that would run, with the trigger that selected them)
-pr-review explain <run.json>   (why each finding was kept or dropped)
+pr-review explain <record.json> [--format table|json]   (why each finding was kept or dropped)
 ```
+
+The `eval` and `explain` lines show the flags as built in D4a. `eval` defaults to `--repeat 3`, `--out pr-review-eval`, `--format table`, `--tier full` and the judge role model. `explain` defaults to `--format table`. Both exit 2 on a usage error. `eval` exits 1 for a failed repeat and 3 for a failed gate.
 
 A GitHub Action wraps `run`. A Claude Code `/review` command wraps `run` for local use. Without `--pr`, `--base` and `--head` are required. `--format github` needs `--pr`.
 

@@ -3,7 +3,14 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { withRepoGlobs } from "./config/globs.js";
-import { ROLE_DEFAULTS, ROLES, resolveModel, type Effort, type Role } from "./config/models.js";
+import {
+  ROLE_DEFAULTS,
+  ROLES,
+  resolveModel,
+  type Effort,
+  type QueryRole,
+  type Role,
+} from "./config/models.js";
 import {
   loadRepoConfig,
   type ConfigRole,
@@ -27,7 +34,7 @@ import {
 } from "./github/post.js";
 import { loadPriorState, type PriorOpen, type PriorState } from "./github/prior.js";
 import { ensureCommit, newHunks } from "./github/scope.js";
-import { sanitizeGitHubText } from "./github/sanitize.js";
+import { sanitizeGitHubText, type Sanitized } from "./github/sanitize.js";
 import { withHeadWorktree } from "./gather/worktree.js";
 import { mergeFindings, toPostedFinding } from "./merge/index.js";
 import { applySuppressions } from "./merge/suppress.js";
@@ -103,6 +110,13 @@ export interface RunInput {
    * gets it.
    */
   authorWriteAccess?: boolean;
+  /**
+   * The title and the body of the change, for a run without "pr". The eval
+   * gives the text of a case here. The run sanitizes it as the text of a
+   * pull request, and the record gives "pr" as the source. Absent means the
+   * description comes from the commit messages.
+   */
+  description?: { title: string; body: string };
   client?: SdkClient;
   now?: () => Date;
 }
@@ -172,6 +186,7 @@ const CLIENT_OVERRIDE_ROLES: ReadonlySet<Role> = new Set<Role>([
 // Add the repo config's model and effort for the role of the request.
 // An override that the request sets itself wins.
 function withRoleOverrides(req: QueryRequest, config: RepoConfig): QueryRequest {
+  if (req.role === "judge") return req;
   if (!CLIENT_OVERRIDE_ROLES.has(req.role) || !isConfigRole(req.role)) return req;
   const set = config.models[req.role];
   if (!set || (set.model === undefined && set.effort === undefined)) return req;
@@ -183,6 +198,25 @@ function withRoleOverrides(req: QueryRequest, config: RepoConfig): QueryRequest 
       ...req.overrides,
     },
   };
+}
+
+// Sanitize a given title and body, and join them as the text of a pull
+// request.
+function givenDescription(given: { title: string; body: string }): Sanitized {
+  const title = sanitizeGitHubText(given.title);
+  const body = sanitizeGitHubText(given.body);
+  return {
+    text: `${title.text}\n\n${body.text}`,
+    sanitized: title.sanitized || body.sanitized,
+    truncated: title.truncated || body.truncated,
+  };
+}
+
+// Give the run role of a query. The judge is a role of the eval, so a
+// judge query in a run is a bug.
+function runRole(role: QueryRole): Role {
+  if (role === "judge") throw new Error("A run does not make a judge query.");
+  return role;
 }
 
 // Wrap the client so that each query gives one cost entry, also a query
@@ -199,6 +233,7 @@ function recordingClient(
 ): SdkClient {
   return {
     async query<T>(original: QueryRequest, options: RunOptions): Promise<QueryOutcome<T>> {
+      const role = runRole(original.role);
       const req = withRoleOverrides(original, config);
       const start = performance.now();
       let outcome: QueryOutcome<T> | null = null;
@@ -212,9 +247,9 @@ function recordingClient(
         // its semaphore slot is free for the next query.
         counter.tokens += usageTokens(raw?.usage);
         entries.push({
-          role: req.role,
+          role,
           ...(req.reviewerName !== undefined ? { reviewer: req.reviewerName } : {}),
-          model: raw?.model ?? resolveModel(req.overrides?.model ?? ROLE_DEFAULTS[req.role].model),
+          model: raw?.model ?? resolveModel(req.overrides?.model ?? ROLE_DEFAULTS[role].model),
           duration_ms: raw?.durationMs ?? Math.round(performance.now() - start),
           stop_reason: raw?.stopReason ?? null,
           subtype,
@@ -476,7 +511,11 @@ export async function runReview(input: RunInput): Promise<RunResult> {
     // With a pull request, the description is its sanitized title and body.
     // Else it is the sanitized commit messages that gather gives. Every
     // reviewer and verifier wraps it as untrusted text.
-    const prText = prContext ? prDescription(prContext.pr) : null;
+    const prText = prContext
+      ? prDescription(prContext.pr)
+      : input.description
+        ? givenDescription(input.description)
+        : null;
     const gathered: GatherResult = prText
       ? { ...commitsGathered, description: prText.text }
       : commitsGathered;

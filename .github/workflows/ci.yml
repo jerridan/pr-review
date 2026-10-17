@@ -1,0 +1,168 @@
+# The CI of pr-review. The checks job runs on every pull request. The eval
+# job runs the eval gate when a change touches the prompts, the code, the
+# eval pin or the lockfile, and on a manual dispatch.
+#
+# Security rules for this file:
+# - The workflow reads two secrets. The token of the cases repo goes only to
+#   the checkout of that repo. The Claude login token goes only to the eval
+#   step.
+# - No checkout keeps a token in .git/config.
+# - A pull request from a fork gets no secrets, so the eval job skips it.
+# - Event values and inputs go to a script through env, never as text in
+#   the script.
+# - No step writes the baseline. A baseline refresh is a deliberate commit.
+name: ci
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      repeat:
+        description: The number of runs of each case.
+        required: false
+        default: "3"
+
+permissions:
+  contents: read
+
+# One run for each pull request. A new push cancels the run in progress.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out pr-review
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+  eval:
+    needs: checks
+    runs-on: ubuntu-latest
+    # A fork pull request has no secrets, so the job skips it and does not fail.
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      || (github.event_name == 'pull_request'
+        && github.event.pull_request.head.repo.full_name == github.repository)
+    steps:
+      - name: Check out pr-review
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Run the eval when the change touches prompts/, src/ or eval/, or
+      # package.json or package-lock.json. A dispatch always runs it.
+      - name: Find the changed paths
+        id: filter
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          merge_base="$(git merge-base "$BASE_SHA" "$HEAD_SHA")"
+          changed="$(git diff --name-only "$merge_base" "$HEAD_SHA")"
+          if grep -E '^(prompts/|src/|eval/|package\.json$|package-lock\.json$)' > /dev/null <<< "$changed"; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No change to prompts/, src/, eval/, package.json or package-lock.json. The eval does not run."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The workflow holds neither the cases repo nor its ref as a literal.
+      # Check both before they go to the checkout.
+      - name: Read the cases pin
+        id: pin
+        if: steps.filter.outputs.run == 'true'
+        run: |
+          node --input-type=module -e '
+          import { appendFileSync, readFileSync } from "node:fs";
+          const pin = JSON.parse(readFileSync("eval/cases.json", "utf8"));
+          if (typeof pin.repo !== "string" || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(pin.repo)) {
+            console.error("eval/cases.json: repo is not owner/name.");
+            process.exit(1);
+          }
+          if (typeof pin.ref !== "string" || !/^[0-9a-f]{40}$/.test(pin.ref)) {
+            console.error("eval/cases.json: ref is not a full commit sha.");
+            process.exit(1);
+          }
+          appendFileSync(process.env.GITHUB_OUTPUT, "repo=" + pin.repo + "\nref=" + pin.ref + "\n");
+          '
+
+      - name: Check out the cases repo
+        if: steps.filter.outputs.run == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.pin.outputs.repo }}
+          ref: ${{ steps.pin.outputs.ref }}
+          path: eval/cases
+          token: ${{ secrets.CASES_TOKEN }}
+          persist-credentials: false
+
+      - name: Set up Node 20
+        if: steps.filter.outputs.run == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install and build
+        if: steps.filter.outputs.run == 'true'
+        run: |
+          npm ci
+          npm run build
+
+      # The eval exits 1 for a failed repeat and 3 for a failed gate.
+      # pipefail keeps that exit code through tee. The step summary is
+      # markdown, so a code fence keeps the lines of the table apart. The
+      # step keeps the exit code of the eval and writes the closing fence
+      # also when the eval fails.
+      - name: Run the eval
+        if: steps.filter.outputs.run == 'true'
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          REPEAT: ${{ github.event_name == 'workflow_dispatch' && inputs.repeat || '3' }}
+        run: |
+          set -o pipefail
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          status=0
+          node dist/cli.js eval --cases eval/cases --repeat "$REPEAT" --baseline eval/baseline.json --out pr-review-eval | tee -a "$GITHUB_STEP_SUMMARY" || status=$?
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      # Upload the report and every record, also after a failed eval.
+      - name: Upload the eval output
+        if: always() && steps.filter.outputs.run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-review-eval-${{ github.run_id }}
+          path: pr-review-eval/
+          if-no-files-found: warn

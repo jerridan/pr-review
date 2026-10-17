@@ -26,4 +26,5 @@ npm run build
 - `docs/design/` holds the design. Read `high-level-design.md` before you change the pipeline.
 - `docs/research/` holds the research notes. `claude-5-5-models.md` fixes the model pins and the SDK query options.
 - `action.yml`, `.github/workflows/review.yml`, `.claude-plugin/` and `commands/` package the tool for CI and for Claude Code. This repo is its own Claude Code marketplace, so add no entry in another repo.
+- `eval/` holds the cases pin, the baseline and the gitignored `eval/cases/`; the case set lives in the cases repo. `scripts/fetch-cases.sh` brings it to `eval/cases/`.
 - TICKETS.md lists the deliverables that remain. The spec for a deliverable in progress lives outside this repo; ask for its path before you start.

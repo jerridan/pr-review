@@ -3,6 +3,13 @@
 
 export type Role = "triage" | "reviewer" | "verifier" | "verifier-escalation" | "merge" | "smoke";
 
+/**
+ * The role of one query. "judge" is a role of the eval, not of a run: it
+ * is not in ROLES, a run record has no entry for it, and a repo config
+ * cannot set it.
+ */
+export type QueryRole = Role | "judge";
+
 export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
 
 export interface RoleConfig {
@@ -90,6 +97,24 @@ export const ROLE_DEFAULTS: Record<Role, RoleConfig> = {
     tools: "none",
   },
 };
+
+/**
+ * The judge of the eval. It runs on a different model from the reviewer
+ * role, with no tools. Effort "high" turns thinking on.
+ */
+export const JUDGE_DEFAULTS: RoleConfig = {
+  model: MODEL_IDS.sonnet,
+  effort: "high",
+  maxTurns: 5,
+  maxBudgetUsd: 0.25,
+  timeoutMs: 120_000,
+  tools: "none",
+};
+
+/** The defaults of the role of one query. */
+export function roleConfig(role: QueryRole): RoleConfig {
+  return role === "judge" ? JUDGE_DEFAULTS : ROLE_DEFAULTS[role];
+}
 
 // An exact model ID starts with "claude-". Any other value must be an alias.
 const MODEL_ID_PATTERN = /^claude-[a-z0-9][a-z0-9.-]*$/;

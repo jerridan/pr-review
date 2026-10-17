@@ -7,14 +7,14 @@ import {
   type SDKResultMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 import type { z } from "zod";
-import { ROLE_DEFAULTS, type Role, type RoleConfig } from "../config/models.js";
+import { roleConfig, type QueryRole, type RoleConfig } from "../config/models.js";
 import type { QueryFailure } from "../schemas/record.js";
 import { buildQueryOptions, type RunOptions } from "./options.js";
 
 export type { RunOptions } from "./options.js";
 
 export interface QueryRequest {
-  role: Role;
+  role: QueryRole;
   reviewerName?: string;
   systemPrompt: string;
   userMessage: string;
@@ -158,7 +158,7 @@ export function createSdkClient(run: QueryFn = query): SdkClient {
       // query failure.
       const sdkOptions = buildQueryOptions(req, options);
       const model = sdkOptions.model as string;
-      const timeoutMs = ROLE_DEFAULTS[req.role].timeoutMs;
+      const timeoutMs = roleConfig(req.role).timeoutMs;
       // Each query has its own controller. The timer aborts it, and the
       // query ends at that time also when the SDK does not stop.
       const controller = new AbortController();

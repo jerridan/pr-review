@@ -348,6 +348,26 @@ git tag -f v1
 git push -f origin v1
 ```
 
+### Continuous integration
+
+This repo runs its own CI in `.github/workflows/ci.yml`. The workflow runs on every pull request and on a manual dispatch.
+
+- The job `checks` runs `npm ci`, `npm test`, `npm run lint`, `npm run typecheck` and `npm run build` on Node 20.
+- The job `eval` runs after `checks`. It runs the eval gate on the pinned case set with `--repeat 3` and `--baseline eval/baseline.json`. A dispatch can set another repeat count.
+- The path filter runs the eval only when the pull request changes a path under `prompts/`, `src/` or `eval/`, or changes `package.json` or `package-lock.json`. A step finds the changed paths with `git diff --name-only` from the merge base. When no path matches, the job passes and runs no eval. A dispatch always runs the eval.
+- The eval job skips a pull request from a fork, because a fork gets no secrets. The skip does not fail the pull request.
+- The job fails on exit 1 and on exit 3 of the eval. It appends the report table to the step summary. It uploads `pr-review-eval/`, with `report.json` and every record, also after a failure.
+- A new push to the pull request cancels the run in progress.
+
+The workflow needs two repo secrets:
+
+| Secret | Content |
+|--------|---------|
+| `CLAUDE_CODE_OAUTH_TOKEN` | The token of `claude setup-token`. Only the eval step gets it. |
+| `CASES_TOKEN` | A fine-grained token with read access to the contents of `jerridan/pr-review-cases` only. Only the checkout of the cases repo gets it, and the checkout keeps no token in `.git/config`. |
+
+Set both with `gh secret set <name>`. The workflow has the permission `contents: read` and nothing more.
+
 ## The `/review` command
 
 The `/review` command runs the CLI from Claude Code, in the current repo. Install it with these two commands:
@@ -524,6 +544,129 @@ The GitHub review adds these keys:
 | `span_text` on each posted finding | The normalized span text that the fingerprint hashes. |
 
 The JSON output holds `reviewers_skipped`, `reviewers_without_bash` and `sensitive_without_hunks` in its `coverage` object. The table output shows the same three lists on its `Coverage` line.
+
+## Evaluate
+
+The eval measures a change to a prompt, a threshold or a model before it ships. It reviews a set of frozen cases several times. Then it scores the posted findings against the golden findings of each case.
+
+```bash
+scripts/fetch-cases.sh
+pr-review eval --cases eval/cases --repeat 3 --baseline eval/baseline.json
+```
+
+The eval makes real SDK calls. It needs a Claude login and it costs money.
+
+| Flag | Meaning | Default |
+|------|---------|---------|
+| `--cases <dir>` | The cases directory. It holds one subdirectory per case. | required |
+| `--repeat <n>` | The number of runs of each case. A positive integer. | 3 |
+| `--baseline <file>` | The baseline file for the gate. | no gate |
+| `--write-baseline` | Write the aggregate of the eval to the `--baseline` file. The gate does not run. | off |
+| `--out <dir>` | The directory for every run record and `report.json`. | `./pr-review-eval` |
+| `--format table\|json` | The format of the report on stdout. | `table` |
+| `--tier full\|fast\|skip` | The tier of every run. | `full` |
+| `--judge-model <id>` | The model of the judge. An alias or an exact ID. | `claude-sonnet-5-5` |
+| `--allow-api-key` | Keep `ANTHROPIC_API_KEY` in the environment, also for the judge. | off |
+| `--allow-same-judge` | Let the judge model equal a reviewer model. | off |
+
+For each case in name order, the eval clones the case into a temporary directory and runs the review there, once for each repeat. The runs go one at a time. The run takes the `title` and the `body` of the case as the PR text. It makes no `gh` call. Each run writes a normal record in `<out>/<case>/<repeat>/`.
+
+### Cases
+
+A case is one directory with four files:
+
+| File | Content |
+|------|---------|
+| `case.json` | `name`, `source`, `base`, `head`, `title`, `body`, `origin` and `language`. The `name` equals the directory name. |
+| `repo.bundle` | A git bundle that holds the base commit, the head commit and the history between them. |
+| `diff.patch` | The three-dot diff from the base to the head, for a person to read. The eval does not read it. |
+| `golden.json` | `findings`, each with `file`, `start_line`, `end_line`, `category`, `severity`, `claim` and an optional `note`. |
+
+`source` is one of `fixture`, `pr`, `reviewbench`, `martian`, `injection` and `record`. A subdirectory without `case.json` is not a case. The eval checks every case before the first model call. A missing file, a field that is not valid, or a sha that the bundle does not hold makes the eval exit 2. The message names the case.
+
+To make a case from two commits, run this command in the cases directory:
+
+```bash
+scripts/make-case.sh <repo> <base> <head> <name>
+```
+
+The script writes `case.json`, `repo.bundle` and `diff.patch`. It takes the title and the body from the head commit message. Edit `case.json`, then write `golden.json` by hand.
+
+### The cases repo and the pin
+
+The case set lives in a separate private repo, `jerridan/pr-review-cases`. Its README tells how to add a case. `eval/cases.json` pins it:
+
+```json
+{ "repo": "<owner>/<name>", "ref": "<sha>" }
+```
+
+`scripts/fetch-cases.sh` brings the pinned case set to `eval/cases/`. Run it from the root of this repo. It uses `git` only, so `git` must reach the private repo, for example through `gh auth setup-git`. The script takes a source url as its one argument. On a machine without a git credential helper, pass the ssh url: `scripts/fetch-cases.sh git@github.com:jerridan/pr-review-cases.git`. A second run fetches and checks out the new pin in place. The CLI never fetches the cases and never reads `eval/cases.json`. `eval/cases/` and `pr-review-eval/` are in `.gitignore`.
+
+### Scoring
+
+The match pass pairs each posted finding with each golden finding:
+
+- The same file, spans that overlap and the same category give an exact match.
+- The same file and spans within 10 lines give an ambiguous pair when the spans do not overlap or the categories differ.
+- Every other pair is no match.
+
+The judge gets one query for each ambiguous pair. Its answer `yes` is a match. The answers `no` and `unknown` are not. A failed judge query counts as `unknown`. Each finding is in one match at most. The judge runs on `claude-sonnet-5-5` at high effort, with no tools. The eval exits 2 before any model call when the judge model equals the model of the `reviewer` role. It also exits 2 when the `.pr-review/` config of a case gives a reviewer the judge model. `--allow-same-judge` permits this.
+
+### The report
+
+The report gives these metrics for each case and each repeat:
+
+| Metric | Meaning |
+|--------|---------|
+| `recall` | The matched goldens divided by the goldens. Null for a case with no golden. |
+| `precision` | The matched posted findings divided by the posted findings. Null when no finding posted. |
+| `posted` | The number of posted findings. |
+| `matched` | The posted findings that match a golden finding. |
+| `cost_usd` | The cost of the review. It holds no judge cost. |
+| `run_ms` | The run time of the review. |
+| `judge_calls`, `judge_cost_usd` | The judge queries of the run and their cost. |
+| `severity_agreement` | The matched pairs with the same severity, and all matched pairs. |
+
+For each repeat, the report gives the mean over the cases of recall, findings per case and cost per case. A mean leaves out null values. The report pools the precision of a repeat over its cases: the sum of `matched` divided by the sum of `posted`. It is null when no case posted a finding. So one case with one wrong finding moves the precision by its share of the findings, not by a whole case. The aggregate gives the mean, the minimum and the maximum of those per-repeat values. `--format table` prints one table per case and a summary. `--format json` prints the same document that the eval writes to `<out>/report.json`. The report lists a failed repeat in `failed_repeats`, with null metrics.
+
+### The gate and the baseline
+
+With `--baseline <file>`, the eval compares the aggregate mean recall and mean precision with the file. The gate fails when the baseline value minus the mean is more than the margin. A drop equal to the margin passes. A null mean fails. The eval prints the two drops and the margin to stderr. The eval warns when the `cases_ref` of the baseline and the HEAD of the cases checkout are both known and differ. A change of the case set needs a new baseline.
+
+Refresh the baseline after a deliberate change, such as a new case set or a new prompt. Run the eval with the baseline flag and the write flag, then commit the file:
+
+```bash
+pr-review eval --cases eval/cases --repeat 3 --baseline eval/baseline.json --write-baseline
+```
+
+The write keeps the `margin` of the existing file, or uses 0.05 for each metric. It writes nothing when a repeat failed. No CI step writes the baseline.
+
+A margin smaller than the noise of the case set makes the gate fail on a run with no change. Pick each margin from the report of the baseline run:
+
+1. Take the spread of the metric: its aggregate `mean` minus its `min` over the repeats. Use the larger spread of the recent baseline runs, not only the last run. A single calm run understates the noise.
+2. Double the spread.
+3. Round up to the next multiple of 0.05.
+4. Use 0.05 when the result is smaller.
+5. Keep the margin at least 0.05 below the baseline value, so the gate still fails on a collapse. Lower the margin to the largest multiple of 0.05 that obeys this. A margin that reaches the baseline value checks nothing for that metric. Say so in the PR that writes it.
+
+For example, a precision with mean 0.667 and min 0.5 has a spread of 0.167. Twice the spread is 0.333, so the margin is 0.35. `--write-baseline` keeps an existing margin, so edit `margin` in the file after the run, then commit it.
+
+The starter set is small, so its spread is large. Its baseline recall is 0.167 with a margin of 0.10. The gate works on the mean over the repeats. So the recall gate fails when the mean recall over the three repeats drops below about 0.07. In the baseline run, only the fixture matched a golden. So the gate fails when the fixture matches fewer than about 0.8 of its goldens per run, on average. Its baseline precision is 1.0 with a margin of 0.35. So the precision gate fails when, on average over the repeats, more than about one posted finding in three is wrong. Until D4b grows the set, both gates are collapse checks. Read the numbers in the step summary of the eval job. Do not read only the check status.
+
+### Explain a record
+
+`pr-review explain <record.json>` shows why each finding of a run record was kept or dropped. It prints one row for each finding. A row shows the reviewer and the pass, the file and the span, the category and the claim. It also shows the last stage, the outcome and the reason. `--format json` prints the rows with the raw fields of each finding. The default is `--format table`. The command works on every record, also a record of an eval run.
+
+### Exit codes
+
+| Code | `eval` | `explain` |
+|------|--------|-----------|
+| 0 | The eval ran, and the gate passed or did not run. | The command printed the rows. |
+| 1 | A repeat failed, or a run error occurred. | Not used. |
+| 2 | A usage error, an invalid case, or a configuration error such as a judge model equal to a reviewer model. | A usage error, or a file that is missing, is not JSON or is not a run record. |
+| 3 | The gate failed. | Not used. |
+
+A failed repeat is a run that exits 1 or throws. A case whose `.pr-review/` config is not valid makes each of its runs fail. A model query that fails is not a failed repeat, because the run records it. With a failed repeat and a failed gate, the eval exits 1, and the report still holds the gate.
 
 ## Measure the passes
 

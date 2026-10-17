@@ -1,12 +1,21 @@
 #!/usr/bin/env node
-// The pr-review command line. Exit codes: 0 when a run writes a record,
-// 1 when a run cannot write a record or cannot post the review that
-// --format github asked for, 2 on a usage error.
+// The pr-review command line. Exit codes of run: 0 when a run writes a
+// record, 1 when a run cannot write a record or cannot post the review that
+// --format github asked for, 2 on a usage error. Exit codes of eval: 0 when
+// the gate passed or did not run, 1 for a failed repeat or a run error, 2
+// for a usage error, an invalid case or a configuration error, 3 when the
+// gate failed. Exit codes of explain: 0 on success, 2 for a usage error or
+// a file that is missing, is not JSON, or is not a run record.
 import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { Command, CommanderError, InvalidArgumentError, Option } from "commander";
 import { z } from "zod";
-import { ROLE_DEFAULTS, resolveModel } from "./config/models.js";
+import { JUDGE_DEFAULTS, ROLE_DEFAULTS, resolveModel } from "./config/models.js";
+import { runEval } from "./eval/run.js";
+import { explain } from "./explain/index.js";
+import { renderExplainJson, renderExplainTable } from "./explain/format.js";
+import { readFile } from "node:fs/promises";
+import { RecordSchema } from "./schemas/record.js";
 import type { GitHubClient } from "./github/client.js";
 import { formatJson } from "./output/json.js";
 import { formatTable } from "./output/table.js";
@@ -17,6 +26,8 @@ import type { SdkClient } from "./sdk/client.js";
 export const EXIT_OK = 0;
 export const EXIT_FAILURE = 1;
 export const EXIT_USAGE = 2;
+/** The eval gate failed. */
+export const EXIT_GATE = 3;
 
 /** The trivial schema of the smoke query. */
 export const SmokeOutputSchema = z.strictObject({ ok: z.boolean(), word: z.string() });
@@ -34,6 +45,19 @@ interface RunCliOptions {
   tier?: "full" | "fast" | "skip";
   allowApiKey?: boolean;
   authorWriteAccess?: boolean;
+}
+
+interface EvalCliOptions {
+  cases: string;
+  repeat: number;
+  baseline?: string;
+  writeBaseline?: boolean;
+  out: string;
+  format: "table" | "json";
+  tier: "full" | "fast" | "skip";
+  judgeModel?: string;
+  allowApiKey?: boolean;
+  allowSameJudge?: boolean;
 }
 
 // Commander exits with 1 on a usage error. This makes it 2. Help and
@@ -60,6 +84,15 @@ function parsePrNumber(value: string): number {
   const n = Number(value);
   if (!/^[1-9][0-9]*$/.test(value) || !Number.isSafeInteger(n)) {
     throw new InvalidArgumentError("Give the pull request number as a positive integer.");
+  }
+  return n;
+}
+
+// Parse --repeat: a positive integer.
+function parseRepeat(value: string): number {
+  const n = Number(value);
+  if (!/^[1-9][0-9]*$/.test(value) || !Number.isSafeInteger(n)) {
+    throw new InvalidArgumentError("Give the repeat count as a positive integer.");
   }
   return n;
 }
@@ -104,6 +137,33 @@ async function runSmoke(deps: ProgramDeps, allowApiKey: boolean): Promise<void> 
     process.exitCode = EXIT_FAILURE;
   }
   process.stdout.write(`${lines.join("\n")}\n`);
+}
+
+// Explain one run record. A file that is missing, is not JSON, or is not a
+// run record exits 2.
+async function runExplain(path: string, format: "table" | "json"): Promise<number> {
+  const fail = (message: string): number => {
+    process.stderr.write(`pr-review explain: ${message}\n`);
+    return EXIT_USAGE;
+  };
+  let value: unknown;
+  try {
+    value = JSON.parse(await readFile(path, "utf8"));
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    return fail(`cannot read the record ${path}: ${reason}`);
+  }
+  const parsed = RecordSchema.safeParse(value);
+  if (!parsed.success) {
+    const issues = parsed.error.issues
+      .slice(0, 5)
+      .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
+      .join("; ");
+    return fail(`${path} is not a run record: ${issues}`);
+  }
+  const rows = explain(parsed.data);
+  process.stdout.write(format === "json" ? renderExplainJson(rows) : renderExplainTable(rows));
+  return EXIT_OK;
 }
 
 /** The default record directory, relative to the current directory. */
@@ -202,6 +262,78 @@ export function createProgram(deps: ProgramDeps): Command {
         command.error("error: --format github needs --pr", { exitCode: EXIT_USAGE });
       }
       await runCommand(deps, options);
+    });
+
+  program
+    .command("eval")
+    .description(
+      "Review each case of a cases directory several times, score the findings against the golden findings, and report.",
+    )
+    .requiredOption("--cases <dir>", "the cases directory, with one subdirectory per case")
+    .option("--repeat <n>", "the number of runs of each case, a positive integer", parseRepeat, 3)
+    .option("--baseline <file>", "the baseline file for the gate (default: no gate)")
+    .option(
+      "--write-baseline",
+      "write the aggregate of the eval to the --baseline file; no gate runs",
+    )
+    .option("--out <dir>", "the directory for every run record and report.json", "pr-review-eval")
+    .addOption(
+      new Option("--format <format>", "the format of the report on stdout")
+        .choices(["table", "json"])
+        .default("table"),
+    )
+    .addOption(
+      new Option("--tier <tier>", "the tier of every run")
+        .choices(["full", "fast", "skip"])
+        .default("full"),
+    )
+    .option(
+      "--judge-model <id>",
+      `the model of the judge, an alias or an exact ID (default: ${JUDGE_DEFAULTS.model}, the judge role default)`,
+    )
+    .option(
+      "--allow-api-key",
+      "keep ANTHROPIC_API_KEY and the other provider variables in the SDK environment, also for the judge",
+    )
+    .option("--allow-same-judge", "allow the judge model to equal a reviewer model")
+    .action(async (options: EvalCliOptions, command: Command) => {
+      if (options.writeBaseline === true && options.baseline === undefined) {
+        command.error("error: --write-baseline needs --baseline", { exitCode: EXIT_USAGE });
+      }
+      try {
+        process.exitCode = await runEval(
+          {
+            cases: options.cases,
+            repeat: options.repeat,
+            ...(options.baseline !== undefined ? { baseline: options.baseline } : {}),
+            writeBaseline: options.writeBaseline === true,
+            out: options.out,
+            format: options.format,
+            tier: options.tier,
+            ...(options.judgeModel !== undefined ? { judgeModel: options.judgeModel } : {}),
+            allowApiKey: options.allowApiKey === true,
+            allowSameJudge: options.allowSameJudge === true,
+          },
+          deps,
+        );
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        process.stderr.write(`pr-review eval: ${message}\n`);
+        process.exitCode = EXIT_FAILURE;
+      }
+    });
+
+  program
+    .command("explain")
+    .description("Show why each finding of a run record was kept or dropped.")
+    .argument("<record>", "the run record file")
+    .addOption(
+      new Option("--format <format>", "the output format")
+        .choices(["table", "json"])
+        .default("table"),
+    )
+    .action(async (path: string, options: { format: "table" | "json" }) => {
+      process.exitCode = await runExplain(path, options.format);
     });
 
   program
