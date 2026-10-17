@@ -7,7 +7,6 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
-  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -518,13 +517,19 @@ describe("pr-review eval: the runs (R3.2 to R3.7)", () => {
   );
 
   it(
-    "takes the description from the case title and body through the sanitizer, with no gh on the PATH",
+    "takes the description from the case title and body through the sanitizer, and makes no gh call",
     async () => {
+      // A gh shim first on the PATH records each call and fails. A real gh
+      // later on the PATH is never reached, so the test holds with gh installed.
       const bin = newDir("bin");
-      const realGit = execFileSync("bash", ["-c", "command -v git"], { encoding: "utf8" }).trim();
-      symlinkSync(realGit, join(bin, "git"));
-      vi.stubEnv("PATH", `${bin}:/usr/bin:/bin`);
-      expect(() => execFileSync("bash", ["-c", "command -v gh"])).toThrow();
+      const calls = join(bin, "gh-calls.log");
+      writeFileSync(join(bin, "gh"), `#!/bin/sh\necho "$*" >> '${calls}'\nexit 1\n`, {
+        mode: 0o755,
+      });
+      vi.stubEnv("PATH", `${bin}:${process.env.PATH ?? ""}`);
+      expect(execFileSync("bash", ["-c", "command -v gh"], { encoding: "utf8" }).trim()).toBe(
+        join(bin, "gh"),
+      );
       const cases = casesDir([
         {
           name: "described",
@@ -542,6 +547,7 @@ describe("pr-review eval: the runs (R3.2 to R3.7)", () => {
       expect(description).toContain("CASE-BODY visible");
       expect(description).not.toContain("HIDDEN-COMMENT");
       expect(description_meta).toEqual({ source: "pr", sanitized: true, truncated: false });
+      expect(existsSync(calls), "the eval called gh").toBe(false);
     },
     RUN_TIMEOUT,
   );
