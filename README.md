@@ -302,6 +302,8 @@ jobs:
 
 The consumer holds the trigger list, because GitHub reads `on:` only from the repo where the event happens.
 
+A consumer repo that requires SHA pins must call the workflow at the commit SHA of `v1`, not at the tag. Put the tag in a trailing comment: `review.yml@<sha> # v1`.
+
 | Trigger | The workflow runs when |
 |---------|------------------------|
 | `pull_request` | A PR opens, gets a push, reopens or becomes ready. |
@@ -333,12 +335,20 @@ The action has two outputs: `record`, the record path, and `verdict`. The action
 
 ### The release tag
 
-The workflow and the action both read the tag `v1`. Create the tag on the commit that you release. Move it to ship a fix:
+A consumer calls the workflow at the tag `v1`. The workflow calls the action at a commit SHA, not at the tag, because a consumer repo can require SHA pins. That rule also covers every action of the workflow that the consumer calls. So each `uses:` in `review.yml` and `action.yml` is a SHA.
 
-```bash
-git tag -f v1
-git push -f origin v1
-```
+Do these steps to ship a fix:
+
+1. Merge the fix to `main`.
+2. Set the SHA of `uses: jerridan/pr-review@<sha>` in `review.yml` to the commit on `main` that holds the fix.
+3. Move the tag to the new commit on `main`:
+
+   ```bash
+   git tag -f v1
+   git push -f origin v1
+   ```
+
+When the fix changes only `review.yml`, skip step 2.
 
 ### Continuous integration
 
