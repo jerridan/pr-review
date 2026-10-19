@@ -58,6 +58,14 @@ function loadJob(): Job {
   return jobs[0] as Job;
 }
 
+// A consumer repo can require SHA pins, and that rule covers the actions of a
+// reusable workflow. So every uses value is a full commit SHA.
+const SHA_PIN = /@[0-9a-f]{40}$/;
+
+function isAction(step: Step): boolean {
+  return /^jerridan\/pr-review@[0-9a-f]{40}$/.test(step.uses ?? "");
+}
+
 function findStep(steps: Step[], test: (step: Step) => boolean, what: string): Step {
   const step = steps.find(test);
   if (!step) throw new Error(`no step: ${what}`);
@@ -401,9 +409,9 @@ describe("action.yml (R9)", () => {
     expect(text).not.toMatch(/github\.token/);
   });
 
-  it("pins every uses to a major tag", () => {
+  it("pins every uses to a full commit SHA", () => {
     for (const step of loadAction().runs.steps) {
-      if (step.uses !== undefined) expect(step.uses).toMatch(/^[\w-]+\/[\w-]+@v\d+$/);
+      if (step.uses !== undefined) expect(step.uses).toMatch(/^[\w-]+\/[\w-]+@[0-9a-f]{40}$/);
     }
   });
 
@@ -750,9 +758,9 @@ describe(".github/workflows/review.yml (R10)", () => {
     expect(git(sandbox.workspace, "rev-parse", "origin/main")).toBe(headSha);
   });
 
-  it("runs the action by jerridan/pr-review@v1 with the two env keys", () => {
+  it("runs the action by jerridan/pr-review at a commit SHA with the two env keys", () => {
     const steps = loadJob().steps;
-    const review = findStep(steps, (s) => s.uses === "jerridan/pr-review@v1", "action");
+    const review = findStep(steps, isAction, "action");
     const ctx = context("pull_request", prEvent("opened", false));
     expect(render(review.env?.CLAUDE_CODE_OAUTH_TOKEN, ctx)).toBe("<secret>");
     expect(render(review.env?.GH_TOKEN, ctx)).toBe("<token>");
@@ -762,7 +770,7 @@ describe(".github/workflows/review.yml (R10)", () => {
 
   describe("the tier and fresh inputs of the action step", () => {
     const inputs = (eventName: string, event: Record<string, Value>) => {
-      const review = findStep(loadJob().steps, (s) => s.uses === "jerridan/pr-review@v1", "action");
+      const review = findStep(loadJob().steps, isAction, "action");
       const ctx = context(eventName, event);
       return {
         tier: render(review.with?.tier ?? "", ctx),
@@ -814,7 +822,7 @@ describe(".github/workflows/review.yml (R10)", () => {
     const ctx = context("pull_request", prEvent("opened", false));
     expect(render(upload.with?.name, ctx)).toBe(`pr-review-record-${PR_NUMBER}-4242`);
     expect(render(upload.with?.path, ctx)).toBe(`/runner/temp/pr-review-records/pr-${PR_NUMBER}`);
-    const review = findStep(steps, (s) => s.uses === "jerridan/pr-review@v1", "action");
+    const review = findStep(steps, isAction, "action");
     expect(steps.indexOf(review)).toBeLessThan(steps.indexOf(upload));
   });
 
@@ -831,7 +839,7 @@ describe(".github/workflows/review.yml (R10)", () => {
 
   it("checks out the records before the action step and pushes after it with if: always()", () => {
     const { checkout, push, steps } = recordsSteps();
-    const review = findStep(steps, (s) => s.uses === "jerridan/pr-review@v1", "action");
+    const review = findStep(steps, isAction, "action");
     expect(steps.indexOf(checkout)).toBeLessThan(steps.indexOf(review));
     expect(steps.indexOf(push)).toBeGreaterThan(steps.indexOf(review));
     expect(push.if).toMatch(/always\(\)/);
@@ -925,7 +933,7 @@ describe(".github/workflows/review.yml (R10)", () => {
     for (const step of loadJob().steps) {
       if (step.uses !== undefined) {
         expect(step.uses).not.toMatch(/^\.\//);
-        expect(step.uses).toMatch(/@v\d+$/);
+        expect(step.uses).toMatch(SHA_PIN);
       }
       expect(step.shell ?? "bash").toBe("bash");
       const run = step.run ?? "";
@@ -948,7 +956,7 @@ describe(".github/workflows/review.yml (R10)", () => {
       // A script can test that GH_TOKEN is set. It never uses the value.
       const rest = run.replace(/\[\s+-n\s+"\$\{GH_TOKEN:-\}"\s+\]/g, "");
       expect(rest).not.toMatch(/GH_TOKEN|GITHUB_TOKEN|CLAUDE_CODE_OAUTH_TOKEN|x-access-token/);
-      if (step.uses !== "jerridan/pr-review@v1") {
+      if (!isAction(step)) {
         const { GH_TOKEN: ghToken, ...env } = step.env ?? {};
         if (ghToken !== undefined) expect(ghToken).toBe("${{ github.token }}");
         expect(JSON.stringify(env)).not.toMatch(/secrets\.|github\.token/);
@@ -1239,7 +1247,7 @@ describe(".github/workflows/ci.yml (R8)", () => {
 
     it("checks out the cases repo from the pin, with CASES_TOKEN and no persisted credentials", () => {
       const step = casesStep();
-      expect(step.uses).toMatch(/^actions\/checkout@v\d+$/);
+      expect(step.uses).toMatch(/^actions\/checkout@[0-9a-f]{40}$/);
       expect(step.with?.["persist-credentials"]).toBe(false);
       expect(step.with?.token).toBe("${{ secrets.CASES_TOKEN }}");
       expect(String(step.with?.repository)).toMatch(/^\$\{\{\s*steps\.\w+\.outputs\.repo\s*\}\}$/);
@@ -1390,11 +1398,11 @@ describe(".github/workflows/ci.yml (R8)", () => {
   });
 
   describe("secrets and pins (R8.7, R2.8, R6.6)", () => {
-    it("pins every uses value to a major tag", () => {
+    it("pins every uses value to a full commit SHA", () => {
       const all = Object.values(loadCi().jobs).flatMap((job) => job.steps);
       const uses = all.flatMap((s) => (s.uses ? [s.uses] : []));
       expect(uses.length).toBeGreaterThan(0);
-      for (const value of uses) expect(value).toMatch(/@v\d+$/);
+      for (const value of uses) expect(value).toMatch(SHA_PIN);
     });
 
     it("sets the permissions to contents: read only", () => {

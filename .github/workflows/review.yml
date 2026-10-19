@@ -133,9 +133,11 @@ jobs:
             exit "$found"
           fi
 
+      # A consumer repo can require SHA pins, so this ref is a SHA, not v1.
+      # Set it to the commit of the action before you move the tag v1.
       - name: Review the pull request
         id: review
-        uses: jerridan/pr-review@v1
+        uses: jerridan/pr-review@0f40cd3cf294c36b14b565aaf0b89d7eaae3268c # v1
         with:
           pr: ${{ steps.pr.outputs.number }}
           out: ${{ runner.temp }}/pr-review-records
