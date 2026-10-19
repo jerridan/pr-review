@@ -71,7 +71,7 @@ jobs:
           echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
 
       - name: Check out the pull request head
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: refs/pull/${{ steps.pr.outputs.number }}/head
           fetch-depth: 0
@@ -159,7 +159,7 @@ jobs:
       # records worktree. Do this also after a failed run.
       - name: Upload the record
         if: always() && steps.pr.outputs.number != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: pr-review-record-${{ steps.pr.outputs.number }}-${{ github.run_id }}
           path: ${{ runner.temp }}/pr-review-records/pr-${{ steps.pr.outputs.number }}
