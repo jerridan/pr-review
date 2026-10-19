@@ -1,0 +1,2069 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 9,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Pin every action to a commit SHA, so a repo that requires SHA pins can call the workflow",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/9"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "79373a81461e2ef8f1c29a9f337cecdd02a4cba9",
+    "head": "4c3956c1f08651ee77afcbf638e4c3ba9cb985b8",
+    "started_at": "2026-10-19T21:46:35.581Z",
+    "tool_version": "0.1.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Pin every action to a commit SHA, so a repo that requires SHA pins can call the workflow\n\n## Why\n\n`jerridan/websites` requires SHA pins (`sha_pinning_required`). That rule also covers every action of a reusable workflow that the repo calls. The tag refs in `review.yml` and `action.yml` would stop the run there.\n\n## What\n\n- Pin `actions/checkout` (v4.4.0), `actions/upload-artifact` (v4.6.2) and `actions/setup-node` (v4.4.0) to commit SHAs in `action.yml`, `review.yml` and `ci.yml`.\n- Pin the action step of `review.yml` to `0f40cd3`, the first commit of this PR, where `action.yml` holds the pin.\n- Change the packaging tests to require full commit SHAs.\n- Update the release steps in the README, and tell a strict consumer to call the workflow at a SHA.\n\n## Merge\n\n**Merge with a merge commit, not a squash.** The action step points to `0f40cd3`. A squash drops that commit from `main`.\n\nThen move `v1` to the merge commit.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": ".github/workflows/ci.yml",
+        "hunks": 5
+      },
+      {
+        "path": ".github/workflows/review.yml",
+        "hunks": 3
+      },
+      {
+        "path": "README.md",
+        "hunks": 2
+      },
+      {
+        "path": "action.yml",
+        "hunks": 1
+      },
+      {
+        "path": "test/packaging.test.ts",
+        "hunks": 10
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [
+      ".github/workflows/ci.yml",
+      ".github/workflows/review.yml"
+    ],
+    "triage": {
+      "tier": "full",
+      "reason": "Pins CI/workflow actions to commit SHAs in sensitive workflow files, including a self-referencing SHA for jerridan/pr-review whose correctness can't be verified from the diff, and changes tests that enforce this.",
+      "confidence": "medium",
+      "categories": [
+        "security",
+        "bug",
+        "test",
+        "docs",
+        "convention"
+      ],
+      "hotspots": [
+        "The jerridan/pr-review@0f40cd3c... SHA in .github/workflows/review.yml: it must be a real commit that holds the action",
+        "The SHAs for actions/checkout, setup-node and upload-artifact, and whether each matches its version comment (checkout v4.4.0 is suspect)",
+        "test/packaging.test.ts: SHA_PIN and isAction regexes, and whether the tests still catch an unpinned or wrong reference",
+        "README.md: the release steps (SHA first, then move the tag)",
+        "action.yml: setup-node SHA"
+      ],
+      "file_notes": [
+        {
+          "file": ".github/workflows/ci.yml",
+          "note": "Replaces the checkout, setup-node and upload-artifact tags with SHAs. Check that each SHA is genuine and matches its version comment."
+        },
+        {
+          "file": ".github/workflows/review.yml",
+          "note": "Pins every action, including the self-reference jerridan/pr-review, to a SHA. The self-reference SHA must point to a commit with a working action.yml."
+        },
+        {
+          "file": "action.yml",
+          "note": "Pins setup-node to a SHA."
+        },
+        {
+          "file": "test/packaging.test.ts",
+          "note": "Pin checks change from the major-tag regex to a 40-hex SHA regex. The new isAction helper replaces the exact v1 string match."
+        },
+        {
+          "file": "README.md",
+          "note": "Documents the SHA-pin rule and the new release procedure."
+        }
+      ],
+      "summary": "The change replaces every `uses:` tag reference (actions/checkout, setup-node, upload-artifact and jerridan/pr-review) with a full commit SHA and a version comment. It does this in ci.yml, review.yml and action.yml, so consumer repos that require SHA pins can use the workflow. The packaging tests now require 40-hex SHAs, and the README describes the new release procedure."
+    },
+    "tier": "full",
+    "tier_reason": "Sensitive paths set a floor of full: .github/workflows/ci.yml, .github/workflows/review.yml.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "test/packaging.test.ts",
+            "start_line": 414,
+            "end_line": 414,
+            "category": "convention",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The action.yml pin test repeats the 40-hex SHA regex inline and does not use the new shared SHA_PIN constant.",
+            "evidence": "if (step.uses !== undefined) expect(step.uses).toMatch(/^[\\w-]+\\/[\\w-]+@[0-9a-f]{40}$/);",
+            "suggested_fix": "Use SHA_PIN, or build the stricter pattern from one shared constant.",
+            "explanation": "The same diff adds SHA_PIN for this check, but the 40-hex pattern still appears in three places, so the copies can drift apart.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4287,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 7329,
+              "outputTokens": 26,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0007459,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 350,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 11904,
+              "webSearchRequests": 0,
+              "costUSD": 0.10224,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 38,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.10298589999999999
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": ".github/workflows/review.yml",
+            "start_line": 74,
+            "end_line": 74,
+            "category": "docs",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "The description says actions/checkout is pinned at v4.4.0, but that release may not exist for actions/checkout (v4 ended at v4.3.x), so the SHA may not match its version comment.",
+            "evidence": "uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0",
+            "suggested_fix": "Check the SHA against the actions/checkout tags and fix the comment or the SHA so they match.",
+            "explanation": "If the version comment is wrong, readers and update tools get the wrong version for the pin.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7438,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 7313,
+              "outputTokens": 24,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0007433,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 518,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 11846,
+              "webSearchRequests": 0,
+              "costUSD": 0.10513600000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 216,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.10587930000000001
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": ".github/workflows/review.yml",
+            "start_line": 140,
+            "end_line": 140,
+            "category": "bug",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "The action is pinned to a commit from this PR's branch, which a squash or rebase merge drops from main.",
+            "evidence": "uses: jerridan/pr-review@0f40cd3cf294c36b14b565aaf0b89d7eaae3268c # v1",
+            "suggested_fix": "After the merge, pin to the merge commit on main.",
+            "explanation": "If that commit stops being reachable, the action step fails in every consumer repo.",
+            "needs_context": true
+          },
+          {
+            "file": ".github/workflows/review.yml",
+            "start_line": 74,
+            "end_line": 74,
+            "category": "bug",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "The actions/checkout SHA may not be the v4.4.0 release that its comment names.",
+            "evidence": "uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0",
+            "suggested_fix": "Check the SHA with git ls-remote against the v4.4.0 tag of actions/checkout.",
+            "explanation": "A wrong or nonexistent SHA breaks every checkout step.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 12118,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 7319,
+              "outputTokens": 26,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0007449000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 1121,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 11797,
+              "webSearchRequests": 0,
+              "costUSD": 0.116804,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 305,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.11754890000000001
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [
+          {
+            "file": ".github/workflows/review.yml",
+            "start_line": 74,
+            "end_line": 74,
+            "category": "bug",
+            "severity_estimate": "blocking",
+            "confidence": "low",
+            "claim": "I cannot confirm that the actions/checkout SHA 11d5960a… belongs to actions/checkout or matches the version comment v4.4.0.",
+            "evidence": "uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0",
+            "suggested_fix": "Run `git ls-remote https://github.com/actions/checkout refs/tags/v4*` to get the right SHA, then pin to it.",
+            "explanation": "The setup-node and upload-artifact SHAs match known release commits, but I do not know of a checkout v4.4.0 release at this SHA. If the SHA does not exist in actions/checkout, every checkout step fails.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7544,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 7325,
+              "outputTokens": 26,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0007455000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 621,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 11803,
+              "webSearchRequests": 0,
+              "costUSD": 0.10685199999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 275,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.10759749999999998
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "README.md",
+            "start_line": 313,
+            "end_line": 313,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The README still tells a repo to call the action at the tag `v1`. The new text says a repo that requires SHA pins must use a commit SHA.",
+            "evidence": "A repo that needs more steps in the job calls the action `jerridan/pr-review@v1` directly.",
+            "suggested_fix": "Add that a repo that requires SHA pins calls `jerridan/pr-review@<sha> # v1`.",
+            "explanation": "The new SHA-pin guidance covers only the workflow call. The direct action call at a tag fails in a strict repo.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 10511,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 7325,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0007430000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 6,
+              "outputTokens": 703,
+              "cacheReadInputTokens": 24409,
+              "cacheCreationInputTokens": 13162,
+              "webSearchRequests": 0,
+              "costUSD": 0.12426179999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 196,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1250048
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": ".github/workflows/review.yml",
+            "start_line": 74,
+            "end_line": 74,
+            "category": "bug",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "The checkout SHA 11d5960a… might not be the actions/checkout v4.4.0 commit that its comment names. The setup-node and upload-artifact SHAs match their tags.",
+            "evidence": "uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0",
+            "suggested_fix": "Get the SHA from `git ls-remote https://github.com/actions/checkout refs/tags/v4.4.0` and use it in review.yml and ci.yml.",
+            "explanation": "A SHA that does not match its version comment, or that does not exist, misleads readers or breaks every run that uses it. The pin replaces the v4 tag that commit 626a9be added.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 8007,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 15750,
+              "outputTokens": 26,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.001588,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 655,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 17291,
+              "webSearchRequests": 0,
+              "costUSD": 0.1520478,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 301,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.15363580000000002
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": ".github/workflows/review.yml",
+            "start_line": 74,
+            "end_line": 74,
+            "category": "security",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "I could not confirm that the actions/checkout SHA is the real v4.4.0 release commit in actions/checkout. If the SHA is wrong, the pin could point at a commit that nobody reviewed.",
+            "evidence": "uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0",
+            "suggested_fix": "Check the SHA with `git ls-remote https://github.com/actions/checkout refs/tags/v4*`.",
+            "explanation": "A SHA pin is only safe when the SHA is the reviewed release commit that the version comment names.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7235,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 7327,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0007432000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 562,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 8844,
+              "webSearchRequests": 0,
+              "costUSD": 0.0826118,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 247,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.083355
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [
+          {
+            "file": ".github/workflows/review.yml",
+            "start_line": 74,
+            "end_line": 74,
+            "category": "security",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "The actions/checkout SHA may not match the v4.4.0 comment, or may not be a known upstream release commit.",
+            "evidence": "uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0",
+            "suggested_fix": "Check the SHA with `git ls-remote https://github.com/actions/checkout refs/tags/v4*` and fix the SHA or the comment.",
+            "explanation": "A SHA pin is only as safe as the SHA. If this SHA does not match a real actions/checkout release tag, the pin can point to code that nobody has checked.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7508,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 7321,
+              "outputTokens": 26,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0007451000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 593,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 8838,
+              "webSearchRequests": 0,
+              "costUSD": 0.0831838,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 275,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0839289
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "test/packaging.test.ts",
+            "start_line": 63,
+            "end_line": 67,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "The pin tests accept any 40-hex string, so a wrong or nonexistent SHA for jerridan/pr-review or a third-party action still passes.",
+            "evidence": "  return /^jerridan\\/pr-review@[0-9a-f]{40}$/.test(step.uses ?? \"\");",
+            "suggested_fix": "Add a test that runs `git cat-file -e <sha>:action.yml` on the local clone for the pr-review SHA, so the pinned commit must exist and hold action.yml.",
+            "explanation": "The tests check only the format of the SHA. A typo or a SHA that is not on main breaks every consumer run, and no check catches it.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6825,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 7327,
+              "outputTokens": 26,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0007457000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 573,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 9515,
+              "webSearchRequests": 0,
+              "costUSD": 0.0881998,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 239,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0889455
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "test/packaging.test.ts",
+          "start_line": 414,
+          "end_line": 414,
+          "category": "convention",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The action.yml pin test repeats the 40-hex SHA regex inline and does not use the new shared SHA_PIN constant.",
+          "evidence": "if (step.uses !== undefined) expect(step.uses).toMatch(/^[\\w-]+\\/[\\w-]+@[0-9a-f]{40}$/);",
+          "suggested_fix": "Use SHA_PIN, or build the stricter pattern from one shared constant.",
+          "explanation": "The same diff adds SHA_PIN for this check, but the 40-hex pattern still appears in three places, so the copies can drift apart.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const SHA_PIN = /@[0-9a-f]{40}$/;",
+            "if (step.uses !== undefined) expect(step.uses).toMatch(/^[\\w-]+\\/[\\w-]+@[0-9a-f]{40}$/);"
+          ],
+          "rationale": "The 40-hex pattern is repeated inline at line 414, in isAction and in the ci checkout test, instead of using SHA_PIN. The inline pattern is deliberately stricter because it also checks the owner/repo shape, and the duplication causes no bug, so this is only a minor nit.",
+          "score": 25,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const SHA_PIN = /@[0-9a-f]{40}$/;",
+            "if (step.uses !== undefined) expect(step.uses).toMatch(/^[\\w-]+\\/[\\w-]+@[0-9a-f]{40}$/);"
+          ],
+          "rationale": "The 40-hex pattern is repeated inline at line 414, in isAction and in the ci checkout test, instead of using SHA_PIN. The inline pattern is deliberately stricter because it also checks the owner/repo shape, and the duplication causes no bug, so this is only a minor nit.",
+          "score": 25,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": ".github/workflows/review.yml",
+          "start_line": 74,
+          "end_line": 74,
+          "category": "docs",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "The description says actions/checkout is pinned at v4.4.0, but that release may not exist for actions/checkout (v4 ended at v4.3.x), so the SHA may not match its version comment.",
+          "evidence": "uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0",
+          "suggested_fix": "Check the SHA against the actions/checkout tags and fix the comment or the SHA so they match.",
+          "explanation": "If the version comment is wrong, readers and update tools get the wrong version for the pin.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0"
+          ],
+          "rationale": "The PR adds this pin with a \"v4.4.0\" comment. As far as I know, actions/checkout v4 ended at v4.3.x (v4.2.2 and v4.3.x have different SHAs), so the SHA and comment may be wrong. I can't check this offline. The finding is hedged and worth posting as a request to verify.",
+          "score": 55,
+          "severity": "suggestion"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0",
+            "uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0"
+          ],
+          "rationale": "The finding only guesses that actions/checkout v4.4.0 \"may not exist\". Nothing in the repo shows the SHA and its version comment disagree, and I could not check the upstream tags from here. The pin is still an immutable SHA, so a wrong comment would not break the run.",
+          "score": 22,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0",
+            "uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0"
+          ],
+          "rationale": "The finding only guesses that actions/checkout v4.4.0 \"may not exist\". Nothing in the repo shows the SHA and its version comment disagree, and I could not check the upstream tags from here. The pin is still an immutable SHA, so a wrong comment would not break the run.",
+          "score": 22,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": ".github/workflows/review.yml",
+          "start_line": 74,
+          "end_line": 74,
+          "category": "bug",
+          "severity_estimate": "blocking",
+          "confidence": "low",
+          "claim": "I cannot confirm that the actions/checkout SHA 11d5960a… belongs to actions/checkout or matches the version comment v4.4.0.",
+          "evidence": "uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0",
+          "suggested_fix": "Run `git ls-remote https://github.com/actions/checkout refs/tags/v4*` to get the right SHA, then pin to it.",
+          "explanation": "The setup-node and upload-artifact SHAs match known release commits, but I do not know of a checkout v4.4.0 release at this SHA. If the SHA does not exist in actions/checkout, every checkout step fails.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0"
+          ],
+          "rationale": "I can't verify the SHA offline. I don't recall an actions/checkout v4.4.0 release, and the known v4.x SHAs (for example v4.2.2 is 11bd7190…) differ from this one, so it may be wrong. A bad pin would make every checkout step fail, and the same SHA is used in ci.yml, so a check against the real tag is worth requesting.",
+          "score": 55,
+          "severity": "suggestion"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0"
+          ],
+          "rationale": "The finding only says the reviewer cannot confirm the SHA. It gives no proof that the SHA is wrong, and the repo cannot show it either way. ci.yml uses the same pin, so the PR's own CI run would expose a wrong SHA at once, which makes this speculation not worth posting.",
+          "score": 15,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0"
+          ],
+          "rationale": "The finding only says the reviewer cannot confirm the SHA. It gives no proof that the SHA is wrong, and the repo cannot show it either way. ci.yml uses the same pin, so the PR's own CI run would expose a wrong SHA at once, which makes this speculation not worth posting.",
+          "score": 15,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "README.md",
+          "start_line": 313,
+          "end_line": 313,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The README still tells a repo to call the action at the tag `v1`. The new text says a repo that requires SHA pins must use a commit SHA.",
+          "evidence": "A repo that needs more steps in the job calls the action `jerridan/pr-review@v1` directly.",
+          "suggested_fix": "Add that a repo that requires SHA pins calls `jerridan/pr-review@<sha> # v1`.",
+          "explanation": "The new SHA-pin guidance covers only the workflow call. The direct action call at a tag fails in a strict repo.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": false,
+          "quotes": [
+            "A repo that needs more steps in the job calls the action `jerridan/pr-review@v1` directly.",
+            "A consumer repo that requires SHA pins must call the workflow at the commit SHA of `v1`, not at the tag."
+          ],
+          "rationale": "The README line still says to call the action at `@v1`, and the new SHA-pin note covers only the workflow call. A strict repo would hit the same problem on the direct action call. The line itself is old, but the PR adds the pin guidance and leaves it incomplete. This is a minor doc gap.",
+          "score": 45,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": false,
+          "quotes": [
+            "A repo that needs more steps in the job calls the action `jerridan/pr-review@v1` directly.",
+            "A consumer repo that requires SHA pins must call the workflow at the commit SHA of `v1`, not at the tag."
+          ],
+          "rationale": "The README line still says to call the action at `@v1`, and the new SHA-pin note covers only the workflow call. A strict repo would hit the same problem on the direct action call. The line itself is old, but the PR adds the pin guidance and leaves it incomplete. This is a minor doc gap.",
+          "score": 45,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": ".github/workflows/review.yml",
+          "start_line": 140,
+          "end_line": 140,
+          "category": "bug",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "The action is pinned to a commit from this PR's branch, which a squash or rebase merge drops from main.",
+          "evidence": "uses: jerridan/pr-review@0f40cd3cf294c36b14b565aaf0b89d7eaae3268c # v1",
+          "suggested_fix": "After the merge, pin to the merge commit on main.",
+          "explanation": "If that commit stops being reachable, the action step fails in every consumer repo.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "uses: jerridan/pr-review@0f40cd3cf294c36b14b565aaf0b89d7eaae3268c # v1"
+          ],
+          "rationale": "The pin does point at a PR-branch commit, but the PR description already says to merge with a merge commit, not a squash, and to move v1 afterward. GitHub also keeps PR-head commits reachable by SHA. This is a known, handled merge-process risk, so it isn't worth posting.",
+          "score": 12,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "uses: jerridan/pr-review@0f40cd3cf294c36b14b565aaf0b89d7eaae3268c # v1",
+            "# Set it to the commit of the action before you move the tag v1."
+          ],
+          "rationale": "The description already covers this risk. It says to merge with a merge commit, not a squash, so 0f40cd3 stays on main. GitHub also keeps PR head commits reachable through refs/pull/N/head, so a squash would not actually break consumer runs. The finding adds nothing a reviewer would need to post.",
+          "score": 15,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "uses: jerridan/pr-review@0f40cd3cf294c36b14b565aaf0b89d7eaae3268c # v1",
+            "# Set it to the commit of the action before you move the tag v1."
+          ],
+          "rationale": "The description already covers this risk. It says to merge with a merge commit, not a squash, so 0f40cd3 stays on main. GitHub also keeps PR head commits reachable through refs/pull/N/head, so a squash would not actually break consumer runs. The finding adds nothing a reviewer would need to post.",
+          "score": 15,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": ".github/workflows/review.yml",
+          "start_line": 74,
+          "end_line": 74,
+          "category": "bug",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "The checkout SHA 11d5960a… might not be the actions/checkout v4.4.0 commit that its comment names. The setup-node and upload-artifact SHAs match their tags.",
+          "evidence": "uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0",
+          "suggested_fix": "Get the SHA from `git ls-remote https://github.com/actions/checkout refs/tags/v4.4.0` and use it in review.yml and ci.yml.",
+          "explanation": "A SHA that does not match its version comment, or that does not exist, misleads readers or breaks every run that uses it. The pin replaces the v4 tag that commit 626a9be added.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0"
+          ],
+          "rationale": "I can't verify the SHA offline. As far as I know, actions/checkout has no v4.4.0 release (v4.2.2 is 11bd7190…, v4.3.0 is 08eba0b2…), so this SHA looks wrong or made up. A bad pin would break every run, and the PR adds it in four places. The finding is hedged, so it's worth posting as a check request.",
+          "score": 62,
+          "severity": "suggestion"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0"
+          ],
+          "rationale": "The finding only guesses that the SHA \"might not\" match v4.4.0 and offers no evidence. Nothing in the repo shows a mismatch, and the same pin in ci.yml would make CI fail if the SHA did not exist. The claim cannot be confirmed, so I retract it.",
+          "score": 15,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0"
+          ],
+          "rationale": "The finding only guesses that the SHA \"might not\" match v4.4.0 and offers no evidence. Nothing in the repo shows a mismatch, and the same pin in ci.yml would make CI fail if the SHA did not exist. The claim cannot be confirmed, so I retract it.",
+          "score": 15,
+          "severity": "suggestion"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": ".github/workflows/review.yml",
+          "start_line": 74,
+          "end_line": 74,
+          "category": "security",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "I could not confirm that the actions/checkout SHA is the real v4.4.0 release commit in actions/checkout. If the SHA is wrong, the pin could point at a commit that nobody reviewed.",
+          "evidence": "uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0",
+          "suggested_fix": "Check the SHA with `git ls-remote https://github.com/actions/checkout refs/tags/v4*`.",
+          "explanation": "A SHA pin is only safe when the SHA is the reviewed release commit that the version comment names.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0"
+          ],
+          "rationale": "The finding is speculative: it says it could not confirm the SHA and shows no evidence that it is wrong. The pin is a well-formed full SHA with a version comment, and I could not check it against upstream, so the finding gives a reviewer nothing to act on.",
+          "score": 12,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0"
+          ],
+          "rationale": "The finding guesses and does not show a defect: nothing in the repo shows that the SHA is wrong. The same pin also appears in ci.yml, where CI would exercise it. An \"I could not confirm\" note without contrary evidence is not worth posting.",
+          "score": 12,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0"
+          ],
+          "rationale": "The finding guesses and does not show a defect: nothing in the repo shows that the SHA is wrong. The same pin also appears in ci.yml, where CI would exercise it. An \"I could not confirm\" note without contrary evidence is not worth posting.",
+          "score": 12,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "test/packaging.test.ts",
+          "start_line": 63,
+          "end_line": 67,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "The pin tests accept any 40-hex string, so a wrong or nonexistent SHA for jerridan/pr-review or a third-party action still passes.",
+          "evidence": "  return /^jerridan\\/pr-review@[0-9a-f]{40}$/.test(step.uses ?? \"\");",
+          "suggested_fix": "Add a test that runs `git cat-file -e <sha>:action.yml` on the local clone for the pr-review SHA, so the pinned commit must exist and hold action.yml.",
+          "explanation": "The tests check only the format of the SHA. A typo or a SHA that is not on main breaks every consumer run, and no check catches it.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "return /^jerridan\\/pr-review@[0-9a-f]{40}$/.test(step.uses ?? \"\");",
+            "const SHA_PIN = /@[0-9a-f]{40}$/;"
+          ],
+          "rationale": "The tests do check only the 40-hex format, so a wrong SHA would pass. But format checks are the normal level for pin tests. The suggested `git cat-file` check would fail on shallow CI clones and for SHAs outside the repo, such as the third-party actions. A careful reviewer would be unlikely to post this.",
+          "score": 15,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "return /^jerridan\\/pr-review@[0-9a-f]{40}$/.test(step.uses ?? \"\");",
+            "const SHA_PIN = /@[0-9a-f]{40}$/;"
+          ],
+          "rationale": "The tests do check only the 40-hex format, so a wrong SHA would pass. But format checks are the normal level for pin tests. The suggested `git cat-file` check would fail on shallow CI clones and for SHAs outside the repo, such as the third-party actions. A careful reviewer would be unlikely to post this.",
+          "score": 15,
+          "severity": "nit"
+        },
+        "passed": false
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5578176406,
+      "review_url": "https://github.com/jerridan/pr-review/pull/9#pullrequestreview-5578176406",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 118326333995
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6699,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 6568,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0006673,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 852,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 7343,
+            "webSearchRequests": 0,
+            "costUSD": 0.037896,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0385633
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 4287,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7329,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007459,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 350,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 11904,
+            "webSearchRequests": 0,
+            "costUSD": 0.10224,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 38,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.10298589999999999
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7438,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7313,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007433,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 518,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 11846,
+            "webSearchRequests": 0,
+            "costUSD": 0.10513600000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 216,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.10587930000000001
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7544,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7325,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007455000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 621,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 11803,
+            "webSearchRequests": 0,
+            "costUSD": 0.10685199999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 275,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.10759749999999998
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "model": "claude-opus-5-5",
+        "duration_ms": 10511,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7325,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007430000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 703,
+            "cacheReadInputTokens": 24409,
+            "cacheCreationInputTokens": 13162,
+            "webSearchRequests": 0,
+            "costUSD": 0.12426179999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 196,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1250048
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 12118,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7319,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007449000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1121,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 11797,
+            "webSearchRequests": 0,
+            "costUSD": 0.116804,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 305,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.11754890000000001
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "model": "claude-opus-5-5",
+        "duration_ms": 8007,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 15750,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.001588,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 655,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 17291,
+            "webSearchRequests": 0,
+            "costUSD": 0.1520478,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 301,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.15363580000000002
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7235,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7327,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007432000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 562,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 8844,
+            "webSearchRequests": 0,
+            "costUSD": 0.0826118,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 247,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.083355
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7508,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7321,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007451000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 593,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 8838,
+            "webSearchRequests": 0,
+            "costUSD": 0.0831838,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 275,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0839289
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 5158,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 32849,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0032969,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 479,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 36251,
+            "webSearchRequests": 0,
+            "costUSD": 0.149798,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 100,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.15309489999999998
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6825,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7327,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007457000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 573,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 9515,
+            "webSearchRequests": 0,
+            "costUSD": 0.0881998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 239,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0889455
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 5892,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7049,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007149000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 597,
+            "cacheReadInputTokens": 3889,
+            "cacheCreationInputTokens": 6562,
+            "webSearchRequests": 0,
+            "costUSD": 0.0326109,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 260,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.033325799999999996
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 8067,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 22315,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.002243,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 718,
+            "cacheReadInputTokens": 29606,
+            "cacheCreationInputTokens": 22401,
+            "webSearchRequests": 0,
+            "costUSD": 0.0997526,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 232,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.10199559999999999
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 14110,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7096,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007221,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 890,
+            "cacheReadInputTokens": 10498,
+            "cacheCreationInputTokens": 11322,
+            "webSearchRequests": 0,
+            "costUSD": 0.0552458,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 462,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0559679
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 14355,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7159,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007289000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 1137,
+            "cacheReadInputTokens": 14450,
+            "cacheCreationInputTokens": 7513,
+            "webSearchRequests": 0,
+            "costUSD": 0.042874999999999996,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 695,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0436039
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 4954,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 32871,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0032976,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 511,
+            "cacheReadInputTokens": 3889,
+            "cacheCreationInputTokens": 32384,
+            "webSearchRequests": 0,
+            "costUSD": 0.13503890000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 142,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.13833650000000003
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 7703,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7105,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007235000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 721,
+            "cacheReadInputTokens": 3889,
+            "cacheCreationInputTokens": 6618,
+            "webSearchRequests": 0,
+            "costUSD": 0.0340749,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 257,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0347984
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6163,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7055,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.000718,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 637,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 10449,
+            "webSearchRequests": 0,
+            "costUSD": 0.09634,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 272,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.09705799999999999
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 19793,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7138,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007268000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 1090,
+            "cacheReadInputTokens": 14429,
+            "cacheCreationInputTokens": 7687,
+            "webSearchRequests": 0,
+            "costUSD": 0.0430989,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 647,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0438257
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 11555,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7149,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007279000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 878,
+            "cacheReadInputTokens": 14432,
+            "cacheCreationInputTokens": 7477,
+            "webSearchRequests": 0,
+            "costUSD": 0.0802784,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 458,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0810063
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 9675,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7105,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007225,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 724,
+            "cacheReadInputTokens": 14388,
+            "cacheCreationInputTokens": 7391,
+            "webSearchRequests": 0,
+            "costUSD": 0.0765016,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 326,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0772241
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 12489,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7106,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007236,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 968,
+            "cacheReadInputTokens": 14389,
+            "cacheCreationInputTokens": 7655,
+            "webSearchRequests": 0,
+            "costUSD": 0.0834938,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 508,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0842174
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 13835,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7158,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007288,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 1054,
+            "cacheReadInputTokens": 14441,
+            "cacheCreationInputTokens": 7593,
+            "webSearchRequests": 0,
+            "costUSD": 0.0847282,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 635,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.085457
+      }
+    ],
+    "total_cost_usd": 2.0373563999999997,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 38,
+      "gather": 85,
+      "triage": 8347,
+      "find_verify": 53724,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
