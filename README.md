@@ -267,7 +267,7 @@ In CI, `out` is `${{ runner.temp }}/pr-review-records`. That directory is outsid
 
 ## Set up CI
 
-Set up the secret and the workflow in each consumer repo. Set the access setting once, in the repo `jerridan/pr-review`.
+Set up the secret and the workflow in each consumer repo. The repo `jerridan/pr-review` is public, so any repo can call its workflow and its action.
 
 ### The secret
 
@@ -275,14 +275,6 @@ Run `claude setup-token`. Store the token as the repo secret `CLAUDE_CODE_OAUTH_
 
 ```bash
 gh secret set CLAUDE_CODE_OAUTH_TOKEN
-```
-
-### The Actions access setting
-
-Other repos of the owner can call the workflow only when the repo `jerridan/pr-review` allows it. The setting is "Accessible from repositories owned by the user". Set it once with this command. `<slug>` is `jerridan/pr-review`:
-
-```bash
-gh api -X PUT /repos/<slug>/actions/permissions/access -f access_level=user
 ```
 
 ### The consumer workflow
