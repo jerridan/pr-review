@@ -1,0 +1,154 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 8,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Remove the Actions access setting step, because the repo is public",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/8"
+    },
+    "run_kind": "later",
+    "prior": {
+      "head": "93262d83dd2d3ada4dcc3d146049c923d3e8e6f6",
+      "source": "record",
+      "record": "/home/runner/work/_temp/pr-review-records/pr-8/2026-10-19T031052.692Z-93262d8.json",
+      "open": [],
+      "dismissed": [],
+      "fetch_failed": false
+    },
+    "base": "e00441d96d2aac139f1405e1b7ac02a83b104aec",
+    "head": "93262d83dd2d3ada4dcc3d146049c923d3e8e6f6",
+    "started_at": "2026-10-19T03:12:10.280Z",
+    "tool_version": "0.1.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Remove the Actions access setting step, because the repo is public\n\n## Summary\n\nThis repo is now public, so a consumer repo no longer needs the Actions access setting. That setting applies only to a private repo. This PR removes the setup step from the README and corrects the design doc.\n\nThe design doc said that a public repo changes nothing. That is wrong. A public consumer repo can call a workflow only from a public repo. `jerridan/crew` is public, and its first run failed with \"workflow file issue\" while this repo was private.\n\n## Changes\n\n- `README.md`: removes the section \"The Actions access setting\" and its `gh api` command. The \"Set up CI\" intro now says that any repo can call the workflow and the action.\n- `docs/design/high-level-design.md`: replaces the access-setting paragraph with the public-repo rule.\n\n## Verification\n\n- `jerridan/crew` PR #101 calls `review.yml@v1` with no access setting. After the visibility change, its run passed every step and posted a review.\n- No link in the repo points at the removed anchor (`git grep actions-access-setting` finds nothing).\n- This change has no code, so it needs no test.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01R5KTT34ZNxeaL3HX8DoDSe\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [],
+    "changed_files": [
+      {
+        "path": "README.md",
+        "hunks": 2
+      },
+      {
+        "path": "docs/design/high-level-design.md",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [],
+    "triage": null,
+    "tier": "skip",
+    "tier_reason": "No new hunks since 93262d8.",
+    "selected_reviewers": [],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [],
+    "verifications": [],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "skipped",
+    "coverage": {
+      "reviewers_ran": [],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0
+    },
+    "findings": [],
+    "github": null,
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [],
+    "total_cost_usd": 0,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 32,
+      "gather": 41,
+      "scope": 3,
+      "find_verify": 2,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
