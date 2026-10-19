@@ -348,7 +348,7 @@ The workflow filters its events. An `issue_comment` event runs only for a PR, a 
 
 The records steps run with `if: always()`. Before the action, the workflow checks the `pr-review-records` branch out at the `out` directory. After the action, it uploads the `pr-<n>/` directory of the pull request as the artifact `pr-review-record-<pr>-<run id>`, commits the new file at `pr-<n>/<file name>` and pushes it. It creates the branch as an orphan when the branch is absent. On a non-fast-forward refusal, it fetches and rebases up to three times.
 
-Other repos the user owns reference this one by the tag `v1`. This repo's Actions setting must allow access from repositories the user owns. The setting is "Accessible from repositories owned by the user", and the README gives its `gh api` command. Making the repo public later changes nothing. Publishing to npm stays an option.
+Other repos reference this one by the tag `v1`. This repo is public, so any repo can call its workflow and its action. A public repo can call a workflow only from a public repo, so a private copy of this repo would block a public consumer. Publishing to npm stays an option.
 
 Consumer workflow:
 
