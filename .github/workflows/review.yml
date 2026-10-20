@@ -20,9 +20,8 @@ on:
       records-commit-trailer:
         description: >-
           Text that the workflow appends to the message of each commit on the
-          records branch. A consumer whose Vercel projects deploy every branch
-          passes "[vercel skip]", so Vercel skips the records branch. The
-          default appends nothing.
+          records branch, such as "[skip ci]" for a tool that reads commit
+          messages. The default appends nothing.
         type: string
         required: false
         default: ""
