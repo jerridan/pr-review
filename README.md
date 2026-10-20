@@ -265,6 +265,17 @@ These steps run even when the review fails, so a failed run leaves its record to
 
 In CI, `out` is `${{ runner.temp }}/pr-review-records`. That directory is outside the repo under review. A local run writes to `./pr-review-records`, or to the `--out` directory. With `--pr`, the record goes in the `pr-<n>` subdirectory.
 
+A deployment platform that builds every branch of the consumer repo also builds the records branch, and the build fails because the branch holds only records. The workflow input `records-commit-trailer` appends text to each records commit message. A consumer with Vercel projects passes `[vercel skip]`, which makes Vercel skip the commit:
+
+```yaml
+    uses: jerridan/pr-review/.github/workflows/review.yml@v1
+    secrets: inherit
+    with:
+      records-commit-trailer: "[vercel skip]"
+```
+
+The default appends nothing, so a consumer without the input sees no change.
+
 ## Set up CI
 
 Set up the secret and the workflow in each consumer repo. The repo `jerridan/pr-review` is public, so any repo can call its workflow and its action.
