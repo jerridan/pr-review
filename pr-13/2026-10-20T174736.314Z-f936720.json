@@ -1,0 +1,518 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 13,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Raise the default reviewer effort from low to medium",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/13"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "35654276b73fdd7d6343c9c9a6f8c41d0d9dbdb0",
+    "head": "f936720c6aea29922774f8b00b12fb6905362b39",
+    "started_at": "2026-10-20T17:47:36.314Z",
+    "tool_version": "0.1.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Raise the default reviewer effort from low to medium\n\nThe reviewers now run at medium effort by default. Before, they ran at low effort.\n\n## Changes\n\n- Each built-in reviewer in `prompts/reviewers/*.md` has `effort: medium` in its frontmatter. The frontmatter value is the effective default when no repo config sets the effort.\n- The `reviewer` role in `ROLE_DEFAULTS` (`src/config/models.ts`) has effort `medium`. The run record shows this value as the reviewer role's effort.\n- The README and `docs/design/high-level-design.md` show the new default. The first harness experiment in section 5.1 now compares Opus 5.5 at medium with Opus 5.5 at low and with Sonnet 5.5 at medium.\n- The tests that expected `low` now expect `medium`. One test in `test/repo-config.test.ts` sets `models.reviewer.effort`. That value changes from `medium` to `high`, so it differs from the new default and the test still shows that the repo config takes precedence over the frontmatter.\n\n## Release\n\nA consumer repo gets this change only when the SHA in `review.yml` moves. Follow \"The release tag\" in the README.\n\n## Checks\n\n`npm test` (1061 pass), `npm run lint`, `npm run typecheck` and `npm run build` all pass.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01UKXoH72K6RLXNCGUFmHPfP\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": "README.md",
+        "hunks": 1
+      },
+      {
+        "path": "docs/design/high-level-design.md",
+        "hunks": 5
+      },
+      {
+        "path": "prompts/reviewers/conventions.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/reviewers/description-drift.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/reviewers/diff-bugs.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/reviewers/docs-and-comments.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/reviewers/history.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/reviewers/security.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/reviewers/tests.md",
+        "hunks": 1
+      },
+      {
+        "path": "src/config/models.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/record.test.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/repo-config.test.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/reviewers.test.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/run.test.ts",
+        "hunks": 3
+      },
+      {
+        "path": "test/sdk-options.test.ts",
+        "hunks": 2
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "fast",
+      "reason": "Changes the default reviewer effort from low to medium consistently across code default, built-in reviewer frontmatter, docs and tests; a small config-value change with a runtime cost impact but no logic change.",
+      "confidence": "medium",
+      "categories": [
+        "other",
+        "test",
+        "docs"
+      ],
+      "hotspots": [
+        "src/config/models.ts",
+        "test/repo-config.test.ts",
+        "prompts/reviewers/"
+      ],
+      "file_notes": [
+        {
+          "file": "src/config/models.ts",
+          "note": "ROLE_DEFAULTS reviewer effort low -> medium; the only runtime code change"
+        },
+        {
+          "file": "prompts/reviewers/conventions.md",
+          "note": "frontmatter effort low -> medium"
+        },
+        {
+          "file": "prompts/reviewers/description-drift.md",
+          "note": "frontmatter effort low -> medium"
+        },
+        {
+          "file": "prompts/reviewers/diff-bugs.md",
+          "note": "frontmatter effort low -> medium"
+        },
+        {
+          "file": "prompts/reviewers/docs-and-comments.md",
+          "note": "frontmatter effort low -> medium"
+        },
+        {
+          "file": "prompts/reviewers/history.md",
+          "note": "frontmatter effort low -> medium"
+        },
+        {
+          "file": "prompts/reviewers/security.md",
+          "note": "frontmatter effort low -> medium"
+        },
+        {
+          "file": "prompts/reviewers/tests.md",
+          "note": "frontmatter effort low -> medium"
+        },
+        {
+          "file": "test/repo-config.test.ts",
+          "note": "expectations updated; the override case now uses effort high so it stays distinct from the new default"
+        },
+        {
+          "file": "test/run.test.ts",
+          "note": "expected effort updated to medium"
+        },
+        {
+          "file": "test/record.test.ts",
+          "note": "expected effort updated to medium"
+        },
+        {
+          "file": "test/reviewers.test.ts",
+          "note": "expected effort updated to medium"
+        },
+        {
+          "file": "test/sdk-options.test.ts",
+          "note": "expected effort updated to medium"
+        },
+        {
+          "file": "README.md",
+          "note": "documented reviewer default effort updated"
+        },
+        {
+          "file": "docs/design/high-level-design.md",
+          "note": "design doc defaults and rationale updated"
+        }
+      ],
+      "summary": "The change raises the default reviewer effort from low to medium. It edits the role default in src/config/models.ts and the frontmatter of all seven built-in reviewers. It also updates the README, the design doc and the tests that assert the old value."
+    },
+    "tier": "fast",
+    "tier_reason": "Triage: Changes the default reviewer effort from low to medium consistently across code default, built-in reviewer frontmatter, docs and tests; a small config-value change with a runtime cost impact but no logic change.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= fast; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= fast; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1771,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 9547,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0009657000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 53,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 14210,
+              "webSearchRequests": 0,
+              "costUSD": 0.114748,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1157137
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 2080,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 9547,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0009657000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 70,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 14113,
+              "webSearchRequests": 0,
+              "costUSD": 0.11431200000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.11527770000000001
+        }
+      }
+    ],
+    "verifications": [],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "diff-bugs"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5589228423,
+      "review_url": "https://github.com/jerridan/pr-review/pull/13#pullrequestreview-5589228423",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 118788451511
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 8776,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9043,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009148000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 967,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 9817,
+            "webSearchRequests": 0,
+            "costUSD": 0.048942,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0498568
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 1771,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9547,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009657000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 53,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 14210,
+            "webSearchRequests": 0,
+            "costUSD": 0.114748,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1157137
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 2080,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9547,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009657000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 70,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 14113,
+            "webSearchRequests": 0,
+            "costUSD": 0.11431200000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.11527770000000001
+      }
+    ],
+    "total_cost_usd": 0.2808482,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 55,
+      "gather": 283,
+      "triage": 9876,
+      "find_verify": 3030,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
