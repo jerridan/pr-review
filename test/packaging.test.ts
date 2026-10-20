@@ -845,9 +845,10 @@ describe(".github/workflows/review.yml (R10)", () => {
     expect(push.if).toMatch(/always\(\)/);
   });
 
-  function recordsRun(sandbox: { workspace: string; temp: string }) {
+  function recordsRun(sandbox: { workspace: string; temp: string }, trailer = "") {
     const { checkout, push } = recordsSteps();
     const ctx = context("pull_request", prEvent("opened", false));
+    ctx.inputs = { "records-commit-trailer": trailer };
     (ctx.runner as Record<string, Value>).temp = sandbox.temp;
     // The sandbox remotes are local. The steps get no GH_TOKEN.
     (ctx.github as Record<string, Value>).token = null;
@@ -885,6 +886,32 @@ describe(".github/workflows/review.yml (R10)", () => {
     expect(remoteFiles(sandbox.remote)).toEqual([`pr-${PR_NUMBER}/new.json`]);
     // The orphan branch shares no history with main.
     expect(git(sandbox.remote, "rev-list", "--count", "pr-review-records")).toBe("1");
+  }, 30_000);
+
+  it("names the pull request in the records commit, with no trailer by default", () => {
+    const sandbox = makeSandbox(true);
+    const run = recordsRun(sandbox);
+    expect(run.checkout().status).toBe(0);
+    mkdirSync(join(run.dir, `pr-${PR_NUMBER}`));
+    writeFileSync(join(run.dir, `pr-${PR_NUMBER}`, "new.json"), "{}\n");
+    const pushed = run.push();
+    expect(pushed.status, pushed.stderr).toBe(0);
+    expect(git(sandbox.remote, "log", "-1", "--format=%s", "pr-review-records")).toBe(
+      `Add the pr-review record of pull request ${PR_NUMBER}`,
+    );
+  }, 30_000);
+
+  it("appends the records-commit-trailer input to the records commit message", () => {
+    const sandbox = makeSandbox(true);
+    const run = recordsRun(sandbox, "[vercel skip]");
+    expect(run.checkout().status).toBe(0);
+    mkdirSync(join(run.dir, `pr-${PR_NUMBER}`));
+    writeFileSync(join(run.dir, `pr-${PR_NUMBER}`, "new.json"), "{}\n");
+    const pushed = run.push();
+    expect(pushed.status, pushed.stderr).toBe(0);
+    expect(git(sandbox.remote, "log", "-1", "--format=%s", "pr-review-records")).toBe(
+      `Add the pr-review record of pull request ${PR_NUMBER} [vercel skip]`,
+    );
   }, 30_000);
 
   it("skips the commit and the push when there is no new record", () => {
