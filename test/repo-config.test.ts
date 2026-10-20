@@ -536,15 +536,15 @@ describe("effective reviewer values (R3, R6)", () => {
     const def = diffBugs();
     expect(effectiveModel(def, DEFAULT_REPO_CONFIG)).toEqual({
       model: "claude-opus-5-5",
-      effort: "low",
+      effort: "medium",
     });
     const roleOnly = withConfig({ models: { reviewer: { model: "sonnet" } } });
-    expect(effectiveModel(def, roleOnly)).toEqual({ model: "claude-sonnet-5-5", effort: "low" });
+    expect(effectiveModel(def, roleOnly)).toEqual({ model: "claude-sonnet-5-5", effort: "medium" });
     const both = withConfig({
-      models: { reviewer: { model: "sonnet", effort: "medium" } },
+      models: { reviewer: { model: "sonnet", effort: "high" } },
       reviewers: { "diff-bugs": { enabled: true, model: "haiku" } },
     });
-    expect(effectiveModel(def, both)).toEqual({ model: "claude-haiku-5-5", effort: "medium" });
+    expect(effectiveModel(def, both)).toEqual({ model: "claude-haiku-5-5", effort: "high" });
     const effortOnly = withConfig({
       reviewers: { "diff-bugs": { enabled: true, effort: "xhigh" } },
     });
@@ -557,7 +557,7 @@ describe("effective reviewer values (R3, R6)", () => {
     expect(effectivePasses(def, DEFAULT_REPO_CONFIG, "full")).toBe(2);
     expect(effectiveModel(def, DEFAULT_REPO_CONFIG)).toEqual({
       model: "claude-opus-5-5",
-      effort: "low",
+      effort: "medium",
     });
   });
 

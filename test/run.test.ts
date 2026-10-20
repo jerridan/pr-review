@@ -778,13 +778,13 @@ describe("the repo config in a run (R3)", () => {
 
     const byRole = (role: string) => fake.calls.filter((c) => c.role === role);
     expect(byRole("triage").map((c) => c.overrides)).toEqual([{ model: "claude-haiku-5-5" }]);
-    // Every built-in reviewer has effort low in its frontmatter, and
+    // Every built-in reviewer has effort medium in its frontmatter, and
     // models.reviewer sets the model of each one.
     expect(byRole("reviewer").length).toBeGreaterThan(1);
     for (const call of byRole("reviewer")) {
       expect(call.overrides, call.reviewerName).toEqual({
         model: "claude-sonnet-5-5",
-        effort: "low",
+        effort: "medium",
       });
     }
     expect(byRole("verifier").map((c) => c.overrides)).toEqual([{ effort: "max" }]);
@@ -797,7 +797,7 @@ describe("the repo config in a run (R3)", () => {
 
     expect(record.identity.models).toEqual({
       triage: { model: "claude-haiku-5-5", effort: "medium" },
-      reviewer: { model: "claude-sonnet-5-5", effort: "low" },
+      reviewer: { model: "claude-sonnet-5-5", effort: "medium" },
       verifier: { model: "claude-sonnet-5-5", effort: "max" },
       "verifier-escalation": { model: "claude-sonnet-5-5", effort: "high" },
       merge: { model: "claude-sonnet-5-5", effort: "low" },
@@ -805,7 +805,7 @@ describe("the repo config in a run (R3)", () => {
     });
     expect(record.identity.selected_reviewers.map((r) => r.name)).toContain("diff-bugs");
     for (const entry of record.identity.selected_reviewers) {
-      expect(entry, entry.name).toMatchObject({ model: "claude-sonnet-5-5", effort: "low" });
+      expect(entry, entry.name).toMatchObject({ model: "claude-sonnet-5-5", effort: "medium" });
     }
     expect(record.identity.excluded_files).toContainEqual({
       path: ".github/workflows/ci.yml",

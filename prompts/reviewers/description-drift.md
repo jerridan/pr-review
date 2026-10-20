@@ -2,7 +2,7 @@
 name: description-drift
 description: Finds claims in the change description that the code does not keep, and changes that the description does not mention.
 model: opus
-effort: low
+effort: medium
 tools: [Read, Grep, Glob]
 triggers:
   paths: []

@@ -106,7 +106,7 @@ describe("built-in reviewers (A4, R1)", () => {
           name,
           description: expect.any(String),
           model: "opus",
-          effort: "low",
+          effort: "medium",
           tools: ["Read", "Grep", "Glob"],
           triggers: { paths: [], categories: [], min_tier: minTier },
           passes,
@@ -266,7 +266,7 @@ describe("model overrides from frontmatter", () => {
     const builtin = loadBuiltinReviewers()[0] as ReviewerDefinition;
     expect(effectiveModel(builtin, DEFAULT_REPO_CONFIG)).toEqual({
       model: "claude-opus-5-5",
-      effort: "low",
+      effort: "medium",
     });
   });
 

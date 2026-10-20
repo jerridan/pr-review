@@ -45,7 +45,7 @@ const EXPECTED: Record<
   },
   reviewer: {
     model: "claude-opus-5-5",
-    effort: "low",
+    effort: "medium",
     maxTurns: 40,
     maxBudgetUsd: 2,
     timeoutMs: 600_000,
@@ -263,7 +263,7 @@ describe("A13: query options for every role", () => {
       runOptions(false),
     );
     expect(exact.model).toBe("claude-opus-4-1");
-    expect(exact.effort).toBe("low");
+    expect(exact.effort).toBe("medium");
 
     const plain = buildQueryOptions(request("reviewer"), runOptions(false));
     expect(plain.model).toBe("claude-opus-5-5");
