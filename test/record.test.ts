@@ -472,7 +472,7 @@ describe("the record parts", () => {
       name: "diff-bugs",
       trigger: expect.stringContaining("min_tier fast"),
       model: "claude-opus-5-5",
-      effort: "low",
+      effort: "medium",
       tools_ignored: [],
     });
     expect(id.selected_reviewers.find((r) => r.name === "tests")?.trigger).toContain(
@@ -480,7 +480,7 @@ describe("the record parts", () => {
     );
     expect(id.models).toEqual({
       triage: { model: "claude-sonnet-5-5", effort: "medium" },
-      reviewer: { model: "claude-opus-5-5", effort: "low" },
+      reviewer: { model: "claude-opus-5-5", effort: "medium" },
       verifier: { model: "claude-sonnet-5-5", effort: "high" },
       "verifier-escalation": { model: "claude-opus-5-5", effort: "high" },
       merge: { model: "claude-sonnet-5-5", effort: "medium" },

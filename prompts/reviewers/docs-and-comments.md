@@ -2,7 +2,7 @@
 name: docs-and-comments
 description: Finds comments and docs that the change makes stale or wrong.
 model: opus
-effort: low
+effort: medium
 tools: [Read, Grep, Glob]
 triggers:
   paths: []

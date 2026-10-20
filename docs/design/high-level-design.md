@@ -95,7 +95,7 @@ evidence (code the reviewer read, quoted), suggested_fix, confidence
 
 Reviewer prompts follow the 5.5 prompting guidance (see `docs/research/claude-5-5-models.md`): one evidence source per reviewer, and an instruction to report every issue in scope with a confidence and an estimated severity, because 5.x models over-filter when told to be conservative. All filtering happens in verify and merge. Scope is the only exclusion: not lint or formatting, and nothing on code the PR did not add, change or aggravate. No finding without quoted evidence, which the orchestrator checks is a substring of the diff or file. A one-line explanation per finding, never visible reasoning. Diff first, instructions last. PR text and diff in tagged untrusted blocks. A line that forbids launching subagents.
 
-Each reviewer is one SDK `query()` with its own model, effort and output schema. Default is Opus 5.5 at low effort; see section 5. Findings come back as structured output validated against a schema. The orchestrator is code, so no LLM retypes a finding on the way to the record.
+Each reviewer is one SDK `query()` with its own model, effort and output schema. Default is Opus 5.5 at medium effort; see section 5. Findings come back as structured output validated against a schema. The orchestrator is code, so no LLM retypes a finding on the way to the record.
 
 Built-in reviewers for v1, split by evidence source:
 
@@ -264,7 +264,7 @@ A custom reviewer can also override `threshold` to be stricter, never looser tha
 | Role | Default model | Effort | Reason |
 |------|---------------|--------|--------|
 | triage | Sonnet 5.5 | medium, thinking on | judgment on risk from one read of the diff; failure falls back to full |
-| reviewers | Opus 5.5 | low | half the old price gap; best published bug-catch rates at low effort; Sonnet 5.5 medium is the first harness comparison |
+| reviewers | Opus 5.5 | medium | half the old price gap; best published bug-catch rates; medium solved more SWE-bench Pro tasks than low at a higher cost per task; Sonnet 5.5 medium is the first harness comparison |
 | verifier | Sonnet 5.5, Opus 5.5 on escalation | high, thinking on | a different model from the finders; escalation on `needs_context` or a middle-band score |
 | semantic merge | Sonnet 5.5 | medium | needs judgment on wording |
 | summarizer | Haiku 5.5 | medium, thinking on | formatting only; low effort leaks reasoning text |
@@ -279,7 +279,7 @@ Config pins exact model IDs, defaulting to the 5.5 family: `claude-haiku-5-5`, `
 
 The role assignments above come from `docs/research/claude-5-5-models.md` and are hypotheses until the harness confirms them. Anthropic's advice is that effort is a better lever than model choice, so the first harness experiments are:
 
-- Reviewers: Opus 5.5 at low against Sonnet 5.5 at medium, on cost per confirmed finding.
+- Reviewers: Opus 5.5 at medium against Opus 5.5 at low and Sonnet 5.5 at medium, on cost per confirmed finding.
 - One Opus 5.5 reviewer at medium effort over the whole diff, as a baseline against the specialist set. Anthropic found a single model in one context beat a lead-with-workers setup when the work fit.
 - Verifier: Sonnet 5.5 at high against Opus 5.5 at high, and the 0 to 100 score against a 5-band scale.
 
@@ -386,7 +386,7 @@ Settled on 2026-10-13:
 3. **Fork policy**: label-gated run through `pull_request_target`. A maintainer adds `review:full` or `review:fast`. The run executes no code from the fork head.
 4. **Review format**: one GitHub review per run, short body with verdict, inline comments on diff lines. Comment event only.
 5. **Verifier threshold**: 80 as the default, tuned by the harness.
-6. **Reviewer models**: Opus 5.5 at low effort by default, as decision 15 states. A repo can override the model and effort per role or per reviewer. See section 4.
+6. **Reviewer models**: Opus 5.5 at medium effort by default, as decision 15 states. A repo can override the model and effort per role or per reviewer. See section 4.
 7. **Severity**: blocking, suggestion, nit, with the tests in section 3.5.
 
 8. **Auth**: the user's Claude subscription, in CI and locally. See section 9.
@@ -397,7 +397,7 @@ Settled on 2026-10-13:
 12. **Records**: workflow artifact plus a `pr-review-records` branch.
 13. **Distribution**: composite action run from source, wrapped in a reusable workflow, plus the CLI. No npm package. The concurrency limit is the `concurrency` key of the repo config, default 5, as decision 17 says.
 14. **Orchestrator**: plain code, no model. Every judgment call is a bounded agent call with a schema.
-15. **Model versions**: exact IDs pinned in config, 5.5 family by default. Reviewers on Opus 5.5 at low effort, verifier on Sonnet 5.5 at high with Opus escalation, triage and merge on Sonnet 5.5, summarizer on Haiku 5.5. Harness hypotheses, see section 5.1.
+15. **Model versions**: exact IDs pinned in config, 5.5 family by default. Reviewers on Opus 5.5 at medium effort, verifier on Sonnet 5.5 at high with Opus escalation, triage and merge on Sonnet 5.5, summarizer on Haiku 5.5. Harness hypotheses, see section 5.1.
 16. **Reviewer prompts**: report everything in scope with confidence and severity; filtering is the verifier's job. Follows the 5.x guidance that conservative review prompts over-filter.
 17. **Parallelism**: a semaphore sized to runner memory, default 5, because each SDK query is a process of about 1 GiB. This is a resource bound, not a rate-limit policy.
 

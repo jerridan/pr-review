@@ -58,7 +58,7 @@ export const ROLE_DEFAULTS: Record<Role, RoleConfig> = {
   },
   reviewer: {
     model: MODEL_IDS.opus,
-    effort: "low",
+    effort: "medium",
     maxTurns: 40,
     maxBudgetUsd: 2,
     timeoutMs: 600_000,
