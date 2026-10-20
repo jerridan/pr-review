@@ -15,17 +15,7 @@
 name: pr-review
 
 on:
-  workflow_call:
-    inputs:
-      records-commit-trailer:
-        description: >-
-          Text that the workflow appends to the message of each commit on the
-          records branch. A consumer whose Vercel projects deploy every branch
-          passes "[vercel skip]", so Vercel skips the records branch. The
-          default appends nothing.
-        type: string
-        required: false
-        default: ""
+  workflow_call: {}
 
 jobs:
   review:
@@ -185,7 +175,6 @@ jobs:
         env:
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           RECORDS_DIR: ${{ runner.temp }}/pr-review-records
-          TRAILER: ${{ inputs.records-commit-trailer }}
           GH_TOKEN: ${{ github.token }}
         run: |
           dir="pr-${PR_NUMBER}"
@@ -201,7 +190,7 @@ jobs:
           bot=(-c "user.name=github-actions[bot]"
             -c "user.email=41898282+github-actions[bot]@users.noreply.github.com")
           git -C "$RECORDS_DIR" "${bot[@]}" commit -q \
-            -m "Add the pr-review record of pull request ${PR_NUMBER}${TRAILER:+ $TRAILER}"
+            -m "Add the pr-review record of pull request ${PR_NUMBER}"
           retries=0
           while ! output=$(git -C "$RECORDS_DIR" push origin HEAD:refs/heads/pr-review-records 2>&1); do
             echo "$output" >&2
