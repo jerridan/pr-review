@@ -10,6 +10,7 @@ import { JUDGE_DEFAULTS, ROLE_DEFAULTS, resolveModel } from "../config/models.js
 import { loadRepoConfig } from "../config/repo-config.js";
 import { effectiveModel, loadBuiltinReviewers } from "../reviewers/loader.js";
 import { runReview } from "../run.js";
+import type { RunRecord } from "../schemas/record.js";
 import type { SdkClient } from "../sdk/client.js";
 import type { RunOptions } from "../sdk/options.js";
 import type { Tier } from "../triage/tier.js";
@@ -150,8 +151,16 @@ type EvalContext = {
   judgeModel: string;
 };
 
-// Run one repeat of one case in its own clone. A run that throws, or that
-// exits 1, gives a failed repeat.
+// The error of a repeat whose review is incomplete. It holds each
+// distinct error of the record, in record order.
+function incompleteMessage(record: RunRecord): string {
+  const reasons = [...new Set(record.cost.errors.map((e) => `${e.stage}: ${e.message}`))];
+  const head = "The review was incomplete.";
+  return reasons.length === 0 ? head : `${head} ${reasons.join("; ")}`;
+}
+
+// Run one repeat of one case in its own clone. A run that throws, that
+// exits 1, or that gives an incomplete review gives a failed repeat.
 async function runRepeat(ctx: EvalContext, c: Case, repeat: number): Promise<RepeatOutcome> {
   const start = performance.now();
   const failed = (error: string): RepeatOutcome => ({
@@ -173,6 +182,10 @@ async function runRepeat(ctx: EvalContext, c: Case, repeat: number): Promise<Rep
       client: ctx.client,
     });
     if (result.exitCode !== 0) return failed(result.error ?? "The run exited with code 1.");
+    // An incomplete review exits 0, but its findings do not show the
+    // reviewers. A score of it would be wrong, so the repeat fails.
+    if (result.record.posted.verdict === "incomplete")
+      return failed(incompleteMessage(result.record));
     const same = result.record.identity.selected_reviewers.filter(
       (r) => r.model === ctx.judgeModel,
     );

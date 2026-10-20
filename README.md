@@ -641,7 +641,7 @@ Refresh the baseline after a deliberate change, such as a new case set or a new 
 pr-review eval --cases eval/cases --repeat 3 --baseline eval/baseline.json --write-baseline
 ```
 
-The write keeps the `margin` of the existing file, or uses 0.05 for each metric. It writes nothing when a repeat failed. No CI step writes the baseline.
+The write keeps the `margin` of the existing file, or uses 0.05 for each metric. It writes nothing when a repeat failed. An incomplete review is a failed repeat. No CI step writes the baseline.
 
 A margin smaller than the noise of the case set makes the gate fail on a run with no change. Pick each margin from the report of the baseline run:
 
@@ -668,7 +668,7 @@ The starter set is small, so its spread is large. Its baseline recall is 0.167 w
 | 2 | A usage error, an invalid case, or a configuration error such as a judge model equal to a reviewer model. | A usage error, or a file that is missing, is not JSON or is not a run record. |
 | 3 | The gate failed. | Not used. |
 
-A failed repeat is a run that exits 1 or throws. A case whose `.pr-review/` config is not valid makes each of its runs fail. A model query that fails is not a failed repeat, because the run records it. With a failed repeat and a failed gate, the eval exits 1, and the report still holds the gate.
+A failed repeat is a run that exits 1, throws, or gives an incomplete review. A review is incomplete when its record has the verdict `incomplete`, for example when every reviewer query hits a session limit. Such a run exits 0, but its findings do not show the reviewers. So the eval does not score it. The error of the repeat gives the errors of the record. A case whose `.pr-review/` config is not valid makes each of its runs fail. A judge query that fails is not a failed repeat. The eval counts it as no match and warns. With a failed repeat and a failed gate, the eval exits 1, and the report still holds the gate.
 
 ## Measure the passes
 
