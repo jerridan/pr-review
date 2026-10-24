@@ -1,0 +1,210 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 17,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Make the role default the floor for a reviewer's model and effort",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/17"
+    },
+    "run_kind": "later",
+    "prior": {
+      "head": "3d9491a1209c0daf6368c16a71bb1c696a45b2ec",
+      "source": "record",
+      "record": "/home/runner/work/_temp/pr-review-records/pr-17/2026-10-24T181444.453Z-3d9491a.json",
+      "open": [],
+      "dismissed": [],
+      "fetch_failed": false
+    },
+    "base": "d903e7369adf3c365cc5d1be139f033b7644327a",
+    "head": "3d9491a1209c0daf6368c16a71bb1c696a45b2ec",
+    "started_at": "2026-10-24T18:17:52.220Z",
+    "tool_version": "0.1.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Make the role default the floor for a reviewer's model and effort\n\nCloses #14.\n\nA built-in reviewer now takes the role default for its model and effort. Before, every built-in prompt set `model: opus` and `effort: low` in its frontmatter, so `ROLE_DEFAULTS.reviewer` in `src/config/models.ts` never applied to a built-in, and the record's `identity.models.reviewer` could claim an effort that no query used.\n\n## Changes\n\n- `model` and `effort` are optional in the reviewer frontmatter schema (`src/schemas/reviewer.ts`). The loader checks the frontmatter model with `resolveModel` only when the frontmatter sets one.\n- `effectiveModel` in `src/reviewers/loader.ts` resolves each field as `reviewers.<name>`, then `models.reviewer`, then the frontmatter value when set, then `ROLE_DEFAULTS.reviewer`. Model and effort still resolve apart.\n- The seven built-in prompts under `prompts/reviewers/` set neither `model` nor `effort`, so the role default is one knob for every built-in. A custom reviewer may still set either field as its own default, and `reviewers.<name>` in the repo config still pins one reviewer.\n- README and `docs/design/high-level-design.md` state the new order and the optional fields. The custom reviewer example in the design doc, which already omitted `effort`, is now valid.\n- `ROLE_DEFAULTS.reviewer` keeps its value, Opus at `low`. This PR changes precedence only, not the default.\n\n## Tests\n\nThe red commit b9d9ae6 adds the acceptance test alone: a review through the fake SDK client with one custom reviewer whose frontmatter sets neither field, and no `models.reviewer` in the config. It asserts that every reviewer query's overrides equal `ROLE_DEFAULTS.reviewer` and that `identity.models.reviewer` equals the same values. On main the schema rejects that frontmatter, so the test fails there. Three more run tests cover a frontmatter effort kept, `models.reviewer.effort` beating it, and `reviewers.<name>.effort` beating both while `identity.models.reviewer` keeps the role value. The built-in frontmatter test now asserts that no built-in sets `model` or `effort`.\n\n`npm test` (1070 pass), `npm run lint`, `npm run typecheck` and `npm run build` all pass.\n\n## Release\n\nA consumer repo gets this change only when the SHA in `review.yml` moves. Follow \"The release tag\" in the README.\n\n## Charter\n\nGoal: handle GitHub issue 14 of jerridan/pr-review, \"Built-in reviewers ignore the role default effort, and the record reports the wrong value\". The principal chose fix 1 of the issue, the role default as the floor, and chose that `model` takes the same treatment as `effort`.\n\nAcceptance: a vitest test runs a review through the fake SDK client with one custom reviewer whose frontmatter sets neither `model` nor `effort`, and with no `models.reviewer` entry in the repo config. It asserts that the review loads, that the model and effort in every reviewer query's overrides equal `ROLE_DEFAULTS.reviewer`, and that `identity.models.reviewer` in the run record equals those same overrides. The test fails on main at d903e73, where the schema rejects the frontmatter, and passes on the deliverable branch. `npm test`, `npm run lint`, `npm run typecheck` and `npm run build` all pass on the deliverable branch.\n\n## Decisions\n\n- Path: the change path. The goal names a change with a known cause, so there was no symptom to investigate.\n- Size: not the light path. The charter left the choice between the two fixes of the issue open, and the README and the design doc document only the precedence that the goal changes, so precedent could not settle it. The principal answered: fix 1, and `model` optional too. Neither answer was recorded as a repo rule.\n- Spec critic round 1: zero critical, two concerns, three nits, all accepted. The existing built-in frontmatter test became the check that no built-in sets the fields. A duplicate test was dropped. \"Pin\" became \"default for one reviewer\". A stale test comment was named for update.\n- Shape: simple path, one package, band standard. The schema change accepts a superset of what it accepted, and tests cover the surface.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_013NJ8nrdv1XAmDexRXHC4SC\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [],
+    "changed_files": [
+      {
+        "path": "README.md",
+        "hunks": 2
+      },
+      {
+        "path": "docs/design/high-level-design.md",
+        "hunks": 2
+      },
+      {
+        "path": "prompts/reviewers/conventions.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/reviewers/description-drift.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/reviewers/diff-bugs.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/reviewers/docs-and-comments.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/reviewers/history.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/reviewers/security.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/reviewers/tests.md",
+        "hunks": 1
+      },
+      {
+        "path": "src/reviewers/loader.ts",
+        "hunks": 4
+      },
+      {
+        "path": "src/run.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/schemas/reviewer.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/repo-config.test.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/reviewers.test.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/run.test.ts",
+        "hunks": 3
+      },
+      {
+        "path": "test/schemas.test.ts",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [],
+    "triage": null,
+    "tier": "skip",
+    "tier_reason": "No new hunks since 3d9491a.",
+    "selected_reviewers": [],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [],
+    "verifications": [],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "skipped",
+    "coverage": {
+      "reviewers_ran": [],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0
+    },
+    "findings": [],
+    "github": null,
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [],
+    "total_cost_usd": 0,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 48,
+      "gather": 302,
+      "scope": 8,
+      "find_verify": 3,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
