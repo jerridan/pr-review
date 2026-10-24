@@ -137,7 +137,7 @@ jobs:
       # Set it to the commit of the action before you move the tag v1.
       - name: Review the pull request
         id: review
-        uses: jerridan/pr-review@0f40cd3cf294c36b14b565aaf0b89d7eaae3268c # v1
+        uses: jerridan/pr-review@1ea734281e8f2e637fac04cb19f4ccf06962d2ba # v1
         with:
           pr: ${{ steps.pr.outputs.number }}
           out: ${{ runner.temp }}/pr-review-records
