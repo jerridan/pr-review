@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { CommanderError } from "commander";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { ROLE_DEFAULTS, resolveModel } from "../src/config/models.js";
 import { DEFAULT_REPO_CONFIG } from "../src/config/repo-config.js";
 import { createProgram } from "../src/cli.js";
 import { GitHubError, type GitHubClient } from "../src/github/client.js";
@@ -897,6 +898,66 @@ describe("the repo config in a run (R3)", () => {
     expect(record.identity.config.files).toEqual([".pr-review/reviewers/naming.md"]);
     // The custom reviewer's threshold 85 holds: the score 92 passes.
     expect(record.posted.findings.length).toBeGreaterThan(0);
+  }, 30_000);
+
+  // Make a fixture with one custom reviewer "naming". "extra" adds lines to
+  // its frontmatter. "configYaml" is the repo config, when a test needs one.
+  async function fixtureWithNaming(extra: string[], configYaml?: string): Promise<Fixture> {
+    const source = mkdtempSync(join(tmpdir(), "pr-review-run-naming-"));
+    try {
+      mkdirSync(join(source, "dir", "reviewers"), { recursive: true });
+      if (configYaml !== undefined) writeFileSync(join(source, "dir", "config.yaml"), configYaml);
+      writeFileSync(
+        join(source, "dir", "reviewers", "naming.md"),
+        [
+          "---",
+          "name: naming",
+          "description: Checks names.",
+          ...extra,
+          "tools: [Read]",
+          "triggers:",
+          "  paths: ['src/**']",
+          "  categories: []",
+          "  min_tier: fast",
+          "passes: 1",
+          "threshold: 85",
+          "---",
+          "CUSTOM-BODY: you review names.",
+          "",
+        ].join("\n"),
+      );
+      const made = await makeFixture("--pr-review-dir", join(source, "dir"));
+      fixtures.push(made);
+      return made;
+    } finally {
+      rmSync(source, { recursive: true, force: true });
+    }
+  }
+
+  async function reviewNaming(cfx: Fixture, name: string) {
+    const fake = createFakeSdkClient(script(cfx));
+    const { record } = await runReview({
+      repo: cfx.repo,
+      base: cfx.base,
+      head: cfx.head,
+      tierOverride: "fast",
+      outDir: join(outRoot, name),
+      format: "json",
+      allowApiKey: false,
+      client: fake,
+    });
+    return { record, calls: fake.calls.filter((c) => c.role === "reviewer") };
+  }
+
+  it("gives every reviewer the role default when no source sets a model or an effort", async () => {
+    const cfx = await fixtureWithNaming([]);
+    const { record, calls } = await reviewNaming(cfx, "config-role-default");
+    const role = ROLE_DEFAULTS.reviewer;
+    const expected = { model: resolveModel(role.model), effort: role.effort };
+    expect(calls.map((c) => c.reviewerName)).toContain("naming");
+    expect(calls.map((c) => c.reviewerName)).toContain("diff-bugs");
+    for (const call of calls) expect(call.overrides, call.reviewerName).toEqual(expected);
+    expect(record.identity.models.reviewer).toEqual(expected);
   }, 30_000);
 
   it("injects the base CLAUDE.md into each reviewer prompt, and a skip run injects nothing", async () => {
