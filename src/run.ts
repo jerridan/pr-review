@@ -157,8 +157,8 @@ export function roleModels(config: RepoConfig): Record<Role, { model: string; ef
 
 /**
  * The record entry of each selected reviewer, with the model and effort
- * that its queries use after the repo config and the frontmatter, and the
- * tools of its frontmatter that the run did not grant.
+ * that its queries use after the repo config, the frontmatter and the role
+ * default, and the tools of its frontmatter that the run did not grant.
  */
 export function describeSelected(
   selected: { def: ReviewerDefinition; trigger: string }[],

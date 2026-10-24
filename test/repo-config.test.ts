@@ -532,7 +532,7 @@ describe("effective reviewer values (R3, R6)", () => {
     ).toBe(92);
   });
 
-  it("model and effort: the reviewer key, then models.reviewer, then the frontmatter", () => {
+  it("model and effort: the reviewer key, then models.reviewer, then the role default", () => {
     const def = diffBugs();
     expect(effectiveModel(def, DEFAULT_REPO_CONFIG)).toEqual({
       model: "claude-opus-5-5",

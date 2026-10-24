@@ -970,17 +970,6 @@ describe("the repo config in a run (R3)", () => {
     });
   }, 30_000);
 
-  it("lets models.reviewer.effort beat the effort of the frontmatter", async () => {
-    const cfx = await fixtureWithNaming(
-      ["effort: high"],
-      "models:\n  reviewer:\n    effort: medium\n",
-    );
-    const { record, calls } = await reviewNaming(cfx, "config-role-beats-frontmatter");
-    const naming = calls.find((c) => c.reviewerName === "naming");
-    expect(naming?.overrides).toEqual({ model: "claude-opus-5-5", effort: "medium" });
-    expect(record.identity.models.reviewer.effort).toBe("medium");
-  }, 30_000);
-
   it("lets reviewers.<name>.effort beat both, and the record keeps the role value apart", async () => {
     const cfx = await fixtureWithNaming(
       ["effort: high"],
