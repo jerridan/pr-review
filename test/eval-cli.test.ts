@@ -230,6 +230,11 @@ type ScriptOptions = {
   judgeCost?: number;
   /** Wait a moment in each query, so two runs at one time would overlap. */
   delay?: boolean;
+  /**
+   * In the runs that "runs" names (1 is the first run), every reviewer
+   * query throws with "message", so the review is incomplete.
+   */
+  reviewerFailure?: { message: string; runs: number[] };
 };
 
 /**
@@ -262,6 +267,13 @@ function evalFake(opts: ScriptOptions = {}) {
           TRIAGE_COST,
         );
       case "reviewer": {
+        if (opts.reviewerFailure?.runs.includes(runs)) {
+          return {
+            ok: false,
+            failure: { kind: "thrown", message: opts.reviewerFailure.message },
+            raw: null,
+          };
+        }
         if (req.reviewerName !== "conventions") return out({ findings: [] });
         const planted = {
           file: fx.file,
@@ -638,6 +650,54 @@ describe("pr-review eval: failed repeats (R3.8, R3.11)", () => {
       );
       expect(code).toBe(1);
       expect(report?.gate?.passed).toBe(false);
+    },
+    RUN_TIMEOUT,
+  );
+});
+
+describe("pr-review eval: incomplete reviews", () => {
+  const LIMIT = "You've hit your session limit";
+
+  it(
+    "lists a repeat whose review is incomplete as a failed repeat with the reason, and exits 1",
+    async () => {
+      const cases = casesDir([{ name: "limited", golden: [PLANTED()] }]);
+      const { code, report } = await evalJson(
+        evalFake({ reviewerFailure: { message: LIMIT, runs: [1] } }),
+        cases,
+        "--repeat",
+        "1",
+      );
+      expect(code).toBe(1);
+      expect(report?.failed_repeats).toHaveLength(1);
+      expect(report?.failed_repeats[0]).toMatchObject({ case: "limited", repeat: 1 });
+      expect(report?.failed_repeats[0]?.error).toContain("incomplete");
+      expect(report?.failed_repeats[0]?.error).toContain(LIMIT);
+      expect(report?.cases[0]?.repeats[0]).toMatchObject({ failed: true, recall: null });
+      expect(stderr).toContain("limited");
+    },
+    RUN_TIMEOUT,
+  );
+
+  it(
+    "leaves the baseline unchanged when one review of two is incomplete",
+    async () => {
+      const file = join(newDir("baseline"), "baseline.json");
+      writeFileSync(file, JSON.stringify(baselineFile({ recall: 1, precision: 1 })));
+      const before = readFileSync(file, "utf8");
+      const cases = casesDir([{ name: "limited", golden: [PLANTED()] }]);
+      // The second review is complete, so the means are not null.
+      const { code } = await evalJson(
+        evalFake({ reviewerFailure: { message: LIMIT, runs: [1] } }),
+        cases,
+        "--repeat",
+        "2",
+        "--baseline",
+        file,
+        "--write-baseline",
+      );
+      expect(code).toBe(1);
+      expect(readFileSync(file, "utf8")).toBe(before);
     },
     RUN_TIMEOUT,
   );
