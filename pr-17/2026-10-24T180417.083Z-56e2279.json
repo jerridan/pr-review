@@ -1,0 +1,1402 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 17,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Make the role default the floor for a reviewer's model and effort",
+      "draft": true,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/17"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "d903e7369adf3c365cc5d1be139f033b7644327a",
+    "head": "56e2279dabeefa62cdcce8d3f534967d3f5f5cea",
+    "started_at": "2026-10-24T18:04:17.083Z",
+    "tool_version": "0.1.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Make the role default the floor for a reviewer's model and effort\n\nCloses #14.\n\nA built-in reviewer now takes the role default for its model and effort. Before, every built-in prompt set `model: opus` and `effort: low` in its frontmatter, so `ROLE_DEFAULTS.reviewer` in `src/config/models.ts` never applied to a built-in, and the record's `identity.models.reviewer` could claim an effort that no query used.\n\n## Changes\n\n- `model` and `effort` are optional in the reviewer frontmatter schema (`src/schemas/reviewer.ts`). The loader checks the frontmatter model with `resolveModel` only when the frontmatter sets one.\n- `effectiveModel` in `src/reviewers/loader.ts` resolves each field as `reviewers.<name>`, then `models.reviewer`, then the frontmatter value when set, then `ROLE_DEFAULTS.reviewer`. Model and effort still resolve apart.\n- The seven built-in prompts under `prompts/reviewers/` set neither `model` nor `effort`, so the role default is one knob for every built-in. A custom reviewer may still set either field as its own default, and `reviewers.<name>` in the repo config still pins one reviewer.\n- README and `docs/design/high-level-design.md` state the new order and the optional fields. The custom reviewer example in the design doc, which already omitted `effort`, is now valid.\n- `ROLE_DEFAULTS.reviewer` keeps its value, Opus at `low`. This PR changes precedence only, not the default.\n\n## Tests\n\nThe red commit b9d9ae6 adds the acceptance test alone: a review through the fake SDK client with one custom reviewer whose frontmatter sets neither field, and no `models.reviewer` in the config. It asserts that every reviewer query's overrides equal `ROLE_DEFAULTS.reviewer` and that `identity.models.reviewer` equals the same values. On main the schema rejects that frontmatter, so the test fails there. Three more run tests cover a frontmatter effort kept, `models.reviewer.effort` beating it, and `reviewers.<name>.effort` beating both while `identity.models.reviewer` keeps the role value. The built-in frontmatter test now asserts that no built-in sets `model` or `effort`.\n\n`npm test` (1070 pass), `npm run lint`, `npm run typecheck` and `npm run build` all pass.\n\n## Release\n\nA consumer repo gets this change only when the SHA in `review.yml` moves. Follow \"The release tag\" in the README.\n\n## Charter\n\nGoal: handle GitHub issue 14 of jerridan/pr-review, \"Built-in reviewers ignore the role default effort, and the record reports the wrong value\". The principal chose fix 1 of the issue, the role default as the floor, and chose that `model` takes the same treatment as `effort`.\n\nAcceptance: a vitest test runs a review through the fake SDK client with one custom reviewer whose frontmatter sets neither `model` nor `effort`, and with no `models.reviewer` entry in the repo config. It asserts that the review loads, that the model and effort in every reviewer query's overrides equal `ROLE_DEFAULTS.reviewer`, and that `identity.models.reviewer` in the run record equals those same overrides. The test fails on main at d903e73, where the schema rejects the frontmatter, and passes on the deliverable branch. `npm test`, `npm run lint`, `npm run typecheck` and `npm run build` all pass on the deliverable branch.\n\n## Decisions\n\n- Path: the change path. The goal names a change with a known cause, so there was no symptom to investigate.\n- Size: not the light path. The charter left the choice between the two fixes of the issue open, and the README and the design doc document only the precedence that the goal changes, so precedent could not settle it. The principal answered: fix 1, and `model` optional too. Neither answer was recorded as a repo rule.\n- Spec critic round 1: zero critical, two concerns, three nits, all accepted. The existing built-in frontmatter test became the check that no built-in sets the fields. A duplicate test was dropped. \"Pin\" became \"default for one reviewer\". A stale test comment was named for update.\n- Shape: simple path, one package, band standard. The schema change accepts a superset of what it accepted, and tests cover the surface.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_013NJ8nrdv1XAmDexRXHC4SC\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": "README.md",
+        "hunks": 2
+      },
+      {
+        "path": "docs/design/high-level-design.md",
+        "hunks": 2
+      },
+      {
+        "path": "prompts/reviewers/conventions.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/reviewers/description-drift.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/reviewers/diff-bugs.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/reviewers/docs-and-comments.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/reviewers/history.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/reviewers/security.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/reviewers/tests.md",
+        "hunks": 1
+      },
+      {
+        "path": "src/reviewers/loader.ts",
+        "hunks": 4
+      },
+      {
+        "path": "src/schemas/reviewer.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/repo-config.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/reviewers.test.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/run.test.ts",
+        "hunks": 3
+      },
+      {
+        "path": "test/schemas.test.ts",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "Changes the reviewer model/effort resolution logic and the frontmatter schema (fields become optional), affecting config precedence and runtime behavior.",
+      "confidence": "high",
+      "categories": [
+        "bug",
+        "test",
+        "docs",
+        "other"
+      ],
+      "hotspots": [
+        "src/reviewers/loader.ts: effectiveModel (fallback chain with ROLE_DEFAULTS)",
+        "src/reviewers/loader.ts: parseReviewer model validation when undefined",
+        "src/schemas/reviewer.ts: optional model/effort in type and schema",
+        "prompts/reviewers/*.md: removal of model/effort frontmatter",
+        "test/run.test.ts: new custom-reviewer precedence tests"
+      ],
+      "file_notes": [
+        {
+          "file": "src/reviewers/loader.ts",
+          "note": "effectiveModel now falls back to ROLE_DEFAULTS.reviewer; model validation skipped when unset"
+        },
+        {
+          "file": "src/schemas/reviewer.ts",
+          "note": "model and effort made optional in type and zod schema"
+        },
+        {
+          "file": "prompts/reviewers/conventions.md",
+          "note": "removed model/effort frontmatter; same in the six other built-in reviewer prompts"
+        },
+        {
+          "file": "README.md",
+          "note": "documents new precedence: reviewer key, models.reviewer, frontmatter, role default"
+        },
+        {
+          "file": "docs/design/high-level-design.md",
+          "note": "same precedence doc update"
+        },
+        {
+          "file": "test/run.test.ts",
+          "note": "new precedence tests with a custom reviewer fixture"
+        },
+        {
+          "file": "test/repo-config.test.ts",
+          "note": "new test for frontmatter and role fallback per field"
+        },
+        {
+          "file": "test/reviewers.test.ts",
+          "note": "built-in frontmatter expectation drops model/effort; new bare-file test"
+        },
+        {
+          "file": "test/schemas.test.ts",
+          "note": "new test that parses frontmatter without model and effort"
+        }
+      ],
+      "summary": "Makes the reviewer frontmatter fields `model` and `effort` optional. Resolution now runs: reviewers.<name>, then models.reviewer, then frontmatter, then ROLE_DEFAULTS.reviewer, with model and effort resolved apart. The built-in reviewer prompts drop their explicit opus/low values, which equal the role default. Docs and tests are updated to match."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: Changes the reviewer model/effort resolution logic and the frontmatter schema (fields become optional), affecting config precedence and runtime behavior.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "test/repo-config.test.ts",
+            "start_line": 554,
+            "end_line": 573,
+            "category": "convention",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "This test checks several behaviours: the frontmatter effort, the frontmatter model, models.reviewer precedence and reviewers.<name> precedence.",
+            "evidence": "it(\"model and effort: the frontmatter value applies when no config sets one, apart for each field\", () => {",
+            "suggested_fix": "Split the test into one test for each precedence level.",
+            "explanation": "CLAUDE.md rule 2 says each test names one behaviour.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 3699,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 13031,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0013131,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 344,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 14636,
+              "webSearchRequests": 0,
+              "costUSD": 0.1245878,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 81,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1259009
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7951,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 13023,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0013128000000000003,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 385,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 14586,
+              "webSearchRequests": 0,
+              "costUSD": 0.1250078,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 57,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1263206
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 8360,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 13031,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0013136,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 399,
+              "cacheReadInputTokens": 20657,
+              "cacheCreationInputTokens": 14866,
+              "webSearchRequests": 0,
+              "costUSD": 0.1310554,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 240,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.132369
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7634,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 13023,
+              "outputTokens": 23,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0013138000000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 182,
+              "cacheReadInputTokens": 20649,
+              "cacheCreationInputTokens": 14850,
+              "webSearchRequests": 0,
+              "costUSD": 0.1265858,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1278996
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7133,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 13031,
+              "outputTokens": 25,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0013155999999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 517,
+              "cacheReadInputTokens": 20664,
+              "cacheCreationInputTokens": 15400,
+              "webSearchRequests": 0,
+              "costUSD": 0.1376888,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 321,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1390044
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 11594,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 24456,
+              "outputTokens": 23,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0024571,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 497,
+              "cacheReadInputTokens": 32204,
+              "cacheCreationInputTokens": 26435,
+              "webSearchRequests": 0,
+              "costUSD": 0.22787680000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 338,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.2303339
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1682,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 13021,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0013121,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 62,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 14627,
+              "webSearchRequests": 0,
+              "costUSD": 0.11887579999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.12018789999999999
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1849,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 13023,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0013128000000000003,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 91,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 14629,
+              "webSearchRequests": 0,
+              "costUSD": 0.1194718,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 37,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1207846
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "test/repo-config.test.ts",
+            "start_line": 554,
+            "end_line": 573,
+            "category": "test",
+            "severity_estimate": "nit",
+            "confidence": "medium",
+            "claim": "One test covers four precedence behaviours, so a failure does not say which level broke.",
+            "evidence": "it(\"model and effort: the frontmatter value applies when no config sets one, apart for each field\", () => {",
+            "suggested_fix": "Split the test into one `it` for each precedence level.",
+            "explanation": "The frontmatter effort, the frontmatter model, the role-over-frontmatter rule and the own-over-role rule all fail under one test name.",
+            "needs_context": false
+          },
+          {
+            "file": "test/run.test.ts",
+            "start_line": 963,
+            "end_line": 982,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "The run tests for a kept frontmatter effort and for models.reviewer beating it fail for the same defect as the effectiveModel unit test in repo-config.test.ts.",
+            "evidence": "it(\"lets models.reviewer.effort beat the effort of the frontmatter\", async () => {",
+            "suggested_fix": "Drop these two run tests. Keep the precedence checks in the effectiveModel unit test.",
+            "explanation": "The unit test already checks this precedence with a smaller scope. These two 30-second run tests add no wiring proof beyond what the role-default and own-beats-all run tests already give.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7313,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 13029,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0013139,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 748,
+              "cacheReadInputTokens": 21424,
+              "cacheCreationInputTokens": 15710,
+              "webSearchRequests": 0,
+              "costUSD": 0.14494079999999998,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 85,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1462547
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "test/repo-config.test.ts",
+          "start_line": 554,
+          "end_line": 573,
+          "category": "convention",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "This test checks several behaviours: the frontmatter effort, the frontmatter model, models.reviewer precedence and reviewers.<name> precedence.",
+          "evidence": "it(\"model and effort: the frontmatter value applies when no config sets one, apart for each field\", () => {",
+          "suggested_fix": "Split the test into one test for each precedence level.",
+          "explanation": "CLAUDE.md rule 2 says each test names one behaviour.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "it(\"model and effort: the frontmatter value applies when no config sets one, apart for each field\", () => {",
+            "expect(effectiveModel(only, role).effort).toBe(\"medium\");",
+            "expect(effectiveModel(only, own).effort).toBe(\"max\");",
+            "1. **TypeScript, as ESM.**"
+          ],
+          "rationale": "The test does bundle the frontmatter effort, frontmatter model, models.reviewer override and reviewers.<name> override in one case, which strains CLAUDE.md rule 2's \\\"names one behaviour\\\". The bundling is mild, because it all exercises one function's precedence. The neighbouring tests in the file bundle the same way, so it is a minor convention point.",
+          "score": 40,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "it(\"model and effort: the frontmatter value applies when no config sets one, apart for each field\", () => {",
+            "expect(effectiveModel(only, role).effort).toBe(\"medium\");",
+            "expect(effectiveModel(only, own).effort).toBe(\"max\");",
+            "1. **TypeScript, as ESM.**"
+          ],
+          "rationale": "The test does bundle the frontmatter effort, frontmatter model, models.reviewer override and reviewers.<name> override in one case, which strains CLAUDE.md rule 2's \\\"names one behaviour\\\". The bundling is mild, because it all exercises one function's precedence. The neighbouring tests in the file bundle the same way, so it is a minor convention point.",
+          "score": 40,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "test/repo-config.test.ts",
+          "start_line": 554,
+          "end_line": 573,
+          "category": "test",
+          "severity_estimate": "nit",
+          "confidence": "medium",
+          "claim": "One test covers four precedence behaviours, so a failure does not say which level broke.",
+          "evidence": "it(\"model and effort: the frontmatter value applies when no config sets one, apart for each field\", () => {",
+          "suggested_fix": "Split the test into one `it` for each precedence level.",
+          "explanation": "The frontmatter effort, the frontmatter model, the role-over-frontmatter rule and the own-over-role rule all fail under one test name.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "it(\"model and effort: the frontmatter value applies when no config sets one, apart for each field\", () => {",
+            "expect(effectiveModel(only, role).effort).toBe(\"medium\");",
+            "expect(effectiveModel(only, own).effort).toBe(\"max\");"
+          ],
+          "rationale": "The new test does bundle four precedence checks, but the adjacent existing test and the file's other tests use the same multi-assertion style. Failures also point to the failing line, so splitting the test is a minor stylistic preference and not worth much.",
+          "score": 22,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "it(\"model and effort: the frontmatter value applies when no config sets one, apart for each field\", () => {",
+            "expect(effectiveModel(only, role).effort).toBe(\"medium\");",
+            "expect(effectiveModel(only, own).effort).toBe(\"max\");"
+          ],
+          "rationale": "The new test does bundle four precedence checks, but the adjacent existing test and the file's other tests use the same multi-assertion style. Failures also point to the failing line, so splitting the test is a minor stylistic preference and not worth much.",
+          "score": 22,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "test/run.test.ts",
+          "start_line": 963,
+          "end_line": 982,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "The run tests for a kept frontmatter effort and for models.reviewer beating it fail for the same defect as the effectiveModel unit test in repo-config.test.ts.",
+          "evidence": "it(\"lets models.reviewer.effort beat the effort of the frontmatter\", async () => {",
+          "suggested_fix": "Drop these two run tests. Keep the precedence checks in the effectiveModel unit test.",
+          "explanation": "The unit test already checks this precedence with a smaller scope. These two 30-second run tests add no wiring proof beyond what the role-default and own-beats-all run tests already give.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "it(\"lets models.reviewer.effort beat the effort of the frontmatter\", async () => {",
+            "expect(naming?.overrides).toEqual({ model: \"claude-opus-5-5\", effort: \"medium\" });",
+            "it(\"keeps the effort that the frontmatter sets\", async () => {"
+          ],
+          "rationale": "The claim that these tests \"fail\" is not supported. The explanation only argues they overlap with the unit test. The two run tests check different wiring: the overrides of the real reviewer queries and the effort in the record, so they are not pure duplicates. The charter chose to include them on purpose, so dropping them is a weak preference.",
+          "score": 12,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "it(\"lets models.reviewer.effort beat the effort of the frontmatter\", async () => {",
+            "expect(naming?.overrides).toEqual({ model: \"claude-opus-5-5\", effort: \"medium\" });",
+            "it(\"keeps the effort that the frontmatter sets\", async () => {"
+          ],
+          "rationale": "The claim that these tests \"fail\" is not supported. The explanation only argues they overlap with the unit test. The two run tests check different wiring: the overrides of the real reviewer queries and the effort in the record, so they are not pure duplicates. The charter chose to include them on purpose, so dropping them is a weak preference.",
+          "score": 12,
+          "severity": "nit"
+        },
+        "passed": false
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5639318635,
+      "review_url": "https://github.com/jerridan/pr-review/pull/17#pullrequestreview-5639318635",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 120946406460
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6534,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11348,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011463,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 898,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 10861,
+            "webSearchRequests": 0,
+            "costUSD": 0.0525542,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.053700500000000005
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 3699,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 13031,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0013131,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 344,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 14636,
+            "webSearchRequests": 0,
+            "costUSD": 0.1245878,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 81,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1259009
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7133,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 13031,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0013155999999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 517,
+            "cacheReadInputTokens": 20664,
+            "cacheCreationInputTokens": 15400,
+            "webSearchRequests": 0,
+            "costUSD": 0.1376888,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 321,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1390044
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7634,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 13023,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0013138000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 182,
+            "cacheReadInputTokens": 20649,
+            "cacheCreationInputTokens": 14850,
+            "webSearchRequests": 0,
+            "costUSD": 0.1265858,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1278996
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7951,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 13023,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0013128000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 385,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 14586,
+            "webSearchRequests": 0,
+            "costUSD": 0.1250078,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 57,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1263206
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 8360,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 13031,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0013136,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 399,
+            "cacheReadInputTokens": 20657,
+            "cacheCreationInputTokens": 14866,
+            "webSearchRequests": 0,
+            "costUSD": 0.1310554,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 240,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.132369
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 1682,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 13021,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0013121,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 62,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 14627,
+            "webSearchRequests": 0,
+            "costUSD": 0.11887579999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.12018789999999999
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 1849,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 13023,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0013128000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 91,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 14629,
+            "webSearchRequests": 0,
+            "costUSD": 0.1194718,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 37,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1207846
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7313,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 13029,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0013139,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 748,
+            "cacheReadInputTokens": 21424,
+            "cacheCreationInputTokens": 15710,
+            "webSearchRequests": 0,
+            "costUSD": 0.14494079999999998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 85,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1462547
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "model": "claude-opus-5-5",
+        "duration_ms": 11594,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 24456,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0024571,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 497,
+            "cacheReadInputTokens": 32204,
+            "cacheCreationInputTokens": 26435,
+            "webSearchRequests": 0,
+            "costUSD": 0.22787680000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 338,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.2303339
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 10190,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 19166,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0019276,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 820,
+            "cacheReadInputTokens": 49263,
+            "cacheCreationInputTokens": 20262,
+            "webSearchRequests": 0,
+            "costUSD": 0.0941863,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 173,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0961139
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 4564,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 19172,
+            "outputTokens": 489,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0021617000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 463,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 484,
+            "cacheReadInputTokens": 3889,
+            "cacheCreationInputTokens": 18685,
+            "webSearchRequests": 0,
+            "costUSD": 0.0799729,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 119,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0821346
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 10228,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 46155,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0046265,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 725,
+            "cacheReadInputTokens": 53446,
+            "cacheCreationInputTokens": 46036,
+            "webSearchRequests": 0,
+            "costUSD": 0.1967466,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 202,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.2013731
+      }
+    ],
+    "total_cost_usd": 1.7023777000000002,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 50,
+      "gather": 258,
+      "triage": 7654,
+      "find_verify": 28547,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
