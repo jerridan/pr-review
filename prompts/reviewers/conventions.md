@@ -1,8 +1,6 @@
 ---
 name: conventions
 description: Finds breaks of the repo rules and of the conventions of nearby code in the lines that the diff adds or changes.
-model: opus
-effort: low
 tools: [Read, Grep, Glob]
 triggers:
   paths: []

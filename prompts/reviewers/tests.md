@@ -1,8 +1,6 @@
 ---
 name: tests
 description: Finds behaviour changes in the diff that have no test, tests that the diff weakens or makes pass for the wrong reason, and tests that assert an internal, fake a module of the same repo, restate the code or duplicate a smaller test.
-model: opus
-effort: low
 tools: [Read, Grep, Glob]
 triggers:
   paths: []

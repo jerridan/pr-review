@@ -1,8 +1,6 @@
 ---
 name: history
 description: Finds changes that undo or repeat a prior fix, from the blame and log of the changed lines.
-model: opus
-effort: low
 tools: [Read, Grep, Glob]
 triggers:
   paths: []

@@ -779,8 +779,8 @@ describe("the repo config in a run (R3)", () => {
 
     const byRole = (role: string) => fake.calls.filter((c) => c.role === role);
     expect(byRole("triage").map((c) => c.overrides)).toEqual([{ model: "claude-haiku-5-5" }]);
-    // Every built-in reviewer has effort low in its frontmatter, and
-    // models.reviewer sets the model of each one.
+    // No built-in reviewer sets an effort in its frontmatter, so the role
+    // default low applies, and models.reviewer sets the model of each one.
     expect(byRole("reviewer").length).toBeGreaterThan(1);
     for (const call of byRole("reviewer")) {
       expect(call.overrides, call.reviewerName).toEqual({
@@ -958,6 +958,41 @@ describe("the repo config in a run (R3)", () => {
     expect(calls.map((c) => c.reviewerName)).toContain("diff-bugs");
     for (const call of calls) expect(call.overrides, call.reviewerName).toEqual(expected);
     expect(record.identity.models.reviewer).toEqual(expected);
+  }, 30_000);
+
+  it("keeps the effort that the frontmatter sets", async () => {
+    const cfx = await fixtureWithNaming(["effort: high"]);
+    const { record, calls } = await reviewNaming(cfx, "config-frontmatter-effort");
+    const naming = calls.find((c) => c.reviewerName === "naming");
+    expect(naming?.overrides).toEqual({ model: "claude-opus-5-5", effort: "high" });
+    expect(record.identity.selected_reviewers.find((r) => r.name === "naming")).toMatchObject({
+      effort: "high",
+    });
+  }, 30_000);
+
+  it("lets models.reviewer.effort beat the effort of the frontmatter", async () => {
+    const cfx = await fixtureWithNaming(
+      ["effort: high"],
+      "models:\n  reviewer:\n    effort: medium\n",
+    );
+    const { record, calls } = await reviewNaming(cfx, "config-role-beats-frontmatter");
+    const naming = calls.find((c) => c.reviewerName === "naming");
+    expect(naming?.overrides).toEqual({ model: "claude-opus-5-5", effort: "medium" });
+    expect(record.identity.models.reviewer.effort).toBe("medium");
+  }, 30_000);
+
+  it("lets reviewers.<name>.effort beat both, and the record keeps the role value apart", async () => {
+    const cfx = await fixtureWithNaming(
+      ["effort: high"],
+      "models:\n  reviewer:\n    effort: medium\nreviewers:\n  naming:\n    effort: max\n",
+    );
+    const { record, calls } = await reviewNaming(cfx, "config-own-beats-all");
+    const naming = calls.find((c) => c.reviewerName === "naming");
+    expect(naming?.overrides).toEqual({ model: "claude-opus-5-5", effort: "max" });
+    expect(record.identity.selected_reviewers.find((r) => r.name === "naming")).toMatchObject({
+      effort: "max",
+    });
+    expect(record.identity.models.reviewer.effort).toBe("medium");
   }, 30_000);
 
   it("injects the base CLAUDE.md into each reviewer prompt, and a skip run injects nothing", async () => {

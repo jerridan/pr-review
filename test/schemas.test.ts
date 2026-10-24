@@ -337,6 +337,13 @@ describe("ReviewerFrontmatterSchema", () => {
     expect(ReviewerFrontmatterSchema.parse({ ...fm, effort: "HIGH" }).effort).toBe("high");
   });
 
+  it("parses a file with neither model nor effort", () => {
+    const { model: _model, effort: _effort, ...bare } = fm;
+    const out = ReviewerFrontmatterSchema.parse(bare);
+    expect(out.model).toBeUndefined();
+    expect(out.effort).toBeUndefined();
+  });
+
   it("checks passes and threshold in code", () => {
     expect(ReviewerFrontmatterSchema.safeParse({ ...fm, passes: 0 }).success).toBe(false);
     expect(ReviewerFrontmatterSchema.safeParse({ ...fm, passes: 1.5 }).success).toBe(false);

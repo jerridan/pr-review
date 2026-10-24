@@ -3,7 +3,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { RepoConfig } from "../config/repo-config.js";
-import { resolveModel, type Effort } from "../config/models.js";
+import { resolveModel, ROLE_DEFAULTS, type Effort } from "../config/models.js";
 import { parseFrontmatter, promptPath } from "../prompts/load.js";
 import { narrowReadOnlyTools } from "../sdk/options.js";
 import { ReviewerFrontmatterSchema, type ReviewerFrontmatter } from "../schemas/reviewer.js";
@@ -91,10 +91,12 @@ export function parseReviewer(
   }
 
   const issues: Issue[] = [];
-  try {
-    resolveModel(result.data.model);
-  } catch (err) {
-    issues.push({ path: ["model"], message: messageOf(err) });
+  if (result.data.model !== undefined) {
+    try {
+      resolveModel(result.data.model);
+    } catch (err) {
+      issues.push({ path: ["model"], message: messageOf(err) });
+    }
   }
   const systemPrompt = parsed.body.replace(/^(?:\r?\n)+/, "");
   if (systemPrompt.trim() === "") {
@@ -184,7 +186,8 @@ export function effectiveThreshold(def: ReviewerDefinition, config: RepoConfig):
 /**
  * The model, as a pinned ID, and the effort of a reviewer's queries. Each
  * comes from reviewers.<name> when set, then models.reviewer when set,
- * then the frontmatter.
+ * then the frontmatter when it sets one, then ROLE_DEFAULTS.reviewer. The
+ * model and the effort resolve apart.
  */
 export function effectiveModel(
   def: ReviewerDefinition,
@@ -193,8 +196,10 @@ export function effectiveModel(
   const own = reviewerEntry(config, def.frontmatter.name);
   const role = config.models.reviewer;
   return {
-    model: resolveModel(own?.model ?? role?.model ?? def.frontmatter.model),
-    effort: own?.effort ?? role?.effort ?? def.frontmatter.effort,
+    model: resolveModel(
+      own?.model ?? role?.model ?? def.frontmatter.model ?? ROLE_DEFAULTS.reviewer.model,
+    ),
+    effort: own?.effort ?? role?.effort ?? def.frontmatter.effort ?? ROLE_DEFAULTS.reviewer.effort,
   };
 }
 

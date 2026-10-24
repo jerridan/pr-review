@@ -1,8 +1,6 @@
 ---
 name: diff-bugs
 description: Finds bugs in the code that the diff adds or changes, from the diff and the head files.
-model: opus
-effort: low
 tools: [Read, Grep, Glob]
 triggers:
   paths: []

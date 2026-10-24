@@ -1,8 +1,6 @@
 ---
 name: security
 description: Finds security problems in the changed paths and in changes to the .pr-review/ directory.
-model: opus
-effort: low
 tools: [Read, Grep, Glob]
 triggers:
   paths: []

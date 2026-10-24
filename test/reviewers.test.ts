@@ -105,8 +105,6 @@ describe("built-in reviewers (A4, R1)", () => {
         expect(def.frontmatter).toEqual({
           name,
           description: expect.any(String),
-          model: "opus",
-          effort: "low",
           tools: ["Read", "Grep", "Glob"],
           triggers: { paths: [], categories: [], min_tier: minTier },
           passes,
@@ -238,6 +236,18 @@ describe("loadReviewer", () => {
     expect(loadError(writeReviewer([...GOOD_FRONTMATTER, "colour: red"])).message).toContain(
       "colour",
     );
+  });
+
+  it("loads a file with neither model nor effort, and the role default applies", () => {
+    const def = loadReviewer(writeReviewer(withField("model", null)));
+    const bare = loadReviewer(writeReviewer(withField("effort", null)));
+    expect(def.frontmatter.model).toBeUndefined();
+    expect(bare.frontmatter.effort).toBeUndefined();
+    const none = GOOD_FRONTMATTER.filter((l) => !/^(model|effort):/.test(l));
+    expect(effectiveModel(loadReviewer(writeReviewer(none)), DEFAULT_REPO_CONFIG)).toEqual({
+      model: "claude-opus-5-5",
+      effort: "low",
+    });
   });
 
   it("rejects an unknown model alias", () => {
