@@ -532,7 +532,7 @@ describe("effective reviewer values (R3, R6)", () => {
     ).toBe(92);
   });
 
-  it("model and effort: the reviewer key, then models.reviewer, then the frontmatter", () => {
+  it("model and effort: the reviewer key, then models.reviewer, then the role default", () => {
     const def = diffBugs();
     expect(effectiveModel(def, DEFAULT_REPO_CONFIG)).toEqual({
       model: "claude-opus-5-5",
@@ -549,6 +549,27 @@ describe("effective reviewer values (R3, R6)", () => {
       reviewers: { "diff-bugs": { enabled: true, effort: "xhigh" } },
     });
     expect(effectiveModel(def, effortOnly)).toEqual({ model: "claude-opus-5-5", effort: "xhigh" });
+  });
+
+  it("model and effort: the frontmatter value applies when no config sets one, apart for each field", () => {
+    const base = diffBugs();
+    const only = withFrontmatter(base, { effort: "high" });
+    expect(effectiveModel(only, DEFAULT_REPO_CONFIG)).toEqual({
+      model: "claude-opus-5-5",
+      effort: "high",
+    });
+    const model = withFrontmatter(base, { model: "haiku" });
+    expect(effectiveModel(model, DEFAULT_REPO_CONFIG)).toEqual({
+      model: "claude-haiku-5-5",
+      effort: "low",
+    });
+    const role = withConfig({ models: { reviewer: { effort: "medium" } } });
+    expect(effectiveModel(only, role).effort).toBe("medium");
+    const own = withConfig({
+      models: { reviewer: { effort: "medium" } },
+      reviewers: { "diff-bugs": { enabled: true, effort: "max" } },
+    });
+    expect(effectiveModel(only, own).effort).toBe("max");
   });
 
   it("reads only own keys of reviewers, so a prototype name gives the frontmatter values", () => {

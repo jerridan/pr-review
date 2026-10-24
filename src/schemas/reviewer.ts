@@ -7,8 +7,10 @@ import { ciEnum, integer } from "./json-schema.js";
 export type ReviewerFrontmatter = {
   name: string;
   description: string;
-  model: string;
-  effort: Effort;
+  /** Optional. The default model of this reviewer, below the config and above the role default. */
+  model?: string;
+  /** Optional. The default effort of this reviewer, below the config and above the role default. */
+  effort?: Effort;
   tools: string[];
   triggers: { paths: string[]; categories: string[]; min_tier: "fast" | "full" };
   passes: number;
@@ -23,8 +25,8 @@ export type ReviewerFrontmatter = {
 export const ReviewerFrontmatterSchema: z.ZodType<ReviewerFrontmatter> = z.strictObject({
   name: z.string(),
   description: z.string(),
-  model: z.string(),
-  effort: ciEnum(EFFORTS as readonly [Effort, ...Effort[]]),
+  model: z.string().optional(),
+  effort: ciEnum(EFFORTS as readonly [Effort, ...Effort[]]).optional(),
   tools: z.array(z.string()),
   triggers: z.strictObject({
     paths: z.array(z.string()),

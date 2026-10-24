@@ -412,8 +412,8 @@ A config file that does not parse or validate stops the run. An unknown key is a
 | `reviewers.<name>.enabled` | boolean | `true` | Whether the reviewer may run. |
 | `reviewers.<name>.passes` | integer, 1 or more | the frontmatter value | The number of passes of the reviewer. |
 | `reviewers.<name>.threshold` | integer 0 to 100 | the frontmatter value, raised to `thresholds.default` when it is lower | The threshold of the reviewer. A value below `thresholds.default` is an error. |
-| `reviewers.<name>.model` | alias or exact model id | the frontmatter value | The model of the reviewer. |
-| `reviewers.<name>.effort` | `low`, `medium`, `high`, `xhigh` or `max` | the frontmatter value | The effort of the reviewer. |
+| `reviewers.<name>.model` | alias or exact model id | `models.reviewer.model`, else the frontmatter value, else the role default | The model of one reviewer. This key pins that reviewer. |
+| `reviewers.<name>.effort` | `low`, `medium`, `high`, `xhigh` or `max` | `models.reviewer.effort`, else the frontmatter value, else the role default | The effort of one reviewer. This key pins that reviewer. |
 | `suppressions` | list of objects | empty | Rules that remove a verified finding. See below. |
 | `sensitive_globs` | list of globs | empty | Globs that the run adds to the default sensitive globs. |
 | `generated_globs` | list of globs | empty | Globs that the run adds to the default generated globs. |
@@ -434,7 +434,7 @@ Notes on the keys:
 - **Band and threshold.** The upper bound of `thresholds.middle_band` must be at least `thresholds.default`. A `reviewers.<name>.threshold` must not be above that upper bound. A score above the band and below the threshold could never escalate and never pass, so the config is an error.
 - **Reviewer names.** `<name>` is a built-in reviewer or a custom reviewer. Any other name is an error.
 - **Models.** A model is an alias (`opus`, `sonnet` or `haiku`) or an exact model id.
-- **Effective model and effort.** The order is `reviewers.<name>.model`, then `models.reviewer.model`, then the frontmatter value. The effort follows the same order.
+- **Effective model and effort.** The order is `reviewers.<name>.model`, then `models.reviewer.model`, then the frontmatter `model` when it is set, then the role default. The role default is Opus at `low` effort. The effort follows the same order. The model and the effort resolve apart. The frontmatter fields `model` and `effort` are optional. No built-in reviewer sets them, so each built-in reviewer takes the role default. A custom reviewer can set either field as the default for that one reviewer.
 - **Roles.** The roles of `models.<role>` are `triage`, `reviewer`, `verifier`, `verifier-escalation` and `merge`. The defaults are `sonnet` with `medium` for triage, `opus` with `low` for reviewer, `sonnet` with `high` for verifier, `opus` with `high` for verifier-escalation, and `sonnet` with `medium` for merge. A `models.<role>` object can give `model` alone, `effort` alone, or both.
 - **`pre_existing`.** With `comment`, the run posts the verified pre-existing findings as one issue comment. See [What the run posts](#what-the-run-posts).
 - **Token ceiling.** When the tokens of the finished queries reach the ceiling, no new reviewer pass starts. Coverage lists each pass that did not start with the reason `token ceiling`, and the verdict is `incomplete`. Verification of findings that the run already has still runs.

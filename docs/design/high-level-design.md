@@ -240,8 +240,8 @@ A custom reviewer can also override `threshold` to be stricter, never looser tha
 | `reviewers.<name>.enabled` | `true` | Whether the reviewer may run. |
 | `reviewers.<name>.passes` | the frontmatter value | The number of passes of the reviewer. |
 | `reviewers.<name>.threshold` | the frontmatter value, raised to `thresholds.default` | The threshold of the reviewer. A value below `thresholds.default` is an error. |
-| `reviewers.<name>.model` | the frontmatter value | The model of the reviewer. |
-| `reviewers.<name>.effort` | the frontmatter value | The effort of the reviewer. |
+| `reviewers.<name>.model` | `models.reviewer.model`, else the frontmatter value, else the role default | The model of one reviewer. This key pins that reviewer. |
+| `reviewers.<name>.effort` | `models.reviewer.effort`, else the frontmatter value, else the role default | The effort of one reviewer. This key pins that reviewer. |
 | `models.<role>` | the table in section 5 | The model and effort of one role: triage, reviewer, verifier, verifier-escalation or merge. |
 | `suppressions` | empty | Rules that remove a verified finding. See below. |
 | `sensitive_globs` | empty | Globs added to the default sensitive globs. |
@@ -254,7 +254,7 @@ A custom reviewer can also override `threshold` to be stricter, never looser tha
 
 `<name>` is a built-in or a custom reviewer. Any other name is an error.
 
-- **Model and effort.** The order is `reviewers.<name>`, then `models.<role>`, then the frontmatter value. For a reviewer, the role is `models.reviewer`. Model and effort resolve apart. A `models.<role>` object can give either one or both. The result is fixed for the run.
+- **Model and effort.** The order is `reviewers.<name>`, then `models.<role>`, then the frontmatter value when it is set, then the role default of section 5. For a reviewer, the role is `models.reviewer`. The frontmatter fields `model` and `effort` are optional. No built-in reviewer sets them, so each built-in reviewer takes the role default. A custom reviewer can set either field as the default for that one reviewer. Model and effort resolve apart. A `models.<role>` object can give either one or both. The result is fixed for the run.
 - **Suppressions.** Each item has `reviewer`, `category`, `path` and `reason`. It needs `reason` and at least one other key. A finding matches an item when it matches every key the item gives. The run applies suppressions to verified findings before the merge groups form. It checks each finding with the name of its own reviewer.
 - **Config hash.** The record field `config_hash` is the SHA-256 of the loaded `.pr-review/` files. Each entry is the path, one newline, and the file bytes. The run sorts the entries by the UTF-8 bytes of the path and joins them with one NUL byte. CLAUDE.md is not an entry. The hash is `null` when the base commit has no `.pr-review/` file.
 - **Bash for a custom reviewer.** The run grants Bash only when the reviewer sets `trusted: true` and the run knows that the PR author has write access. The CLI option `--author-write-access` carries that fact. A built-in reviewer never gets Bash, whatever `trusted` says. When a custom reviewer asks for Bash and does not get it, it runs with read-only tools, and the coverage line names it with the reason.
