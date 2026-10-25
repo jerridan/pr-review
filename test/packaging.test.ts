@@ -435,7 +435,7 @@ describe("action.yml (R9)", () => {
     expect(setup.with).not.toHaveProperty("cache-dependency-path");
   });
 
-  it("copies the action path to the runner temp directory, and installs, builds and runs there", () => {
+  it("copies the action path to the runner temp directory, and installs, builds and runs from there", () => {
     const steps = loadAction().runs.steps;
     const copy = findStep(
       steps,
@@ -445,11 +445,14 @@ describe("action.yml (R9)", () => {
     const ci = findStep(steps, (s) => /^\s*npm ci\s*$/.test(s.run ?? ""), "npm ci");
     const build = findStep(steps, (s) => /^\s*npm run build\s*$/.test(s.run ?? ""), "npm build");
     const cli = findStep(steps, (s) => (s.run ?? "").includes("dist/cli.js"), "cli");
-    for (const step of [ci, build, cli]) {
+    for (const step of [ci, build]) {
       expect(step["working-directory"]).toMatch(/^\$\{\{\s*runner\.temp\s*\}\}\/pr-review-action$/);
       expect(step.shell).toBe("bash");
     }
     expect(copy.shell).toBe("bash");
+    // The review step keeps the default working directory, so a relative out
+    // starts at the workspace. It runs the CLI by its absolute path.
+    expect(cli["working-directory"]).toBeUndefined();
     expect(cli.run).toContain('node "$RUNNER_TEMP/pr-review-action/dist/cli.js"');
     expect(steps.indexOf(copy)).toBeLessThan(steps.indexOf(ci));
     expect(steps.indexOf(ci)).toBeLessThan(steps.indexOf(build));
@@ -547,7 +550,6 @@ describe("action.yml (R9)", () => {
     outputs: string;
     stdout: string;
     watchdog: string | undefined;
-    workspace: string;
   } {
     const action = loadAction();
     const cli = findStep(action.runs.steps, (s) => (s.run ?? "").includes("dist/cli.js"), "cli");
@@ -585,7 +587,7 @@ describe("action.yml (R9)", () => {
       RUNNER_TEMP: base,
     };
     for (const [key, value] of Object.entries(cli.env ?? {})) env[key] = render(value, ctx);
-    const result = runScript(render(cli.run, ctx), env, render(cli["working-directory"], ctx));
+    const result = runScript(render(cli.run, ctx), env, workspace);
     const argsLine = result.stderr.split("\n").find((line) => line.startsWith("ARGS"));
     const args = argsLine ? (JSON.parse(argsLine.slice(4)) as string[]) : [];
     const watchdog = result.stderr
@@ -598,17 +600,15 @@ describe("action.yml (R9)", () => {
       outputs: readFileSync(outputFile, "utf8"),
       stdout: result.stdout,
       watchdog,
-      workspace,
     };
   }
 
   it("passes only the base options when no optional input is set", () => {
-    const { status, args, workspace } = runCliStep({ pr: "7" }, 0);
+    const { status, args } = runCliStep({ pr: "7" }, 0);
     expect(status).toBe(0);
     expect(args.slice(0, 5)).toEqual(["run", "--format", "github", "--pr", "7"]);
     expect(args).toContain("--repo");
-    // The step runs outside the workspace, so a relative out starts at the workspace.
-    expect(args[args.indexOf("--out") + 1]).toBe(join(workspace, "pr-review-records"));
+    expect(args[args.indexOf("--out") + 1]).toBe("pr-review-records");
     expect(args).not.toContain("--tier");
     expect(args).not.toContain("--fresh");
     expect(args).not.toContain("--allow-api-key");

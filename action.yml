@@ -55,8 +55,9 @@ runs:
     # The workspace is data. In the reusable workflow, the action path is in
     # the workspace, and npm looks up from its directory for a package.json
     # that names it as a workspace. So the action copies its source to the
-    # runner temp directory, and it installs, builds and runs there. No npm or
-    # node command runs under the workspace.
+    # runner temp directory, and it installs, builds and runs there. No npm
+    # command runs under the workspace. The review step runs node by the
+    # absolute path of the CLI, so node loads no module from the workspace.
     - name: Copy pr-review out of the workspace
       shell: bash
       run: |
@@ -76,12 +77,9 @@ runs:
     # The inputs go to the script through env, never as text in the script.
     # The step keeps the exit code of the CLI. It writes the outputs before
     # it exits, so the outputs are also set when the review cannot post.
-    # The step runs in the runner temp directory, so it adds the workspace
-    # to a relative "out" path.
     - name: Review the pull request
       id: review
       shell: bash
-      working-directory: ${{ runner.temp }}/pr-review-action
       env:
         CLAUDE_CODE_RETRY_WATCHDOG: "1"
         INPUT_PR: ${{ inputs.pr }}
@@ -90,9 +88,7 @@ runs:
         INPUT_OUT: ${{ inputs.out }}
         INPUT_ALLOW_API_KEY: ${{ inputs.allow-api-key }}
       run: |
-        out="$INPUT_OUT"
-        case "$out" in /*) ;; *) out="$GITHUB_WORKSPACE/$out" ;; esac
-        args=(run --format github --pr "$INPUT_PR" --repo "$GITHUB_WORKSPACE" --out "$out")
+        args=(run --format github --pr "$INPUT_PR" --repo "$GITHUB_WORKSPACE" --out "$INPUT_OUT")
         if [ -n "$INPUT_TIER" ]; then args+=(--tier "$INPUT_TIER"); fi
         if [ "$INPUT_FRESH" = "true" ]; then args+=(--fresh); fi
         if [ "$INPUT_ALLOW_API_KEY" = "true" ]; then args+=(--allow-api-key); fi
