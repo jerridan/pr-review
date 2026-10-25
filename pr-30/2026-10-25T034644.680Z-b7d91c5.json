@@ -1,0 +1,220 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 30,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Release by semver tag from package.json and run the action from its own commit",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/30"
+    },
+    "run_kind": "later",
+    "prior": {
+      "head": "b7d91c5a0fb4306c3dbe382238118b28e85e4004",
+      "source": "record",
+      "record": "/home/runner/work/_temp/pr-review-records/pr-30/2026-10-25T034123.963Z-b7d91c5.json",
+      "open": [],
+      "dismissed": [],
+      "fetch_failed": false
+    },
+    "base": "29c27a7b68623deef48b20c68bc05106594372f3",
+    "head": "b7d91c5a0fb4306c3dbe382238118b28e85e4004",
+    "started_at": "2026-10-25T03:46:44.680Z",
+    "tool_version": "0.1.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Release by semver tag from package.json and run the action from its own commit\n\nA release is now the tag `v<version>` and a GitHub Release, created by a workflow from `version` in `package.json`. The hand-run procedure in the README, with its SHA pin bump and the moving `v1` tag, is gone.\n\n## Changes\n\n- `scripts/release-tag.sh` reads `version` from `package.json`, requires `MAJOR.MINOR.PATCH`, refuses a ref other than `refs/heads/main` unless in dry run, and checks whether `v<version>` exists on origin. When it is absent, it runs one `gh release create` with `--target HEAD`, so GitHub creates the tag and the release together. No `git tag`, no `git push`, no tagger identity, and a tag never moves. When the tag exists, it prints one line and exits 0.\n- `.github/workflows/release.yml` runs that script on every push to `main` and on a manual dispatch with a `dry_run` input. Permissions are `contents: write` only, the checkout keeps no credentials, and a concurrency group serialises runs.\n- `scripts/check-version-bump.sh` fails a pull request that changes `src/`, `prompts/`, `action.yml` or `review.yml` without raising the version, by semver order, in `package.json`, `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` together. The `checks` job of `ci.yml` runs it on pull requests.\n- `.github/workflows/review.yml` runs the action from a fresh checkout of this repo at `job.workflow_sha`, the commit of the workflow file itself, so the action and the workflow always come from one commit and no pin inside the repo needs a bump. The workspace rule relaxes from \"never build in the workspace\" to \"never build the pull request's own files\", with two guards: a step deletes anything the pull request placed at `.pr-review-action` and the workspace `node_modules`, and the checkout sets `persist-credentials: false`. The reviewers read a worktree built from git objects, so they never see the directory.\n- `.github/actionlint.yaml` ignores one message for `review.yml`: actionlint 1.7.12 does not yet know `job.workflow_sha`, which the GitHub contexts reference documents.\n- `pr-review.yml` of this repo calls `review.yml@main`. `action.yml` gets Marketplace branding. The README, the design doc and CLAUDE.md describe the new flow, and a consumer references `@v<version>`.\n- The three version fields move from 0.1.0 to 0.2.0, so the merge of this pull request creates `v0.2.0`.\n\n## After the merge\n\n- `release.yml` tags `v0.2.0` at the merge commit and creates the release. Watch the first run.\n- Delete the old tag by hand, once: `git push origin --delete v1`. Nothing references it after this change.\n- To list the action on the Marketplace, open the release and publish it. That click is manual.\n\n## Tests\n\nThe red commit 83e6d61 adds `test/release-scripts.test.ts` alone, and all fourteen tests fail there because the script does not exist. The tests run both scripts in a temporary git repository with a bare remote and a stateful `gh` stub that creates the tag on `release create`, the way GitHub does. They cover the release, the idempotent second run, both dry-run selectors, the ref and token refusals, malformed versions, a remote read failure, and every row of the version-check table including a lowered version. The packaging tests assert the release workflow's shape, the local action with its two guard steps, the branding, and that the plugin version equals the package version.\n\n`npm test` (1105 pass), `npm run lint`, `npm run typecheck`, `npm run build` and `actionlint .github/workflows/*.yml` all pass. `scripts/check-version-bump.sh` exits 0 on this branch.\n\n## Charter\n\nGoal: replace the hand-run release procedure with a release driven by `version` in `package.json`, and make the reusable workflow run the action from its own commit so the SHA pin inside the repo goes away. The principal decided: semver tags with no moving `v1`; the version bump lives in the feature pull request; this repo calls `review.yml@main`; one version across `package.json` and both plugin manifests, enforced in CI; Marketplace publishing stays manual; the workspace rule relaxes to \"never build the pull request's own files\" with the guards above.\n\n## Decisions\n\n- Path: the change path. Not the light path: six items across workflows, scripts, tests and docs, with two preference questions open.\n- Preference answers: `@main` for this repo's own workflow; one version across the three files. Neither recorded as a CLAUDE.md rule; the README states both.\n- Spec critic round 1 (3 critical, 9 concern, 3 nit): the \"logic in a script\" and \"values through env\" constraints were missing; `uses: ./` conflicted with the workspace security rule and its tests; the release script's credentials and tagger identity were unspecified. All fixed. The security conflict went to the principal, who chose to relax the rule with the guards.\n- Spec critic round 2 (0 critical, 4 concern, 6 nit): Node module resolution could walk up to the workspace `node_modules`, so the guard step deletes it; the version check takes two positional SHAs and reads the base version at the base SHA; two greps added to the docs acceptance. All folded in.\n- Shape: simple path, one package, band deep, because the package changes a security boundary and the criterion took interpretation.\n- actionlint 1.7.12 rejects `job.workflow_sha`; one scoped ignore in `.github/actionlint.yaml` with a comment that names the cause.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_013NJ8nrdv1XAmDexRXHC4SC\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [],
+    "changed_files": [
+      {
+        "path": ".claude-plugin/marketplace.json",
+        "hunks": 1
+      },
+      {
+        "path": ".claude-plugin/plugin.json",
+        "hunks": 1
+      },
+      {
+        "path": ".github/actionlint.yaml",
+        "hunks": 1
+      },
+      {
+        "path": ".github/workflows/ci.yml",
+        "hunks": 3
+      },
+      {
+        "path": ".github/workflows/pr-review.yml",
+        "hunks": 1
+      },
+      {
+        "path": ".github/workflows/release.yml",
+        "hunks": 1
+      },
+      {
+        "path": ".github/workflows/review.yml",
+        "hunks": 2
+      },
+      {
+        "path": "CLAUDE.md",
+        "hunks": 1
+      },
+      {
+        "path": "README.md",
+        "hunks": 3
+      },
+      {
+        "path": "action.yml",
+        "hunks": 3
+      },
+      {
+        "path": "docs/design/high-level-design.md",
+        "hunks": 2
+      },
+      {
+        "path": "package.json",
+        "hunks": 1
+      },
+      {
+        "path": "scripts/check-version-bump.sh",
+        "hunks": 1
+      },
+      {
+        "path": "scripts/release-tag.sh",
+        "hunks": 1
+      },
+      {
+        "path": "test/packaging.test.ts",
+        "hunks": 9
+      },
+      {
+        "path": "test/release-scripts.test.ts",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [
+      {
+        "path": "package-lock.json",
+        "reason": "generated"
+      }
+    ],
+    "sensitive_files": [
+      ".github/workflows/ci.yml",
+      ".github/workflows/pr-review.yml",
+      ".github/workflows/release.yml",
+      ".github/workflows/review.yml"
+    ],
+    "triage": null,
+    "tier": "skip",
+    "tier_reason": "No new hunks since b7d91c5.",
+    "selected_reviewers": [],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [],
+    "verifications": [],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "skipped",
+    "coverage": {
+      "reviewers_ran": [],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0
+    },
+    "findings": [],
+    "github": null,
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [],
+    "total_cost_usd": 0,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 46,
+      "gather": 197,
+      "scope": 7,
+      "find_verify": 3,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
