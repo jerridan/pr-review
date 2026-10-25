@@ -58,11 +58,13 @@ runs:
     # runner temp directory, and it installs, builds and runs there. No npm
     # command runs under the workspace. The review step runs node by the
     # absolute path of the CLI, so node loads no module from the workspace.
+    # The copy needs no git history, so the step deletes the .git copy.
     - name: Copy pr-review out of the workspace
       shell: bash
       run: |
         rm -rf -- "$RUNNER_TEMP/pr-review-action"
         cp -R "$GITHUB_ACTION_PATH" "$RUNNER_TEMP/pr-review-action"
+        rm -rf -- "$RUNNER_TEMP/pr-review-action/.git"
 
     - name: Install the dependencies of pr-review
       shell: bash
