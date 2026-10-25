@@ -1,11 +1,13 @@
-// Tests for the release scripts: scripts/release-tag.sh tags a release from
-// the version in package.json.
+// Tests for the release scripts and the release workflow:
+// scripts/release-tag.sh tags a release from the version in package.json,
+// and .github/workflows/release.yml runs it.
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
+import { parse } from "yaml";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -253,4 +255,69 @@ describe("scripts/release-tag.sh", () => {
     expect(run.status).toBe(1);
     expect(ghCalls(sandbox)).toEqual([]);
   }, 30_000);
+});
+
+// ---------------------------------------------------------------------------
+
+interface ReleaseStep {
+  uses?: string;
+  run?: string;
+  with?: Record<string, unknown>;
+  env?: Record<string, unknown>;
+}
+
+interface ReleaseWorkflow {
+  on: Record<string, unknown>;
+  permissions?: Record<string, string>;
+  concurrency?: { group: string; "cancel-in-progress": boolean };
+  jobs: Record<string, { permissions?: unknown; steps: ReleaseStep[] }>;
+}
+
+describe(".github/workflows/release.yml", () => {
+  const load = (): ReleaseWorkflow =>
+    parse(readFileSync(join(ROOT, ".github/workflows/release.yml"), "utf8")) as ReleaseWorkflow;
+  const steps = (): ReleaseStep[] => Object.values(load().jobs).flatMap((job) => job.steps);
+
+  it("runs on a push to main and on a dispatch with the boolean input dry_run", () => {
+    const on = load().on;
+    expect(Object.keys(on).sort()).toEqual(["push", "workflow_dispatch"]);
+    expect(on.push).toEqual({ branches: ["main"] });
+    const dispatch = on.workflow_dispatch as { inputs: Record<string, { type?: string }> };
+    expect(Object.keys(dispatch.inputs)).toEqual(["dry_run"]);
+    expect(dispatch.inputs.dry_run?.type).toBe("boolean");
+  });
+
+  it("has only contents: write, at the workflow level", () => {
+    const wf = load();
+    expect(wf.permissions).toEqual({ contents: "write" });
+    for (const job of Object.values(wf.jobs)) expect(job.permissions).toBeUndefined();
+  });
+
+  it("has the concurrency group release with no cancel-in-progress", () => {
+    expect(load().concurrency).toEqual({ group: "release", "cancel-in-progress": false });
+  });
+
+  it("checks out the full history with no persisted credentials", () => {
+    const checkout = steps().find((s) => (s.uses ?? "").startsWith("actions/checkout@"));
+    expect(checkout?.with?.["fetch-depth"]).toBe(0);
+    expect(checkout?.with?.["persist-credentials"]).toBe(false);
+  });
+
+  it("runs only scripts/release-tag.sh, with GH_TOKEN and RELEASE_DRY_RUN in env", () => {
+    const runs = steps().filter((s) => s.run !== undefined);
+    expect(runs).toHaveLength(1);
+    const step = runs[0] as ReleaseStep;
+    expect(step.run).toContain("scripts/release-tag.sh");
+    expect(step.run).not.toContain("${{");
+    expect(step.env).toEqual({
+      GH_TOKEN: "${{ github.token }}",
+      RELEASE_DRY_RUN: "${{ inputs.dry_run }}",
+    });
+  });
+
+  it("pins every uses value to a full commit SHA", () => {
+    const uses = steps().flatMap((s) => (s.uses ? [s.uses] : []));
+    expect(uses.length).toBeGreaterThan(0);
+    for (const value of uses) expect(value).toMatch(/^[\w-]+\/[\w-]+@[0-9a-f]{40}$/);
+  });
 });
