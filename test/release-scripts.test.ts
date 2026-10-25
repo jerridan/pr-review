@@ -301,13 +301,15 @@ function writeFiles(dir: string, paths: string[]): void {
 
 /**
  * Make a repo with a base commit at "base" versions, and a feature branch
- * that changes "paths" and, when "head" is set, the versions. When
- * "mainPaths" is set, main gets one more commit after the branch point.
+ * that changes "paths" and, when "head" is set, the versions. Each pair in
+ * "moves" moves a file with git mv on the branch. When "mainPaths" is set,
+ * main gets one more commit after the branch point.
  */
 function bumpSandbox(options: {
   base: string;
   paths: string[];
   head?: Versions;
+  moves?: [string, string][];
   mainPaths?: string[];
 }): { work: string; baseSha: string; headSha: string } {
   const work = tempDir("pr-review-bump-");
@@ -324,6 +326,10 @@ function bumpSandbox(options: {
   git(work, "commit", "-q", "-m", "base");
   git(work, "checkout", "-q", "-b", "feature");
   writeFiles(work, options.paths);
+  for (const [from, to] of options.moves ?? []) {
+    mkdirSync(dirname(join(work, to)), { recursive: true });
+    git(work, "mv", from, to);
+  }
   if (options.head) writeVersions(work, options.head);
   git(work, "add", ".");
   git(work, "commit", "-q", "-m", "head");
@@ -379,6 +385,11 @@ describe("scripts/check-version-bump.sh", () => {
       1,
     ],
     ["only README.md changed, no bump", { base: "0.1.0", paths: ["README.md"] }, 0],
+    [
+      "a file moved from src/ to lib/, no bump",
+      { base: "0.1.0", paths: [], moves: [["src/a.ts", "lib/a.ts"]] },
+      1,
+    ],
     ["prompts/ changed, no bump", { base: "0.1.0", paths: ["prompts/a.md"] }, 1],
     ["action.yml changed, no bump", { base: "0.1.0", paths: ["action.yml"] }, 1],
     [
