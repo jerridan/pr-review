@@ -12,8 +12,9 @@
 # - package.json, .claude-plugin/plugin.json and the plugin entry of
 #   .claude-plugin/marketplace.json hold the same version at the head.
 #
+# A file that moves shows at its old path and at its new path.
 # The base version comes from package.json at the base sha. The head
-# versions come from the working tree, which is the head.
+# versions come from the three files at the head sha.
 # The script exits 0 when the check passes. It exits 1 with a one-line
 # reason in every other case.
 set -euo pipefail
@@ -33,7 +34,7 @@ root="$(git rev-parse --show-toplevel 2> /dev/null)" || fail "the current direct
 
 merge_base="$(git -C "$root" merge-base "$base_sha" "$head_sha" 2> /dev/null)" \
   || fail "cannot find the merge base of $base_sha and $head_sha."
-changed="$(git -C "$root" diff --name-only "$merge_base" "$head_sha")" \
+changed="$(git -C "$root" diff --name-only --no-renames "$merge_base" "$head_sha")" \
   || fail "cannot read the diff from $merge_base to $head_sha."
 
 if ! grep -E '^(src/|prompts/|action\.yml$|\.github/workflows/review\.yml$)' > /dev/null <<< "$changed"; then
@@ -63,11 +64,12 @@ is_semver() {
 
 base_version="$(git -C "$root" show "$base_sha:package.json" 2> /dev/null | read_version pkg)" \
   || fail "cannot read package.json at $base_sha."
-head_version="$(read_version pkg < "$root/package.json")" || fail "cannot read package.json."
-plugin_version="$(read_version pkg < "$root/.claude-plugin/plugin.json")" \
-  || fail "cannot read .claude-plugin/plugin.json."
-market_version="$(read_version market < "$root/.claude-plugin/marketplace.json")" \
-  || fail "cannot read .claude-plugin/marketplace.json."
+head_version="$(git -C "$root" show "$head_sha:package.json" 2> /dev/null | read_version pkg)" \
+  || fail "cannot read package.json at $head_sha."
+plugin_version="$(git -C "$root" show "$head_sha:.claude-plugin/plugin.json" 2> /dev/null | read_version pkg)" \
+  || fail "cannot read .claude-plugin/plugin.json at $head_sha."
+market_version="$(git -C "$root" show "$head_sha:.claude-plugin/marketplace.json" 2> /dev/null | read_version market)" \
+  || fail "cannot read .claude-plugin/marketplace.json at $head_sha."
 
 is_semver "$base_version" || fail "the base version \"$base_version\" is not MAJOR.MINOR.PATCH."
 is_semver "$head_version" || fail "the head version \"$head_version\" is not MAJOR.MINOR.PATCH."
