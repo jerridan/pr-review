@@ -392,6 +392,7 @@ describe("scripts/check-version-bump.sh", () => {
     ],
     ["prompts/ changed, no bump", { base: "0.1.0", paths: ["prompts/a.md"] }, 1],
     ["action.yml changed, no bump", { base: "0.1.0", paths: ["action.yml"] }, 1],
+    ["only package-lock.json changed, no bump", { base: "0.1.0", paths: ["package-lock.json"] }, 1],
     [
       ".github/workflows/review.yml changed, no bump",
       { base: "0.1.0", paths: [".github/workflows/review.yml"] },
