@@ -4,8 +4,9 @@
 # Usage: scripts/check-version-bump.sh <base-sha> <head-sha>
 #
 # The script finds the merge base of the two commits. When the diff from the
-# merge base to the head touches src/, prompts/, action.yml or
-# .github/workflows/review.yml, the script requires all of these:
+# merge base to the head touches src/, prompts/, commands/, .claude-plugin/,
+# action.yml, package.json, package-lock.json or .github/workflows/review.yml,
+# the script requires all of these:
 # - The version in package.json is MAJOR.MINOR.PATCH at the base and at the
 #   head.
 # - The head version is greater than the base version.
@@ -37,7 +38,7 @@ merge_base="$(git -C "$root" merge-base "$base_sha" "$head_sha" 2> /dev/null)" \
 changed="$(git -C "$root" diff --name-only --no-renames "$merge_base" "$head_sha")" \
   || fail "cannot read the diff from $merge_base to $head_sha."
 
-if ! grep -E '^(src/|prompts/|action\.yml$|\.github/workflows/review\.yml$)' > /dev/null <<< "$changed"; then
+if ! grep -E '^(src/|prompts/|commands/|\.claude-plugin/|action\.yml$|package\.json$|package-lock\.json$|\.github/workflows/review\.yml$)' > /dev/null <<< "$changed"; then
   echo "The change touches no shipped file. A version bump is not necessary."
   exit 0
 fi
