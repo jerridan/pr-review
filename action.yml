@@ -9,6 +9,11 @@ name: pr-review
 description: Review a pull request with Claude agents and post the review to GitHub.
 author: Jerridan Quiring
 
+# The GitHub Marketplace shows this icon and color.
+branding:
+  icon: search
+  color: blue
+
 inputs:
   pr:
     description: The number of the pull request to review.

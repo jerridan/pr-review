@@ -406,6 +406,11 @@ function remoteFiles(remote: string): string[] {
 // ---------------------------------------------------------------------------
 
 describe("action.yml (R9)", () => {
+  it("has the Marketplace branding icon search and color blue", () => {
+    const action = parse(readText("action.yml")) as { branding?: Record<string, string> };
+    expect(action.branding).toEqual({ icon: "search", color: "blue" });
+  });
+
   it("reads no secret", () => {
     const text = readText("action.yml");
     expect(text).not.toMatch(/secrets\./);
