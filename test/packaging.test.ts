@@ -435,15 +435,27 @@ describe("action.yml (R9)", () => {
     expect(setup.with).not.toHaveProperty("cache-dependency-path");
   });
 
-  it("runs npm ci and npm run build in the action path", () => {
+  it("copies the action path to the runner temp directory, and installs, builds and runs there", () => {
     const steps = loadAction().runs.steps;
+    const copy = findStep(
+      steps,
+      (s) => (s.run ?? "").includes('cp -R "$GITHUB_ACTION_PATH" "$RUNNER_TEMP/pr-review-action"'),
+      "copy",
+    );
     const ci = findStep(steps, (s) => /^\s*npm ci\s*$/.test(s.run ?? ""), "npm ci");
     const build = findStep(steps, (s) => /^\s*npm run build\s*$/.test(s.run ?? ""), "npm build");
-    for (const step of [ci, build]) {
-      expect(step["working-directory"]).toMatch(/^\$\{\{\s*github\.action_path\s*\}\}$/);
+    const cli = findStep(steps, (s) => (s.run ?? "").includes("dist/cli.js"), "cli");
+    for (const step of [ci, build, cli]) {
+      expect(step["working-directory"]).toMatch(
+        /^\$\{\{\s*runner\.temp\s*\}\}\/pr-review-action$/,
+      );
       expect(step.shell).toBe("bash");
     }
+    expect(copy.shell).toBe("bash");
+    expect(cli.run).toContain('node "$RUNNER_TEMP/pr-review-action/dist/cli.js"');
+    expect(steps.indexOf(copy)).toBeLessThan(steps.indexOf(ci));
     expect(steps.indexOf(ci)).toBeLessThan(steps.indexOf(build));
+    expect(steps.indexOf(build)).toBeLessThan(steps.indexOf(cli));
   });
 
   // npm looks up from its directory for a package.json that names it as a
@@ -537,11 +549,13 @@ describe("action.yml (R9)", () => {
     outputs: string;
     stdout: string;
     watchdog: string | undefined;
+    workspace: string;
   } {
     const action = loadAction();
     const cli = findStep(action.runs.steps, (s) => (s.run ?? "").includes("dist/cli.js"), "cli");
     const base = tempDir("pr-review-action-");
-    const actionPath = join(base, "action");
+    // The copy step puts the action at <runner temp>/pr-review-action.
+    const actionPath = join(base, "pr-review-action");
     const workspace = join(base, "workspace");
     mkdirSync(join(actionPath, "dist"), { recursive: true });
     mkdirSync(workspace);
@@ -563,16 +577,17 @@ describe("action.yml (R9)", () => {
       inputs: Object.fromEntries(
         Object.entries(action.inputs).map(([k, v]) => [k, inputs[k] ?? String(v.default ?? "")]),
       ),
-      github: { workspace, action_path: actionPath },
+      github: { workspace, action_path: join(workspace, ".pr-review-action") },
+      runner: { temp: base },
     };
     const env: Record<string, string> = {
-      GITHUB_ACTION_PATH: actionPath,
+      GITHUB_ACTION_PATH: join(workspace, ".pr-review-action"),
       GITHUB_WORKSPACE: workspace,
       GITHUB_OUTPUT: outputFile,
       RUNNER_TEMP: base,
     };
     for (const [key, value] of Object.entries(cli.env ?? {})) env[key] = render(value, ctx);
-    const result = runScript(render(cli.run, ctx), env, workspace);
+    const result = runScript(render(cli.run, ctx), env, render(cli["working-directory"], ctx));
     const argsLine = result.stderr.split("\n").find((line) => line.startsWith("ARGS"));
     const args = argsLine ? (JSON.parse(argsLine.slice(4)) as string[]) : [];
     const watchdog = result.stderr
@@ -585,15 +600,17 @@ describe("action.yml (R9)", () => {
       outputs: readFileSync(outputFile, "utf8"),
       stdout: result.stdout,
       watchdog,
+      workspace,
     };
   }
 
   it("passes only the base options when no optional input is set", () => {
-    const { status, args } = runCliStep({ pr: "7" }, 0);
+    const { status, args, workspace } = runCliStep({ pr: "7" }, 0);
     expect(status).toBe(0);
     expect(args.slice(0, 5)).toEqual(["run", "--format", "github", "--pr", "7"]);
     expect(args).toContain("--repo");
-    expect(args[args.indexOf("--out") + 1]).toBe("pr-review-records");
+    // The step runs outside the workspace, so a relative out starts at the workspace.
+    expect(args[args.indexOf("--out") + 1]).toBe(join(workspace, "pr-review-records"));
     expect(args).not.toContain("--tier");
     expect(args).not.toContain("--fresh");
     expect(args).not.toContain("--allow-api-key");
