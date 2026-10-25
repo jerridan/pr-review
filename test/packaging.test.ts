@@ -1047,21 +1047,16 @@ describe(".github/workflows/review.yml (R10)", () => {
     const checkout = steps[at - 1] as Step;
     expect(checkout.uses).toMatch(/^actions\/checkout@[0-9a-f]{40}$/);
     expect(checkout.with).toEqual({
-      repository: "jerridan/pr-review",
+      repository: "${{ job.workflow_repository }}",
       ref: "${{ job.workflow_sha }}",
       path: ".pr-review-action",
       "persist-credentials": false,
     });
 
     // The step before that checkout deletes what the pull request put at the
-    // action path and at the node_modules of the workspace.
+    // action path.
     const rm = steps[at - 2] as Step;
-    expect((rm.run ?? "").trim()).toBe(
-      [
-        'rm -rf -- "$GITHUB_WORKSPACE/.pr-review-action"',
-        'rm -rf -- "$GITHUB_WORKSPACE/node_modules"',
-      ].join("\n"),
-    );
+    expect((rm.run ?? "").trim()).toBe('rm -rf -- "$GITHUB_WORKSPACE/.pr-review-action"');
     const head = findStep(steps, (s) => s.name === "Check out the pull request head", "head");
     expect(steps.indexOf(head)).toBeLessThan(at - 2);
 
