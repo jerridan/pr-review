@@ -302,7 +302,8 @@ function writeFiles(dir: string, paths: string[]): void {
 /**
  * Make a repo with a base commit at "base" versions, and a feature branch
  * that changes "paths" and, when "head" is set, the versions. Each pair in
- * "moves" moves a file with git mv on the branch. When "mainPaths" is set,
+ * "moves" moves a file with git mv on the branch. The branch deletes each
+ * file in "removes" after it writes the versions. When "mainPaths" is set,
  * main gets one more commit after the branch point.
  */
 function bumpSandbox(options: {
@@ -310,6 +311,7 @@ function bumpSandbox(options: {
   paths: string[];
   head?: Versions;
   moves?: [string, string][];
+  removes?: string[];
   mainPaths?: string[];
 }): { work: string; baseSha: string; headSha: string } {
   const work = tempDir("pr-review-bump-");
@@ -331,7 +333,8 @@ function bumpSandbox(options: {
     git(work, "mv", from, to);
   }
   if (options.head) writeVersions(work, options.head);
-  git(work, "add", ".");
+  for (const path of options.removes ?? []) rmSync(join(work, path));
+  git(work, "add", "-A");
   git(work, "commit", "-q", "-m", "head");
   const headSha = git(work, "rev-parse", "HEAD");
   if (options.mainPaths) {
@@ -422,6 +425,19 @@ describe("scripts/check-version-bump.sh", () => {
     },
     30_000,
   );
+
+  it("prints only a one-line reason when the head has no .claude-plugin/plugin.json", () => {
+    const run = checkBump(
+      bumpSandbox({
+        base: "0.1.0",
+        paths: ["src/a.ts"],
+        head: same("0.2.0"),
+        removes: [".claude-plugin/plugin.json"],
+      }),
+    );
+    expect(run.status, run.stderr).toBe(1);
+    expect(run.stderr.trim().split("\n")).toHaveLength(1);
+  }, 30_000);
 });
 
 // ---------------------------------------------------------------------------
