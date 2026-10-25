@@ -480,10 +480,9 @@ describe(".github/workflows/release.yml", () => {
     expect(load().concurrency).toEqual({ group: "release", "cancel-in-progress": false });
   });
 
-  it("checks out the full history with no persisted credentials", () => {
+  it("checks out with the default depth and no persisted credentials", () => {
     const checkout = steps().find((s) => (s.uses ?? "").startsWith("actions/checkout@"));
-    expect(checkout?.with?.["fetch-depth"]).toBe(0);
-    expect(checkout?.with?.["persist-credentials"]).toBe(false);
+    expect(checkout?.with).toEqual({ "persist-credentials": false });
   });
 
   it("runs only scripts/release-tag.sh, with GH_TOKEN and RELEASE_DRY_RUN in env", () => {
