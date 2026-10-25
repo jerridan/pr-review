@@ -63,14 +63,25 @@ is_semver() {
   [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
 }
 
-base_version="$(git -C "$root" show "$base_sha:package.json" 2> /dev/null | read_version pkg)" \
+# Read each file into a variable first. A file that is missing stops the
+# script with a one-line reason, before node reads the text.
+base_pkg="$(git -C "$root" show "$base_sha:package.json" 2> /dev/null)" \
   || fail "cannot read package.json at $base_sha."
-head_version="$(git -C "$root" show "$head_sha:package.json" 2> /dev/null | read_version pkg)" \
+head_pkg="$(git -C "$root" show "$head_sha:package.json" 2> /dev/null)" \
   || fail "cannot read package.json at $head_sha."
-plugin_version="$(git -C "$root" show "$head_sha:.claude-plugin/plugin.json" 2> /dev/null | read_version pkg)" \
+head_plugin="$(git -C "$root" show "$head_sha:.claude-plugin/plugin.json" 2> /dev/null)" \
   || fail "cannot read .claude-plugin/plugin.json at $head_sha."
-market_version="$(git -C "$root" show "$head_sha:.claude-plugin/marketplace.json" 2> /dev/null | read_version market)" \
+head_market="$(git -C "$root" show "$head_sha:.claude-plugin/marketplace.json" 2> /dev/null)" \
   || fail "cannot read .claude-plugin/marketplace.json at $head_sha."
+
+base_version="$(read_version pkg <<< "$base_pkg")" \
+  || fail "cannot read the version in package.json at $base_sha."
+head_version="$(read_version pkg <<< "$head_pkg")" \
+  || fail "cannot read the version in package.json at $head_sha."
+plugin_version="$(read_version pkg <<< "$head_plugin")" \
+  || fail "cannot read the version in .claude-plugin/plugin.json at $head_sha."
+market_version="$(read_version market <<< "$head_market")" \
+  || fail "cannot read the version in .claude-plugin/marketplace.json at $head_sha."
 
 is_semver "$base_version" || fail "the base version \"$base_version\" is not MAJOR.MINOR.PATCH."
 is_semver "$head_version" || fail "the head version \"$head_version\" is not MAJOR.MINOR.PATCH."
