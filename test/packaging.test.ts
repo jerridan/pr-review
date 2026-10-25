@@ -62,8 +62,11 @@ function loadJob(): Job {
 // reusable workflow. So every uses value is a full commit SHA.
 const SHA_PIN = /@[0-9a-f]{40}$/;
 
+// The review step runs the action from the trusted checkout of this repo.
+const ACTION_PATH = "./.pr-review-action";
+
 function isAction(step: Step): boolean {
-  return /^jerridan\/pr-review@[0-9a-f]{40}$/.test(step.uses ?? "");
+  return step.uses === ACTION_PATH;
 }
 
 function findStep(steps: Step[], test: (step: Step) => boolean, what: string): Step {
@@ -427,7 +430,7 @@ describe("action.yml (R9)", () => {
     expect(setup.with).not.toHaveProperty("cache-dependency-path");
   });
 
-  it("runs npm ci and npm run build in the action path, never in the workspace", () => {
+  it("runs npm ci and npm run build in the action path", () => {
     const steps = loadAction().runs.steps;
     const ci = findStep(steps, (s) => /^\s*npm ci\s*$/.test(s.run ?? ""), "npm ci");
     const build = findStep(steps, (s) => /^\s*npm run build\s*$/.test(s.run ?? ""), "npm build");
@@ -758,7 +761,7 @@ describe(".github/workflows/review.yml (R10)", () => {
     expect(git(sandbox.workspace, "rev-parse", "origin/main")).toBe(headSha);
   });
 
-  it("runs the action by jerridan/pr-review at a commit SHA with the two env keys", () => {
+  it("runs the local action .pr-review-action with the two env keys", () => {
     const steps = loadJob().steps;
     const review = findStep(steps, isAction, "action");
     const ctx = context("pull_request", prEvent("opened", false));
@@ -942,13 +945,41 @@ describe(".github/workflows/review.yml (R10)", () => {
     ]);
   }, 30_000);
 
-  it("runs no npm, make, sh or other script from the workspace", () => {
-    for (const step of loadJob().steps) {
-      if (step.uses !== undefined) {
-        expect(step.uses).not.toMatch(/^\.\//);
-        expect(step.uses).toMatch(SHA_PIN);
-      }
+  it("runs no script from the workspace except the trusted action checkout", () => {
+    const steps = loadJob().steps;
+    const local = steps.filter((s) => s.uses?.startsWith("./"));
+    expect(local.map((s) => s.uses)).toEqual([ACTION_PATH]);
+    const review = local[0] as Step;
+    const at = steps.indexOf(review);
+
+    // The step before the action is a fresh checkout of this repo at the
+    // commit of this workflow file, with no credentials.
+    const checkout = steps[at - 1] as Step;
+    expect(checkout.uses).toMatch(/^actions\/checkout@[0-9a-f]{40}$/);
+    expect(checkout.with).toEqual({
+      repository: "jerridan/pr-review",
+      ref: "${{ job.workflow_sha }}",
+      path: ".pr-review-action",
+      "persist-credentials": false,
+    });
+
+    // The step before that checkout deletes what the pull request put at the
+    // action path and at the node_modules of the workspace.
+    const rm = steps[at - 2] as Step;
+    expect((rm.run ?? "").trim()).toBe(
+      [
+        'rm -rf -- "$GITHUB_WORKSPACE/.pr-review-action"',
+        'rm -rf -- "$GITHUB_WORKSPACE/node_modules"',
+      ].join("\n"),
+    );
+    const head = findStep(steps, (s) => s.name === "Check out the pull request head", "head");
+    expect(steps.indexOf(head)).toBeLessThan(at - 2);
+
+    for (const step of steps) {
+      if (step.uses !== undefined && step !== review) expect(step.uses).toMatch(SHA_PIN);
       expect(step.shell ?? "bash").toBe("bash");
+      // The exact text above replaces the line checks for the rm step.
+      if (step === rm) continue;
       const run = step.run ?? "";
       for (const line of run.split("\n")) {
         const code = line.replace(/#.*$/, "");

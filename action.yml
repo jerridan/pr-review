@@ -47,8 +47,9 @@ runs:
       with:
         node-version: 20
 
-    # Install and build in the action path. Never install or build in the
-    # workspace: the workspace is the repo under review, and it is data.
+    # Install and build in the action path. In the reusable workflow, the
+    # action path is the trusted checkout of this repo. Never install or build
+    # the pull request's own files: they are data.
     - name: Install the dependencies of pr-review
       shell: bash
       working-directory: ${{ github.action_path }}
