@@ -446,9 +446,7 @@ describe("action.yml (R9)", () => {
     const build = findStep(steps, (s) => /^\s*npm run build\s*$/.test(s.run ?? ""), "npm build");
     const cli = findStep(steps, (s) => (s.run ?? "").includes("dist/cli.js"), "cli");
     for (const step of [ci, build, cli]) {
-      expect(step["working-directory"]).toMatch(
-        /^\$\{\{\s*runner\.temp\s*\}\}\/pr-review-action$/,
-      );
+      expect(step["working-directory"]).toMatch(/^\$\{\{\s*runner\.temp\s*\}\}\/pr-review-action$/);
       expect(step.shell).toBe("bash");
     }
     expect(copy.shell).toBe("bash");
