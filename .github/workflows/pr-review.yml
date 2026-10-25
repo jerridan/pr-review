@@ -12,5 +12,5 @@ jobs:
       pull-requests: write
       checks: write
       contents: write
-    uses: jerridan/pr-review/.github/workflows/review.yml@v1
+    uses: jerridan/pr-review/.github/workflows/review.yml@main
     secrets: inherit

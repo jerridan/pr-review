@@ -348,7 +348,7 @@ The workflow filters its events. An `issue_comment` event runs only for a PR, a 
 
 The records steps run with `if: always()`. Before the action, the workflow checks the `pr-review-records` branch out at the `out` directory. After the action, it uploads the `pr-<n>/` directory of the pull request as the artifact `pr-review-record-<pr>-<run id>`, commits the new file at `pr-<n>/<file name>` and pushes it. It creates the branch as an orphan when the branch is absent. On a non-fast-forward refusal, it fetches and rebases up to three times.
 
-Other repos reference this one by the tag `v1`. This repo is public, so any repo can call its workflow and its action. A public repo can call a workflow only from a public repo, so a private copy of this repo would block a public consumer. Publishing to npm stays an option.
+Other repos reference this one by a release tag `v<version>`, such as `v0.2.0`. The version is `version` in `package.json`. After a merge to `main`, the release workflow creates the tag and the release when the tag is absent. No tag moves. A consumer that requires SHA pins uses the commit SHA of the tag. The reusable workflow checks out this repo at its own commit, `job.workflow_sha`, and runs the action from that checkout. So the workflow and the action always come from one commit. This repo is public, so any repo can call its workflow and its action. A public repo can call a workflow only from a public repo, so a private copy of this repo would block a public consumer. Publishing to npm stays an option.
 
 Consumer workflow:
 
@@ -367,7 +367,7 @@ jobs:
       pull-requests: write
       checks: write
       contents: write
-    uses: jerridan/pr-review/.github/workflows/review.yml@v1
+    uses: jerridan/pr-review/.github/workflows/review.yml@v0.2.0
     secrets: inherit
 ```
 

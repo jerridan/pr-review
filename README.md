@@ -296,13 +296,15 @@ jobs:
       pull-requests: write
       checks: write
       contents: write
-    uses: jerridan/pr-review/.github/workflows/review.yml@v1
+    uses: jerridan/pr-review/.github/workflows/review.yml@v0.2.0
     secrets: inherit
 ```
 
+The example calls the release `v0.2.0`. Call `review.yml@v<version>` with the version of the release that you want. See [The release tag](#the-release-tag).
+
 The consumer holds the trigger list, because GitHub reads `on:` only from the repo where the event happens.
 
-A consumer repo that requires SHA pins must call the workflow at the commit SHA of `v1`, not at the tag. Put the tag in a trailing comment: `review.yml@<sha> # v1`.
+A consumer repo that requires SHA pins must call the workflow at the commit SHA of the tag `v<version>`, not at the tag. Put the tag in a trailing comment: `review.yml@<sha> # v0.2.0`.
 
 | Trigger | The workflow runs when |
 |---------|------------------------|
@@ -310,7 +312,7 @@ A consumer repo that requires SHA pins must call the workflow at the commit SHA 
 | `pull_request_target` | Someone adds a label that starts with `review:`. |
 | `issue_comment` | A comment on a PR holds `@pr-review full`. The author is an owner, member or collaborator. |
 
-The workflow runs one review for each PR at a time. A new push cancels the run in progress. The `contents: write` permission lets the job push the [records branch](#the-records-branch). A repo that needs more steps in the job calls the action `jerridan/pr-review@v1` directly.
+The workflow runs one review for each PR at a time. A new push cancels the run in progress. The `contents: write` permission lets the job push the [records branch](#the-records-branch). A repo that needs more steps in the job calls the action `jerridan/pr-review@v<version>` directly.
 
 | Action input | Meaning |
 |--------------|---------|
@@ -335,26 +337,41 @@ The action has two outputs: `record`, the record path, and `verdict`. The action
 
 ### The release tag
 
-A consumer calls the workflow at the tag `v1`. The workflow calls the action at a commit SHA, not at the tag, because a consumer repo can require SHA pins. That rule also covers every action of the workflow that the consumer calls. So each `uses:` in `review.yml` and `action.yml` is a SHA.
+A release is the git tag `v<version>` and a GitHub release with the same name. The version is `version` in `package.json`. A tag never moves.
 
-Do these steps to ship a fix:
+Do these steps to ship a change:
 
-1. Merge the fix to `main`.
-2. Set the SHA of `uses: jerridan/pr-review@<sha>` in `review.yml` to the commit on `main` that holds the fix.
-3. Move the tag to the new commit on `main`:
+1. In the feature pull request, set the new version in these three files. Give the three files the same version.
+   - `package.json`. Then run `npm install --package-lock-only`, so `package-lock.json` gets the same version.
+   - `.claude-plugin/plugin.json`.
+   - The `pr-review` entry of `.claude-plugin/marketplace.json`.
+2. Merge the pull request to `main`.
 
-   ```bash
-   git tag -f v1
-   git push -f origin v1
-   ```
+Increase PATCH for a fix, MINOR for a new feature, and MAJOR for a change that breaks a consumer.
 
-When the fix changes only `review.yml`, skip step 2.
+After the merge, the workflow `.github/workflows/release.yml` runs `scripts/release-tag.sh`. When the tag `v<version>` is absent, the script creates the tag and the release at the merge commit. GitHub writes the release notes. When the tag exists, the script does nothing.
+
+On each pull request, the `checks` job runs `scripts/check-version-bump.sh`. When the pull request changes `src/`, `prompts/`, `action.yml` or `.github/workflows/review.yml`, the version must increase, and the three files must hold the same version. Otherwise the job fails.
+
+A consumer calls the workflow `jerridan/pr-review/.github/workflows/review.yml@v<version>`, or the action `jerridan/pr-review@v<version>`. A consumer repo that requires SHA pins uses the commit SHA of that tag. The reusable workflow checks out this repo at its own commit and runs the action from that checkout. So the workflow and the action always come from one commit.
+
+This repo calls `review.yml@main` in `.github/workflows/pr-review.yml`. So this repo reviews its pull requests with the code on `main`.
+
+When a release run fails, run the release workflow again from the Actions tab. The script creates the release only when the tag is absent, so a second run is safe. A manual run with `dry_run` set prints what the script would do and creates nothing.
+
+To publish a release to the GitHub Marketplace, open the release on GitHub and publish it by hand.
+
+One-time note: the old tag `v1` has no release. After this flow merges, the owner deletes the remote tag `v1` by hand:
+
+```bash
+git push origin --delete v1
+```
 
 ### Continuous integration
 
 This repo runs its own CI in `.github/workflows/ci.yml`. The workflow runs on every pull request and on a manual dispatch.
 
-- The job `checks` runs `npm ci`, `npm test`, `npm run lint`, `npm run typecheck` and `npm run build` on Node 20.
+- The job `checks` runs `npm ci`, `npm test`, `npm run lint`, `npm run typecheck` and `npm run build` on Node 20. On a pull request, it first runs the version check. See [The release tag](#the-release-tag).
 - The job `eval` runs after `checks`. It runs the eval gate on the pinned case set with `--repeat 3` and `--baseline eval/baseline.json`. A dispatch can set another repeat count.
 - The path filter runs the eval only when the pull request changes a path under `prompts/`, `src/` or `eval/`, or changes `package.json` or `package-lock.json`. A step finds the changed paths with `git diff --name-only` from the merge base. When no path matches, the job passes and runs no eval. A dispatch always runs the eval.
 - The eval job skips a pull request from a fork, because a fork gets no secrets. The skip does not fail the pull request.

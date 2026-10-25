@@ -26,6 +26,6 @@ npm run build
 - `docs/design/` holds the design. Read `high-level-design.md` before you change the pipeline.
 - `docs/research/` holds the research notes. `claude-5-5-models.md` fixes the model pins and the SDK query options.
 - `action.yml`, `.github/workflows/review.yml`, `.claude-plugin/` and `commands/` package the tool for CI and for Claude Code. This repo is its own Claude Code marketplace, so add no entry in another repo.
-- `review.yml` calls the action at a commit SHA, not at `v1`, because a consumer repo can require SHA pins. A change to `action.yml` or `src/` does not reach a consumer until that SHA moves. Follow "The release tag" in the README to ship it.
+- To release, bump `version` in `package.json` and in the two `.claude-plugin/` manifests in the pull request; after the merge, `release.yml` tags `v<version>` and creates the release.
 - `eval/` holds the cases pin, the baseline and the gitignored `eval/cases/`; the case set lives in the cases repo. `scripts/fetch-cases.sh` brings it to `eval/cases/`.
 - TICKETS.md lists the deliverables that remain. The spec for a deliverable in progress lives outside this repo; ask for its path before you start.
