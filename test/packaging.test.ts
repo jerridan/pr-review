@@ -470,7 +470,9 @@ describe("action.yml (R9)", () => {
     const workspace = join(base, "workspace");
     const actionPath = join(workspace, ".pr-review-action");
     const temp = join(base, "runner-temp");
-    mkdirSync(actionPath, { recursive: true });
+    // The checkout of the action puts a .git directory at the action path.
+    mkdirSync(join(actionPath, ".git"), { recursive: true });
+    writeFileSync(join(actionPath, ".git", "HEAD"), "ref: refs/heads/main\n");
     mkdirSync(temp);
     // No network: npm works offline, and the packages have no dependencies.
     const npmEnv: Record<string, string> = {
@@ -525,6 +527,9 @@ describe("action.yml (R9)", () => {
     }
     expect(existsSync(join(workspace, "pwned.txt"))).toBe(false);
     expect(existsSync(join(workspace, "node_modules"))).toBe(false);
+    // The copy keeps no git history.
+    expect(existsSync(join(temp, "pr-review-action", "package.json"))).toBe(true);
+    expect(existsSync(join(temp, "pr-review-action", ".git"))).toBe(false);
   }, 60_000);
 
   it("runs the CLI with the retry watchdog in its env, in a sandbox", () => {
