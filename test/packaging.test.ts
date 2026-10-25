@@ -437,11 +437,7 @@ describe("action.yml (R9)", () => {
 
   it("copies the action path to the runner temp directory, and installs, builds and runs from there", () => {
     const steps = loadAction().runs.steps;
-    const copy = findStep(
-      steps,
-      (s) => (s.run ?? "").includes('cp -R "$GITHUB_ACTION_PATH" "$RUNNER_TEMP/pr-review-action"'),
-      "copy",
-    );
+    const copy = findStep(steps, (s) => s.name === "Copy pr-review out of the workspace", "copy");
     const ci = findStep(steps, (s) => /^\s*npm ci\s*$/.test(s.run ?? ""), "npm ci");
     const build = findStep(steps, (s) => /^\s*npm run build\s*$/.test(s.run ?? ""), "npm build");
     const cli = findStep(steps, (s) => (s.run ?? "").includes("dist/cli.js"), "cli");
