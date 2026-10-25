@@ -446,6 +446,74 @@ describe("action.yml (R9)", () => {
     expect(steps.indexOf(ci)).toBeLessThan(steps.indexOf(build));
   });
 
+  // npm looks up from its directory for a package.json that names it as a
+  // workspace. A hostile pull request can put that package.json at the root
+  // of the workspace. Run the steps up to the install in a sandbox with that
+  // file, and make sure that npm installs none of the workspace.
+  it("installs no package and runs no script of a hostile workspace root", () => {
+    const steps = loadAction().runs.steps;
+    const ci = findStep(steps, (s) => /^\s*npm ci\s*$/.test(s.run ?? ""), "npm ci");
+    const base = tempDir("pr-review-hostile-");
+    const workspace = join(base, "workspace");
+    const actionPath = join(workspace, ".pr-review-action");
+    const temp = join(base, "runner-temp");
+    mkdirSync(actionPath, { recursive: true });
+    mkdirSync(temp);
+    // No network: npm works offline, and the packages have no dependencies.
+    const npmEnv: Record<string, string> = {
+      PATH: process.env.PATH ?? "",
+      HOME: base,
+      npm_config_offline: "true",
+      npm_config_audit: "false",
+      npm_config_fund: "false",
+      npm_config_update_notifier: "false",
+      npm_config_cache: join(base, "npm-cache"),
+    };
+    const lock = (cwd: string) =>
+      execFileSync("npm", ["install", "--package-lock-only", "--ignore-scripts"], {
+        cwd,
+        env: npmEnv,
+        stdio: "ignore",
+      });
+    writeFileSync(
+      join(actionPath, "package.json"),
+      JSON.stringify({ name: "pr-review", version: "0.0.0", private: true }),
+    );
+    lock(actionPath);
+    writeFileSync(
+      join(workspace, "package.json"),
+      JSON.stringify({
+        name: "hostile",
+        version: "0.0.0",
+        private: true,
+        workspaces: [".pr-review-action"],
+        scripts: { preinstall: "node -e \"require('fs').writeFileSync('pwned.txt', 'x')\"" },
+      }),
+    );
+    lock(workspace);
+    expect(existsSync(join(workspace, "pwned.txt"))).toBe(false);
+
+    const ctx: Record<string, Value> = {
+      github: { workspace, action_path: actionPath },
+      runner: { temp },
+    };
+    const env: Record<string, string> = {
+      ...npmEnv,
+      GITHUB_ACTION_PATH: actionPath,
+      GITHUB_WORKSPACE: workspace,
+      RUNNER_TEMP: temp,
+    };
+    for (const step of steps.slice(0, steps.indexOf(ci) + 1)) {
+      if (step.run === undefined) continue;
+      const dir = step["working-directory"];
+      const cwd = dir === undefined ? workspace : render(dir, ctx);
+      const result = runScript(render(step.run, ctx), env, cwd);
+      expect(result.status, `${step.name ?? ""}: ${result.stdout}${result.stderr}`).toBe(0);
+    }
+    expect(existsSync(join(workspace, "pwned.txt"))).toBe(false);
+    expect(existsSync(join(workspace, "node_modules"))).toBe(false);
+  }, 60_000);
+
   it("runs the CLI with the retry watchdog in its env, in a sandbox", () => {
     expect(runCliStep({}, 0).watchdog).toBe("1");
   });
