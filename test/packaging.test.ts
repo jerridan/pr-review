@@ -62,8 +62,11 @@ function loadJob(): Job {
 // reusable workflow. So every uses value is a full commit SHA.
 const SHA_PIN = /@[0-9a-f]{40}$/;
 
+// The review step runs the action from the trusted checkout of this repo.
+const ACTION_PATH = "./.pr-review-action";
+
 function isAction(step: Step): boolean {
-  return /^jerridan\/pr-review@[0-9a-f]{40}$/.test(step.uses ?? "");
+  return step.uses === ACTION_PATH;
 }
 
 function findStep(steps: Step[], test: (step: Step) => boolean, what: string): Step {
@@ -403,6 +406,11 @@ function remoteFiles(remote: string): string[] {
 // ---------------------------------------------------------------------------
 
 describe("action.yml (R9)", () => {
+  it("has the Marketplace branding icon search and color blue", () => {
+    const action = parse(readText("action.yml")) as { branding?: Record<string, string> };
+    expect(action.branding).toEqual({ icon: "search", color: "blue" });
+  });
+
   it("reads no secret", () => {
     const text = readText("action.yml");
     expect(text).not.toMatch(/secrets\./);
@@ -427,16 +435,98 @@ describe("action.yml (R9)", () => {
     expect(setup.with).not.toHaveProperty("cache-dependency-path");
   });
 
-  it("runs npm ci and npm run build in the action path, never in the workspace", () => {
+  it("copies the action path to the runner temp directory, and installs, builds and runs from there", () => {
     const steps = loadAction().runs.steps;
+    const copy = findStep(steps, (s) => s.name === "Copy pr-review out of the workspace", "copy");
     const ci = findStep(steps, (s) => /^\s*npm ci\s*$/.test(s.run ?? ""), "npm ci");
     const build = findStep(steps, (s) => /^\s*npm run build\s*$/.test(s.run ?? ""), "npm build");
+    const cli = findStep(steps, (s) => (s.run ?? "").includes("dist/cli.js"), "cli");
     for (const step of [ci, build]) {
-      expect(step["working-directory"]).toMatch(/^\$\{\{\s*github\.action_path\s*\}\}$/);
+      expect(step["working-directory"]).toMatch(/^\$\{\{\s*runner\.temp\s*\}\}\/pr-review-action$/);
       expect(step.shell).toBe("bash");
     }
+    expect(copy.shell).toBe("bash");
+    // The review step keeps the default working directory, so a relative out
+    // starts at the workspace. It runs the CLI by its absolute path.
+    expect(cli["working-directory"]).toBeUndefined();
+    expect(cli.run).toContain('node "$RUNNER_TEMP/pr-review-action/dist/cli.js"');
+    expect(steps.indexOf(copy)).toBeLessThan(steps.indexOf(ci));
     expect(steps.indexOf(ci)).toBeLessThan(steps.indexOf(build));
+    expect(steps.indexOf(build)).toBeLessThan(steps.indexOf(cli));
   });
+
+  // npm looks up from its directory for a package.json that names it as a
+  // workspace. A hostile pull request can put that package.json at the root
+  // of the workspace. Run the steps up to the install in a sandbox with that
+  // file, and make sure that npm installs none of the workspace.
+  it("installs no package and runs no script of a hostile workspace root", () => {
+    const steps = loadAction().runs.steps;
+    const ci = findStep(steps, (s) => /^\s*npm ci\s*$/.test(s.run ?? ""), "npm ci");
+    const base = tempDir("pr-review-hostile-");
+    const workspace = join(base, "workspace");
+    const actionPath = join(workspace, ".pr-review-action");
+    const temp = join(base, "runner-temp");
+    // The checkout of the action puts a .git directory at the action path.
+    mkdirSync(join(actionPath, ".git"), { recursive: true });
+    writeFileSync(join(actionPath, ".git", "HEAD"), "ref: refs/heads/main\n");
+    mkdirSync(temp);
+    // No network: npm works offline, and the packages have no dependencies.
+    const npmEnv: Record<string, string> = {
+      PATH: process.env.PATH ?? "",
+      HOME: base,
+      npm_config_offline: "true",
+      npm_config_audit: "false",
+      npm_config_fund: "false",
+      npm_config_update_notifier: "false",
+      npm_config_cache: join(base, "npm-cache"),
+    };
+    const lock = (cwd: string) =>
+      execFileSync("npm", ["install", "--package-lock-only", "--ignore-scripts"], {
+        cwd,
+        env: npmEnv,
+        stdio: "ignore",
+      });
+    writeFileSync(
+      join(actionPath, "package.json"),
+      JSON.stringify({ name: "pr-review", version: "0.0.0", private: true }),
+    );
+    lock(actionPath);
+    writeFileSync(
+      join(workspace, "package.json"),
+      JSON.stringify({
+        name: "hostile",
+        version: "0.0.0",
+        private: true,
+        workspaces: [".pr-review-action"],
+        scripts: { preinstall: "node -e \"require('fs').writeFileSync('pwned.txt', 'x')\"" },
+      }),
+    );
+    lock(workspace);
+    expect(existsSync(join(workspace, "pwned.txt"))).toBe(false);
+
+    const ctx: Record<string, Value> = {
+      github: { workspace, action_path: actionPath },
+      runner: { temp },
+    };
+    const env: Record<string, string> = {
+      ...npmEnv,
+      GITHUB_ACTION_PATH: actionPath,
+      GITHUB_WORKSPACE: workspace,
+      RUNNER_TEMP: temp,
+    };
+    for (const step of steps.slice(0, steps.indexOf(ci) + 1)) {
+      if (step.run === undefined) continue;
+      const dir = step["working-directory"];
+      const cwd = dir === undefined ? workspace : render(dir, ctx);
+      const result = runScript(render(step.run, ctx), env, cwd);
+      expect(result.status, `${step.name ?? ""}: ${result.stdout}${result.stderr}`).toBe(0);
+    }
+    expect(existsSync(join(workspace, "pwned.txt"))).toBe(false);
+    expect(existsSync(join(workspace, "node_modules"))).toBe(false);
+    // The copy keeps no git history.
+    expect(existsSync(join(temp, "pr-review-action", "package.json"))).toBe(true);
+    expect(existsSync(join(temp, "pr-review-action", ".git"))).toBe(false);
+  }, 60_000);
 
   it("runs the CLI with the retry watchdog in its env, in a sandbox", () => {
     expect(runCliStep({}, 0).watchdog).toBe("1");
@@ -465,7 +555,8 @@ describe("action.yml (R9)", () => {
     const action = loadAction();
     const cli = findStep(action.runs.steps, (s) => (s.run ?? "").includes("dist/cli.js"), "cli");
     const base = tempDir("pr-review-action-");
-    const actionPath = join(base, "action");
+    // The copy step puts the action at <runner temp>/pr-review-action.
+    const actionPath = join(base, "pr-review-action");
     const workspace = join(base, "workspace");
     mkdirSync(join(actionPath, "dist"), { recursive: true });
     mkdirSync(workspace);
@@ -487,10 +578,11 @@ describe("action.yml (R9)", () => {
       inputs: Object.fromEntries(
         Object.entries(action.inputs).map(([k, v]) => [k, inputs[k] ?? String(v.default ?? "")]),
       ),
-      github: { workspace, action_path: actionPath },
+      github: { workspace, action_path: join(workspace, ".pr-review-action") },
+      runner: { temp: base },
     };
     const env: Record<string, string> = {
-      GITHUB_ACTION_PATH: actionPath,
+      GITHUB_ACTION_PATH: join(workspace, ".pr-review-action"),
       GITHUB_WORKSPACE: workspace,
       GITHUB_OUTPUT: outputFile,
       RUNNER_TEMP: base,
@@ -758,7 +850,7 @@ describe(".github/workflows/review.yml (R10)", () => {
     expect(git(sandbox.workspace, "rev-parse", "origin/main")).toBe(headSha);
   });
 
-  it("runs the action by jerridan/pr-review at a commit SHA with the two env keys", () => {
+  it("runs the local action .pr-review-action with the two env keys", () => {
     const steps = loadJob().steps;
     const review = findStep(steps, isAction, "action");
     const ctx = context("pull_request", prEvent("opened", false));
@@ -942,13 +1034,41 @@ describe(".github/workflows/review.yml (R10)", () => {
     ]);
   }, 30_000);
 
-  it("runs no npm, make, sh or other script from the workspace", () => {
-    for (const step of loadJob().steps) {
-      if (step.uses !== undefined) {
-        expect(step.uses).not.toMatch(/^\.\//);
-        expect(step.uses).toMatch(SHA_PIN);
-      }
+  it("runs no script from the workspace except the trusted action checkout", () => {
+    const steps = loadJob().steps;
+    const local = steps.filter((s) => s.uses?.startsWith("./"));
+    expect(local.map((s) => s.uses)).toEqual([ACTION_PATH]);
+    const review = local[0] as Step;
+    const at = steps.indexOf(review);
+
+    // The step before the action is a fresh checkout of this repo at the
+    // commit of this workflow file, with no credentials.
+    const checkout = steps[at - 1] as Step;
+    expect(checkout.uses).toMatch(/^actions\/checkout@[0-9a-f]{40}$/);
+    expect(checkout.with).toEqual({
+      repository: "${{ job.workflow_repository }}",
+      ref: "${{ job.workflow_sha }}",
+      path: ".pr-review-action",
+      "persist-credentials": false,
+    });
+
+    // The step before that checkout deletes what the pull request put at the
+    // action path and the node_modules of the workspace.
+    const rm = steps[at - 2] as Step;
+    expect((rm.run ?? "").trim()).toBe(
+      [
+        'rm -rf -- "$GITHUB_WORKSPACE/.pr-review-action"',
+        'rm -rf -- "$GITHUB_WORKSPACE/node_modules"',
+      ].join("\n"),
+    );
+    const head = findStep(steps, (s) => s.name === "Check out the pull request head", "head");
+    expect(steps.indexOf(head)).toBeLessThan(at - 2);
+
+    for (const step of steps) {
+      if (step.uses !== undefined && step !== review) expect(step.uses).toMatch(SHA_PIN);
       expect(step.shell ?? "bash").toBe("bash");
+      // The exact text above replaces the line checks for the rm step.
+      if (step === rm) continue;
       const run = step.run ?? "";
       for (const line of run.split("\n")) {
         const code = line.replace(/#.*$/, "");
@@ -1006,6 +1126,8 @@ describe("the plugin and the /review command (R11)", () => {
     expect(entry?.name).toBe("pr-review");
     expect(entry?.source).toBe("./");
     expect(entry?.version).toBe(plugin.version);
+    const pkg = JSON.parse(readText("package.json")) as { version: string };
+    expect(plugin.version).toBe(pkg.version);
   });
 
   it("has a /review command with a frontmatter description", () => {
@@ -1152,6 +1274,57 @@ describe(".github/workflows/ci.yml (R8)", () => {
     expect(job.steps.indexOf(node)).toBeLessThan(
       job.steps.findIndex((s) => (s.run ?? "").includes("npm ci")),
     );
+  });
+
+  describe("the version bump check", () => {
+    const bumpStep = () =>
+      findStep(
+        ciJob("checks").steps,
+        (s) => (s.run ?? "").includes("scripts/check-version-bump.sh"),
+        "version bump",
+      );
+
+    it("checks out the full history with no persisted credentials", () => {
+      const checkout = findStep(
+        ciJob("checks").steps,
+        (s) => (s.uses ?? "").startsWith("actions/checkout@"),
+        "checkout",
+      );
+      expect(checkout.with?.["fetch-depth"]).toBe(0);
+      expect(checkout.with?.["persist-credentials"]).toBe(false);
+    });
+
+    it("runs on a pull request only", () => {
+      expect(evaluateIf(String(bumpStep().if), ciContext("pull_request"))).toBe(true);
+      expect(evaluateIf(String(bumpStep().if), ciContext("workflow_dispatch"))).toBe(false);
+    });
+
+    function runBump(paths: string[]): { status: number | null; stderr: string } {
+      const sandbox = changeSandbox(paths);
+      mkdirSync(join(sandbox.workspace, "scripts"));
+      writeFileSync(
+        join(sandbox.workspace, "scripts", "check-version-bump.sh"),
+        readText("scripts/check-version-bump.sh"),
+        { mode: 0o755 },
+      );
+      const ctx = ciContext("pull_request");
+      const event = (ctx.github as { event: { pull_request: Record<string, Value> } }).event;
+      event.pull_request.base = { sha: sandbox.base };
+      event.pull_request.head = { sha: sandbox.head, repo: { full_name: SAME_REPO } };
+      return runStep(
+        bumpStep(),
+        ctx,
+        { workspace: sandbox.workspace, temp: sandbox.workspace },
+        { PATH: process.env.PATH ?? "" },
+      );
+    }
+
+    it("passes the base and head shas of the pull request to the script, in a sandbox", () => {
+      // The script fails only when the diff from the base to the head
+      // touches a shipped file. So the exit codes show that it got both shas.
+      expect(runBump(["README.md"]).status).toBe(0);
+      expect(runBump(["src/a.ts"]).status).toBe(1);
+    }, 30_000);
   });
 
   describe("the eval job gate (R8.3)", () => {

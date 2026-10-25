@@ -1,0 +1,49 @@
+# The release of pr-review. After each push to main, the workflow creates
+# the release v<version> for the version in package.json, when it is absent.
+# GitHub creates the tag and the release together.
+#
+# Security rules for this file:
+# - The only permission is contents: write. The release needs it.
+# - The checkout keeps no token in .git/config.
+# - The release logic is in scripts/release-tag.sh, so a test can run it.
+# - Event values and inputs go to the script through env, never as text in
+#   the script.
+#
+# When a run fails, run the workflow again from the Actions tab. The script
+# creates the release only when the tag is absent.
+name: release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: When true, print what the release would do and create nothing.
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write
+
+# One release run at a time. A new run waits and does not cancel the run in
+# progress.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out pr-review
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_DRY_RUN: ${{ inputs.dry_run }}
+        run: scripts/release-tag.sh

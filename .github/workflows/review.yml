@@ -3,11 +3,14 @@
 # reads "on:" only from the repo of the event.
 #
 # Security rules for this file:
-# - The checkout of the pull request is data. No step runs npm, make, sh or
-#   another script or build from the workspace.
+# - The checkout of the pull request is data. The one local action is this
+#   repo at `job.workflow_sha`, checked out fresh with no credentials into
+#   `.pr-review-action`. It installs and builds in the runner temp
+#   directory, and the CLI runs from there.
 # - No "run:" command line holds a token.
-# - The checkout keeps no token in the workspace .git/config. The reviewers
-#   read the workspace, so they must find no token there.
+# - The checkouts keep no token in any .git/config under the workspace. The
+#   reviewers read a worktree built from the pull request's git objects, so
+#   they must find no token there.
 # - The gh credential helper gives git the job token. The helper reads
 #   GH_TOKEN from the env of each git command. Only the steps that fetch or
 #   push get GH_TOKEN. The reviewer subprocesses get no GH_TOKEN.
@@ -133,11 +136,29 @@ jobs:
             exit "$found"
           fi
 
-      # A consumer repo can require SHA pins, so this ref is a SHA, not v1.
-      # Set it to the commit of the action before you move the tag v1.
+      # The pull request can put a file, a directory or a symlink at the
+      # action path. Delete it, so the next checkout writes a clean tree.
+      # The review step runs with the workspace as its cwd, so a committed
+      # node_modules must not be there. Delete it also.
+      - name: Clear the action path
+        run: |
+          rm -rf -- "$GITHUB_WORKSPACE/.pr-review-action"
+          rm -rf -- "$GITHUB_WORKSPACE/node_modules"
+
+      # Check out this repo at the commit of this workflow file. So the
+      # action and the workflow always come from one commit. The checkout
+      # keeps no token in .pr-review-action/.git/config.
+      - name: Check out the pr-review action
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .pr-review-action
+          persist-credentials: false
+
       - name: Review the pull request
         id: review
-        uses: jerridan/pr-review@1ea734281e8f2e637fac04cb19f4ccf06962d2ba # v1
+        uses: ./.pr-review-action
         with:
           pr: ${{ steps.pr.outputs.number }}
           out: ${{ runner.temp }}/pr-review-records

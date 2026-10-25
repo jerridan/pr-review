@@ -9,6 +9,11 @@ name: pr-review
 description: Review a pull request with Claude agents and post the review to GitHub.
 author: Jerridan Quiring
 
+# The GitHub Marketplace shows this icon and color.
+branding:
+  icon: search
+  color: blue
+
 inputs:
   pr:
     description: The number of the pull request to review.
@@ -47,16 +52,28 @@ runs:
       with:
         node-version: 20
 
-    # Install and build in the action path. Never install or build in the
-    # workspace: the workspace is the repo under review, and it is data.
+    # The workspace is data. In the reusable workflow, the action path is in
+    # the workspace, and npm looks up from its directory for a package.json
+    # that names it as a workspace. So the action copies its source to the
+    # runner temp directory, and it installs, builds and runs there. No npm
+    # command runs under the workspace. The review step runs node by the
+    # absolute path of the CLI, so node loads no module from the workspace.
+    # The copy needs no git history, so the step deletes the .git copy.
+    - name: Copy pr-review out of the workspace
+      shell: bash
+      run: |
+        rm -rf -- "$RUNNER_TEMP/pr-review-action"
+        cp -R "$GITHUB_ACTION_PATH" "$RUNNER_TEMP/pr-review-action"
+        rm -rf -- "$RUNNER_TEMP/pr-review-action/.git"
+
     - name: Install the dependencies of pr-review
       shell: bash
-      working-directory: ${{ github.action_path }}
+      working-directory: ${{ runner.temp }}/pr-review-action
       run: npm ci
 
     - name: Build pr-review
       shell: bash
-      working-directory: ${{ github.action_path }}
+      working-directory: ${{ runner.temp }}/pr-review-action
       run: npm run build
 
     # The inputs go to the script through env, never as text in the script.
@@ -79,7 +96,7 @@ runs:
         if [ "$INPUT_ALLOW_API_KEY" = "true" ]; then args+=(--allow-api-key); fi
         stdout_file="$RUNNER_TEMP/pr-review-stdout-$$.json"
         status=0
-        node "$GITHUB_ACTION_PATH/dist/cli.js" "${args[@]}" > "$stdout_file" || status=$?
+        node "$RUNNER_TEMP/pr-review-action/dist/cli.js" "${args[@]}" > "$stdout_file" || status=$?
         cat "$stdout_file"
         node --input-type=module -e '
           import { appendFileSync, readFileSync } from "node:fs";
