@@ -1037,6 +1037,8 @@ describe("the plugin and the /review command (R11)", () => {
     expect(entry?.name).toBe("pr-review");
     expect(entry?.source).toBe("./");
     expect(entry?.version).toBe(plugin.version);
+    const pkg = JSON.parse(readText("package.json")) as { version: string };
+    expect(plugin.version).toBe(pkg.version);
   });
 
   it("has a /review command with a frontmatter description", () => {
@@ -1183,6 +1185,57 @@ describe(".github/workflows/ci.yml (R8)", () => {
     expect(job.steps.indexOf(node)).toBeLessThan(
       job.steps.findIndex((s) => (s.run ?? "").includes("npm ci")),
     );
+  });
+
+  describe("the version bump check", () => {
+    const bumpStep = () =>
+      findStep(
+        ciJob("checks").steps,
+        (s) => (s.run ?? "").includes("scripts/check-version-bump.sh"),
+        "version bump",
+      );
+
+    it("checks out the full history with no persisted credentials", () => {
+      const checkout = findStep(
+        ciJob("checks").steps,
+        (s) => (s.uses ?? "").startsWith("actions/checkout@"),
+        "checkout",
+      );
+      expect(checkout.with?.["fetch-depth"]).toBe(0);
+      expect(checkout.with?.["persist-credentials"]).toBe(false);
+    });
+
+    it("runs on a pull request only", () => {
+      expect(evaluateIf(String(bumpStep().if), ciContext("pull_request"))).toBe(true);
+      expect(evaluateIf(String(bumpStep().if), ciContext("workflow_dispatch"))).toBe(false);
+    });
+
+    function runBump(paths: string[]): { status: number | null; stderr: string } {
+      const sandbox = changeSandbox(paths);
+      mkdirSync(join(sandbox.workspace, "scripts"));
+      writeFileSync(
+        join(sandbox.workspace, "scripts", "check-version-bump.sh"),
+        readText("scripts/check-version-bump.sh"),
+        { mode: 0o755 },
+      );
+      const ctx = ciContext("pull_request");
+      const event = (ctx.github as { event: { pull_request: Record<string, Value> } }).event;
+      event.pull_request.base = { sha: sandbox.base };
+      event.pull_request.head = { sha: sandbox.head, repo: { full_name: SAME_REPO } };
+      return runStep(
+        bumpStep(),
+        ctx,
+        { workspace: sandbox.workspace, temp: sandbox.workspace },
+        { PATH: process.env.PATH ?? "" },
+      );
+    }
+
+    it("passes the base and head shas of the pull request to the script, in a sandbox", () => {
+      // The script fails only when the diff from the base to the head
+      // touches a shipped file. So the exit codes show that it got both shas.
+      expect(runBump(["README.md"]).status).toBe(0);
+      expect(runBump(["src/a.ts"]).status).toBe(1);
+    }, 30_000);
   });
 
   describe("the eval job gate (R8.3)", () => {

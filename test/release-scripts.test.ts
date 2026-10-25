@@ -259,6 +259,161 @@ describe("scripts/release-tag.sh", () => {
 
 // ---------------------------------------------------------------------------
 
+interface Versions {
+  pkg: string;
+  plugin: string;
+  market: string;
+}
+
+function same(version: string): Versions {
+  return { pkg: version, plugin: version, market: version };
+}
+
+function writeVersions(dir: string, versions: Versions): void {
+  mkdirSync(join(dir, ".claude-plugin"), { recursive: true });
+  writeFileSync(
+    join(dir, "package.json"),
+    `${JSON.stringify({ name: "pr-review", version: versions.pkg }, null, 2)}\n`,
+  );
+  writeFileSync(
+    join(dir, ".claude-plugin", "plugin.json"),
+    `${JSON.stringify({ name: "pr-review", version: versions.plugin }, null, 2)}\n`,
+  );
+  writeFileSync(
+    join(dir, ".claude-plugin", "marketplace.json"),
+    `${JSON.stringify(
+      {
+        name: "pr-review",
+        plugins: [{ name: "pr-review", source: "./", version: versions.market }],
+      },
+      null,
+      2,
+    )}\n`,
+  );
+}
+
+function writeFiles(dir: string, paths: string[]): void {
+  for (const path of paths) {
+    mkdirSync(dirname(join(dir, path)), { recursive: true });
+    writeFileSync(join(dir, path), `${path} ${Math.random()}\n`);
+  }
+}
+
+/**
+ * Make a repo with a base commit at "base" versions, and a feature branch
+ * that changes "paths" and, when "head" is set, the versions. When
+ * "mainPaths" is set, main gets one more commit after the branch point.
+ */
+function bumpSandbox(options: {
+  base: string;
+  paths: string[];
+  head?: Versions;
+  mainPaths?: string[];
+}): { work: string; baseSha: string; headSha: string } {
+  const work = tempDir("pr-review-bump-");
+  git(work, "init", "-q", "-b", "main");
+  writeVersions(work, same(options.base));
+  writeFiles(work, [
+    "README.md",
+    "src/a.ts",
+    "prompts/a.md",
+    "action.yml",
+    ".github/workflows/review.yml",
+  ]);
+  git(work, "add", ".");
+  git(work, "commit", "-q", "-m", "base");
+  git(work, "checkout", "-q", "-b", "feature");
+  writeFiles(work, options.paths);
+  if (options.head) writeVersions(work, options.head);
+  git(work, "add", ".");
+  git(work, "commit", "-q", "-m", "head");
+  const headSha = git(work, "rev-parse", "HEAD");
+  if (options.mainPaths) {
+    git(work, "checkout", "-q", "main");
+    writeFiles(work, options.mainPaths);
+    git(work, "add", ".");
+    git(work, "commit", "-q", "-m", "main moves on");
+    git(work, "checkout", "-q", "feature");
+  }
+  return { work, baseSha: git(work, "rev-parse", "main"), headSha };
+}
+
+function checkBump(sandbox: { work: string; baseSha: string; headSha: string }): Run {
+  return runRepoScript(
+    "check-version-bump.sh",
+    [sandbox.baseSha, sandbox.headSha],
+    { ...GIT_BASE, HOME: sandbox.work },
+    sandbox.work,
+  );
+}
+
+describe("scripts/check-version-bump.sh", () => {
+  it.each<[string, Parameters<typeof bumpSandbox>[0], number]>([
+    ["src/ changed, no bump", { base: "0.1.0", paths: ["src/a.ts"] }, 1],
+    [
+      "src/ changed, bump, three versions equal",
+      { base: "0.1.0", paths: ["src/a.ts"], head: same("0.2.0") },
+      0,
+    ],
+    [
+      "src/ changed, bump, three versions differ",
+      {
+        base: "0.1.0",
+        paths: ["src/a.ts"],
+        head: { pkg: "0.2.0", plugin: "0.1.0", market: "0.2.0" },
+      },
+      1,
+    ],
+    [
+      "src/ changed, bump, the marketplace version differs",
+      {
+        base: "0.1.0",
+        paths: ["src/a.ts"],
+        head: { pkg: "0.2.0", plugin: "0.2.0", market: "0.1.0" },
+      },
+      1,
+    ],
+    [
+      "src/ changed, version lowered 0.2.0 to 0.1.0",
+      { base: "0.2.0", paths: ["src/a.ts"], head: same("0.1.0") },
+      1,
+    ],
+    ["only README.md changed, no bump", { base: "0.1.0", paths: ["README.md"] }, 0],
+    ["prompts/ changed, no bump", { base: "0.1.0", paths: ["prompts/a.md"] }, 1],
+    ["action.yml changed, no bump", { base: "0.1.0", paths: ["action.yml"] }, 1],
+    [
+      ".github/workflows/review.yml changed, no bump",
+      { base: "0.1.0", paths: [".github/workflows/review.yml"] },
+      1,
+    ],
+    [
+      "src/ changed, bump of the patch number",
+      { base: "0.1.9", paths: ["src/a.ts"], head: same("0.1.10") },
+      0,
+    ],
+    [
+      "src/ changed, a head version that is not MAJOR.MINOR.PATCH",
+      { base: "0.1.0", paths: ["src/a.ts"], head: same("0.2") },
+      1,
+    ],
+    [
+      "only README.md changed on the branch, and main changed src/ after the branch point",
+      { base: "0.1.0", paths: ["README.md"], mainPaths: ["src/b.ts"] },
+      0,
+    ],
+  ])(
+    "gives the expected exit code when %s",
+    (_label, options, expected) => {
+      const run = checkBump(bumpSandbox(options));
+      expect(run.status, `${run.stdout}${run.stderr}`).toBe(expected);
+      if (expected === 1) oneLineReason(run);
+    },
+    30_000,
+  );
+});
+
+// ---------------------------------------------------------------------------
+
 interface ReleaseStep {
   uses?: string;
   run?: string;

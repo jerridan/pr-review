@@ -1,4 +1,6 @@
-# The CI of pr-review. The checks job runs on every pull request. The eval
+# The CI of pr-review. The checks job runs on every pull request. On a pull
+# request it also checks that a change to the shipped files bumps the
+# version. The eval
 # job runs the eval gate when a change touches the prompts, the code, the
 # eval pin or the lockfile, and on a manual dispatch.
 #
@@ -34,9 +36,11 @@ jobs:
   checks:
     runs-on: ubuntu-latest
     steps:
+      # The version check needs the base commit, so fetch the full history.
       - name: Check out pr-review
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Set up Node 20
@@ -44,6 +48,15 @@ jobs:
         with:
           node-version: 20
           cache: npm
+
+      # A change to src/, prompts/, action.yml or review.yml must bump the
+      # version in the three version files.
+      - name: Check the version bump
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: scripts/check-version-bump.sh "$BASE_SHA" "$HEAD_SHA"
 
       - name: Install
         run: npm ci
