@@ -1,0 +1,6 @@
+# actionlint 1.7.12 does not know job.workflow_sha, which the GitHub contexts reference documents.
+# Remove this ignore when actionlint learns that property.
+paths:
+  .github/workflows/review.yml:
+    ignore:
+      - 'property "workflow_sha" is not defined in object type'
