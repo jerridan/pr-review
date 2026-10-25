@@ -361,12 +361,6 @@ When a release run fails, run the release workflow again from the Actions tab. T
 
 To publish a release to the GitHub Marketplace, open the release on GitHub and publish it by hand.
 
-One-time note: the old tag `v1` has no release. After this flow merges, the owner deletes the remote tag `v1` by hand:
-
-```bash
-git push origin --delete v1
-```
-
 ### Continuous integration
 
 This repo runs its own CI in `.github/workflows/ci.yml`. The workflow runs on every pull request and on a manual dispatch.
