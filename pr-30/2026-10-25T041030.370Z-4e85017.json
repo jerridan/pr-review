@@ -1,0 +1,1632 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 30,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Release by semver tag from package.json and run the action from its own commit",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/30"
+    },
+    "run_kind": "later",
+    "prior": {
+      "head": "b7d91c5a0fb4306c3dbe382238118b28e85e4004",
+      "source": "record",
+      "record": "/home/runner/work/_temp/pr-review-records/pr-30/2026-10-25T034123.963Z-b7d91c5.json",
+      "open": [],
+      "dismissed": [],
+      "fetch_failed": false
+    },
+    "base": "29c27a7b68623deef48b20c68bc05106594372f3",
+    "head": "4e850174050f7e0d2d9e1a1a44e546b22d78b545",
+    "started_at": "2026-10-25T04:10:30.370Z",
+    "tool_version": "0.1.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Release by semver tag from package.json and run the action from its own commit\n\nA release is now the tag `v<version>` and a GitHub Release, created by a workflow from `version` in `package.json`. The hand-run procedure in the README, with its SHA pin bump and the moving `v1` tag, is gone.\n\n## Changes\n\n- `scripts/release-tag.sh` reads `version` from `package.json`, requires `MAJOR.MINOR.PATCH`, refuses a ref other than `refs/heads/main` unless in dry run, and checks whether `v<version>` exists on origin. When it is absent, it runs one `gh release create` with `--target HEAD`, so GitHub creates the tag and the release together. No `git tag`, no `git push`, no tagger identity, and a tag never moves. When the tag exists, it prints one line and exits 0.\n- `.github/workflows/release.yml` runs that script on every push to `main` and on a manual dispatch with a `dry_run` input. Permissions are `contents: write` only, the checkout keeps no credentials, and a concurrency group serialises runs.\n- `scripts/check-version-bump.sh` fails a pull request that changes `src/`, `prompts/`, `action.yml` or `review.yml` without raising the version, by semver order, in `package.json`, `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` together. The `checks` job of `ci.yml` runs it on pull requests.\n- `.github/workflows/review.yml` runs the action from a fresh checkout of this repo at `job.workflow_sha`, the commit of the workflow file itself, so the action and the workflow always come from one commit and no pin inside the repo needs a bump. The workspace rule relaxes from \"never build in the workspace\" to \"never build the pull request's own files\", with two guards: a step deletes anything the pull request placed at `.pr-review-action` and the workspace `node_modules`, and the checkout sets `persist-credentials: false`. The reviewers read a worktree built from git objects, so they never see the directory.\n- `.github/actionlint.yaml` ignores one message for `review.yml`: actionlint 1.7.12 does not yet know `job.workflow_sha`, which the GitHub contexts reference documents.\n- `pr-review.yml` of this repo calls `review.yml@main`. `action.yml` gets Marketplace branding. The README, the design doc and CLAUDE.md describe the new flow, and a consumer references `@v<version>`.\n- The three version fields move from 0.1.0 to 0.2.0, so the merge of this pull request creates `v0.2.0`.\n\n## After the merge\n\n- `release.yml` tags `v0.2.0` at the merge commit and creates the release. Watch the first run.\n- Delete the old tag by hand, once: `git push origin --delete v1`. Nothing references it after this change.\n- To list the action on the Marketplace, open the release and publish it. That click is manual.\n\n## Tests\n\nThe red commit 83e6d61 adds `test/release-scripts.test.ts` alone, and all fourteen tests fail there because the script does not exist. The tests run both scripts in a temporary git repository with a bare remote and a stateful `gh` stub that creates the tag on `release create`, the way GitHub does. They cover the release, the idempotent second run, both dry-run selectors, the ref and token refusals, malformed versions, a remote read failure, and every row of the version-check table including a lowered version. The packaging tests assert the release workflow's shape, the local action with its two guard steps, the branding, and that the plugin version equals the package version.\n\n`npm test` (1105 pass), `npm run lint`, `npm run typecheck`, `npm run build` and `actionlint .github/workflows/*.yml` all pass. `scripts/check-version-bump.sh` exits 0 on this branch.\n\n## Charter\n\nGoal: replace the hand-run release procedure with a release driven by `version` in `package.json`, and make the reusable workflow run the action from its own commit so the SHA pin inside the repo goes away. The principal decided: semver tags with no moving `v1`; the version bump lives in the feature pull request; this repo calls `review.yml@main`; one version across `package.json` and both plugin manifests, enforced in CI; Marketplace publishing stays manual; the workspace rule relaxes to \"never build the pull request's own files\" with the guards above.\n\n## Decisions\n\n- Path: the change path. Not the light path: six items across workflows, scripts, tests and docs, with two preference questions open.\n- Preference answers: `@main` for this repo's own workflow; one version across the three files. Neither recorded as a CLAUDE.md rule; the README states both.\n- Spec critic round 1 (3 critical, 9 concern, 3 nit): the \"logic in a script\" and \"values through env\" constraints were missing; `uses: ./` conflicted with the workspace security rule and its tests; the release script's credentials and tagger identity were unspecified. All fixed. The security conflict went to the principal, who chose to relax the rule with the guards.\n- Spec critic round 2 (0 critical, 4 concern, 6 nit): Node module resolution could walk up to the workspace `node_modules`, so the guard step deletes it; the version check takes two positional SHAs and reads the base version at the base SHA; two greps added to the docs acceptance. All folded in.\n- Shape: simple path, one package, band deep, because the package changes a security boundary and the criterion took interpretation.\n- actionlint 1.7.12 rejects `job.workflow_sha`; one scoped ignore in `.github/actionlint.yaml` with a comment that names the cause.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_013NJ8nrdv1XAmDexRXHC4SC\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": ".claude-plugin/marketplace.json",
+        "hunks": 1
+      },
+      {
+        "path": ".claude-plugin/plugin.json",
+        "hunks": 1
+      },
+      {
+        "path": ".github/actionlint.yaml",
+        "hunks": 1
+      },
+      {
+        "path": ".github/workflows/ci.yml",
+        "hunks": 3
+      },
+      {
+        "path": ".github/workflows/pr-review.yml",
+        "hunks": 1
+      },
+      {
+        "path": ".github/workflows/release.yml",
+        "hunks": 1
+      },
+      {
+        "path": ".github/workflows/review.yml",
+        "hunks": 2
+      },
+      {
+        "path": "CLAUDE.md",
+        "hunks": 1
+      },
+      {
+        "path": "README.md",
+        "hunks": 3
+      },
+      {
+        "path": "action.yml",
+        "hunks": 3
+      },
+      {
+        "path": "docs/design/high-level-design.md",
+        "hunks": 2
+      },
+      {
+        "path": "package.json",
+        "hunks": 1
+      },
+      {
+        "path": "scripts/check-version-bump.sh",
+        "hunks": 1
+      },
+      {
+        "path": "scripts/release-tag.sh",
+        "hunks": 1
+      },
+      {
+        "path": "test/packaging.test.ts",
+        "hunks": 9
+      },
+      {
+        "path": "test/release-scripts.test.ts",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [
+      {
+        "path": "package-lock.json",
+        "reason": "generated"
+      }
+    ],
+    "sensitive_files": [
+      ".github/workflows/ci.yml",
+      ".github/workflows/pr-review.yml",
+      ".github/workflows/release.yml",
+      ".github/workflows/review.yml"
+    ],
+    "triage": {
+      "tier": "full",
+      "reason": "The change rewrites CI and release workflows, the reusable review workflow's checkout and trust model, action.yml execution paths, and adds new release and version-check shell scripts.",
+      "confidence": "high",
+      "categories": [
+        "security",
+        "bug",
+        "test",
+        "docs",
+        "convention"
+      ],
+      "hotspots": [
+        ".github/workflows/review.yml (new checkout of job.workflow_sha, Clear the action path step)",
+        "action.yml (copy to RUNNER_TEMP, npm ci/build there, cli path)",
+        "scripts/release-tag.sh",
+        "scripts/check-version-bump.sh",
+        "  .github/workflows/release.yml (contents: write, triggers)",
+        "  .github/workflows/ci.yml (fetch-depth 0, bump step env)",
+        "  .github/workflows/pr-review.yml (@main ref)",
+        "  .github/actionlint.yaml (ignores)"
+      ],
+      "file_notes": [
+        {
+          "file": ".github/workflows/review.yml",
+          "note": "Security-sensitive: replaces SHA-pinned action with a local checkout at job.workflow_sha; relies on job.workflow_repository/sha being correct for reusable workflows. Pull-request-controlled workspace content must not influence it."
+        },
+        {
+          "file": "action.yml",
+          "note": "Copies action to RUNNER_TEMP, installs, builds and runs there; adds branding. Check cp of GITHUB_ACTION_PATH and .git removal."
+        },
+        {
+          "file": ".github/workflows/release.yml",
+          "note": "New workflow with contents: write on push to main and dispatch; creates releases."
+        },
+        {
+          "file": ".github/workflows/ci.yml",
+          "note": "Adds full-history checkout and version-bump check step."
+        },
+        {
+          "file": ".github/workflows/pr-review.yml",
+          "note": "Now calls review.yml@main instead of @v1."
+        },
+        {
+          "file": ".github/actionlint.yaml",
+          "note": "New lint ignores for unknown job context properties."
+        },
+        {
+          "file": "scripts/release-tag.sh",
+          "note": "New script: tag existence check via ls-remote, gh release create."
+        },
+        {
+          "file": "scripts/check-version-bump.sh",
+          "note": "New script: merge-base diff, semver comparison, consistency across three files."
+        },
+        {
+          "file": "test/packaging.test.ts",
+          "note": "Updated tests for new action/workflow structure; adds hostile-workspace npm sandbox test."
+        },
+        {
+          "file": "test/release-scripts.test.ts",
+          "note": "New tests for release and version-bump scripts and release workflow."
+        },
+        {
+          "file": "package.json",
+          "note": "Version bump to 0.2.0."
+        },
+        {
+          "file": ".claude-plugin/plugin.json",
+          "note": "Version bump to 0.2.0."
+        },
+        {
+          "file": ".claude-plugin/marketplace.json",
+          "note": "Version bump to 0.2.0."
+        },
+        {
+          "file": "README.md",
+          "note": "Docs for new release process."
+        },
+        {
+          "file": "CLAUDE.md",
+          "note": "Docs update for release process."
+        },
+        {
+          "file": "docs/design/high-level-design.md",
+          "note": "Docs update for release tags."
+        }
+      ],
+      "summary": "Switches pr-review from a moving v1 tag to versioned releases. A new release workflow and script create v<version> from package.json, and a CI check requires a version bump when shipped files change. The reusable review workflow now checks out its own repo at job.workflow_sha and runs the action from there. action.yml copies itself to the runner temp dir before it installs, builds and runs, so a hostile workspace can't influence npm. Tests and docs are updated to match."
+    },
+    "tier": "full",
+    "tier_reason": "Sensitive paths set a floor of full: .github/workflows/ci.yml, .github/workflows/pr-review.yml, .github/workflows/release.yml, .github/workflows/review.yml.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6734,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 19892,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0020002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 482,
+              "cacheReadInputTokens": 5159,
+              "cacheCreationInputTokens": 19396,
+              "webSearchRequests": 0,
+              "costUSD": 0.1658478,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 119,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.167848
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "scripts/check-version-bump.sh",
+            "start_line": 41,
+            "end_line": 41,
+            "category": "docs",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "The description says a bump is required when the change touches src/, prompts/, action.yml or review.yml, but the script also requires a bump for commands/, .claude-plugin/, package.json and package-lock.json.",
+            "evidence": "if ! grep -E '^(src/|prompts/|commands/|\\.claude-plugin/|action\\.yml$|package\\.json$|package-lock\\.json$|\\.github/workflows/review\\.yml$)' > /dev/null <<< \"$changed\"; then",
+            "suggested_fix": "List every path that the script checks in the description.",
+            "explanation": "The script checks more paths than the description lists, so a lockfile-only or manifest-only PR now fails CI without a bump, and a reader of the description would not expect that.",
+            "needs_context": false
+          },
+          {
+            "file": "action.yml",
+            "start_line": 62,
+            "end_line": 67,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The description says nothing about the change in action.yml that copies the action to RUNNER_TEMP and installs, builds and runs it there.",
+            "evidence": "cp -R \"$GITHUB_ACTION_PATH\" \"$RUNNER_TEMP/pr-review-action\"",
+            "suggested_fix": "Add the copy step to the Changes list.",
+            "explanation": "This changes where the action builds and runs, and the description does not mention it.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 8698,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 19878,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0019983,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 736,
+              "cacheReadInputTokens": 5117,
+              "cacheCreationInputTokens": 19382,
+              "webSearchRequests": 0,
+              "costUSD": 0.1708074,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 164,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1728057
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 12137,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 19900,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.002001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 620,
+              "cacheReadInputTokens": 29528,
+              "cacheCreationInputTokens": 20971,
+              "webSearchRequests": 0,
+              "costUSD": 0.18608960000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 489,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.18809060000000002
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 8332,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 19894,
+              "outputTokens": 19,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0019989,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 591,
+              "cacheReadInputTokens": 29522,
+              "cacheCreationInputTokens": 20178,
+              "webSearchRequests": 0,
+              "costUSD": 0.1791644,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 399,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.18116329999999997
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 14769,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 19890,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0019990000000000003,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 6,
+              "outputTokens": 671,
+              "cacheReadInputTokens": 54335,
+              "cacheCreationInputTokens": 20129,
+              "webSearchRequests": 0,
+              "costUSD": 0.185343,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 410,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.187342
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 9576,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 606,
+              "cacheReadInputTokens": 43064,
+              "cacheCreationInputTokens": 33125,
+              "webSearchRequests": 0,
+              "costUSD": 0.2857488,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 448,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-haiku-5-5": {
+              "inputTokens": 33192,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0033292,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.289078
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 9960,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 19896,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0020006000000000004,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 841,
+              "cacheReadInputTokens": 5160,
+              "cacheCreationInputTokens": 19400,
+              "webSearchRequests": 0,
+              "costUSD": 0.17306,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 353,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.17506059999999998
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 10650,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 19890,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0019995000000000004,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 888,
+              "cacheReadInputTokens": 5160,
+              "cacheCreationInputTokens": 19394,
+              "webSearchRequests": 0,
+              "costUSD": 0.17395200000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 292,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1759515
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "test/packaging.test.ts",
+            "start_line": 1058,
+            "end_line": 1063,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "The test compares the rm step's script with an exact copy of its text, so it repeats the code instead of checking the behaviour.",
+            "evidence": "expect((rm.run ?? \"\").trim()).toBe(",
+            "suggested_fix": "Run the step in a sandbox that has a planted .pr-review-action symlink and a node_modules directory, then assert that both are gone.",
+            "explanation": "A change that keeps the same effect but rewords the script breaks this test, and the test does not show that a planted file, directory or symlink is gone.",
+            "needs_context": false
+          },
+          {
+            "file": "test/release-scripts.test.ts",
+            "start_line": 396,
+            "end_line": 396,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "The version-check table does not test changes under commands/ or .claude-plugin/, or a change to package.json alone, but the script treats all of them as shipped.",
+            "evidence": "[\"prompts/ changed, no bump\", { base: \"0.1.0\", paths: [\"prompts/a.md\"] }, 1],",
+            "suggested_fix": "Add rows for commands/x.md, .claude-plugin/other.json and package.json changed with no bump.",
+            "explanation": "If the regex loses one of these alternatives, a shipped change gets through without a version bump and no test fails.",
+            "needs_context": false
+          },
+          {
+            "file": "test/release-scripts.test.ts",
+            "start_line": 494,
+            "end_line": 497,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "The release.yml tests check the exact YAML values, so they repeat the config literally.",
+            "evidence": "expect(step.env).toEqual({",
+            "explanation": "The expected values are copies of the workflow text, so they show nothing that the YAML file does not already show.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 10945,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 19900,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.002001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 1005,
+              "cacheReadInputTokens": 31066,
+              "cacheCreationInputTokens": 19895,
+              "webSearchRequests": 0,
+              "costUSD": 0.18548920000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 176,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.18749020000000002
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "scripts/check-version-bump.sh",
+          "start_line": 41,
+          "end_line": 41,
+          "category": "docs",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "The description says a bump is required when the change touches src/, prompts/, action.yml or review.yml, but the script also requires a bump for commands/, .claude-plugin/, package.json and package-lock.json.",
+          "evidence": "if ! grep -E '^(src/|prompts/|commands/|\\.claude-plugin/|action\\.yml$|package\\.json$|package-lock\\.json$|\\.github/workflows/review\\.yml$)' > /dev/null <<< \"$changed\"; then",
+          "suggested_fix": "List every path that the script checks in the description.",
+          "explanation": "The script checks more paths than the description lists, so a lockfile-only or manifest-only PR now fails CI without a bump, and a reader of the description would not expect that.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": false,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if ! grep -E '^(src/|prompts/|commands/|\\.claude-plugin/|action\\.yml$|package\\.json$|package-lock\\.json$|\\.github/workflows/review\\.yml$)' > /dev/null <<< \"$changed\"; then",
+            "# merge base to the head touches src/, prompts/, commands/, .claude-plugin/,"
+          ],
+          "rationale": "The description is narrower than the script's path list, which is true. But the script's own header comment lists every path accurately, and the fix would edit a PR description, not code. That is a low-value nit.",
+          "score": 22,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": false,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if ! grep -E '^(src/|prompts/|commands/|\\.claude-plugin/|action\\.yml$|package\\.json$|package-lock\\.json$|\\.github/workflows/review\\.yml$)' > /dev/null <<< \"$changed\"; then",
+            "# merge base to the head touches src/, prompts/, commands/, .claude-plugin/,"
+          ],
+          "rationale": "The description is narrower than the script's path list, which is true. But the script's own header comment lists every path accurately, and the fix would edit a PR description, not code. That is a low-value nit.",
+          "score": 22,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "action.yml",
+          "start_line": 62,
+          "end_line": 67,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The description says nothing about the change in action.yml that copies the action to RUNNER_TEMP and installs, builds and runs it there.",
+          "evidence": "cp -R \"$GITHUB_ACTION_PATH\" \"$RUNNER_TEMP/pr-review-action\"",
+          "suggested_fix": "Add the copy step to the Changes list.",
+          "explanation": "This changes where the action builds and runs, and the description does not mention it.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "cp -R \"$GITHUB_ACTION_PATH\" \"$RUNNER_TEMP/pr-review-action\"",
+            "working-directory: ${{ runner.temp }}/pr-review-action"
+          ],
+          "rationale": "The copy-to-RUNNER_TEMP step is new in this diff. The description only says \"`action.yml` gets Marketplace branding\", so it omits the change. This is a minor documentation gap, though the changed build location is security-relevant.",
+          "score": 40,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "cp -R \"$GITHUB_ACTION_PATH\" \"$RUNNER_TEMP/pr-review-action\"",
+            "working-directory: ${{ runner.temp }}/pr-review-action"
+          ],
+          "rationale": "The copy-to-RUNNER_TEMP step is new in this diff. The description only says \"`action.yml` gets Marketplace branding\", so it omits the change. This is a minor documentation gap, though the changed build location is security-relevant.",
+          "score": 40,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "test/packaging.test.ts",
+          "start_line": 1058,
+          "end_line": 1063,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "The test compares the rm step's script with an exact copy of its text, so it repeats the code instead of checking the behaviour.",
+          "evidence": "expect((rm.run ?? \"\").trim()).toBe(",
+          "suggested_fix": "Run the step in a sandbox that has a planted .pr-review-action symlink and a node_modules directory, then assert that both are gone.",
+          "explanation": "A change that keeps the same effect but rewords the script breaks this test, and the test does not show that a planted file, directory or symlink is gone.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect((rm.run ?? \"\").trim()).toBe(",
+            "'rm -rf -- \"$GITHUB_WORKSPACE/.pr-review-action\"',",
+            "// The exact text above replaces the line checks for the rm step.",
+            "rm -rf -- \"$GITHUB_WORKSPACE/.pr-review-action\""
+          ],
+          "rationale": "The test does pin the rm script to an exact string and never runs it against a planted symlink or directory. The pinning is deliberate, and it is a reasonable way to guard a short security step, so this is only a minor suggestion.",
+          "score": 35,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect((rm.run ?? \"\").trim()).toBe(",
+            "'rm -rf -- \"$GITHUB_WORKSPACE/.pr-review-action\"',",
+            "// The exact text above replaces the line checks for the rm step.",
+            "rm -rf -- \"$GITHUB_WORKSPACE/.pr-review-action\""
+          ],
+          "rationale": "The test does pin the rm script to an exact string and never runs it against a planted symlink or directory. The pinning is deliberate, and it is a reasonable way to guard a short security step, so this is only a minor suggestion.",
+          "score": 35,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "test/release-scripts.test.ts",
+          "start_line": 396,
+          "end_line": 396,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "The version-check table does not test changes under commands/ or .claude-plugin/, or a change to package.json alone, but the script treats all of them as shipped.",
+          "evidence": "[\"prompts/ changed, no bump\", { base: \"0.1.0\", paths: [\"prompts/a.md\"] }, 1],",
+          "suggested_fix": "Add rows for commands/x.md, .claude-plugin/other.json and package.json changed with no bump.",
+          "explanation": "If the regex loses one of these alternatives, a shipped change gets through without a version bump and no test fails.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if ! grep -E '^(src/|prompts/|commands/|\\.claude-plugin/|action\\.yml$|package\\.json$|package-lock\\.json$|\\.github/workflows/review\\.yml$)' > /dev/null <<< \"$changed\"; then",
+            "[\"prompts/ changed, no bump\", { base: \"0.1.0\", paths: [\"prompts/a.md\"] }, 1],"
+          ],
+          "rationale": "The script's regex includes commands/, .claude-plugin/ and package.json, and the test table has no row for any of them. Dropping one of those alternatives would not fail a test, so the gap is real. It is a modest coverage gap, not a bug.",
+          "score": 50,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if ! grep -E '^(src/|prompts/|commands/|\\.claude-plugin/|action\\.yml$|package\\.json$|package-lock\\.json$|\\.github/workflows/review\\.yml$)' > /dev/null <<< \"$changed\"; then",
+            "[\"prompts/ changed, no bump\", { base: \"0.1.0\", paths: [\"prompts/a.md\"] }, 1],"
+          ],
+          "rationale": "The script's regex includes commands/, .claude-plugin/ and package.json, and the test table has no row for any of them. Dropping one of those alternatives would not fail a test, so the gap is real. It is a modest coverage gap, not a bug.",
+          "score": 50,
+          "severity": "suggestion"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "test/release-scripts.test.ts",
+          "start_line": 494,
+          "end_line": 497,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "The release.yml tests check the exact YAML values, so they repeat the config literally.",
+          "evidence": "expect(step.env).toEqual({",
+          "explanation": "The expected values are copies of the workflow text, so they show nothing that the YAML file does not already show.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(step.env).toEqual({\n      GH_TOKEN: \"${{ github.token }}\",\n      RELEASE_DRY_RUN: \"${{ inputs.dry_run }}\",\n    });",
+            "expect(step.run).not.toContain(\"${{\");"
+          ],
+          "rationale": "The assertion does compare against literal workflow values, but this is a deliberate guard on a security-sensitive workflow (token and inputs passed through env, not inlined in `run`). It catches regressions and the PR's stated goal is to assert the workflow's shape, so a careful reviewer would not post this as a problem.",
+          "score": 8,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(step.env).toEqual({\n      GH_TOKEN: \"${{ github.token }}\",\n      RELEASE_DRY_RUN: \"${{ inputs.dry_run }}\",\n    });",
+            "expect(step.run).not.toContain(\"${{\");"
+          ],
+          "rationale": "The assertion does compare against literal workflow values, but this is a deliberate guard on a security-sensitive workflow (token and inputs passed through env, not inlined in `run`). It catches regressions and the PR's stated goal is to assert the workflow's shape, so a careful reviewer would not post this as a problem.",
+          "score": 8,
+          "severity": "nit"
+        },
+        "passed": false
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5641449699,
+      "review_url": "https://github.com/jerridan/pr-review/pull/30#pullrequestreview-5641449699",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 121072239526
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 8892,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 27036,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0027131000000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1267,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 26548,
+            "webSearchRequests": 0,
+            "costUSD": 0.11899219999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.12170529999999999
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6734,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 19892,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0020002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 482,
+            "cacheReadInputTokens": 5159,
+            "cacheCreationInputTokens": 19396,
+            "webSearchRequests": 0,
+            "costUSD": 0.1658478,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 119,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.167848
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 8332,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 19894,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0019989,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 591,
+            "cacheReadInputTokens": 29522,
+            "cacheCreationInputTokens": 20178,
+            "webSearchRequests": 0,
+            "costUSD": 0.1791644,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 399,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.18116329999999997
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "model": "claude-opus-5-5",
+        "duration_ms": 8698,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 19878,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0019983,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 736,
+            "cacheReadInputTokens": 5117,
+            "cacheCreationInputTokens": 19382,
+            "webSearchRequests": 0,
+            "costUSD": 0.1708074,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 164,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1728057
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 12137,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 19900,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.002001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 620,
+            "cacheReadInputTokens": 29528,
+            "cacheCreationInputTokens": 20971,
+            "webSearchRequests": 0,
+            "costUSD": 0.18608960000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 489,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.18809060000000002
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "model": "claude-opus-5-5",
+        "duration_ms": 14769,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 19890,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0019990000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 671,
+            "cacheReadInputTokens": 54335,
+            "cacheCreationInputTokens": 20129,
+            "webSearchRequests": 0,
+            "costUSD": 0.185343,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 410,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.187342
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "model": "claude-opus-5-5",
+        "duration_ms": 9576,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 606,
+            "cacheReadInputTokens": 43064,
+            "cacheCreationInputTokens": 33125,
+            "webSearchRequests": 0,
+            "costUSD": 0.2857488,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 448,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-haiku-5-5": {
+            "inputTokens": 33192,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0033292,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.289078
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 9960,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 19896,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0020006000000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 841,
+            "cacheReadInputTokens": 5160,
+            "cacheCreationInputTokens": 19400,
+            "webSearchRequests": 0,
+            "costUSD": 0.17306,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 353,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.17506059999999998
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 10650,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 19890,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0019995000000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 888,
+            "cacheReadInputTokens": 5160,
+            "cacheCreationInputTokens": 19394,
+            "webSearchRequests": 0,
+            "costUSD": 0.17395200000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 292,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1759515
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 5663,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8489,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0008604000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 653,
+            "cacheReadInputTokens": 3889,
+            "cacheCreationInputTokens": 8001,
+            "webSearchRequests": 0,
+            "costUSD": 0.0389269,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 271,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0397873
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 4464,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 6330,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.000644,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 501,
+            "cacheReadInputTokens": 3889,
+            "cacheCreationInputTokens": 5842,
+            "webSearchRequests": 0,
+            "costUSD": 0.028770900000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 156,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0294149
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "model": "claude-opus-5-5",
+        "duration_ms": 10945,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 19900,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.002001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 1005,
+            "cacheReadInputTokens": 31066,
+            "cacheCreationInputTokens": 19895,
+            "webSearchRequests": 0,
+            "costUSD": 0.18548920000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 176,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.18749020000000002
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 5014,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 20765,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0020854999999999997,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 478,
+            "cacheReadInputTokens": 3889,
+            "cacheCreationInputTokens": 20277,
+            "webSearchRequests": 0,
+            "costUSD": 0.0862809,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 85,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0883664
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6780,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 20868,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0020958,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 735,
+            "cacheReadInputTokens": 28158,
+            "cacheCreationInputTokens": 21381,
+            "webSearchRequests": 0,
+            "costUSD": 0.0956978,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 171,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0977936
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 9031,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 38727,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0038821999999999997,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 795,
+            "cacheReadInputTokens": 46017,
+            "cacheCreationInputTokens": 38833,
+            "webSearchRequests": 0,
+            "costUSD": 0.1678917,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 264,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1717739
+      }
+    ],
+    "total_cost_usd": 2.2736712999999997,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 49,
+      "gather": 204,
+      "scope": 8,
+      "triage": 9695,
+      "find_verify": 34895,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
