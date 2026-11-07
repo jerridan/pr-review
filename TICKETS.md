@@ -2,28 +2,48 @@
 
 This file lists the work that remains after D1 to D4a. D1 is the local walking skeleton. D2 is the full reviewer set and repo configuration. D3 is the GitHub review posting and CI packaging. D4a is the evaluation harness. Each ticket is one deliverable: one branch, one PR. The design is `docs/design/high-level-design.md`; section numbers below refer to it.
 
-The order of the deliverables is D5, then D4b, then D6, D7 and D8 in any order, then D4c. D5 gives the eval the metrics and the labels that D6 to D8 need to show their effect. The issues 18 to 28 of this repo hold the evidence behind D5 to D8. Each issue states its numbers from a run of this tool on six keyed pull requests.
+The order of the deliverables is D5, then D4b, then D6, D7 and D8 in any order, then D4c. D5 gives the eval the labels and the metrics that D6 to D8 need to show their effect. The issues 18 to 28 of this repo hold the evidence behind D5 to D8. Each issue states its numbers from a run of this tool on six keyed pull requests.
+
+Two facts shape the eval. First, one person maintains this repo and fixes almost every finding a reviewer posts, so a finding that a person acted on is no sign of its importance, and the findings posted on the PRs of this repo are not the full list of their real issues. The eval takes no golden from a record. Second, the eval is a tool for that one person, not a gate for a team. It runs on demand, and a small curated set that grows is worth more than a large set built up front.
 
 ## D5: Eval foundation
 
-Goal: make the eval able to show where a change helps and where it hurts, before any prompt or threshold moves. Closes issues 26 and 27.
+Goal: give the eval a severity policy, a labeler that applies it, a first curated case set, and the metrics that show where a change helps and where it hurts. Closes issues 26 and 27.
 
-- Write `docs/design/severity-policy.md`. It defines blocking, suggestion and nit by consequence and by the path a person needs to reach the problem. It also defines the three outcomes that do not post: don't post, not real and unsure. It covers normal and unusual paths, stored data, tests and missing tests, partly true claims, messages and status codes, process findings and accessibility. An accessibility problem that stops a keyboard or screen-reader user from a task is blocking. The verifier prompt, the eval judge prompt and the labeler all use this one policy. Section 3.5 and decision 7 point to it.
-- Add a labeling loop in `scripts/`, with its prompts under `prompts/`. A scorer model labels the severity and the category of each golden finding under the policy. A judge model from another model family accepts the label or rejects it with a reason. A rejected label goes back to the scorer with the reason, at most twice. An accepted label is gold. A label that never converges goes to a human queue file. The loop writes the first-pass acceptance rate to the case set, because that rate is the bar a severity agreement is read against. The judge credential stays outside the tool: `scripts/` only, never `src/`. Note this in section 1 and section 8.
-- Build the golden findings of a case from a pool, not from the output of this tool alone: every finding from every recorded run, plus two blind reviews by a strong model with no sight of any comment. Anonymise the pool. Two model families adjudicate each item. Keep an item that both rate at 75 or above.
+Done so far: `docs/design/severity-policy.md`, merged in PR #32.
+
+- Add a three-pass labeler in `scripts/`, with its prompt under `prompts/`. For each golden finding it asks for a severity and a category under the policy three times, each pass blind to the others, across two model families: two passes on Claude and one on a GPT model through the Codex CLI, or the reverse. Two passes that agree set the label. Three different labels send the finding to a human queue file. The labeler writes every disagreement to a log with the policy section each pass cited, so the log shows which rule reads two ways. The GPT credential stays outside the tool: `scripts/` only, never `src/`. Note this in section 1 and section 8.
+- Build the first curated set from the open-source benchmarks, with the sources `martian` and `reviewbench`. Their golden findings are already pooled and adjudicated. The labeler maps their severity onto the policy; do not copy the source label. The set holds the languages of the user's own repos: TypeScript, JavaScript and Python, with one Ruby case. Remove the four starter cases of D4a: the fixture is synthetic and the three PR cases took their goldens from fixes. The ten cases:
+
+  | Source | Repo | PR | Language | Lines | Goldens |
+  |--------|------|----|----------|-------|---------|
+  | martian | calcom/cal.com | 14943 | TypeScript | 44 | 2 |
+  | martian | calcom/cal.com | 8330 | TypeScript | 121 | 2 |
+  | martian | ai-code-review-evaluation/sentry-greptile | 1 | Python | 138 | 4 |
+  | martian | getsentry/sentry | 93824 | Python | 249 | 5 |
+  | martian | ai-code-review-evaluation/discourse-graphite | 1 | Ruby | 32 | 4 |
+  | reviewbench | axios/axios | 10836 | JavaScript | 12 | 2 true |
+  | reviewbench | konturio/disaster-ninja-fe | 1166 | TypeScript | 15 | 3 true, 6 false |
+  | reviewbench | Marvell-Consulting/statswales-frontend | 626 | TypeScript | 57 | 6 true, 1 false |
+  | reviewbench | jannekbuengener/Claire_de_Binare | 1550 | Python | 29 | 2 true, 9 false |
+  | reviewbench | alexbol99/flatten-js | 244 | JavaScript | 85 | 5 true, 4 false |
+
+  ReviewBench marks each golden true or false. A false golden becomes a not-real golden, so the golden schema allows the six labels of the policy from this deliverable. Recall counts the three posted labels. A posted finding that matches a not-real golden is a false positive. Amend the line in the policy that limits a golden to the three posted labels.
+- After the first labeling round, read the disagreement log and amend the policy where it points. Repeat once.
+- Move the pin in `eval/cases.json` and write a new baseline. Make the eval job in `ci.yml` run on manual dispatch only. A change that touches behaviour runs the eval locally at one repeat, and the PR description carries the table. Record this in section 8.
 - Score `stages.reviewers[].findings` against the goldens beside `posted.findings`. Print raw recall, posted recall and the per-stage drop counts from `explain` in the eval table.
-- Report precision against adjudicated extras: a posted finding that matches no golden goes to the judge before it counts as false.
+- Report precision against adjudicated extras: a posted finding that matches no golden goes to a judge before it counts as false. An extra the judge accepts queues as a candidate golden for the next case revision. The set never changes during a run.
 - Report cost per PR beside every metric. Each later deliverable adds reading, passes or posts, so the cost must stay visible.
 
 ## D4b: More eval cases
 
-Goal: grow the case set of the eval beyond the starter set of D4a (section 8). A larger set lets the metrics separate one prompt or model from another. Depends on D5: every new case takes its severity labels from the labeling loop, and its goldens from the pool.
+Goal: grow the case set in small revisions, about five cases each. Depends on D5: every new case takes its severity labels from the three-pass labeler.
 
-- Add cases from ReviewBench and Martian, with the sources `reviewbench` and `martian`. Their severity scales differ from ours. The labeling loop maps them onto the policy; do not copy the source label.
-- Add cases by bug injection into jerridan/websites and jerridan/walle, with the source `injection`. Each injected bug is one golden finding.
-- Add cases from real records where a person acted on or dismissed a finding, with the source `record`.
-- Make each case with `scripts/make-case.sh` and add it to the cases repo as its README says. Move the pin in `eval/cases.json` and write a new baseline with `--write-baseline` in the same PR.
-- The gate margin tightens as the set grows, because a larger set has a smaller spread. Re-derive each margin from the new baseline run by the rule in the README.
+- Add more cases from Martian and ReviewBench while the set stays under about 30. Keep the spread of language, category and size.
+- Add cases from jerridan/websites, jerridan/walle and jerridan/pr-review, picked for variety of size and change type, not for their record. Build their goldens from a pool: two blind reviews each by a Claude model and a GPT model with no sight of any comment, plus the findings of every recorded run. Anonymise the pool. Both families adjudicate each item. Keep an item both rate at 75 or above. A PR whose pool adjudicates to nothing is a clean case and measures precision only.
+- A dismissed finding from a record becomes a golden with the label not real or don't post, after the pool adjudicates it. These are the only goldens a record gives. A posted finding that matches a don't-post golden is noise.
+- Add a few cases by bug injection into jerridan/websites and jerridan/walle, with the source `injection`. Each injected bug is one golden finding. Keep them few: synthetic cases overstate quality.
+- Make each case with `scripts/make-case.sh` and add it to the cases repo as its README says. Each revision moves the pin in `eval/cases.json`, writes a new baseline with `--write-baseline` and re-derives the margins by the rule in the README, in one PR.
 
 ## D6: Verifier inputs and rubric
 
