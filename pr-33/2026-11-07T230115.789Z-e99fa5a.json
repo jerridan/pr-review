@@ -1,0 +1,547 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 33,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Reshape D5 and D4b around a small curated eval set",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/33"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "279e518bf00f8871ccbca4578e1840788b13816d",
+    "head": "e99fa5ac3e8c3b536eca9bea3a6b4111dab05410",
+    "started_at": "2026-11-07T23:01:15.789Z",
+    "tool_version": "0.2.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Reshape D5 and D4b around a small curated eval set\n\nUpdates TICKETS.md after the severity policy landed in #32.\n\n- **Preamble** states two facts that shape the eval: a finding a person acted on carries no importance signal in this repo, and the eval is an on-demand tool for one person, not a team gate.\n- **D5** now has a three-pass labeler with a disagreement log in place of the scorer-judge loop, a first curated set of ten small cases from Martian and ReviewBench in TypeScript, JavaScript, Python and Ruby, removal of the four D4a starter cases, a round of policy amendments from the disagreement log, a manual-only eval job in CI, and the rule that the case set never changes during a run. ReviewBench false-positive goldens bring the six-label golden schema into D5.\n- **D4b** grows the set in revisions of about five. Own-repo cases get goldens from a two-family pool. Only dismissed findings come from records, as not-real or don't-post goldens. The `record` source as a positive golden is gone.\n\nNo code change.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZgggAoxaZA98nRCMsW",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": "TICKETS.md",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "fast",
+      "reason": "Only TICKETS.md, a planning document that no code reads, changes; it rewrites the D5 and D4b ticket text, so the risk is inconsistent or wrong planning content and not a runtime bug.",
+      "confidence": "medium",
+      "categories": [
+        "docs"
+      ],
+      "hotspots": [
+        "TICKETS.md: D5 case table (counts and goldens per case)",
+        "TICKETS.md: D5 three-pass labeler and policy amendment bullets",
+        "TICKETS.md: D4b revised scope"
+      ],
+      "file_notes": [
+        {
+          "file": "TICKETS.md",
+          "note": "Docs-only rewrite of the D5 and D4b tickets. It replaces the labeling loop with a three-pass labeler, adds a ten-case curated set, and narrows D4b. Check that it is internally consistent and matches the design docs."
+        }
+      ],
+      "summary": "The change rewrites the D5 and D4b tickets in TICKETS.md. D5 now covers a three-pass, two-family labeler, a curated set of ten benchmark cases from martian and reviewbench, and a manual-dispatch eval job. It also covers metrics and reporting changes. D4b now grows the set in small revisions and builds goldens from a pool. No code or configuration changes."
+    },
+    "tier": "fast",
+    "tier_reason": "Triage: Only TICKETS.md, a planning document that no code reads, changes; it rewrites the D5 and D4b ticket text, so the risk is inconsistent or wrong planning content and not a runtime bug.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= fast; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= fast; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "TICKETS.md",
+            "start_line": 7,
+            "end_line": 7,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The new preamble has a long compound sentence that breaks the ASD-STE100 rule of short sentences with one instruction or fact each.",
+            "evidence": "First, one person maintains this repo and fixes almost every finding a reviewer posts, so a finding that a person acted on is no sign of its importance, and the findings posted on the PRs of this repo are not the full list of their real issues.",
+            "suggested_fix": "Split it into three sentences, one for each fact.",
+            "explanation": "CLAUDE.md rule 5 asks for short sentences in every markdown file. This sentence joins three facts into one.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4496,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 5534,
+              "outputTokens": 27,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0005669,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 466,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 10175,
+              "webSearchRequests": 0,
+              "costUSD": 0.090728,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 159,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0912949
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4674,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 5532,
+              "outputTokens": 27,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0005667,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 354,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 10076,
+              "webSearchRequests": 0,
+              "costUSD": 0.087696,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 139,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0882627
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "TICKETS.md",
+          "start_line": 7,
+          "end_line": 7,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The new preamble has a long compound sentence that breaks the ASD-STE100 rule of short sentences with one instruction or fact each.",
+          "evidence": "First, one person maintains this repo and fixes almost every finding a reviewer posts, so a finding that a person acted on is no sign of its importance, and the findings posted on the PRs of this repo are not the full list of their real issues.",
+          "suggested_fix": "Split it into three sentences, one for each fact.",
+          "explanation": "CLAUDE.md rule 5 asks for short sentences in every markdown file. This sentence joins three facts into one.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "First, one person maintains this repo and fixes almost every finding a reviewer posts, so a finding that a person acted on is no sign of its importance, and the findings posted on the PRs of this repo are not the full list of their real issues.",
+            "Write ASD-STE100 prose.** Use it in every markdown file and every code comment. Write short sentences in active voice, with one instruction each."
+          ],
+          "rationale": "CLAUDE.md rule 5 requires short ASD-STE100 sentences in every markdown file. The new sentence on line 7 joins three facts with \"so\" and \"and\", and this PR added it. The finding is valid but only a prose-style nit.",
+          "score": 62,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "First, one person maintains this repo and fixes almost every finding a reviewer posts, so a finding that a person acted on is no sign of its importance, and the findings posted on the PRs of this repo are not the full list of their real issues.",
+            "5. **Write ASD-STE100 prose.** Use it in every markdown file and every code comment. Write short sentences in active voice, with one instruction each."
+          ],
+          "rationale": "The finding is true. The new preamble sentence is about 50 words long and joins three facts, and CLAUDE.md rule 5 asks for short ASD-STE100 sentences in every markdown file. It is a real style issue, but only a minor wording nit in a docs file.",
+          "score": 62,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "First, one person maintains this repo and fixes almost every finding a reviewer posts, so a finding that a person acted on is no sign of its importance, and the findings posted on the PRs of this repo are not the full list of their real issues.",
+            "5. **Write ASD-STE100 prose.** Use it in every markdown file and every code comment. Write short sentences in active voice, with one instruction each."
+          ],
+          "rationale": "The finding is true. The new preamble sentence is about 50 words long and joins three facts, and CLAUDE.md rule 5 asks for short ASD-STE100 sentences in every markdown file. It is a real style issue, but only a minor wording nit in a docs file.",
+          "score": 62,
+          "severity": "nit"
+        },
+        "passed": false
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "diff-bugs"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5815471540,
+      "review_url": "https://github.com/jerridan/pr-review/pull/33#pullrequestreview-5815471540",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 128556240487
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 4436,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 4817,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0004932000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 556,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 5592,
+            "webSearchRequests": 0,
+            "costUSD": 0.027932,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.028425199999999998
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 4496,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5534,
+            "outputTokens": 27,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005669,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 466,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 10175,
+            "webSearchRequests": 0,
+            "costUSD": 0.090728,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 159,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0912949
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 4674,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5532,
+            "outputTokens": 27,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005667,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 354,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 10076,
+            "webSearchRequests": 0,
+            "costUSD": 0.087696,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 139,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0882627
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6245,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11231,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011346,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 635,
+            "cacheReadInputTokens": 14633,
+            "cacheCreationInputTokens": 14934,
+            "webSearchRequests": 0,
+            "costUSD": 0.0675573,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 82,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0686919
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6584,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11217,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011342,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 640,
+            "cacheReadInputTokens": 14611,
+            "cacheCreationInputTokens": 14976,
+            "webSearchRequests": 0,
+            "costUSD": 0.1355462,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 94,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1366804
+      }
+    ],
+    "total_cost_usd": 0.4133551,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 38,
+      "gather": 32,
+      "triage": 6128,
+      "find_verify": 19289,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
