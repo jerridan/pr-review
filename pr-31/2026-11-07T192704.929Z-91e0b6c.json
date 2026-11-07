@@ -1,0 +1,730 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 31,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Add tickets D5 to D8 from the reviewer issues",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/31"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "9ab4fe938a79ebda30bbe3a390320b52174d4127",
+    "head": "91e0b6c2dbbdfb7203812417b6f8f13915b7a03f",
+    "started_at": "2026-11-07T19:27:04.929Z",
+    "tool_version": "0.2.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Add tickets D5 to D8 from the reviewer issues\n\nTurns issues #18 to #28 into deliverables in TICKETS.md and sets their order against D4b and D4c.\n\n- **D5 Eval foundation**: severity policy document, cross-family labeling loop in `scripts/`, pooled golden key, per-stage metrics, precision against adjudicated extras, cost per PR beside every metric. Covers #26 and #27.\n- **D4b** now depends on D5 and takes severity labels from the loop.\n- **D6 Verifier inputs and rubric**: truth-only score, `unsure` result, the reviewers' description block, git facts as data blocks from gather, windowed head file. Covers #18, #19, #24.\n- **D7 Reviewer briefing and reading plans**: gather fix for the PR body, file list and read-in-full instruction, concrete reading steps for diff-bugs, history and tests. Covers #20, #25.\n- **D8 Passes default**: two passes for history and tests, measured over 20 runs per arm, plus a per-reviewer turn budget. Covers #21.\n- **Design updates**: decisions for sections 10, 6 and 3.6. Covers #22 and #28, holds #23 for D4c.\n- **D4c** gains the cap decision and the injection measurement after D7.\n\nEach item was weighed against the issue evidence and against `docs/research/`. No issue closes here; each closes with its deliverable.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZgggAoxaZA98nRCMsW",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": "TICKETS.md",
+        "hunks": 2
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "fast",
+      "reason": "The change only adds planning text to TICKETS.md, which no code reads, so it cannot cause a bug. It is a long doc with design claims, so a light consistency check is still worth doing.",
+      "confidence": "medium",
+      "categories": [
+        "docs"
+      ],
+      "hotspots": [
+        "TICKETS.md: deliverable order line and the Depends-on statements in D4b, D6, D7 and D8",
+        "TICKETS.md: D6 verifier rules (claim_holds, unsure, escalation band)",
+        "TICKETS.md: 'Design updates from issues 22, 23 and 28' section references to design sections 3.6, 6 and 10"
+      ],
+      "file_notes": [
+        {
+          "file": "TICKETS.md",
+          "note": "Docs only. Adds tickets D5 to D8 and a design-updates section. Reorders D4b and D4c dependencies and adds two items to D4c. No code or config is touched."
+        }
+      ],
+      "summary": "The change adds new tickets to TICKETS.md: D5 (eval foundation and severity policy), D6 (verifier inputs and rubric), D7 (reviewer briefing and reading plans) and D8 (passes default). It also adds a design-updates section for issues 22, 23 and 28. It sets a delivery order, links D4b to D5, and adds two items to D4c. No code changes."
+    },
+    "tier": "fast",
+    "tier_reason": "Triage: The change only adds planning text to TICKETS.md, which no code reads, so it cannot cause a bug. It is a long doc with design claims, so a light consistency check is still worth doing.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= fast; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= fast; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "TICKETS.md",
+            "start_line": 45,
+            "end_line": 45,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The word \"exhortations\" is not in the simple word list of ASD-STE100.",
+            "evidence": "Write steps, not exhortations.",
+            "suggested_fix": "Write steps, not general requests such as \"be thorough\".",
+            "explanation": "CLAUDE.md rule 5 asks for ASD-STE100 prose in every markdown file, and that standard uses only simple, approved words.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6563,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 5404,
+              "outputTokens": 26,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0005534,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 635,
+              "cacheReadInputTokens": 10043,
+              "cacheCreationInputTokens": 10640,
+              "webSearchRequests": 0,
+              "costUSD": 0.09984459999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 285,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.10039799999999999
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "TICKETS.md",
+            "start_line": 47,
+            "end_line": 47,
+            "category": "other",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "D7 tells the team to run the D4c injection measurement as part of D7, but the stated order puts D4c after D7 and D4c lists that measurement as its own item.",
+            "evidence": "- Run the injection measurement of D4c with this change, because the PR body now reaches every reviewer and the verifier.",
+            "suggested_fix": "Make D7 ship the injection test case and leave the measurement to D4c, or remove the item from D4c.",
+            "explanation": "Two deliverables now claim the same work, and the delivery order does not say which one owns it.",
+            "needs_context": false
+          },
+          {
+            "file": "TICKETS.md",
+            "start_line": 32,
+            "end_line": 32,
+            "category": "other",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "The D6 posting rule first says a finding posts only when the score is at or above the threshold, then says agreement from the escalation can override a score below the threshold.",
+            "evidence": "Post when `claim_holds` is true and the score is at or above the threshold. Keep the escalation band. Let agreement on `claim_holds` from the escalation override a score below the threshold.",
+            "suggested_fix": "Write one rule: a finding posts when claim_holds is true and either the score is at or above the threshold or the escalation agrees.",
+            "explanation": "The two sentences give conflicting conditions for when a finding posts.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 8454,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 5398,
+              "outputTokens": 26,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0005528,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 918,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 9940,
+              "webSearchRequests": 0,
+              "costUSD": 0.097888,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 316,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.09844080000000001
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "TICKETS.md",
+          "start_line": 45,
+          "end_line": 45,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The word \"exhortations\" is not in the simple word list of ASD-STE100.",
+          "evidence": "Write steps, not exhortations.",
+          "suggested_fix": "Write steps, not general requests such as \"be thorough\".",
+          "explanation": "CLAUDE.md rule 5 asks for ASD-STE100 prose in every markdown file, and that standard uses only simple, approved words.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "Write steps, not exhortations.",
+            "5. **Write ASD-STE100 prose.** Use it in every markdown file and every code comment."
+          ],
+          "rationale": "CLAUDE.md rule 5 requires ASD-STE100 prose in every markdown file, and \"exhortations\" is an uncommon word that is not in the approved vocabulary. The line is new in this PR, but it is a small wording issue.",
+          "score": 62,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "Write steps, not exhortations. The 5.5 guidance says a line such as \"be thorough\" costs tokens and adds nothing.",
+            "5. **Write ASD-STE100 prose.** Use it in every markdown file and every code comment. Write short sentences in active voice, with one instruction each."
+          ],
+          "rationale": "The finding is correct: \"exhortations\" is not a simple STE word, this PR added the line, and CLAUDE.md asks for STE prose in markdown. But it is a wording nit of little value, the next sentence already explains the meaning, and the file uses other non-STE words such as \"adjudicate\" and \"anonymise\".",
+          "score": 42,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "Write steps, not exhortations. The 5.5 guidance says a line such as \"be thorough\" costs tokens and adds nothing.",
+            "5. **Write ASD-STE100 prose.** Use it in every markdown file and every code comment. Write short sentences in active voice, with one instruction each."
+          ],
+          "rationale": "The finding is correct: \"exhortations\" is not a simple STE word, this PR added the line, and CLAUDE.md asks for STE prose in markdown. But it is a wording nit of little value, the next sentence already explains the meaning, and the file uses other non-STE words such as \"adjudicate\" and \"anonymise\".",
+          "score": 42,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "TICKETS.md",
+          "start_line": 47,
+          "end_line": 47,
+          "category": "other",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "D7 tells the team to run the D4c injection measurement as part of D7, but the stated order puts D4c after D7 and D4c lists that measurement as its own item.",
+          "evidence": "- Run the injection measurement of D4c with this change, because the PR body now reaches every reviewer and the verifier.",
+          "suggested_fix": "Make D7 ship the injection test case and leave the measurement to D4c, or remove the item from D4c.",
+          "explanation": "Two deliverables now claim the same work, and the delivery order does not say which one owns it.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- Run the injection measurement of D4c with this change, because the PR body now reaches every reviewer and the verifier.",
+            "- A prompt injection in a PR body against the sanitizer and the untrusted wrapper, after D7.",
+            "The order of the deliverables is D5, then D4b, then D6, D7 and D8 in any order, then D4c."
+          ],
+          "rationale": "The same injection measurement is listed in both D7 (\"Run the injection measurement of D4c with this change\") and D4c (\"after D7\"), and D4c runs last. Ownership is ambiguous, but the intent is fairly clear, so this is a minor documentation inconsistency.",
+          "score": 45,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- Run the injection measurement of D4c with this change, because the PR body now reaches every reviewer and the verifier.",
+            "- A prompt injection in a PR body against the sanitizer and the untrusted wrapper, after D7.",
+            "The order of the deliverables is D5, then D4b, then D6, D7 and D8 in any order, then D4c."
+          ],
+          "rationale": "The same injection measurement is listed in both D7 (\"Run the injection measurement of D4c with this change\") and D4c (\"after D7\"), and D4c runs last. Ownership is ambiguous, but the intent is fairly clear, so this is a minor documentation inconsistency.",
+          "score": 45,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "TICKETS.md",
+          "start_line": 32,
+          "end_line": 32,
+          "category": "other",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "The D6 posting rule first says a finding posts only when the score is at or above the threshold, then says agreement from the escalation can override a score below the threshold.",
+          "evidence": "Post when `claim_holds` is true and the score is at or above the threshold. Keep the escalation band. Let agreement on `claim_holds` from the escalation override a score below the threshold.",
+          "suggested_fix": "Write one rule: a finding posts when claim_holds is true and either the score is at or above the threshold or the escalation agrees.",
+          "explanation": "The two sentences give conflicting conditions for when a finding posts.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "Post when `claim_holds` is true and the score is at or above the threshold. Keep the escalation band. Let agreement on `claim_holds` from the escalation override a score below the threshold."
+          ],
+          "rationale": "The three sentences read as a base rule, then an exception that applies to escalated middle-band scores, and the code already escalates middle-band scores. This is a loosely worded ticket, not a contradiction; a one-line clarification would help but it is not a defect.",
+          "score": 22,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "Post when `claim_holds` is true and the score is at or above the threshold. Keep the escalation band. Let agreement on `claim_holds` from the escalation override a score below the threshold."
+          ],
+          "rationale": "The three sentences read as a base rule, then an exception that applies to escalated middle-band scores, and the code already escalates middle-band scores. This is a loosely worded ticket, not a contradiction; a one-line clarification would help but it is not a defect.",
+          "score": 22,
+          "severity": "nit"
+        },
+        "passed": false
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "diff-bugs"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5814561356,
+      "review_url": "https://github.com/jerridan/pr-review/pull/31#pullrequestreview-5814561356",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 128504657932
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6390,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 4499,
+            "outputTokens": 31,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00046540000000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 868,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 5274,
+            "webSearchRequests": 0,
+            "costUSD": 0.02978,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 291,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.030245400000000002
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6563,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5404,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005534,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 635,
+            "cacheReadInputTokens": 10043,
+            "cacheCreationInputTokens": 10640,
+            "webSearchRequests": 0,
+            "costUSD": 0.09984459999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 285,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.10039799999999999
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 8454,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5398,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005528,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 918,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 9940,
+            "webSearchRequests": 0,
+            "costUSD": 0.097888,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 316,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.09844080000000001
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 5704,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9932,
+            "outputTokens": 286,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011362,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 260,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 550,
+            "cacheReadInputTokens": 13334,
+            "cacheCreationInputTokens": 13643,
+            "webSearchRequests": 0,
+            "costUSD": 0.0614134,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 19,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0625496
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 5878,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9978,
+            "outputTokens": 224,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011098,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 198,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 724,
+            "cacheReadInputTokens": 3889,
+            "cacheCreationInputTokens": 9491,
+            "webSearchRequests": 0,
+            "costUSD": 0.045596899999999996,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 322,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0467067
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 8792,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9997,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0010112,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 936,
+            "cacheReadInputTokens": 31523,
+            "cacheCreationInputTokens": 11290,
+            "webSearchRequests": 0,
+            "costUSD": 0.057684299999999994,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 253,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0586955
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7271,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9922,
+            "outputTokens": 27,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0010057000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 661,
+            "cacheReadInputTokens": 13316,
+            "cacheCreationInputTokens": 13569,
+            "webSearchRequests": 0,
+            "costUSD": 0.1244512,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 156,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.12545689999999998
+      }
+    ],
+    "total_cost_usd": 0.5224929,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 51,
+      "gather": 48,
+      "triage": 7526,
+      "find_verify": 21612,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
