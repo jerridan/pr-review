@@ -1,0 +1,594 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 32,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Add the severity policy",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/32"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "ea283ca78e79a976a3974c26f02ec11a8545211c",
+    "head": "0fbc1f47c6a0acab5903e56feabe0439b1274381",
+    "started_at": "2026-11-07T19:56:59.696Z",
+    "tool_version": "0.2.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Add the severity policy\n\nFirst piece of D5 (eval foundation) in TICKETS.md.\n\n- Adds `docs/design/severity-policy.md`: one rule set for the severity of a finding, used by the labeler of `golden.json`, the verifier and the judge of the labeling loop. Three posted labels (blocking, suggestion, nit) and three outcomes that do not post (don't post, not real, unsure). Sections on normal paths, stored data, switches, accessibility, tests, partly true claims, messages and status codes, process and conventions, and how the pipeline uses the labels.\n- Accessibility is weighted by task: a control a keyboard or screen-reader user cannot operate is blocking, and so is missing information that decides the outcome of a normal path.\n- Updates the CLAUDE.md line on specs: the TICKETS.md entry is the spec of a deliverable unless the entry names another document.\n\nNo code change. The verifier prompt adopts the policy in D6; the labeling loop adopts it later in D5.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZgggAoxaZA98nRCMsW",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": "CLAUDE.md",
+        "hunks": 1
+      },
+      {
+        "path": "docs/design/severity-policy.md",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "fast",
+      "reason": "The change is documentation only: one guidance line in CLAUDE.md and a new draft design doc, with no code, config or tests touched.",
+      "confidence": "medium",
+      "categories": [
+        "docs"
+      ],
+      "hotspots": [
+        "docs/design/severity-policy.md: Tests and Stored data sections, for internal contradictions",
+        "docs/design/severity-policy.md: 'How the pipeline uses the labels' cross-references to sections 3.5 and 3.6 of the high-level design",
+        "CLAUDE.md: changed TICKETS.md spec line"
+      ],
+      "file_notes": [
+        {
+          "file": "CLAUDE.md",
+          "note": "Agent guidance reworded: the TICKETS.md entry is now the spec unless it names another document. This replaces 'spec lives outside the repo; ask for its path'."
+        },
+        {
+          "file": "docs/design/severity-policy.md",
+          "note": "New draft design doc of severity rules for the labeler, verifier and judge. Check that the rules agree with each other, and that the referenced design sections exist. No code reads it yet."
+        }
+      ],
+      "summary": "The change rewords one line in CLAUDE.md. The TICKETS.md entry is now the spec for a deliverable, unless the entry names another document. It also adds a draft severity policy (docs/design/severity-policy.md) that defines the labels (blocking, suggestion, nit, don't post, not real, unsure) and the rules for tests, stored data, accessibility and status codes. Neither file changes code or behavior directly."
+    },
+    "tier": "fast",
+    "tier_reason": "Triage: The change is documentation only: one guidance line in CLAUDE.md and a new draft design doc, with no code, config or tests touched.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= fast; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= fast; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6786,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 6084,
+              "outputTokens": 18,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0006174,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 6,
+              "outputTokens": 512,
+              "cacheReadInputTokens": 26811,
+              "cacheCreationInputTokens": 6697,
+              "webSearchRequests": 0,
+              "costUSD": 0.0692022,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 225,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0698196
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "docs/design/severity-policy.md",
+            "start_line": 33,
+            "end_line": 33,
+            "category": "docs",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "The Labels section makes every accessibility gap that leaves the task possible a suggestion, but the Accessibility section makes the same gap blocking when the missing information decides the outcome of a normal path.",
+            "evidence": "- an accessibility gap that leaves the task possible, but with less information than a sighted or mouse user gets.",
+            "suggested_fix": "Add \"when the missing information does not decide the outcome\" to the suggestion bullet, and add the outcome-deciding case to the blocking list.",
+            "explanation": "The two sections give different labels for the same finding, so the labeler, the verifier and the judge can disagree.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6135,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 6092,
+              "outputTokens": 18,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0006182000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 658,
+              "cacheReadInputTokens": 15670,
+              "cacheCreationInputTokens": 6639,
+              "webSearchRequests": 0,
+              "costUSD": 0.06942200000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 215,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0700402
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "docs/design/severity-policy.md",
+          "start_line": 33,
+          "end_line": 33,
+          "category": "docs",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "The Labels section makes every accessibility gap that leaves the task possible a suggestion, but the Accessibility section makes the same gap blocking when the missing information decides the outcome of a normal path.",
+          "evidence": "- an accessibility gap that leaves the task possible, but with less information than a sighted or mouse user gets.",
+          "suggested_fix": "Add \"when the missing information does not decide the outcome\" to the suggestion bullet, and add the outcome-deciding case to the blocking list.",
+          "explanation": "The two sections give different labels for the same finding, so the labeler, the verifier and the judge can disagree.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- an accessibility gap that leaves the task possible, but with less information than a sighted or mouse user gets.",
+            "- A control they can operate, but with less information than a sighted or mouse user gets, is blocking when the missing information decides the outcome of a normal path.",
+            "- a control that a keyboard or screen-reader user cannot operate, or a task they cannot complete."
+          ],
+          "rationale": "The Suggestion bullet in Labels (line 33) puts every accessibility gap with less information in the suggestion class. The Accessibility section (line 70) makes the same gap blocking when the missing information decides a normal-path outcome. The Labels summary has no such qualifier, and the Blocking list has no matching bullet. The policy exists to give the three readers one rule, so this contradiction matters.",
+          "score": 82,
+          "severity": "suggestion"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- an accessibility gap that leaves the task possible, but with less information than a sighted or mouse user gets.",
+            "- A control they can operate, but with less information than a sighted or mouse user gets, is blocking when the missing information decides the outcome of a normal path. Examples: an error state that only color shows, a required field with no accessible name, a status change that no live region announces.",
+            "- a control that a keyboard or screen-reader user cannot operate, or a task they cannot complete."
+          ],
+          "rationale": "The finding is correct. The Labels section makes every operable accessibility gap with less information a suggestion, and its blocking list leaves out the case where the missing information decides the outcome. The Accessibility section makes that case blocking. A policy written to keep the labeler, the verifier and the judge in agreement now gives two labels for the same finding.",
+          "score": 86,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- an accessibility gap that leaves the task possible, but with less information than a sighted or mouse user gets.",
+            "- A control they can operate, but with less information than a sighted or mouse user gets, is blocking when the missing information decides the outcome of a normal path. Examples: an error state that only color shows, a required field with no accessible name, a status change that no live region announces.",
+            "- a control that a keyboard or screen-reader user cannot operate, or a task they cannot complete."
+          ],
+          "rationale": "The finding is correct. The Labels section makes every operable accessibility gap with less information a suggestion, and its blocking list leaves out the case where the missing information decides the outcome. The Accessibility section makes that case blocking. A policy written to keep the labeler, the verifier and the judge in agreement now gives two labels for the same finding.",
+          "score": 86,
+          "severity": "suggestion"
+        },
+        "passed": true
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "diff-bugs"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0
+    },
+    "findings": [
+      {
+        "file": "docs/design/severity-policy.md",
+        "start_line": 33,
+        "end_line": 33,
+        "category": "docs",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "The Labels section makes every accessibility gap that leaves the task possible a suggestion, but the Accessibility section makes the same gap blocking when the missing information decides the outcome of a normal path.",
+        "evidence": "- an accessibility gap that leaves the task possible, but with less information than a sighted or mouse user gets.",
+        "suggested_fix": "Add \"when the missing information does not decide the outcome\" to the suggestion bullet, and add the outcome-deciding case to the blocking list.",
+        "explanation": "The two sections give different labels for the same finding, so the labeler, the verifier and the judge can disagree.",
+        "needs_context": false,
+        "fingerprint": "749ca13032b3e4c9",
+        "severity": "suggestion",
+        "score": 86,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- an accessibility gap that leaves the task possible, but with less information than a sighted or mouse user gets.",
+            "- A control they can operate, but with less information than a sighted or mouse user gets, is blocking when the missing information decides the outcome of a normal path. Examples: an error state that only color shows, a required field with no accessible name, a status change that no live region announces.",
+            "- a control that a keyboard or screen-reader user cannot operate, or a task they cannot complete."
+          ],
+          "rationale": "The finding is correct. The Labels section makes every operable accessibility gap with less information a suggestion, and its blocking list leaves out the case where the missing information decides the outcome. The Accessibility section makes that case blocking. A policy written to keep the labeler, the verifier and the judge in agreement now gives two labels for the same finding.",
+          "score": 86,
+          "severity": "suggestion"
+        },
+        "span_text": "- an accessibility gap that leaves the task possible, but with less information than a sighted or mouse user gets."
+      }
+    ],
+    "github": {
+      "review_id": 5814666996,
+      "review_url": "https://github.com/jerridan/pr-review/pull/32#pullrequestreview-5814666996",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [
+        {
+          "fingerprint": "749ca13032b3e4c9",
+          "comment_id": 4503513620
+        }
+      ],
+      "in_body": [],
+      "check_run": {
+        "id": 128511884262
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6252,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5344,
+            "outputTokens": 16,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005424,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 781,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 4856,
+            "webSearchRequests": 0,
+            "costUSD": 0.027364199999999998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 146,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.027906599999999997
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6135,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 6092,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0006182000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 658,
+            "cacheReadInputTokens": 15670,
+            "cacheCreationInputTokens": 6639,
+            "webSearchRequests": 0,
+            "costUSD": 0.06942200000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 215,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0700402
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6786,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 6084,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0006174,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 512,
+            "cacheReadInputTokens": 26811,
+            "cacheCreationInputTokens": 6697,
+            "webSearchRequests": 0,
+            "costUSD": 0.0692022,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 225,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0698196
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 5002,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9418,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009518,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 635,
+            "cacheReadInputTokens": 3889,
+            "cacheCreationInputTokens": 8930,
+            "webSearchRequests": 0,
+            "costUSD": 0.042462900000000005,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 191,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.04341470000000001
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5498,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9404,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009504,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 614,
+            "cacheReadInputTokens": 3889,
+            "cacheCreationInputTokens": 8908,
+            "webSearchRequests": 0,
+            "costUSD": 0.0843298,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 158,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0852802
+      }
+    ],
+    "total_cost_usd": 0.2964613,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 38,
+      "gather": 34,
+      "triage": 7136,
+      "find_verify": 18461,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
