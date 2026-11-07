@@ -28,4 +28,4 @@ npm run build
 - `action.yml`, `.github/workflows/review.yml`, `.claude-plugin/` and `commands/` package the tool for CI and for Claude Code. This repo is its own Claude Code marketplace, so add no entry in another repo.
 - To release, bump `version` in `package.json` and in the two `.claude-plugin/` manifests in the pull request; after the merge, `release.yml` tags `v<version>` and creates the release.
 - `eval/` holds the cases pin, the baseline and the gitignored `eval/cases/`; the case set lives in the cases repo. `scripts/fetch-cases.sh` brings it to `eval/cases/`.
-- TICKETS.md lists the deliverables that remain. The spec for a deliverable in progress lives outside this repo; ask for its path before you start.
+- TICKETS.md lists the deliverables that remain. The entry in TICKETS.md is the spec of a deliverable, unless the entry names another document.
