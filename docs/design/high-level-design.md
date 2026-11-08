@@ -10,7 +10,7 @@ Status: draft for discussion, revised 2026-10-13 after first review. Builds on `
 - Low noise is the first quality target. A finding that is wrong costs more than a finding that is missed.
 - The review covers only what the PR adds, changes or aggravates. Pre-existing issues are out of scope.
 - Very small or trivial PRs take a cheaper path.
-- Claude models only, for now.
+- Claude models only, for now. The one exception is the judge of the eval's severity labeler: it runs on a GPT model through the Codex CLI, outside the run pipeline (section 8).
 - Every run writes a record that the evaluation harness can replay.
 
 Non-goals for v1: auto-fix commits, chat with the reviewer in PR threads, multi-provider support.
