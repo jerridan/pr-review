@@ -571,25 +571,32 @@ The labeler makes real model calls. It needs a Claude login for the scorer. It n
 | `--cases <dir>` | The cases directory. It holds one subdirectory per case. | required |
 | `--runs <n>` | The independent runs of each finding. A positive integer. | 3 |
 | `--concurrency <n>` | The most findings in flight at once. A positive integer. | 2 |
-| `--write-golden` | Write the chosen `blocking`, `suggestion` and `nit` labels to `golden.json`. | off |
+| `--write-golden` | Write the chosen `blocking`, `suggestion` and `nit` severities to `golden.json`. The category does not change. | off |
 | `--only <case>` | Label only the case with this name. | every case |
 | `--out <dir>` | The directory for the output files. | each case directory |
 | `--format table\|json` | The format of the totals on stdout. | `table` |
 | `--allow-api-key` | Keep `ANTHROPIC_API_KEY` in the environment of the scorer. | off |
 
-For each run of a finding, the scorer gets the finding, the head file from 100 lines above the span to 100 lines below it, the diff of the file and the policy. It gives a severity, a category, the policy section it uses and a rationale. The judge gets the same data and the label. It accepts the label or rejects it with a reason. A rejected label goes back to the scorer with the reason, at most twice. A run converges when the judge accepts. A call that fails gets one retry. A call that fails again ends its run as failed.
+For each run of a finding, the scorer gets the finding, the head file from 100 lines above the span to 100 lines below it, the diff of the file and the policy. The finding has its file, its span, its category and its claim. It has no severity, so the scorer decides the severity from the policy alone. A diff section longer than 65536 characters is cut to that length, and a line in the prompt says so. The head file window has a limit of 32768 characters, with the same line. It gives a severity, a category, the policy section it uses and a rationale. The judge gets the same data and the label. It accepts the label or rejects it with a reason. A rejected label goes back to the scorer with the reason, at most twice. A run converges when the judge accepts. A call that fails gets one retry. A call that fails again ends its run as failed.
 
 The runs of one finding go in sequence, and no run sees the calls of another. Findings go in parallel up to `--concurrency`. The default is low, because the judge runs on a subscription with a rate window. The scorer is `claude-opus-5-5` at high effort through the Agent SDK. The judge is `gpt-6.1-sol` at high effort through `codex exec`. The case checkout is the working directory of every call.
 
-A severity that at least two converged runs agree on, and that a majority of the converged runs hold, is the chosen label. Each case gets three files beside `golden.json`, or under `<out>/<case>/`:
+A severity that at least two converged runs agree on, and that a majority of the converged runs hold, is the chosen label. A finding with two or more runs that did not converge has no chosen label at any `--runs`, and it goes to the queue with the reason `too_few_converged`. Each case gets three files beside `golden.json`, or under `<out>/<case>/`:
 
 | File | Content |
 |------|---------|
-| `labels.json` | Every finding with its runs, its calls and its chosen label, and the first-pass acceptance rate and the run agreement rate of the case. |
+| `labels.json` | Every finding with its runs, its calls and its chosen label, and the two rates of the case, with `run_agreement_excluded`. `current_severity` is the severity in `golden.json` before the run. |
 | `disagreements.json` | The findings whose runs did not all converge to one severity. Read it to find the policy rules that read two ways. |
 | `human-queue.json` | The findings with no chosen label, and the findings whose chosen severity is `dont_post`, `not_real` or `unsure`. Each has a `reason`. |
 
-`label-summary.json` goes in the cases directory, or in `<out>/`. It holds the counts of each case and the two rates over all cases. The command exits 0 when every call succeeded. It exits 1 when a case checkout failed or a call failed after its retry, and it still writes every file. It exits 2 on a usage error. Without `--write-golden`, `golden.json` does not change. With it, only the findings whose chosen label posts change, and every other field stays.
+`label-summary.json` goes in the cases directory, or in `<out>/`. It holds the counts of each case and the two rates over all cases. The command exits 0 when every call succeeded. It exits 1 when a case checkout failed or a call failed after its retry, and it still writes every file. It exits 2 on a usage error. Without `--write-golden`, `golden.json` does not change. With it, only the `severity` of the findings whose chosen severity posts changes. The category and every other field stay. The chosen category stays in `labels.json`.
+
+The two rates:
+
+- `first_pass_acceptance_rate` is the runs whose first label the judge accepted, over the runs that got a first verdict.
+- `run_agreement_rate` is the findings whose runs all converged to one severity, over the findings whose runs all converged. The rate leaves out a finding with at least one run that did not converge. `run_agreement_excluded` is the count of those findings. It is in `labels.json` and in `label-summary.json`.
+
+A rate is `null` when its denominator is 0. In `label-summary.json` the rates and the excluded count pool the counts of all cases.
 
 ## Evaluate
 

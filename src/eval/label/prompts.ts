@@ -8,6 +8,15 @@ import type { GoldenFinding } from "../case.js";
 /** The lines of the head file that the window holds above and below the span. */
 export const WINDOW_LINES = 100;
 
+/**
+ * The most characters of a diff section that a call gets. Linux limits one
+ * argv element to 131072 bytes, and the judge prompt is one argument.
+ */
+export const DIFF_SECTION_LIMIT = 65536;
+
+/** The most characters of the head window that a call gets. */
+export const HEAD_WINDOW_LIMIT = 32768;
+
 /** The data of one golden finding that every call of its runs gets. */
 export type FindingInput = {
   index: number;
@@ -92,11 +101,15 @@ function describeFinding(f: GoldenFinding): string {
     start_line: f.start_line,
     end_line: f.end_line,
     category: f.category,
-    severity: f.severity,
     claim: f.claim,
-    note: f.note ?? "",
   };
   return JSON.stringify(shown, null, 2);
+}
+
+// Keep the first "limit" characters, and tell the model about the cut.
+function cap(text: string, limit: number, what: string): string {
+  if (text.length <= limit) return text;
+  return `${text.slice(0, limit)}\n[The ${what} was cut here. The limit is ${limit} characters.]`;
 }
 
 function dataBlocks(
@@ -105,10 +118,16 @@ function dataBlocks(
 ): Record<string, string> {
   const { finding } = input;
   const window = headWindow(input.headText, finding.start_line, finding.end_line);
-  const diff = input.diffSection.trim() === "" ? texts.noDiffText : input.diffSection;
+  const diff =
+    input.diffSection.trim() === ""
+      ? texts.noDiffText
+      : cap(input.diffSection, DIFF_SECTION_LIMIT, "diff");
   return {
     finding: wrapUntrusted("finding", describeFinding(finding)).block,
-    head_file: wrapUntrusted("head_file", window ?? texts.noFileText).block,
+    head_file: wrapUntrusted(
+      "head_file",
+      window === null ? texts.noFileText : cap(window, HEAD_WINDOW_LIMIT, "head file window"),
+    ).block,
     diff: wrapUntrusted("diff", diff).block,
     policy: wrapUntrusted("policy", input.policy).block,
   };

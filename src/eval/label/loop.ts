@@ -250,6 +250,7 @@ function majority<T>(values: readonly T[]): T | null {
 /**
  * The chosen label of a finding from its runs. The severity is the one
  * that a majority of the converged runs agree on, and at least two runs.
+ * A finding with two or more unresolved runs has no label, at any run count.
  * The category is the majority category of the converged runs, or the
  * current category when there is no majority.
  */
@@ -258,7 +259,10 @@ export function aggregate(
   currentCategory: Category,
 ): { chosen: Chosen | null; queueReason: QueueReason | null } {
   const converged = runs.filter((r) => r.converged && r.severity !== null);
-  if (converged.length < 2) return { chosen: null, queueReason: "too_few_converged" };
+  const unresolved = runs.length - converged.length;
+  if (converged.length < 2 || unresolved >= 2) {
+    return { chosen: null, queueReason: "too_few_converged" };
+  }
   const severity = majority(converged.map((r) => r.severity as LabelSeverity));
   if (severity === null) return { chosen: null, queueReason: "no_majority" };
   const category = majority(converged.map((r) => r.category as Category)) ?? currentCategory;
