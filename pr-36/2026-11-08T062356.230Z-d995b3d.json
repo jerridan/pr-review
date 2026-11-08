@@ -1,0 +1,1399 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 36,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Add shallow bundle support for large cases",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/36"
+    },
+    "run_kind": "later",
+    "prior": {
+      "head": "ee94cdde0a061075fb47d8b57aa048d32d2f4da0",
+      "source": "record",
+      "record": "/home/runner/work/_temp/pr-review-records/pr-36/2026-11-08T055606.092Z-ee94cdd.json",
+      "open": [],
+      "dismissed": [],
+      "fetch_failed": false
+    },
+    "base": "f4f1a04248fd5a93b1de22aba88b51e96d1e3ffd",
+    "head": "d995b3db08cadeea27dd923e4cc94b5ea07ac5a0",
+    "started_at": "2026-11-08T06:23:56.230Z",
+    "tool_version": "0.3.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Add shallow bundle support for large cases\n\n## What\n\n- `cloneCase` reads an optional `shallow` file in a case. When it is present, the eval fetches `repo.bundle` into an empty repo that holds the same shallow marks, because git refuses to clone a bundle made from a shallow repo.\n- `scripts/make-case.sh` writes `shallow` into the case when the source repo is shallow, and gives the bundle step the shallow marks so it does not stop at a missing object.\n- New `scripts/fetch-pr.sh <url> <merge-base> <head> <dir>`: a shallow repo that holds the merge base, the head and the commits between them, and nothing older.\n- README: the `shallow` file and the fetch script. Version 0.3.1.\n\n## Why\n\nD5 builds the first case set from Martian and ReviewBench. A full clone of sentry or cal.com makes a bundle of hundreds of megabytes. Two snapshots of the tree are 30 to 60 MB.\n\n## Tests\n\nTwo new tests in `test/eval-case.test.ts`: a shallow case checks out; the same bundle without the shallow file is rejected with the case name. Two in `test/eval-scripts.test.ts`: `fetch-pr.sh` then `make-case.sh` gives a case that `cloneCase` checks out with the three-dot diff available; `fetch-pr.sh` stops when the directory exists. `npm test` 1169 passed, lint, typecheck and build exit 0.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZgggAoxaZA98nRCMsW",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": ".claude-plugin/marketplace.json",
+        "hunks": 1
+      },
+      {
+        "path": ".claude-plugin/plugin.json",
+        "hunks": 1
+      },
+      {
+        "path": "README.md",
+        "hunks": 2
+      },
+      {
+        "path": "TICKETS.md",
+        "hunks": 1
+      },
+      {
+        "path": "docs/design/severity-policy.md",
+        "hunks": 3
+      },
+      {
+        "path": "package.json",
+        "hunks": 1
+      },
+      {
+        "path": "scripts/fetch-pr.sh",
+        "hunks": 1
+      },
+      {
+        "path": "scripts/make-case.sh",
+        "hunks": 3
+      },
+      {
+        "path": "src/eval/checkout.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/eval-case.test.ts",
+        "hunks": 5
+      },
+      {
+        "path": "test/eval-scripts.test.ts",
+        "hunks": 2
+      }
+    ],
+    "excluded_files": [
+      {
+        "path": "package-lock.json",
+        "reason": "generated"
+      }
+    ],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "Adds new shell script logic and changes the eval checkout code path (shallow bundle handling) and make-case.sh, plus policy text changes, beyond a low-risk change.",
+      "confidence": "high",
+      "categories": [
+        "bug",
+        "test",
+        "docs",
+        "other"
+      ],
+      "hotspots": [
+        "src/eval/checkout.ts: cloneCase shallow branch (init, copy shallow, fetch refs/case/*)",
+        "scripts/fetch-pr.sh: deepen loop and final depth cut",
+        "scripts/make-case.sh: shallow file copy and alternates setup",
+        "test/eval-scripts.test.ts: fetch-pr tests",
+        "docs/design/severity-policy.md: new rules that change labeling"
+      ],
+      "file_notes": [
+        {
+          "file": "src/eval/checkout.ts",
+          "note": "New shallow-aware checkout path; the fetch uses +refs/heads/*:refs/case/*, so check that later base/head resolution still works. Also check the error handling."
+        },
+        {
+          "file": "scripts/fetch-pr.sh",
+          "note": "New script. Check the loop bounds (depth starts at 1, grows by 20, caps at 1000), the --depth cut, and that the merge-base check handles failures."
+        },
+        {
+          "file": "scripts/make-case.sh",
+          "note": "Copies the shallow file into the temp bare repo and the case. Uses the git common dir for worktrees."
+        },
+        {
+          "file": "test/eval-case.test.ts",
+          "note": "New shallow clone tests and fixtures."
+        },
+        {
+          "file": "test/eval-scripts.test.ts",
+          "note": "New fetch-pr.sh tests, including an end-to-end run through make-case and cloneCase."
+        },
+        {
+          "file": "docs/design/severity-policy.md",
+          "note": "Policy amendments that change how labels are applied."
+        },
+        {
+          "file": "README.md",
+          "note": "Documents the shallow file and fetch-pr.sh."
+        },
+        {
+          "file": "TICKETS.md",
+          "note": "Case table and notes update."
+        },
+        {
+          "file": "package.json",
+          "note": "Version bump to 0.3.1."
+        },
+        {
+          "file": ".claude-plugin/plugin.json",
+          "note": "Version bump to 0.3.1."
+        },
+        {
+          "file": ".claude-plugin/marketplace.json",
+          "note": "Version bump to 0.3.1."
+        }
+      ],
+      "summary": "The change adds support for eval cases built from shallow repos. A new fetch-pr.sh makes a shallow repo that holds only the merge base, the head and the commits between them. make-case.sh now writes a `shallow` file, and cloneCase fetches the bundle into an empty repo that has those shallow marks. It also amends the severity policy, updates the README and TICKETS.md, adds tests, and bumps the version to 0.3.1."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: Adds new shell script logic and changes the eval checkout code path (shallow bundle handling) and make-case.sh, plus policy text changes, beyond a low-risk change.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5740,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3232,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.00033370000000000003,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 372,
+              "cacheReadInputTokens": 5136,
+              "cacheCreationInputTokens": 2737,
+              "webSearchRequests": 0,
+              "costUSD": 0.0303712,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 121,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0307049
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "docs/design/severity-policy.md",
+            "start_line": 49,
+            "end_line": 51,
+            "category": "docs",
+            "severity_estimate": "suggestion",
+            "confidence": "high",
+            "claim": "The description covers only shallow bundle support, a fetch script, the README and a version bump, but the diff changes the severity policy's labeling rules, and the description does not mention this.",
+            "evidence": "Rare inputs are not unusual paths. An edge value, a numeric corner case, a near-tolerance input or an uncommon configuration that a supported call accepts is a normal path.",
+            "suggested_fix": "Mention the severity-policy amendment in the description, or move it to its own change.",
+            "explanation": "New severity rules change how the labeler, the verifier and the judge label findings, so a reader must know about them.",
+            "needs_context": false
+          },
+          {
+            "file": "docs/design/severity-policy.md",
+            "start_line": 67,
+            "end_line": 67,
+            "category": "docs",
+            "severity_estimate": "suggestion",
+            "confidence": "high",
+            "claim": "The description does not mention the new rule that a defect behind a new switch that stays off is a suggestion even when the change exists to add that feature.",
+            "evidence": "This holds also when the change exists to add the feature behind the switch.",
+            "suggested_fix": "Document the policy amendment in the description.",
+            "explanation": "This rule changes the golden labels away from the ratings of the source, and the description does not say so.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6654,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3232,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.00033420000000000005,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 554,
+              "cacheReadInputTokens": 5094,
+              "cacheCreationInputTokens": 2737,
+              "webSearchRequests": 0,
+              "costUSD": 0.0340028,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 47,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.034337
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 2987,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3240,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.000335,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 69,
+              "cacheReadInputTokens": 5039,
+              "cacheCreationInputTokens": 2745,
+              "webSearchRequests": 0,
+              "costUSD": 0.0243558,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0246908
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 2778,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3252,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.00033620000000000004,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 72,
+              "cacheReadInputTokens": 5039,
+              "cacheCreationInputTokens": 2757,
+              "webSearchRequests": 0,
+              "costUSD": 0.0245118,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.024848000000000002
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "docs/design/severity-policy.md",
+            "start_line": 49,
+            "end_line": 53,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The new sentence says the list is the whole test for an unusual path, but the next paragraph adds another case: acting before a visible loading state finishes.",
+            "evidence": "The list above is the whole test for an unusual path.",
+            "suggested_fix": "Name the loading-state case as an exception, or add it to the list in the first paragraph.",
+            "explanation": "Two rules in the same section disagree, so a labeler can read the loading-state case two ways.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7725,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3240,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.000335,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 527,
+              "cacheReadInputTokens": 12837,
+              "cacheCreationInputTokens": 4058,
+              "webSearchRequests": 0,
+              "costUSD": 0.0455874,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 143,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0459224
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5367,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 12025,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0012135,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 352,
+              "cacheReadInputTokens": 5161,
+              "cacheCreationInputTokens": 11530,
+              "webSearchRequests": 0,
+              "costUSD": 0.1003202,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 80,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1015337
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 2692,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3252,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.00033620000000000004,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 68,
+              "cacheReadInputTokens": 5137,
+              "cacheCreationInputTokens": 2757,
+              "webSearchRequests": 0,
+              "costUSD": 0.024451399999999998,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0247876
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 2463,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3242,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0003352,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 78,
+              "cacheReadInputTokens": 5137,
+              "cacheCreationInputTokens": 2747,
+              "webSearchRequests": 0,
+              "costUSD": 0.0245714,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0249066
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 2433,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3240,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0003345,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 76,
+              "cacheReadInputTokens": 5808,
+              "cacheCreationInputTokens": 2745,
+              "webSearchRequests": 0,
+              "costUSD": 0.0246496,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.024984100000000002
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "docs/design/severity-policy.md",
+          "start_line": 49,
+          "end_line": 51,
+          "category": "docs",
+          "severity_estimate": "suggestion",
+          "confidence": "high",
+          "claim": "The description covers only shallow bundle support, a fetch script, the README and a version bump, but the diff changes the severity policy's labeling rules, and the description does not mention this.",
+          "evidence": "Rare inputs are not unusual paths. An edge value, a numeric corner case, a near-tolerance input or an uncommon configuration that a supported call accepts is a normal path.",
+          "suggested_fix": "Mention the severity-policy amendment in the description, or move it to its own change.",
+          "explanation": "New severity rules change how the labeler, the verifier and the judge label findings, so a reader must know about them.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "Rare inputs are not unusual paths. An edge value, a numeric corner case, a near-tolerance input or an uncommon configuration that a supported call accepts is a normal path.",
+            "This holds also when the change exists to add the feature behind the switch."
+          ],
+          "rationale": "The diff adds substantive severity-policy rules (rare inputs are normal paths, the switch rule, a visible-loss suggestion) that change how findings get labeled. The description lists only shallow bundle work and never mentions them. This is a real scope and description gap, but a low-impact one.",
+          "score": 55,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "Rare inputs are not unusual paths. An edge value, a numeric corner case, a near-tolerance input or an uncommon configuration that a supported call accepts is a normal path.",
+            "This holds also when the change exists to add the feature behind the switch."
+          ],
+          "rationale": "The diff adds substantive severity-policy rules (rare inputs are normal paths, the switch rule, a visible-loss suggestion) that change how findings get labeled. The description lists only shallow bundle work and never mentions them. This is a real scope and description gap, but a low-impact one.",
+          "score": 55,
+          "severity": "suggestion"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "docs/design/severity-policy.md",
+          "start_line": 67,
+          "end_line": 67,
+          "category": "docs",
+          "severity_estimate": "suggestion",
+          "confidence": "high",
+          "claim": "The description does not mention the new rule that a defect behind a new switch that stays off is a suggestion even when the change exists to add that feature.",
+          "evidence": "This holds also when the change exists to add the feature behind the switch.",
+          "suggested_fix": "Document the policy amendment in the description.",
+          "explanation": "This rule changes the golden labels away from the ratings of the source, and the description does not say so.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "This holds also when the change exists to add the feature behind the switch. No user reaches the path until a later change turns the switch on, and that change is the one that makes the defect blocking. The source of a golden finding may rate such a defect higher; the label follows this policy, not the source."
+          ],
+          "rationale": "The PR adds a policy rule that overrides source ratings for golden labels, and the description covers only shallow-bundle work and never mentions the policy amendment. The claim is accurate, but it is a process or description point that a reviewer would raise only lightly.",
+          "score": 45,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "This holds also when the change exists to add the feature behind the switch. No user reaches the path until a later change turns the switch on, and that change is the one that makes the defect blocking. The source of a golden finding may rate such a defect higher; the label follows this policy, not the source."
+          ],
+          "rationale": "The PR adds a policy rule that overrides source ratings for golden labels, and the description covers only shallow-bundle work and never mentions the policy amendment. The claim is accurate, but it is a process or description point that a reviewer would raise only lightly.",
+          "score": 45,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "docs/design/severity-policy.md",
+          "start_line": 49,
+          "end_line": 53,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The new sentence says the list is the whole test for an unusual path, but the next paragraph adds another case: acting before a visible loading state finishes.",
+          "evidence": "The list above is the whole test for an unusual path.",
+          "suggested_fix": "Name the loading-state case as an exception, or add it to the list in the first paragraph.",
+          "explanation": "Two rules in the same section disagree, so a labeler can read the loading-state case two ways.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "A path is unusual only when it needs one of these first: a failure, a race or specific timing, a second actor, or a client that is behind the deploy.",
+            "The list above is the whole test for an unusual path.",
+            "A defect that needs the person to act before a visible loading state finishes is a suggestion, or a nit when the window is short."
+          ],
+          "rationale": "The claimed conflict is not there. Acting before a loading state finishes is a case of \"specific timing\", which is already in the list. The loading-state paragraph only sets a label and does not add a new unusual-path case, so a labeler would not read the two rules as disagreeing.",
+          "score": 12,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "A path is unusual only when it needs one of these first: a failure, a race or specific timing, a second actor, or a client that is behind the deploy.",
+            "The list above is the whole test for an unusual path.",
+            "A defect that needs the person to act before a visible loading state finishes is a suggestion, or a nit when the window is short."
+          ],
+          "rationale": "The claimed conflict is not there. Acting before a loading state finishes is a case of \"specific timing\", which is already in the list. The loading-state paragraph only sets a label and does not add a new unusual-path case, so a labeler would not read the two rules as disagreeing.",
+          "score": 12,
+          "severity": "nit"
+        },
+        "passed": false
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5816891833,
+      "review_url": "https://github.com/jerridan/pr-review/pull/36#pullrequestreview-5816891833",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 128650868962
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 7562,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11022,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011132,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1019,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 10535,
+            "webSearchRequests": 0,
+            "costUSD": 0.0524602,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0535734
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 2778,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3252,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00033620000000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 72,
+            "cacheReadInputTokens": 5039,
+            "cacheCreationInputTokens": 2757,
+            "webSearchRequests": 0,
+            "costUSD": 0.0245118,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.024848000000000002
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 2987,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3240,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.000335,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 69,
+            "cacheReadInputTokens": 5039,
+            "cacheCreationInputTokens": 2745,
+            "webSearchRequests": 0,
+            "costUSD": 0.0243558,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0246908
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5740,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3232,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00033370000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 372,
+            "cacheReadInputTokens": 5136,
+            "cacheCreationInputTokens": 2737,
+            "webSearchRequests": 0,
+            "costUSD": 0.0303712,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 121,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0307049
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6654,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3232,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00033420000000000005,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 554,
+            "cacheReadInputTokens": 5094,
+            "cacheCreationInputTokens": 2737,
+            "webSearchRequests": 0,
+            "costUSD": 0.0340028,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 47,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.034337
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 2692,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3252,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00033620000000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 68,
+            "cacheReadInputTokens": 5137,
+            "cacheCreationInputTokens": 2757,
+            "webSearchRequests": 0,
+            "costUSD": 0.024451399999999998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0247876
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7725,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3240,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.000335,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 527,
+            "cacheReadInputTokens": 12837,
+            "cacheCreationInputTokens": 4058,
+            "webSearchRequests": 0,
+            "costUSD": 0.0455874,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 143,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0459224
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 2463,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3242,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0003352,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 78,
+            "cacheReadInputTokens": 5137,
+            "cacheCreationInputTokens": 2747,
+            "webSearchRequests": 0,
+            "costUSD": 0.0245714,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0249066
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5367,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 12025,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012135,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 352,
+            "cacheReadInputTokens": 5161,
+            "cacheCreationInputTokens": 11530,
+            "webSearchRequests": 0,
+            "costUSD": 0.1003202,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 80,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1015337
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "model": "claude-opus-5-5",
+        "duration_ms": 2433,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3240,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0003345,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 76,
+            "cacheReadInputTokens": 5808,
+            "cacheCreationInputTokens": 2745,
+            "webSearchRequests": 0,
+            "costUSD": 0.0246496,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.024984100000000002
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 5906,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7145,
+            "outputTokens": 302,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0008655000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 281,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 674,
+            "cacheReadInputTokens": 3889,
+            "cacheCreationInputTokens": 6658,
+            "webSearchRequests": 0,
+            "costUSD": 0.0337649,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 312,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0346304
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 7632,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7216,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007341000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 784,
+            "cacheReadInputTokens": 14507,
+            "cacheCreationInputTokens": 7219,
+            "webSearchRequests": 0,
+            "costUSD": 0.0381747,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 275,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0389088
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 8626,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7157,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007287000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 1086,
+            "cacheReadInputTokens": 14448,
+            "cacheCreationInputTokens": 7413,
+            "webSearchRequests": 0,
+            "costUSD": 0.0419688,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 343,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0426975
+      }
+    ],
+    "total_cost_usd": 0.5065252,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 48,
+      "gather": 180,
+      "scope": 6,
+      "triage": 8497,
+      "find_verify": 19408,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
