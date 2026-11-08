@@ -287,6 +287,7 @@ type RunJson = {
 type EntryJson = {
   index: number;
   claim: string;
+  current_severity: string;
   chosen: { severity: string; category: string } | null;
   runs: RunJson[];
 };
@@ -296,6 +297,7 @@ type LabelsJson = {
   findings: EntryJson[];
   first_pass_acceptance_rate: number | null;
   run_agreement_rate: number | null;
+  run_agreement_excluded: number;
 };
 
 function readJson<T>(path: string): T {
@@ -422,6 +424,22 @@ describe("label over two cases", () => {
     expect(summary.scorer_cost_usd).toBeCloseTo(0.15);
   });
 
+  it("counts the findings that the agreement rate leaves out, per case and over the cases", () => {
+    // A2 has one run that did not converge, so the rate leaves it out.
+    expect(labels("a-three").run_agreement_excluded).toBe(1);
+    expect(labels("b-one").run_agreement_excluded).toBe(0);
+    const summary = readJson<Record<string, unknown>>(join(cases, "label-summary.json"));
+    expect(summary.run_agreement_excluded).toBe(1);
+  });
+
+  it("keeps the source severity of each finding in labels.json", () => {
+    expect(labels("a-three").findings.map((f) => f.current_severity)).toEqual([
+      "nit",
+      "blocking",
+      "nit",
+    ]);
+  });
+
   it("leaves golden.json byte-identical without --write-golden", () => {
     expect(readFileSync(join(cases, "a-three", "golden.json")).equals(goldenBefore.a!)).toBe(true);
     expect(readFileSync(join(cases, "b-one", "golden.json")).equals(goldenBefore.b!)).toBe(true);
@@ -468,8 +486,13 @@ describe("label --write-golden", () => {
         join(cases, "a-three", "golden.json"),
       );
       const [a1, a2, a3] = after.findings;
-      expect(a1).toEqual({ ...before.findings[0], severity: "blocking", category: "bug" });
-      expect(a2).toEqual({ ...before.findings[1], severity: "suggestion", category: "bug" });
+      // Only the severity changes. The category stays.
+      expect(a1).toEqual({ ...before.findings[0], severity: "blocking" });
+      expect(a1?.category).toBe("test");
+      expect(a2).toEqual({ ...before.findings[1], severity: "suggestion" });
+      expect(
+        readJson<LabelsJson>(join(cases, "a-three", "labels.json")).findings[0]?.chosen?.category,
+      ).toBe("bug");
       expect(a3).toEqual(before.findings[2]);
       after.findings.forEach((f, i) =>
         expect(Object.keys(f)).toEqual(Object.keys(before.findings[i] ?? {})),

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ROLES, roleConfig } from "../src/config/models.js";
 import type { Case, GoldenFinding } from "../src/eval/case.js";
 import { labelCase, type FindingOutcome, type LabelCall } from "../src/eval/label/loop.js";
+import { DIFF_SECTION_LIMIT } from "../src/eval/label/prompts.js";
 import { loadPrompt } from "../src/prompts/load.js";
 import { ScorerResultSchema } from "../src/schemas/label.js";
 import type { QueryMeta, QueryOutcome } from "../src/sdk/client.js";
@@ -176,6 +177,22 @@ async function label(
   );
 }
 
+/** The prompt of every judge call, from the logged codex argv. */
+function judgePrompts(): string[] {
+  const path = join(codexDir, "log.jsonl");
+  if (!existsSync(path)) return [];
+  return readFileSync(path, "utf8")
+    .trim()
+    .split("\n")
+    .map((line) => (JSON.parse(line) as { argv: string[] }).argv.at(-1) ?? "");
+}
+
+/** The JSON object inside the finding block of a prompt. */
+function findingBlock(text: string): Record<string, unknown> {
+  const match = /<finding_[0-9a-f]+>\n([\s\S]*?)\n<\/finding_[0-9a-f]+>/.exec(text);
+  return JSON.parse(match?.[1] ?? "null") as Record<string, unknown>;
+}
+
 const kinds = (calls: LabelCall[]): string[] => calls.map((c) => c.kind);
 
 describe("the labeler role", () => {
@@ -324,6 +341,79 @@ describe("the loop", () => {
     expect(message).toContain("A-DIFF-LINE");
     expect(message).not.toContain("B-DIFF-LINE");
     expect(message).toContain("POLICY-TEXT-xyz");
+  });
+
+  it("sends no severity and no note of the source label in the finding block of any call", async () => {
+    judgePlan({ default: [{ accept: true }] });
+    const { client } = scorerFake({});
+    const withNote = { ...golden("MARK-a"), note: "NOTE-TEXT-xyz" };
+    await label([withNote], client, { runs: 1 });
+    const messages = [...client.calls.map((c) => c.userMessage), ...judgePrompts()];
+    expect(messages).toHaveLength(2);
+    for (const message of messages) {
+      const block = findingBlock(message);
+      expect(block.claim).toBe("The claim MARK-a.");
+      expect(block).not.toHaveProperty("severity");
+      expect(block).not.toHaveProperty("note");
+      expect(message).not.toContain("NOTE-TEXT-xyz");
+    }
+  });
+
+  it("cuts a diff section over the limit, for the scorer and the judge, and says so", async () => {
+    expect(DIFF_SECTION_LIMIT).toBe(65536);
+    const body = Array.from({ length: 20000 }, (_, i) => `+filler ${i}`).join("\n");
+    writeFileSync(
+      join(caseDir, "diff.patch"),
+      `diff --git a/a.ts b/a.ts\n--- a/a.ts\n+++ b/a.ts\n@@ -1,1 +1,1 @@\n${body}\n+ENDOFDIFF\n`,
+    );
+    judgePlan({ default: [{ accept: true }] });
+    const { client } = scorerFake({});
+    await label([golden("MARK-a")], client, { runs: 1 });
+    const messages = [client.calls[0]?.userMessage ?? "", judgePrompts()[0] ?? ""];
+    for (const message of messages) {
+      expect(message).toContain("+filler 100\n");
+      expect(message).not.toContain("ENDOFDIFF");
+      expect(message).toMatch(/cut[^\n]*65536|65536[^\n]*cut/);
+    }
+    // Both calls get the same diff text.
+    const diffOf = (m: string) => /<diff_[0-9a-f]+>\n([\s\S]*?)\n<\/diff_[0-9a-f]+>/.exec(m)?.[1];
+    expect(diffOf(messages[0] ?? "")).toBe(diffOf(messages[1] ?? ""));
+    // The prompt of the judge stays under the limit of one argument.
+    expect((messages[1] ?? "").length).toBeLessThan(131072 / 2);
+  });
+
+  it("sends a diff section under the limit whole, with no cut line", async () => {
+    judgePlan({ default: [{ accept: true }] });
+    const { client } = scorerFake({});
+    await label([golden("MARK-a")], client, { runs: 1 });
+    expect(client.calls[0]?.userMessage).toContain("A-DIFF-LINE");
+    expect(client.calls[0]?.userMessage).not.toContain("65536");
+  });
+
+  it("queues a finding with two unresolved runs of four, also when two runs converged", async () => {
+    judgePlan({
+      default: [{ accept: true }, { accept: true }, ...Array<JudgeStep>(6).fill({ accept: false })],
+    });
+    const { client } = scorerFake({ default: [{ severity: "nit" }] });
+    const [only] = await label([golden("MARK-a")], client, { runs: 4 });
+    expect(only?.entry.runs.map((r) => r.converged)).toEqual([true, true, false, false]);
+    expect(only?.entry.chosen).toBeNull();
+    expect(only?.queueReason).toBe("too_few_converged");
+  });
+
+  it("keeps the label when one run of four is unresolved", async () => {
+    judgePlan({
+      default: [
+        { accept: true },
+        { accept: true },
+        { accept: true },
+        ...Array<JudgeStep>(3).fill({ accept: false }),
+      ],
+    });
+    const { client } = scorerFake({ default: [{ severity: "nit" }] });
+    const [only] = await label([golden("MARK-a")], client, { runs: 4 });
+    expect(only?.entry.chosen?.severity).toBe("nit");
+    expect(only?.queueReason).toBeNull();
   });
 
   it("converges a run whose scorer call fails once and succeeds on the retry", async () => {
