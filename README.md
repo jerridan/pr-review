@@ -366,9 +366,7 @@ To publish a release to the GitHub Marketplace, open the release on GitHub and p
 This repo runs its own CI in `.github/workflows/ci.yml`. The workflow runs on every pull request and on a manual dispatch.
 
 - The job `checks` runs `npm ci`, `npm test`, `npm run lint`, `npm run typecheck` and `npm run build` on Node 20. On a pull request, it first runs the version check. See [The release tag](#the-release-tag).
-- The job `eval` runs after `checks`. It runs the eval gate on the pinned case set with `--repeat 3` and `--baseline eval/baseline.json`. A dispatch can set another repeat count.
-- The path filter runs the eval only when the pull request changes a path under `prompts/`, `src/` or `eval/`, or changes `package.json` or `package-lock.json`. A step finds the changed paths with `git diff --name-only` from the merge base. When no path matches, the job passes and runs no eval. A dispatch always runs the eval.
-- The eval job skips a pull request from a fork, because a fork gets no secrets. The skip does not fail the pull request.
+- The job `eval` runs after `checks`, on a manual dispatch only. It runs the eval on the pinned case set with `--repeat 3` and `--baseline eval/baseline.json`. A dispatch can set another repeat count. A pull request does not run it: one person maintains this repo and runs the eval locally before a change to behaviour merges.
 - The job fails on exit 1 and on exit 3 of the eval. It appends the report table to the step summary. It uploads `pr-review-eval/`, with `report.json` and every record, also after a failure.
 - A new push to the pull request cancels the run in progress.
 
@@ -664,7 +662,7 @@ A margin smaller than the noise of the case set makes the gate fail on a run wit
 
 For example, a precision with mean 0.667 and min 0.5 has a spread of 0.167. Twice the spread is 0.333, so the margin is 0.35. `--write-baseline` keeps an existing margin, so edit `margin` in the file after the run, then commit it.
 
-The starter set is small, so its spread is large. Its baseline recall is 0.117 with a margin of 0.05. The gate works on the mean over the repeats. So the recall gate fails when the mean recall over the three repeats drops below about 0.067. In the baseline run, only the fixture matched a golden. The fixture has five goldens. So the gate fails when the fixture matches fewer than about 1.3 of its goldens per run, on average. Its baseline precision is 1.0 with a margin of 0.35. So the precision gate fails when, on average over the repeats, more than about one posted finding in three is wrong. Until D4b grows the set, both gates are collapse checks. Read the numbers in the step summary of the eval job. Do not read only the check status.
+The case set is empty and the repo holds no baseline until D5 adds the first ten cases and writes one. The eval job in CI runs on a manual dispatch only. Before a change to behaviour merges, run the eval locally at one repeat and put the table in the PR description. Read the numbers. Do not read only the gate status.
 
 ### Explain a record
 
