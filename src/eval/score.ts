@@ -1,17 +1,31 @@
 // Score the posted findings and the raw candidates of one run record
 // against the golden findings of its case: exact matches first, then the
 // judge on the ambiguous pairs. The posted goldens go first. The not-real
-// goldens then take the findings that are still free.
+// goldens then take the findings that are still free. With extras on, the
+// extras judge then checks each posted finding that matches no golden.
+import { z } from "zod";
 import { readHeadFile } from "../find/evidence.js";
+import { diffSections } from "../gather/diff.js";
+import { prDiff } from "../gather/index.js";
 import { loadPrompt, render, type PromptFile } from "../prompts/load.js";
 import type { Finding } from "../schemas/finding.js";
+import { ciEnum } from "../schemas/json-schema.js";
 import { JudgeOutputSchema, type JudgeOutput } from "../schemas/judge.js";
 import type { RunRecord } from "../schemas/record.js";
 import type { SdkClient } from "../sdk/client.js";
 import type { RunOptions } from "../sdk/options.js";
 import { wrapUntrusted } from "../untrusted.js";
 import { isPostedGolden, type GoldenFinding } from "./case.js";
+import { readPolicy } from "./label/policy.js";
 import { classifyPair, type PairKind } from "./match.js";
+
+/** The answer of the extras judge for one posted finding that matches no golden. */
+export type ExtrasOutput = { real: "yes" | "no" | "unknown"; reason: string };
+
+export const ExtrasOutputSchema: z.ZodType<ExtrasOutput> = z.strictObject({
+  real: ciEnum(["yes", "no", "unknown"] as const),
+  reason: z.string(),
+});
 
 export type ScoreResult = {
   /** The matches to posted goldens. A match to a not-real golden is not here. */
@@ -33,6 +47,12 @@ export type ScoreResult = {
    * index into that list. "candidates" is its length.
    */
   raw: { matched: Match[]; notRealMatches: number; candidates: number };
+  /**
+   * The extras judge. "enabled" is false when the caller did not ask for
+   * it. "judged" is the count of queries. "accepted" holds the indices of
+   * the posted findings with the answer "yes".
+   */
+  extras: { enabled: boolean; judged: number; accepted: number[] };
 };
 
 type Match = { posted: number; golden: number; via: "exact" | "judge" };
@@ -40,10 +60,13 @@ type Match = { posted: number; golden: number; via: "exact" | "judge" };
 /** prompts/judge.md, loaded: the system prompt and the user message texts. */
 type JudgePrompt = { system: string; template: string; noSpanText: string };
 
-function field(prompt: PromptFile, name: string): string {
+/** prompts/extras-judge.md, loaded. */
+type ExtrasPrompt = JudgePrompt & { noDiffText: string };
+
+function field(prompt: PromptFile, file: string, name: string): string {
   const value = prompt.frontmatter[name];
   if (typeof value !== "string") {
-    throw new Error(`prompts/judge.md has no "${name}" string in its frontmatter.`);
+    throw new Error(`prompts/${file} has no "${name}" string in its frontmatter.`);
   }
   return value;
 }
@@ -52,10 +75,24 @@ function loadJudgePrompt(): JudgePrompt {
   const prompt = loadPrompt("judge.md");
   return {
     system: prompt.body,
-    template: field(prompt, "user_message"),
-    noSpanText: field(prompt, "no_span_text"),
+    template: field(prompt, "judge.md", "user_message"),
+    noSpanText: field(prompt, "judge.md", "no_span_text"),
   };
 }
+
+function loadExtrasPrompt(): ExtrasPrompt {
+  const file = "extras-judge.md";
+  const prompt = loadPrompt(file);
+  return {
+    system: prompt.body,
+    template: field(prompt, file, "user_message"),
+    noSpanText: field(prompt, file, "no_span_text"),
+    noDiffText: field(prompt, file, "no_diff_text"),
+  };
+}
+
+/** The lines of context that the extras judge gets above and below a span. */
+const EXTRAS_WINDOW = 20;
 
 /**
  * The numbered lines of a head file from "start" to "end". The text for no
@@ -158,13 +195,16 @@ function rawCandidates(record: RunRecord): Finding[] {
  * ambiguous pair in which neither finding has a match yet. Only the answer
  * "yes" is a match. A failed query counts as "unknown". The two matchings
  * share the judge answers: a pair with the same judge text and the same
- * golden gets one query only.
+ * golden gets one query only. With "extras" on, each posted finding that
+ * matches no golden then gets one query of the extras judge. Extras are
+ * off by default.
  */
 export async function scoreRecord(
   record: RunRecord,
   golden: GoldenFinding[],
   headDir: string,
   judge: { client: SdkClient; model: string; options: RunOptions },
+  opts: { extras?: boolean } = {},
 ): Promise<ScoreResult> {
   const postedGolden = golden.map(isPostedGolden);
 
@@ -274,6 +314,63 @@ export async function scoreRecord(
   const candidates = rawCandidates(record);
   const fromRaw = await matchAll(candidates);
 
+  const unmatchedPosted = posted.flatMap((_, p) => (fromPosted.taken.has(p) ? [] : [p]));
+
+  // The extras judge: one query for each posted finding with no golden.
+  const enabled = opts.extras === true;
+  const accepted: number[] = [];
+  let judged = 0;
+  if (enabled && unmatchedPosted.length > 0) {
+    const extras = loadExtrasPrompt();
+    // The diff of the change, split by file once. A git failure gives no diff.
+    const sections = await prDiff(headDir, record.identity.base, record.identity.head).then(
+      diffSections,
+      () => new Map<string, string>(),
+    );
+    const policy = readPolicy().trim();
+    for (const p of unmatchedPosted) {
+      const finding = posted[p];
+      if (!finding) continue;
+      judged += 1;
+      judgeCalls += 1;
+      const section = (sections.get(finding.file) ?? "").trim();
+      const blocks = {
+        posted_finding: wrapUntrusted("posted_finding", describePosted(finding)).block,
+        posted_span: wrapUntrusted(
+          "posted_span",
+          spanText(
+            linesOf(finding.file),
+            Math.max(1, finding.start_line - EXTRAS_WINDOW),
+            finding.end_line + EXTRAS_WINDOW,
+            extras.noSpanText,
+          ),
+        ).block,
+        diff: wrapUntrusted("diff", section === "" ? extras.noDiffText : section).block,
+        policy: wrapUntrusted("policy", policy).block,
+      };
+      let answer: ExtrasOutput["real"] = "unknown";
+      try {
+        const outcome = await judge.client.query<ExtrasOutput>(
+          {
+            role: "judge",
+            systemPrompt: extras.system,
+            userMessage: render(extras.template, blocks),
+            schema: ExtrasOutputSchema,
+            cwd: headDir,
+            overrides: { model: judge.model },
+          },
+          judge.options,
+        );
+        judgeCostUsd += outcome.raw?.costUsd ?? 0;
+        if (outcome.ok) answer = outcome.output.real;
+      } catch {
+        answer = "unknown";
+      }
+      if (answer === "yes") accepted.push(p);
+      else if (answer === "unknown") judgeUnknown += 1;
+    }
+  }
+
   const { matched } = fromPosted;
   const same = matched.filter((m) => posted[m.posted]?.severity === golden[m.golden]?.severity);
   return {
@@ -284,11 +381,12 @@ export async function scoreRecord(
     severityAgreement: { same: same.length, matched: matched.length },
     notRealMatches: fromPosted.notRealMatches,
     postedGoldenCount: postedGolden.filter(Boolean).length,
-    unmatchedPosted: posted.flatMap((_, p) => (fromPosted.taken.has(p) ? [] : [p])),
+    unmatchedPosted,
     raw: {
       matched: fromRaw.matched,
       notRealMatches: fromRaw.notRealMatches,
       candidates: candidates.length,
     },
+    extras: { enabled, judged, accepted },
   };
 }

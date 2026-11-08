@@ -18,6 +18,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { createProgram } from "../src/cli.js";
 import type { GoldenFinding } from "../src/eval/case.js";
 import type { Report } from "../src/eval/report.js";
+import { ExtrasOutputSchema } from "../src/eval/score.js";
 import { RecordSchema, type RunRecord } from "../src/schemas/record.js";
 import type { QueryMeta, QueryOutcome, QueryRequest } from "../src/sdk/client.js";
 import { createFakeSdkClient } from "../src/sdk/fake.js";
@@ -237,6 +238,10 @@ type ScriptOptions = {
   reviewerFailure?: { message: string; runs: number[] };
   /** The verifier says that the claim of the planted finding does not hold. */
   rejectPlanted?: boolean;
+  /** The conventions reviewer reports the planted finding only. */
+  plantedOnly?: boolean;
+  /** The answer of every extras judge query. The default is "no". */
+  extrasAnswer?: "yes" | "no";
 };
 
 /**
@@ -302,7 +307,8 @@ function evalFake(opts: ScriptOptions = {}) {
           needs_context: false,
         };
         const evenRun = runs % 2 === 0;
-        return out({ findings: opts.vary && evenRun ? [planted] : [planted, ci] });
+        const one = opts.plantedOnly === true || (opts.vary === true && evenRun);
+        return out({ findings: one ? [planted] : [planted, ci] });
       }
       case "verifier":
       case "verifier-escalation":
@@ -331,6 +337,11 @@ function evalFake(opts: ScriptOptions = {}) {
           merged: [{ member_index: 0, claim: "merged", explanation: "e", severity: "blocking" }],
         });
       case "judge":
+        // An extras query has no cost, so the judge costs of a test show
+        // the match queries only.
+        if (req.schema === ExtrasOutputSchema) {
+          return out({ real: opts.extrasAnswer ?? "no", reason: "r" });
+        }
         if (opts.judgeAnswer === "fail") {
           return { ok: false, failure: { kind: "limit", message: "budget" }, raw: meta(0.25) };
         }
@@ -381,7 +392,10 @@ function recordsUnder(out: string): { path: string; record: RunRecord }[] {
   return found.sort((a, b) => (a.path < b.path ? -1 : 1));
 }
 
-const judgeCalls = (fake: Fake) => fake.calls.filter((c) => c.role === "judge");
+// The match queries of the judge. An extras query has its own schema.
+const judgeCalls = (fake: Fake) =>
+  fake.calls.filter((c) => c.role === "judge" && c.schema !== ExtrasOutputSchema);
+const extrasCalls = (fake: Fake) => fake.calls.filter((c) => c.schema === ExtrasOutputSchema);
 
 describe("pr-review eval: the end-to-end report (R10.1, R5.1, R5.4, R5.6)", () => {
   it(
@@ -411,6 +425,9 @@ describe("pr-review eval: the end-to-end report (R10.1, R5.1, R5.4, R5.6)", () =
         findings_per_case: 2,
         cost_per_case: 0.1,
         drops: {},
+        // The extras judge answers no, so no extra counts.
+        adjudicated_precision: 0.25,
+        judge_cost_per_case: 0,
       };
       expect(report.repeats).toEqual([
         { repeat: 1, ...perRepeat },
@@ -423,8 +440,11 @@ describe("pr-review eval: the end-to-end report (R10.1, R5.1, R5.4, R5.6)", () =
         findings_per_case: { mean: 2, min: 2, max: 2 },
         cost_per_case: { mean: 0.1, min: 0.1, max: 0.1 },
         drops: {},
+        adjudicated_precision: { mean: 0.25, min: 0.25, max: 0.25 },
+        judge_cost_per_case: { mean: 0, min: 0, max: 0 },
       });
-      expect(report.judge).toEqual({ calls: 0, unknown: 0, cost_usd: 0 });
+      // Each repeat asks the extras judge about the three unmatched findings.
+      expect(report.judge).toEqual({ calls: 6, unknown: 0, cost_usd: 0 });
       expect(report.failed_repeats).toEqual([]);
       expect(report.gate).toBeNull();
       for (const key of ["cases", "repeats", "aggregate", "judge", "failed_repeats", "gate"]) {
@@ -771,6 +791,7 @@ describe("pr-review eval: usage errors (R3.1, R3.9)", () => {
       "--judge-model <id>",
       "--allow-api-key",
       "--allow-same-judge",
+      "--no-extras",
     ]) {
       expect(stdout).toContain(flag);
     }
@@ -908,7 +929,8 @@ describe("pr-review eval: the judge (R4.4, R5.2)", () => {
         { name: "judged", golden: [{ ...PLANTED(), category: "security" }] },
       ]);
       const fake = evalFake({ judgeCost: 0.25, judgeAnswer: "yes" });
-      const { code, report } = await evalJson(fake, cases, "--repeat", "1");
+      // The extras judge is off, so the counts show the match query only.
+      const { code, report } = await evalJson(fake, cases, "--repeat", "1", "--no-extras");
       expect(code, stderr).toBe(0);
       expect(judgeCalls(fake)).toHaveLength(1);
       const [r] = report?.cases[0]?.repeats ?? [];
@@ -1034,11 +1056,107 @@ describe("pr-review eval: the report outputs (R5.5, R5.6, R5.7)", () => {
       expect(stdout).toContain("b-unmatched");
       expect(stdout).toMatch(/^recall\s+0\.500\s+0\.500\s+0\.500\s*$/m);
       expect(stdout).toMatch(/^findings per case\s+2\.000\s+2\.000\s+2\.000\s*$/m);
-      expect(stdout).toMatch(/^repeat\s+raw recall\s+recall\s+precision\s+posted\s+drops\s+cost$/m);
+      expect(stdout).toMatch(
+        /^repeat\s+raw recall\s+recall\s+precision\s+adj precision\s+posted\s+drops\s+cost\s+judge cost$/m,
+      );
+      // The repeat rows of a-planted and of b-unmatched.
+      expect(stdout).toMatch(
+        /^1\s+1\.000\s+1\.000\s+0\.500\s+0\.500\s+2\s+-\s+\$0\.1000\s+\$0\.0000$/m,
+      );
+      expect(stdout).toMatch(
+        /^1\s+0\.000\s+0\.000\s+0\.000\s+0\.000\s+2\s+-\s+\$0\.1000\s+\$0\.0000$/m,
+      );
       expect(stdout).toMatch(/^raw recall\s+0\.500\s+0\.500\s+0\.500\s*$/m);
       expect(stdout).toMatch(/^drops\s+-\s*$/m);
+      expect(stdout).toMatch(/^cost per PR: /);
+      expect(stdout).toMatch(/^cost per PR\s+\$0\.1000\s+\$0\.1000\s+\$0\.1000\s*$/m);
+      expect(stdout).toMatch(/^judge cost per PR\s+\$0\.0000\s+\$0\.0000\s+\$0\.0000\s*$/m);
       const report = JSON.parse(readFileSync(join(out, "report.json"), "utf8")) as Report;
       expect(report.aggregate.recall.mean).toBe(0.5);
+    },
+    RUN_TIMEOUT,
+  );
+});
+
+describe("pr-review eval: the extras judge", () => {
+  type CandidatesFile = { findings: Record<string, unknown>[] };
+  const candidatesOf = (out: string, name: string): CandidatesFile =>
+    JSON.parse(readFileSync(join(out, name, "candidates.json"), "utf8")) as CandidatesFile;
+
+  // The run posts the planted finding only, and the golden finding is
+  // elsewhere, so the posted finding matches no golden.
+  const extraCase = () => casesDir([{ name: "extra", golden: [UNMATCHED] }]);
+
+  it(
+    "adjudicates an unmatched posted finding, writes it to candidates.json, and leaves golden.json alone",
+    async () => {
+      const cases = extraCase();
+      const goldenBefore = readFileSync(join(cases, "extra", "golden.json"));
+      const fake = evalFake({ plantedOnly: true, extrasAnswer: "yes" });
+      const { code, out, report } = await evalJson(fake, cases, "--repeat", "1");
+      expect(code, stderr).toBe(0);
+      const [r] = report?.cases[0]?.repeats ?? [];
+      expect(r).toMatchObject({
+        precision: 0,
+        adjudicated_precision: 1,
+        extras_judged: 1,
+        extras_accepted: 1,
+      });
+      expect(report?.repeats[0]?.adjudicated_precision).toBe(1);
+      expect(report?.aggregate.adjudicated_precision).toEqual({ mean: 1, min: 1, max: 1 });
+      // The extras query holds the diff section of the planted file.
+      const [call] = extrasCalls(fake);
+      expect(call?.role).toBe("judge");
+      expect(call?.userMessage).toMatch(/<diff_[0-9a-f]{16}>\n[^]*@@[^]*<\/diff_/);
+      expect(call?.userMessage).toContain(fx.file);
+      const { findings } = candidatesOf(out, "extra");
+      expect(findings).toHaveLength(1);
+      expect(findings[0]).toMatchObject({
+        file: fx.file,
+        start_line: fx.line,
+        end_line: fx.line,
+        category: "bug",
+        severity: "blocking",
+        claim: "CLAIM-off-by-one",
+      });
+      expect(String(findings[0]?.note)).toMatch(
+        /^Extra accepted by the extras judge claude-sonnet-5-5 on the eval run .+, started \d{4}-\d\d-\d\dT[^,]+Z, repeat 1\.$/,
+      );
+      expect(String(findings[0]?.note)).toContain(out);
+      expect(readFileSync(join(cases, "extra", "golden.json")).equals(goldenBefore)).toBe(true);
+    },
+    RUN_TIMEOUT,
+  );
+
+  it(
+    "asks no extras query, gives null adjudicated precision and writes no candidates.json with --no-extras",
+    async () => {
+      const fake = evalFake({ plantedOnly: true, extrasAnswer: "yes" });
+      const { code, out, report } = await evalJson(
+        fake,
+        extraCase(),
+        "--repeat",
+        "1",
+        "--no-extras",
+      );
+      expect(code, stderr).toBe(0);
+      expect(extrasCalls(fake)).toHaveLength(0);
+      const [r] = report?.cases[0]?.repeats ?? [];
+      expect(r).toMatchObject({ precision: 0, adjudicated_precision: null, extras_judged: 0 });
+      expect(report?.repeats[0]?.adjudicated_precision).toBeNull();
+      expect(existsSync(join(out, "extra", "candidates.json"))).toBe(false);
+    },
+    RUN_TIMEOUT,
+  );
+
+  it(
+    "writes one candidates.json entry when two repeats accept the same extra",
+    async () => {
+      const fake = evalFake({ plantedOnly: true, extrasAnswer: "yes" });
+      const { code, out, report } = await evalJson(fake, extraCase(), "--repeat", "2");
+      expect(code, stderr).toBe(0);
+      expect(report?.cases[0]?.repeats.map((r) => r.extras_accepted)).toEqual([1, 1]);
+      expect(candidatesOf(out, "extra").findings).toHaveLength(1);
     },
     RUN_TIMEOUT,
   );

@@ -56,6 +56,9 @@ function repeat(n: number, recall: number | null, precision: number | null): Rep
     raw_matched: 0,
     raw_candidates: 0,
     drops: {},
+    extras_judged: 0,
+    extras_accepted: 0,
+    adjudicated_precision: precision,
   };
 }
 

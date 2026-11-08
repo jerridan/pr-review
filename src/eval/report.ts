@@ -18,6 +18,10 @@ export type Report = {
     cost_per_case: number | null;
     /** The drops of the repeat, summed over its cases. */
     drops: Record<string, number>;
+    /** Pooled like the precision. Null when no case of the repeat has a value. */
+    adjudicated_precision: number | null;
+    /** The mean over the cases of the judge cost: the judge cost per PR. */
+    judge_cost_per_case: number | null;
   }[];
   aggregate: {
     raw_recall: Spread;
@@ -27,6 +31,8 @@ export type Report = {
     cost_per_case: Spread;
     /** The drops of every repeat that did not fail, summed. */
     drops: Record<string, number>;
+    adjudicated_precision: Spread;
+    judge_cost_per_case: Spread;
   };
   judge: { calls: number; unknown: number; cost_usd: number };
   failed_repeats: { case: string; repeat: number; error: string }[];
@@ -57,6 +63,19 @@ function pooledPrecision(repeats: RepeatMetrics[]): number | null {
   const posted = repeats.reduce((sum, r) => sum + r.posted, 0);
   if (posted === 0) return null;
   return repeats.reduce((sum, r) => sum + r.matched, 0) / posted;
+}
+
+/**
+ * The adjudicated precision of a repeat, pooled over its cases like the
+ * precision: the matched and the accepted posted findings, over the posted
+ * findings. Only the cases with a value count. Null when no case has one,
+ * for example when extras are off.
+ */
+function pooledAdjudicated(repeats: RepeatMetrics[]): number | null {
+  const judged = repeats.filter((r) => r.adjudicated_precision !== null);
+  const posted = judged.reduce((sum, r) => sum + r.posted, 0);
+  if (posted === 0) return null;
+  return judged.reduce((sum, r) => sum + r.matched + r.extras_accepted, 0) / posted;
 }
 
 /** Add the drop counts of "parts" by stage. A failed repeat has none. */
@@ -109,6 +128,8 @@ export function buildReport(
       findings_per_case: mean(ok.map((r) => r.posted)),
       cost_per_case: mean(ok.map((r) => r.cost_usd)),
       drops: sumDrops(ok.map((r) => r.drops)),
+      adjudicated_precision: pooledAdjudicated(ok),
+      judge_cost_per_case: mean(ok.map((r) => r.judge_cost_usd)),
     };
   });
   return {
@@ -121,6 +142,8 @@ export function buildReport(
       findings_per_case: spread(repeats.map((r) => r.findings_per_case)),
       cost_per_case: spread(repeats.map((r) => r.cost_per_case)),
       drops: sumDrops(repeats.map((r) => r.drops)),
+      adjudicated_precision: spread(repeats.map((r) => r.adjudicated_precision)),
+      judge_cost_per_case: spread(repeats.map((r) => r.judge_cost_per_case)),
     },
     judge: {
       calls: all.reduce((sum, { r }) => sum + r.judge_calls, 0),
@@ -153,17 +176,32 @@ function columns(rows: string[][]): string[] {
 }
 
 /**
- * Render the report as text: one table for each case, with a row for each
- * repeat, then the summary with the mean, the minimum and the maximum.
- * "baselineCasesRef" is the cases ref of the baseline that the gate used.
- * When it and the cases ref of the report are both known and differ, the
- * "Cases ref" line names both, so the step summary shows the mismatch.
+ * Render the report as text: a heading that names the costs per PR, one
+ * table for each case, with a row for each repeat, then the summary with
+ * the mean, the minimum and the maximum. "baselineCasesRef" is the cases
+ * ref of the baseline that the gate used. When it and the cases ref of the
+ * report are both known and differ, the "Cases ref" line names both, so
+ * the step summary shows the mismatch.
  */
 export function renderTable(report: Report, baselineCasesRef: string | null = null): string {
-  const lines: string[] = [];
+  const lines: string[] = [
+    "cost per PR: in each case table, cost is the cost of the review run and judge cost is the cost of the judge, for that PR.",
+    "",
+  ];
+  const header = [
+    "repeat",
+    "raw recall",
+    "recall",
+    "precision",
+    "adj precision",
+    "posted",
+    "drops",
+    "cost",
+    "judge cost",
+  ];
   for (const c of report.cases) {
     lines.push(`Case: ${c.name}`);
-    const rows = [["repeat", "raw recall", "recall", "precision", "posted", "drops", "cost"]];
+    const rows = [header];
     for (const r of c.repeats) {
       rows.push(
         r.failed
@@ -173,9 +211,11 @@ export function renderTable(report: Report, baselineCasesRef: string | null = nu
               ratio(r.raw_recall),
               ratio(r.recall),
               ratio(r.precision),
+              ratio(r.adjudicated_precision),
               String(r.posted),
               dropsText(r.drops),
               usd(r.cost_usd),
+              usd(r.judge_cost_usd),
             ],
       );
     }
@@ -191,16 +231,28 @@ export function renderTable(report: Report, baselineCasesRef: string | null = nu
       ["recall", ratio(a.recall.mean), ratio(a.recall.min), ratio(a.recall.max)],
       ["precision", ratio(a.precision.mean), ratio(a.precision.min), ratio(a.precision.max)],
       [
+        "adj precision",
+        ratio(a.adjudicated_precision.mean),
+        ratio(a.adjudicated_precision.min),
+        ratio(a.adjudicated_precision.max),
+      ],
+      [
         "findings per case",
         ratio(a.findings_per_case.mean),
         ratio(a.findings_per_case.min),
         ratio(a.findings_per_case.max),
       ],
       [
-        "cost per case",
+        "cost per PR",
         usd(a.cost_per_case.mean),
         usd(a.cost_per_case.min),
         usd(a.cost_per_case.max),
+      ],
+      [
+        "judge cost per PR",
+        usd(a.judge_cost_per_case.mean),
+        usd(a.judge_cost_per_case.min),
+        usd(a.judge_cost_per_case.max),
       ],
       // The drops are one sum over the eval, not a spread.
       ["drops", dropsText(a.drops)],

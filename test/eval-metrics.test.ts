@@ -118,6 +118,7 @@ function scoreOf(parts: Partial<ScoreResult> = {}): ScoreResult {
     postedGoldenCount: 0,
     unmatchedPosted: [],
     raw: { matched: [], notRealMatches: 0, candidates: 0 },
+    extras: { enabled: false, judged: 0, accepted: [] },
     ...parts,
   };
 }
@@ -145,6 +146,7 @@ describe("metrics (R5.1, R5.2)", () => {
         notRealMatches: 0,
         candidates: 5,
       },
+      extras: { enabled: true, judged: 2, accepted: [3] },
     });
     expect(metrics(rec, score, 3)).toEqual({
       repeat: 3,
@@ -165,7 +167,25 @@ describe("metrics (R5.1, R5.2)", () => {
       raw_matched: 2,
       raw_candidates: 5,
       drops: {},
+      extras_judged: 2,
+      extras_accepted: 1,
+      // One match and one accepted extra of four posted findings.
+      adjudicated_precision: 0.5,
     });
+  });
+
+  it("gives null adjudicated precision when extras are off, and keeps the strict precision", () => {
+    const rec = record([posted(1), posted(2)], { total: 0, stageMs: {} });
+    const m = metrics(rec, scoreOf({ matched: [{ posted: 0, golden: 0, via: "exact" }] }), 1);
+    expect(m.adjudicated_precision).toBeNull();
+    expect(m.extras_judged).toBe(0);
+    expect(m.precision).toBe(0.5);
+  });
+
+  it("gives null adjudicated precision when no finding posted", () => {
+    const rec = record([], { total: 0, stageMs: {} });
+    const m = metrics(rec, scoreOf({ extras: { enabled: true, judged: 0, accepted: [] } }), 1);
+    expect(m.adjudicated_precision).toBeNull();
   });
 
   it("keeps the judge cost out of cost_usd", () => {
@@ -291,6 +311,9 @@ describe("failedMetrics (R3.8)", () => {
       raw_matched: 0,
       raw_candidates: 0,
       drops: {},
+      extras_judged: 0,
+      extras_accepted: 0,
+      adjudicated_precision: null,
     });
   });
 });
@@ -319,6 +342,9 @@ function rm(repeat: number, parts: Partial<RepeatMetrics> = {}): RepeatMetrics {
     raw_matched: 0,
     raw_candidates: 0,
     drops: {},
+    extras_judged: 0,
+    extras_accepted: 0,
+    adjudicated_precision: null,
     ...parts,
   };
 }
@@ -345,9 +371,10 @@ describe("buildReport (R5.3, R5.4, R5.6)", () => {
     const { repeats } = buildReport(cases, null, null);
     // Repeat 1: 1 matched of 2 posted, and a case with none posted: 0.5.
     // Repeat 2: 1 matched of 1 posted, and 0 matched of 3 posted: 1 of 4.
+    const same = { raw_recall: 1, recall: 0.5, adjudicated_precision: null, drops: {} };
     expect(repeats.map(({ cost_per_case: _cost, ...rest }) => rest)).toEqual([
-      { repeat: 1, raw_recall: 1, recall: 0.5, precision: 0.5, findings_per_case: 1, drops: {} },
-      { repeat: 2, raw_recall: 1, recall: 0.5, precision: 0.25, findings_per_case: 2, drops: {} },
+      { repeat: 1, ...same, precision: 0.5, findings_per_case: 1, judge_cost_per_case: 0.125 },
+      { repeat: 2, ...same, precision: 0.25, findings_per_case: 2, judge_cost_per_case: 0 },
     ]);
     expect(repeats[0]?.cost_per_case).toBeCloseTo(0.3, 10);
     expect(repeats[1]?.cost_per_case).toBeCloseTo(0.3, 10);
@@ -450,8 +477,57 @@ describe("buildReport (R5.3, R5.4, R5.6)", () => {
       findings_per_case: 2,
       cost_per_case: 0.1,
       drops: {},
+      adjudicated_precision: null,
+      judge_cost_per_case: 0,
     });
     expect(report.cases[0]?.repeats[1]?.failed).toBe(true);
+  });
+
+  it("pools the adjudicated precision of a repeat, and gives the mean judge cost per case", () => {
+    const judged = [
+      {
+        name: "a-case",
+        repeats: [
+          rm(1, {
+            posted: 4,
+            matched: 1,
+            extras_accepted: 1,
+            adjudicated_precision: 0.5,
+            judge_cost_usd: 0.1,
+          }),
+          rm(2, { judge_cost_usd: 0.5 }),
+        ],
+      },
+      {
+        name: "b-case",
+        repeats: [
+          rm(1, {
+            posted: 2,
+            matched: 0,
+            extras_accepted: 2,
+            adjudicated_precision: 1,
+            judge_cost_usd: 0.3,
+          }),
+          rm(2, { judge_cost_usd: 0.1 }),
+        ],
+      },
+    ];
+    const report = buildReport(judged, null, null);
+    // Repeat 1: (1 + 1 + 0 + 2) / (4 + 2). Repeat 2 has no extras.
+    expect(report.repeats[0]?.adjudicated_precision).toBeCloseTo(4 / 6, 10);
+    expect(report.repeats[1]?.adjudicated_precision).toBeNull();
+    expect(report.repeats[0]?.judge_cost_per_case).toBeCloseTo(0.2, 10);
+    expect(report.repeats[1]?.judge_cost_per_case).toBeCloseTo(0.3, 10);
+    const adj = report.aggregate.adjudicated_precision;
+    expect([adj.mean, adj.min, adj.max].map((v) => v?.toFixed(6))).toEqual(
+      Array(3).fill((4 / 6).toFixed(6)),
+    );
+    const cost = report.aggregate.judge_cost_per_case;
+    expect([cost.mean, cost.min, cost.max].map((v) => v?.toFixed(6))).toEqual([
+      "0.250000",
+      "0.200000",
+      "0.300000",
+    ]);
   });
 
   it("holds the cases, the gate and the cases ref that it gets", () => {
@@ -480,6 +556,9 @@ describe("renderTable (R5.5)", () => {
             posted: 2,
             cost_usd: 0.2,
             drops: { merge: 1, verify: 2 },
+            extras_accepted: 1,
+            adjudicated_precision: 1,
+            judge_cost_usd: 0.05,
           }),
           rm(2, { raw_recall: 0.5, recall: 0.5, precision: 1, posted: 1, cost_usd: 0.4 }),
         ],
@@ -491,21 +570,46 @@ describe("renderTable (R5.5)", () => {
   );
   const text = renderTable(report);
 
-  it("prints one table for each case, with a row for each repeat and the six columns", () => {
+  it("prints one table for each case, with a row for each repeat and the nine columns", () => {
     const lines = text.split("\n");
     for (const name of ["a-case", "b-case"]) expect(text).toContain(name);
     const header = lines.find((l) => /recall/.test(l) && /posted/.test(l)) ?? "";
-    expect(header).toMatch(/^repeat\s+raw recall\s+recall\s+precision\s+posted\s+drops\s+cost$/);
-    // The drops go in the order of the pipeline stages.
+    expect(header).toMatch(
+      /^repeat\s+raw recall\s+recall\s+precision\s+adj precision\s+posted\s+drops\s+cost\s+judge cost$/,
+    );
+    // The drops go in the order of the pipeline stages. A repeat with no
+    // extras shows "-" for the adjudicated precision.
     expect(
       lines.some((l) =>
-        /^\s*1\s+1\.000\s+1\.000\s+0\.500\s+2\s+verify 2, merge 1\s+\$0\.2000\s*$/.test(l),
+        /^\s*1\s+1\.000\s+1\.000\s+0\.500\s+1\.000\s+2\s+verify 2, merge 1\s+\$0\.2000\s+\$0\.0500\s*$/.test(
+          l,
+        ),
       ),
     ).toBe(true);
     expect(
-      lines.some((l) => /^\s*2\s+0\.500\s+0\.500\s+1\.000\s+1\s+-\s+\$0\.4000\s*$/.test(l)),
+      lines.some((l) =>
+        /^\s*2\s+0\.500\s+0\.500\s+1\.000\s+-\s+1\s+-\s+\$0\.4000\s+\$0\.0000\s*$/.test(l),
+      ),
     ).toBe(true);
     expect(text).toContain("the run threw");
+  });
+
+  it("prints the cost per PR heading once, before the first case table", () => {
+    const lines = text.split("\n");
+    expect(lines[0]).toMatch(/^cost per PR: /);
+    expect(lines[0]).toContain("judge cost");
+    expect(lines.filter((l) => l.startsWith("cost per PR:"))).toHaveLength(1);
+    expect(text.indexOf("cost per PR:")).toBeLessThan(text.indexOf("Case: a-case"));
+  });
+
+  it("prints the adjudicated precision and the judge cost per PR in the summary", () => {
+    const lines = text.split("\n");
+    // Repeat 1 pools (1 + 1) / 2 from a-case. Repeat 2 has no extras.
+    expect(lines.some((l) => /^adj precision\s+1\.000\s+1\.000\s+1\.000\s*$/.test(l))).toBe(true);
+    // The judge cost per case is (0.05 + 0) / 2 and 0.
+    expect(
+      lines.some((l) => /^judge cost per PR\s+\$0\.0125\s+\$0\.0000\s+\$0\.0250\s*$/.test(l)),
+    ).toBe(true);
   });
 
   it("prints the raw recall and the summed drops in the summary", () => {
@@ -526,8 +630,8 @@ describe("renderTable (R5.5)", () => {
     expect(lines.some((l) => /^findings per case\s+1\.250\s+1\.000\s+1\.500\s*$/.test(l))).toBe(
       true,
     );
-    expect(
-      lines.some((l) => /^cost per case\s+\$0\.2750\s+\$0\.1500\s+\$0\.4000\s*$/.test(l)),
-    ).toBe(true);
+    expect(lines.some((l) => /^cost per PR\s+\$0\.2750\s+\$0\.1500\s+\$0\.4000\s*$/.test(l))).toBe(
+      true,
+    );
   });
 });

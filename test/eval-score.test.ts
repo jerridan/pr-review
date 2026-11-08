@@ -4,7 +4,9 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DEFAULT_REPO_CONFIG } from "../src/config/repo-config.js";
 import type { GoldenFinding } from "../src/eval/case.js";
-import { scoreRecord } from "../src/eval/score.js";
+import { readPolicy } from "../src/eval/label/policy.js";
+import { ExtrasOutputSchema, scoreRecord } from "../src/eval/score.js";
+import { loadPrompt } from "../src/prompts/load.js";
 import type { Category, Finding, Severity } from "../src/schemas/finding.js";
 import { JudgeOutputSchema } from "../src/schemas/judge.js";
 import type { PostedFinding, RunRecord } from "../src/schemas/record.js";
@@ -607,5 +609,119 @@ describe("scoreRecord: the raw candidates", () => {
     expect(result.judgeCalls).toBe(1);
     expect(result.judgeCostUsd).toBeCloseTo(0.02, 10);
     expect(result.raw.matched).toEqual([{ posted: 0, golden: 0, via: "judge" }]);
+  });
+});
+
+describe("scoreRecord: the extras judge", () => {
+  type Real = "yes" | "no" | "unknown" | "fail" | "throw";
+
+  /** A fake whose extras queries give the answers in order. A match query gets "no". */
+  function extrasFake(answers: Real[], costUsd = 0.01) {
+    let next = 0;
+    return createFakeSdkClient((req: QueryRequest): QueryOutcome<unknown> => {
+      if (req.role !== "judge") throw new Error(`unexpected role ${req.role}`);
+      if (req.schema !== ExtrasOutputSchema) {
+        return { ok: true, output: { same_issue: "no", reason: "r" }, raw: meta(costUsd) };
+      }
+      const answer = answers[next] ?? "no";
+      next += 1;
+      if (answer === "throw") throw new Error("the judge process crashed");
+      if (answer === "fail") {
+        return { ok: false, failure: { kind: "limit", message: "budget" }, raw: meta(costUsd) };
+      }
+      return { ok: true, output: { real: answer, reason: "r" }, raw: meta(costUsd) };
+    });
+  }
+
+  const extrasCalls = (fake: ReturnType<typeof extrasFake>) =>
+    fake.calls.filter((c) => c.schema === ExtrasOutputSchema);
+
+  function scoreExtras(
+    findings: PostedFinding[],
+    goldens: GoldenFinding[],
+    fake: ReturnType<typeof extrasFake>,
+    extras = true,
+  ) {
+    return scoreRecord(
+      record(findings),
+      goldens,
+      head,
+      { client: fake, model: SONNET, options: OPTIONS },
+      { extras },
+    );
+  }
+
+  it("asks once for each posted finding that matches no golden, and accepts the answer yes", async () => {
+    const fake = extrasFake(["yes"]);
+    const result = await scoreExtras(
+      [posted("src/a.ts", 10, 10), posted("src/a.ts", 40, 40), posted("src/b.ts", 5, 5)],
+      [golden("src/a.ts", 10, 10), golden("src/b.ts", 5, 5, { severity: "not_real" })],
+      fake,
+    );
+    expect(extrasCalls(fake)).toHaveLength(1);
+    expect(blocks(extrasCalls(fake)[0]?.userMessage ?? "").get("posted_finding")).toContain(
+      "POSTED-CLAIM-src/a.ts-40",
+    );
+    expect(result.extras).toEqual({ enabled: true, judged: 1, accepted: [1] });
+    expect(result.judgeCalls).toBe(1);
+  });
+
+  it("accepts no extra for the answers no, unknown, a failed query and a thrown query", async () => {
+    const fake = extrasFake(["no", "unknown", "fail", "throw"], 0.02);
+    const result = await scoreExtras(
+      [
+        posted("src/a.ts", 10, 10),
+        posted("src/a.ts", 30, 30),
+        posted("src/a.ts", 50, 50),
+        posted("src/b.ts", 50, 50),
+      ],
+      [],
+      fake,
+    );
+    expect(result.extras).toEqual({ enabled: true, judged: 4, accepted: [] });
+    expect(result.judgeCalls).toBe(4);
+    expect(result.judgeUnknown).toBe(3);
+    // The thrown query gives no cost.
+    expect(result.judgeCostUsd).toBeCloseTo(0.06, 10);
+  });
+
+  it("asks no extras query when extras are off, and by default", async () => {
+    const off = extrasFake(["yes"]);
+    const result = await scoreExtras([posted("src/a.ts", 40, 40)], [], off, false);
+    expect(off.calls).toHaveLength(0);
+    expect(result.extras).toEqual({ enabled: false, judged: 0, accepted: [] });
+    const byDefault = extrasFake(["yes"]);
+    await score([posted("src/a.ts", 40, 40)], [], byDefault);
+    expect(byDefault.calls).toHaveLength(0);
+  });
+
+  it("sends the extras prompt with the finding, the lines around its span, the diff and the policy", async () => {
+    const fake = extrasFake(["yes"]);
+    await scoreExtras([posted("src/a.ts", 25, 26)], [], fake);
+    const [call] = extrasCalls(fake);
+    const prompt = loadPrompt("extras-judge.md");
+    expect(call?.role).toBe("judge");
+    expect(call?.overrides?.model).toBe(SONNET);
+    expect(call?.systemPrompt).toBe(prompt.body);
+    const found = blocks(call?.userMessage ?? "");
+    expect(found.get("posted_finding")).toContain("POSTED-EVIDENCE-25");
+    const span = found.get("posted_span") ?? "";
+    // Twenty lines above the span and twenty lines below it.
+    expect(span).toContain("5| const v5 = 5;");
+    expect(span).toContain("46| const v46 = 46;");
+    expect(span).not.toContain("const v4 = 4;");
+    expect(span).not.toContain("const v47 = 47;");
+    // The head directory is no git checkout, so there is no diff.
+    expect(found.get("diff")).toBe(String(prompt.frontmatter.no_diff_text).trim());
+    expect(found.get("policy")).toBe(readPolicy().trim());
+  });
+
+  it("sends the no-span text for a span past the end of the head file", async () => {
+    const fake = extrasFake(["no"]);
+    await scoreExtras([posted("src/a.ts", 90, 90)], [], fake);
+    const found = blocks(extrasCalls(fake)[0]?.userMessage ?? "");
+    expect(found.get("posted_span")).toBe(
+      String(loadPrompt("extras-judge.md").frontmatter.no_span_text).trim(),
+    );
   });
 });
