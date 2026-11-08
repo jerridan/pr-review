@@ -4,11 +4,11 @@
 export type Role = "triage" | "reviewer" | "verifier" | "verifier-escalation" | "merge" | "smoke";
 
 /**
- * The role of one query. "judge" is a role of the eval, not of a run: it
- * is not in ROLES, a run record has no entry for it, and a repo config
- * cannot set it.
+ * The role of one query. "judge" and "labeler" are roles of the eval, not
+ * of a run: they are not in ROLES, a run record has no entry for them, and
+ * a repo config cannot set them.
  */
-export type QueryRole = Role | "judge";
+export type QueryRole = Role | "judge" | "labeler";
 
 export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
 
@@ -111,9 +111,24 @@ export const JUDGE_DEFAULTS: RoleConfig = {
   tools: "none",
 };
 
+/**
+ * The scorer of the severity labeler. Its model is pinned apart from the
+ * pipeline roles, so a golden label does not change when they change.
+ */
+export const LABELER_DEFAULTS: RoleConfig = {
+  model: MODEL_IDS.opus,
+  effort: "high",
+  maxTurns: 5,
+  maxBudgetUsd: 0.5,
+  timeoutMs: 300_000,
+  tools: "none",
+};
+
 /** The defaults of the role of one query. */
 export function roleConfig(role: QueryRole): RoleConfig {
-  return role === "judge" ? JUDGE_DEFAULTS : ROLE_DEFAULTS[role];
+  if (role === "judge") return JUDGE_DEFAULTS;
+  if (role === "labeler") return LABELER_DEFAULTS;
+  return ROLE_DEFAULTS[role];
 }
 
 // An exact model ID starts with "claude-". Any other value must be an alias.
