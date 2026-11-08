@@ -17,16 +17,18 @@ Done so far: `docs/design/severity-policy.md`, merged in PR #32.
 
   | Source | Repo | PR | Language | Lines | Goldens |
   |--------|------|----|----------|-------|---------|
-  | martian | calcom/cal.com | 14943 | TypeScript | 44 | 2 |
   | martian | calcom/cal.com | 8330 | TypeScript | 121 | 2 |
-  | martian | ai-code-review-evaluation/sentry-greptile | 1 | Python | 138 | 4 |
-  | martian | getsentry/sentry | 93824 | Python | 249 | 5 |
+  | martian | ai-code-review-evaluation/sentry-greptile | 1 | Python | 138 | 3 |
+  | martian | getsentry/sentry | 93824 | Python | 249 | 4 |
   | martian | ai-code-review-evaluation/discourse-graphite | 1 | Ruby | 32 | 4 |
   | reviewbench | axios/axios | 10836 | JavaScript | 12 | 2 true |
   | reviewbench | konturio/disaster-ninja-fe | 1166 | TypeScript | 15 | 3 true, 6 false |
+  | reviewbench | namehash/ensnode | 1938 | TypeScript | 35 | 4 true, 2 false |
   | reviewbench | Marvell-Consulting/statswales-frontend | 626 | TypeScript | 57 | 6 true, 1 false |
   | reviewbench | jannekbuengener/Claire_de_Binare | 1550 | Python | 29 | 2 true, 9 false |
   | reviewbench | alexbol99/flatten-js | 244 | JavaScript | 85 | 5 true, 4 false |
+
+  Built in jerridan/pr-review-cases PR #3. cal.com PR 14943 was in the plan: its head tree holds 116 MB of app-store media, and the bundle is over the GitHub file limit, so namehash/ensnode 1938 takes its place. A large project needs `scripts/fetch-pr.sh` first, so the bundle holds two snapshots and the case holds a `shallow` file. Two source goldens are left out, see the README of the cases repo. Martian goldens have no span in the source; a model located each span, and the note of the golden gives the confidence.
 
   ReviewBench marks each golden true or false. A false golden becomes a not-real golden, so the golden schema allows the six labels of the policy from this deliverable. Recall counts the three posted labels. A posted finding that matches a not-real golden is a false positive. Amend the line in the policy that limits a golden to the three posted labels.
 - After the first labeling round, read the disagreement log and amend the policy where it points. Repeat once.
