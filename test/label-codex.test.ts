@@ -17,6 +17,7 @@ type Step = {
   exit?: number;
   missing?: boolean;
   raw?: string;
+  readStdin?: boolean;
 };
 
 // The fake codex: a shell shim first on PATH that runs a node script. The
@@ -37,6 +38,7 @@ const n = existsSync(statePath) ? Number(readFileSync(statePath, "utf8")) : 0;
 writeFileSync(statePath, String(n + 1));
 const list = plan[marker] ?? plan.default ?? [{ accept: true }];
 const step = list[Math.min(n, list.length - 1)];
+if (step.readStdin) readFileSync(0);
 if (step.stderr) process.stderr.write(step.stderr);
 if (step.exit) process.exit(step.exit);
 if (step.missing) process.exit(0);
@@ -145,6 +147,12 @@ describe("the codex runner", () => {
     expect(outcome.ok).toBe(false);
     expect(outcome.stderr).toContain("boom");
   });
+
+  it("closes the stdin of codex, so a codex that reads stdin to its end does not wait", async () => {
+    plan({ default: [{ readStdin: true, accept: true }] });
+    const outcome = await runCodexJudge("PROMPT", checkout);
+    expect(outcome.ok).toBe(true);
+  }, 10_000);
 
   it("returns a failed call when codex writes no out file", async () => {
     plan({ default: [{ missing: true }] });
