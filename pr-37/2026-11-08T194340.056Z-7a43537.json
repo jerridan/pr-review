@@ -1,0 +1,1384 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 37,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Pin the ten D5 cases and write the first baseline",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/37"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "d4b4c6eb1c087c822f581bae2fbdd9c548e35e50",
+    "head": "7a4353762951d645cff873ffe54aba1a2f32bf03",
+    "started_at": "2026-11-08T19:43:40.056Z",
+    "tool_version": "0.3.1",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Pin the ten D5 cases and write the first baseline\n\n## What\n\n- `eval/cases.json` points at jerridan/pr-review-cases main c86b210, the ten labeled cases of D5.\n- `eval/baseline.json`: recall 0.287, precision 0.636, one repeat, margins 0.10 and 0.35 as before. Written by hand from the report of the run below, because the eval refuses to write a baseline when a repeat fails and one case failed.\n- Section 8 of the design records the local eval practice. TICKETS.md marks the D5 labeling and pin bullets done and adds a D6 bullet for the failure.\n\n## The eval run, 2026-11-08, one repeat\n\n| Case | Recall | Precision | Posted | Cost |\n|---|---|---|---|---|\n| martian-calcom-8330 | 1.000 | 0.500 | 4 | $9.02 |\n| martian-discourse-graphite-1 | failed | | | |\n| martian-sentry-93824 | 0.250 | 1.000 | 1 | $5.66 |\n| martian-sentry-greptile-1 | 1.000 | 0.600 | 5 | $11.62 |\n| reviewbench-axios-10836 | 0.000 | - | 0 | $2.01 |\n| reviewbench-claire-de-binare-1550 | 0.000 | - | 0 | $1.97 |\n| reviewbench-disaster-ninja-fe-1166 | 0.000 | - | 0 | $1.72 |\n| reviewbench-ensnode-1938 | 0.333 | 1.000 | 1 | $0.89 |\n| reviewbench-flatten-js-244 | 0.000 | - | 0 | $2.45 |\n| reviewbench-statswales-frontend-626 | 0.000 | - | 0 | $2.87 |\n| mean over nine | 0.287 | 0.636 | 1.22 | $4.25 |\n\nThe discourse case failed whole: the Opus escalation of one finding in a 1000-line locale file reached its $1 budget, and the review reported itself incomplete. D6 gets a bullet: a budget stop gives that finding `unsure` and the review completes.\n\nFive ReviewBench cases posted nothing. Cost per case is $4.25 against $0.6 to $1.4 in D1. Both are the numbers behind issue #18.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZgggAoxaZA98nRCMsW",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": "TICKETS.md",
+        "hunks": 2
+      },
+      {
+        "path": "docs/design/high-level-design.md",
+        "hunks": 1
+      },
+      {
+        "path": "eval/baseline.json",
+        "hunks": 1
+      },
+      {
+        "path": "eval/cases.json",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "The change adds eval/baseline.json, which sets the gate's recall and precision margins, and moves the case pin in eval/cases.json. Both are data and config that code reads, and the docs claim a ci.yml change that is not in the diff.",
+      "confidence": "medium",
+      "categories": [
+        "other",
+        "docs",
+        "test"
+      ],
+      "hotspots": [
+        "eval/baseline.json (margin values, especially precision 0.35, and the field names the eval gate reads)",
+        "eval/cases.json (ref must match the cases_ref in baseline.json and exist in jerridan/pr-review-cases)",
+        "TICKETS.md and docs/design/high-level-design.md (say the eval job in ci.yml is manual-dispatch only, but ci.yml is not in this diff)",
+        "TICKETS.md (new ticket text on unsure verdicts when an escalation budget is exhausted)"
+      ],
+      "file_notes": [
+        {
+          "file": "eval/baseline.json",
+          "note": "New baseline file. Recall 0.287, precision 0.636, one repeat. The margins (0.1 recall, 0.35 precision) are wide, so the gate may rarely fail. Check the schema against the eval loader."
+        },
+        {
+          "file": "eval/cases.json",
+          "note": "Moves the pinned cases ref to c86b210f. It must match cases_ref in the baseline."
+        },
+        {
+          "file": "docs/design/high-level-design.md",
+          "note": "Rewrites the gate paragraph: eval runs locally at one repeat and CI runs it on manual dispatch only."
+        },
+        {
+          "file": "TICKETS.md",
+          "note": "Marks two tasks done and adds a requirement that an escalation hitting its budget gives an unsure result instead of failing the review. The requirement is not implemented in this diff."
+        }
+      ],
+      "summary": "The change moves the eval cases pin to a new commit of the cases repo and adds the first eval baseline (recall 0.287, precision 0.636, one repeat, with margins). It updates the design doc to a local, one-repeat eval gate with manual-dispatch CI. TICKETS.md records the labeling rounds as done and adds a requirement that a verifier escalation that reaches its budget gives an unsure result instead of failing the review. No source code changes."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: The change adds eval/baseline.json, which sets the gate's recall and precision margins, and moves the case pin in eval/cases.json. Both are data and config that code reads, and the docs claim a ci.yml change that is not in the diff.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "TICKETS.md",
+            "start_line": 34,
+            "end_line": 35,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The new Done bullets use long, multi-clause sentences with parentheses and semicolons, against the ASD-STE100 rule.",
+            "evidence": "The set has 29 posted goldens; six findings landed on don't post, not real or unsure and sit in `not-real.json`.",
+            "suggested_fix": "Split each clause into its own short sentence.",
+            "explanation": "CLAUDE.md rule 5 asks for short sentences in active voice, with one instruction each, in every markdown file.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 3459,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 5363,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0005468,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 355,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 6943,
+              "webSearchRequests": 0,
+              "costUSD": 0.06326380000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 83,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.06381060000000001
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7340,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 5357,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0005461999999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 591,
+              "cacheReadInputTokens": 13013,
+              "cacheCreationInputTokens": 7995,
+              "webSearchRequests": 0,
+              "costUSD": 0.0783986,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 418,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0789448
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 10787,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 5363,
+              "outputTokens": 23,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0005478,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 6,
+              "outputTokens": 838,
+              "cacheReadInputTokens": 24185,
+              "cacheCreationInputTokens": 11149,
+              "webSearchRequests": 0,
+              "costUSD": 0.110813,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 507,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.11136079999999998
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6552,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 5363,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0005468,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 452,
+              "cacheReadInputTokens": 12964,
+              "cacheCreationInputTokens": 8023,
+              "webSearchRequests": 0,
+              "costUSD": 0.0758328,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 250,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.07637959999999999
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6471,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 5363,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0005468,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 434,
+              "cacheReadInputTokens": 12971,
+              "cacheCreationInputTokens": 7953,
+              "webSearchRequests": 0,
+              "costUSD": 0.07491419999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 261,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.075461
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "docs/design/high-level-design.md",
+            "start_line": 309,
+            "end_line": 310,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The Metrics bullet of section 8 still says each case runs three times, but the new Gate bullet says the eval runs at one repeat.",
+            "evidence": "Gate: a change that touches behaviour runs the eval locally at one repeat against `eval/baseline.json`",
+            "suggested_fix": "Change the Metrics bullet to say that the local gate runs one repeat and that three repeats with a spread are optional.",
+            "explanation": "The Metrics line \"Run each case three times and report the spread\" now contradicts the new one-repeat gate and the baseline's \"repeat\": 1.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6745,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 8132,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0008237,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 694,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 9737,
+              "webSearchRequests": 0,
+              "costUSD": 0.0923958,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 80,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0932195
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "eval/baseline.json",
+            "start_line": 4,
+            "end_line": 4,
+            "category": "security",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The precision margin of 0.35 on a baseline of 0.636 lets precision fall to about 0.29 before the eval gate fails, so the regression gate is very weak.",
+            "evidence": "\"margin\": { \"recall\": 0.1, \"precision\": 0.35 },",
+            "suggested_fix": "Tighten the precision margin after more repeats give a stable spread.",
+            "explanation": "A wide margin lets a large drop in review quality pass the gate unnoticed.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 3835,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 5355,
+              "outputTokens": 23,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0005470000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 384,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 6936,
+              "webSearchRequests": 0,
+              "costUSD": 0.0637878,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 114,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.06433480000000001
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4120,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 5363,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0005468,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 360,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 6944,
+              "webSearchRequests": 0,
+              "costUSD": 0.0633718,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 94,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0639186
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1638,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 5361,
+              "outputTokens": 23,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0005476000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 72,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 7613,
+              "webSearchRequests": 0,
+              "costUSD": 0.0629638,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0635114
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "TICKETS.md",
+          "start_line": 34,
+          "end_line": 35,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The new Done bullets use long, multi-clause sentences with parentheses and semicolons, against the ASD-STE100 rule.",
+          "evidence": "The set has 29 posted goldens; six findings landed on don't post, not real or unsure and sit in `not-real.json`.",
+          "suggested_fix": "Split each clause into its own short sentence.",
+          "explanation": "CLAUDE.md rule 5 asks for short sentences in active voice, with one instruction each, in every markdown file.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "The set has 29 posted goldens; six findings landed on don't post, not real or unsure and sit in `not-real.json`.",
+            "- Done 2026-11-08: two labeling rounds ran (first-pass acceptance 0.69 in both; judge rejections fell from 35 to 31; round 1 and round 2 gave the same majority label for 32 of 35 findings)."
+          ],
+          "rationale": "CLAUDE.md rule 5 requires ASD-STE100 prose in every markdown file, and the added bullets use semicolons, parentheses and long multi-clause sentences. The violation is real and new, but it is a style nit, and the rest of the file already reads this way.",
+          "score": 55,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "The set has 29 posted goldens; six findings landed on don't post, not real or unsure and sit in `not-real.json`.",
+            "- Done 2026-11-08: two labeling rounds ran (first-pass acceptance 0.69 in both; judge rejections fell from 35 to 31; round 1 and round 2 gave the same majority label for 32 of 35 findings)."
+          ],
+          "rationale": "CLAUDE.md rule 5 requires ASD-STE100 prose in every markdown file, and the added bullets use semicolons, parentheses and long multi-clause sentences. The violation is real and new, but it is a style nit, and the rest of the file already reads this way.",
+          "score": 55,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "eval/baseline.json",
+          "start_line": 4,
+          "end_line": 4,
+          "category": "security",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The precision margin of 0.35 on a baseline of 0.636 lets precision fall to about 0.29 before the eval gate fails, so the regression gate is very weak.",
+          "evidence": "\"margin\": { \"recall\": 0.1, \"precision\": 0.35 },",
+          "suggested_fix": "Tighten the precision margin after more repeats give a stable spread.",
+          "explanation": "A wide margin lets a large drop in review quality pass the gate unnoticed.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": false,
+          "quotes": [
+            "\"margin\": { \"recall\": 0.1, \"precision\": 0.35 },"
+          ],
+          "rationale": "The arithmetic is right (0.636 - 0.35 is about 0.29). But the margin is a deliberate choice that follows the README's documented procedure, and the README's own example gives 0.35. The description also says the margins are kept \"as before\", so this PR didn't introduce them. The finding is labelled \"security\", which is the wrong category.",
+          "score": 12,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"margin\": { \"recall\": 0.1, \"precision\": 0.35 },",
+            "\"precision\": 0.6363636363636364,",
+            "const within = (drop: number | null, margin: number): boolean =>",
+            "For example, a precision with mean 0.667 and min 0.5 has a spread of 0.167. Twice the spread is 0.333, so the margin is 0.35."
+          ],
+          "rationale": "The arithmetic is right: 0.636 − 0.35 ≈ 0.29. But the README rule for margins (twice the spread, kept at least 0.05 below the baseline) produces 0.35, and the PR says it chose this value on purpose. The finding is also not a security issue, and its suggested fix only defers the work until more repeats are run, so the post adds little.",
+          "score": 22,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"margin\": { \"recall\": 0.1, \"precision\": 0.35 },",
+            "\"precision\": 0.6363636363636364,",
+            "const within = (drop: number | null, margin: number): boolean =>",
+            "For example, a precision with mean 0.667 and min 0.5 has a spread of 0.167. Twice the spread is 0.333, so the margin is 0.35."
+          ],
+          "rationale": "The arithmetic is right: 0.636 − 0.35 ≈ 0.29. But the README rule for margins (twice the spread, kept at least 0.05 below the baseline) produces 0.35, and the PR says it chose this value on purpose. The finding is also not a security issue, and its suggested fix only defers the work until more repeats are run, so the post adds little.",
+          "score": 22,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "docs/design/high-level-design.md",
+          "start_line": 309,
+          "end_line": 310,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The Metrics bullet of section 8 still says each case runs three times, but the new Gate bullet says the eval runs at one repeat.",
+          "evidence": "Gate: a change that touches behaviour runs the eval locally at one repeat against `eval/baseline.json`",
+          "suggested_fix": "Change the Metrics bullet to say that the local gate runs one repeat and that three repeats with a spread are optional.",
+          "explanation": "The Metrics line \"Run each case three times and report the spread\" now contradicts the new one-repeat gate and the baseline's \"repeat\": 1.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "Run each case three times and report the spread.",
+            "Gate: a change that touches behaviour runs the eval locally at one repeat against `eval/baseline.json`",
+            "`eval` defaults to `--repeat 3`"
+          ],
+          "rationale": "The Metrics bullet still says three runs per case while the new Gate bullet and the baseline use one repeat. The two bullets describe different things (the harness default of 3 versus the gate practice), so the contradiction is mild. The PR did leave the wording unreconciled.",
+          "score": 40,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "Run each case three times and report the spread.",
+            "Gate: a change that touches behaviour runs the eval locally at one repeat against `eval/baseline.json`",
+            "`eval` defaults to `--repeat 3`"
+          ],
+          "rationale": "The Metrics bullet still says three runs per case while the new Gate bullet and the baseline use one repeat. The two bullets describe different things (the harness default of 3 versus the gate practice), so the contradiction is mild. The PR did leave the wording unreconciled.",
+          "score": 40,
+          "severity": "nit"
+        },
+        "passed": false
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5819384633,
+      "review_url": "https://github.com/jerridan/pr-review/pull/37#pullrequestreview-5819384633",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 128840656519
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 8041,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 4114,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00042239999999999997,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1071,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 3625,
+            "webSearchRequests": 0,
+            "costUSD": 0.0253402,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 209,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0257626
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 3459,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5363,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005468,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 355,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 6943,
+            "webSearchRequests": 0,
+            "costUSD": 0.06326380000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 83,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.06381060000000001
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6471,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5363,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005468,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 434,
+            "cacheReadInputTokens": 12971,
+            "cacheCreationInputTokens": 7953,
+            "webSearchRequests": 0,
+            "costUSD": 0.07491419999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 261,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.075461
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6552,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5363,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005468,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 452,
+            "cacheReadInputTokens": 12964,
+            "cacheCreationInputTokens": 8023,
+            "webSearchRequests": 0,
+            "costUSD": 0.0758328,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 250,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.07637959999999999
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7340,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5357,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005461999999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 591,
+            "cacheReadInputTokens": 13013,
+            "cacheCreationInputTokens": 7995,
+            "webSearchRequests": 0,
+            "costUSD": 0.0783986,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 418,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0789448
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "model": "claude-opus-5-5",
+        "duration_ms": 1638,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5361,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005476000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 72,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 7613,
+            "webSearchRequests": 0,
+            "costUSD": 0.0629638,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0635114
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 3835,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5355,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005470000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 384,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 6936,
+            "webSearchRequests": 0,
+            "costUSD": 0.0637878,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 114,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.06433480000000001
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 10787,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5363,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005478,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 838,
+            "cacheReadInputTokens": 24185,
+            "cacheCreationInputTokens": 11149,
+            "webSearchRequests": 0,
+            "costUSD": 0.110813,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 507,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.11136079999999998
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6745,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8132,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0008237,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 694,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 9737,
+            "webSearchRequests": 0,
+            "costUSD": 0.0923958,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 80,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0932195
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 4120,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5363,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005468,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 360,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 6944,
+            "webSearchRequests": 0,
+            "costUSD": 0.0633718,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 94,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0639186
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6530,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10508,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0010613,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 716,
+            "cacheReadInputTokens": 17797,
+            "cacheCreationInputTokens": 10404,
+            "webSearchRequests": 0,
+            "costUSD": 0.0505637,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 156,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.051625000000000004
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6804,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 18800,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0018930000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 764,
+            "cacheReadInputTokens": 26089,
+            "cacheCreationInputTokens": 18794,
+            "webSearchRequests": 0,
+            "costUSD": 0.0854329,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 289,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.08732590000000001
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 9799,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 2845,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00029499999999999996,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 1125,
+            "cacheReadInputTokens": 24566,
+            "cacheCreationInputTokens": 4632,
+            "webSearchRequests": 0,
+            "costUSD": 0.0322506,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 209,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0325456
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7557,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 2851,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0002946,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 746,
+            "cacheReadInputTokens": 10132,
+            "cacheCreationInputTokens": 4673,
+            "webSearchRequests": 0,
+            "costUSD": 0.0543464,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 174,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.054641
+      }
+    ],
+    "total_cost_usd": 0.9428412,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 34,
+      "gather": 56,
+      "triage": 8952,
+      "find_verify": 30521,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
