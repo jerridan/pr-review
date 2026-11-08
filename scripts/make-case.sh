@@ -9,6 +9,9 @@
 #     and the language are empty strings.
 #   - repo.bundle: a git bundle that holds base, head and their history.
 #   - diff.patch: the three-dot diff from base to head.
+#   - shallow: only when <repo> is a shallow repo. The commits whose
+#     parents <repo> does not hold. The eval reads it to fetch the bundle.
+#     scripts/fetch-pr.sh makes such a repo for a large project.
 # The labeler then edits case.json and writes golden.json.
 #
 # The script does not change <repo>. It stops when <name> exists, so it
@@ -53,9 +56,14 @@ head="$(resolve "$head_arg")"
 # then holds base also when base is not an ancestor of head.
 work="$(mktemp -d "${TMPDIR:-/tmp}/make-case.XXXXXX")"
 trap 'rm -rf "$work"' EXIT
-objects="$(cd "$repo" && cd "$(git rev-parse --git-common-dir)" && pwd)/objects"
+common="$(cd "$repo" && cd "$(git rev-parse --git-common-dir)" && pwd)"
 git init --quiet --bare "$work/refs.git"
-echo "$objects" > "$work/refs.git/objects/info/alternates"
+echo "$common/objects" > "$work/refs.git/objects/info/alternates"
+# A shallow repo lacks the parents of its boundary commits. The bundle
+# step must know the boundary, or it stops at a missing object.
+if [ -f "$common/shallow" ]; then
+  cp "$common/shallow" "$work/refs.git/shallow"
+fi
 git -C "$work/refs.git" update-ref refs/heads/base "$base"
 git -C "$work/refs.git" update-ref refs/heads/head "$head"
 
@@ -64,6 +72,9 @@ out="$work/case"
 mkdir "$out"
 git -C "$work/refs.git" bundle create --quiet "$out/repo.bundle" refs/heads/base refs/heads/head
 git -C "$repo" -c core.quotePath=false diff --no-color --no-ext-diff "$base...$head" > "$out/diff.patch"
+if [ -f "$common/shallow" ]; then
+  cp "$common/shallow" "$out/shallow"
+fi
 
 title="$(git -C "$repo" log -1 --format=%s "$head")"
 body="$(git -C "$repo" log -1 --format=%b "$head")"

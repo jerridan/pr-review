@@ -634,6 +634,7 @@ A case is one directory with four files:
 | `repo.bundle` | A git bundle that holds the base commit, the head commit and the history between them. |
 | `diff.patch` | The three-dot diff from the base to the head, for a person to read. The eval does not read it. |
 | `golden.json` | `findings`, each with `file`, `start_line`, `end_line`, `category`, `severity`, `claim` and an optional `note`. |
+| `shallow` | Optional. Present when the bundle comes from a shallow repo: the commits whose parents the bundle does not hold, one sha per line. The eval fetches the bundle into a repo with these shallow marks, because git refuses to clone such a bundle. |
 
 `source` is one of `fixture`, `pr`, `reviewbench`, `martian`, `injection` and `record`. A subdirectory without `case.json` is not a case. The eval checks every case before the first model call. A missing file, a field that is not valid, or a sha that the bundle does not hold makes the eval exit 2. The message names the case.
 
@@ -644,6 +645,14 @@ scripts/make-case.sh <repo> <base> <head> <name>
 ```
 
 The script writes `case.json`, `repo.bundle` and `diff.patch`. It takes the title and the body from the head commit message. Edit `case.json`, then write `golden.json` by hand.
+
+A full clone of a large project makes a bundle of hundreds of megabytes. For such a project, fetch only the commits of the change first:
+
+```bash
+scripts/fetch-pr.sh <url> <merge-base> <head> <dir>
+```
+
+The script makes a shallow repo in `<dir>` that holds the merge base, the head and the commits between them. Then run `make-case.sh` with `<dir>` as the repo. It writes the `shallow` file into the case, and the bundle holds two snapshots of the tree. For a PR, the merge base is the `merge_base_commit` of the GitHub compare API for `<base-branch>...<head>`.
 
 ### The cases repo and the pin
 
