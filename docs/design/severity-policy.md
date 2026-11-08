@@ -40,7 +40,7 @@ Three labels post. Three outcomes do not post.
 
 **Unsure.** The repository does not settle the question. The answer needs production data, a runtime or an external service. A process question is not unsure. It is don't post.
 
-The verifier posts blocking, suggestion and nit. It records don't post, not real and unsure in the record and posts none of them. A golden finding has one of the three posted labels. The labeling loop uses all six: a case candidate that lands on not real or don't post leaves the golden set.
+The verifier posts blocking, suggestion and nit. It records don't post, not real and unsure in the record and posts none of them. A golden finding carries one of the six labels. Only the goldens with the three posted labels count for recall. A posted finding that matches a golden with don't post, not real or unsure is a false positive.
 
 ## Normal path
 

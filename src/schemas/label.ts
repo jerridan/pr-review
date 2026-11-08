@@ -15,7 +15,7 @@ export const LABEL_SEVERITIES = [
 ] as const;
 export type LabelSeverity = (typeof LABEL_SEVERITIES)[number];
 
-/** The labels that post, and that --write-golden writes. */
+/** The labels that post. A golden with one of them counts for recall. */
 export const POSTED_SEVERITIES: readonly LabelSeverity[] = ["blocking", "suggestion", "nit"];
 
 export type ScorerResult = {

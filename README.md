@@ -571,7 +571,7 @@ The labeler makes real model calls. It needs a Claude login for the scorer. It n
 | `--cases <dir>` | The cases directory. It holds one subdirectory per case. | required |
 | `--runs <n>` | The independent runs of each finding. A positive integer. | 3 |
 | `--concurrency <n>` | The most findings in flight at once. A positive integer. | 2 |
-| `--write-golden` | Write the chosen `blocking`, `suggestion` and `nit` severities to `golden.json`. The category does not change. | off |
+| `--write-golden` | Write every chosen label to `golden.json`: `blocking`, `suggestion`, `nit`, `dont_post`, `not_real` or `unsure`. The category does not change. | off |
 | `--only <case>` | Label only the case with this name. | every case |
 | `--out <dir>` | The directory for the output files. | each case directory |
 | `--format table\|json` | The format of the totals on stdout. | `table` |
@@ -589,7 +589,7 @@ A severity that at least two converged runs agree on, and that a majority of the
 | `disagreements.json` | The findings whose runs did not all converge to one severity. Read it to find the policy rules that read two ways. |
 | `human-queue.json` | The findings with no chosen label, and the findings whose chosen severity is `dont_post`, `not_real` or `unsure`. Each has a `reason`. |
 
-`label-summary.json` goes in the cases directory, or in `<out>/`. It holds the counts of each case and the two rates over all cases. The command exits 0 when every call succeeded. It exits 1 when a case checkout failed or a call failed after its retry, and it still writes every file. It exits 2 on a usage error. Without `--write-golden`, `golden.json` does not change. With it, only the `severity` of the findings whose chosen severity posts changes. The category and every other field stay. The chosen category stays in `labels.json`.
+`label-summary.json` goes in the cases directory, or in `<out>/`. It holds the counts of each case and the two rates over all cases. The command exits 0 when every call succeeded. It exits 1 when a case checkout failed or a call failed after its retry, and it still writes every file. It exits 2 on a usage error. Without `--write-golden`, `golden.json` does not change. With it, the `severity` of each finding with a chosen label changes to that label. The category and every other field stay. The chosen category stays in `labels.json`.
 
 The two rates:
 
@@ -633,7 +633,7 @@ A case is one directory with four files:
 | `case.json` | `name`, `source`, `base`, `head`, `title`, `body`, `origin` and `language`. The `name` equals the directory name. |
 | `repo.bundle` | A git bundle that holds the base commit, the head commit and the history between them. |
 | `diff.patch` | The three-dot diff from the base to the head, for a person to read. The eval does not read it. |
-| `golden.json` | `findings`, each with `file`, `start_line`, `end_line`, `category`, `severity`, `claim` and an optional `note`. |
+| `golden.json` | `findings`, each with `file`, `start_line`, `end_line`, `category`, `severity`, `claim` and an optional `note`. `severity` is one of the six labels of `docs/design/severity-policy.md`: `blocking`, `suggestion`, `nit`, `dont_post`, `not_real` or `unsure`. A golden with one of the first three is a posted golden. A golden with one of the last three is a not-real golden. |
 | `shallow` | Optional. Present when the bundle comes from a shallow repo: the commits whose parents the bundle does not hold, one sha per line. The eval fetches the bundle into a repo with these shallow marks, because git refuses to clone such a bundle. |
 
 `source` is one of `fixture`, `pr`, `reviewbench`, `martian`, `injection` and `record`. A subdirectory without `case.json` is not a case. The eval checks every case before the first model call. A missing file, a field that is not valid, or a sha that the bundle does not hold makes the eval exit 2. The message names the case.
@@ -674,20 +674,23 @@ The match pass pairs each posted finding with each golden finding:
 
 The judge gets one query for each ambiguous pair. Its answer `yes` is a match. The answers `no` and `unknown` are not. A failed judge query counts as `unknown`. Each finding is in one match at most. The judge runs on `claude-sonnet-5-5` at high effort, with no tools. The eval exits 2 before any model call when the judge model equals the model of the `reviewer` role. It also exits 2 when the `.pr-review/` config of a case gives a reviewer the judge model. `--allow-same-judge` permits this.
 
+The posted goldens get their matches first: the exact matches, then the judge. The posted findings that are still free then go to the not-real goldens in the same two steps. So when a posted finding can match a posted golden and a not-real golden, the posted golden wins. A match to a posted golden is a hit. Recall counts the posted goldens only. A posted finding that matches a not-real golden is a false positive. It counts in `not_real_matches` and not in `matched`.
+
 ### The report
 
 The report gives these metrics for each case and each repeat:
 
 | Metric | Meaning |
 |--------|---------|
-| `recall` | The matched goldens divided by the goldens. Null for a case with no golden. |
+| `recall` | The matched posted goldens divided by the posted goldens. Null for a case with no posted golden. |
 | `precision` | The matched posted findings divided by the posted findings. Null when no finding posted. |
 | `posted` | The number of posted findings. |
-| `matched` | The posted findings that match a golden finding. |
+| `matched` | The posted findings that match a posted golden. |
+| `not_real_matches` | The posted findings that match a not-real golden. Each is a false positive. |
 | `cost_usd` | The cost of the review. It holds no judge cost. |
 | `run_ms` | The run time of the review. |
 | `judge_calls`, `judge_cost_usd` | The judge queries of the run and their cost. |
-| `severity_agreement` | The matched pairs with the same severity, and all matched pairs. |
+| `severity_agreement` | The matched pairs with the same severity, and all matched pairs. Only the matches to posted goldens count. |
 
 For each repeat, the report gives the mean over the cases of recall, findings per case and cost per case. A mean leaves out null values. The report pools the precision of a repeat over its cases: the sum of `matched` divided by the sum of `posted`. It is null when no case posted a finding. So one case with one wrong finding moves the precision by its share of the findings, not by a whole case. The aggregate gives the mean, the minimum and the maximum of those per-repeat values. `--format table` prints one table per case and a summary. `--format json` prints the same document that the eval writes to `<out>/report.json`. The report lists a failed repeat in `failed_repeats`, with null metrics.
 

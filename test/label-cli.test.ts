@@ -467,13 +467,15 @@ describe("label over two cases", () => {
 
 describe("label --write-golden", () => {
   it(
-    "writes the chosen posted labels, keeps the other entries, fields and key order, and loads",
+    "writes every chosen label, keeps the other entries, fields and key order, and loads",
     async () => {
       const cases = twoCases();
       const before = readJson<{ findings: Record<string, unknown>[] }>(
         join(cases, "a-three", "golden.json"),
       );
-      const beforeB = readFileSync(join(cases, "b-one", "golden.json"));
+      const beforeB = readJson<{ findings: Record<string, unknown>[] }>(
+        join(cases, "b-one", "golden.json"),
+      );
       judgePlan(JUDGE_PLAN);
       const code = await labelCli(
         { client: scorerFake(SCORER_PLAN) },
@@ -497,16 +499,41 @@ describe("label --write-golden", () => {
       after.findings.forEach((f, i) =>
         expect(Object.keys(f)).toEqual(Object.keys(before.findings[i] ?? {})),
       );
-      // B1 converges to not_real, which does not post, so its entry stays.
-      expect(readFileSync(join(cases, "b-one", "golden.json")).equals(beforeB)).toBe(true);
-      const b1 = readJson<LabelsJson>(join(cases, "b-one", "labels.json")).findings[0];
-      expect(b1?.chosen?.severity).toBe("not_real");
+      // B1 converges to not_real, which does not post. Its golden still
+      // gets the label.
+      const afterB = readJson<{ findings: Record<string, unknown>[] }>(
+        join(cases, "b-one", "golden.json"),
+      );
+      expect(afterB.findings).toEqual([{ ...beforeB.findings[0], severity: "not_real" }]);
       const queue = readJson<{ findings: { reason: string }[] }>(
         join(cases, "b-one", "human-queue.json"),
       );
       expect(queue.findings.map((f) => f.reason)).toEqual(["not_posted_label"]);
       const loaded = await loadCases(cases);
       expect(loaded.find((c) => c.name === "a-three")?.golden[0]?.severity).toBe("blocking");
+      expect(loaded.find((c) => c.name === "b-one")?.golden[0]?.severity).toBe("not_real");
+    },
+    TIMEOUT,
+  );
+
+  it(
+    "writes a dont_post label into golden.json, and keeps the category",
+    async () => {
+      const cases = casesDir([{ name: "c-one", golden: [finding("MARK-C1")] }]);
+      judgePlan({ "MARK-C1": [{ accept: true }] });
+      const code = await labelCli(
+        { client: scorerFake({ "MARK-C1": [{ severity: "dont_post", category: "bug" }] }) },
+        "--cases",
+        cases,
+        "--write-golden",
+      );
+      expect(code, stderr).toBe(0);
+      const after = readJson<{ findings: Record<string, unknown>[] }>(
+        join(cases, "c-one", "golden.json"),
+      );
+      expect(after.findings).toEqual([{ ...finding("MARK-C1"), severity: "dont_post" }]);
+      const [loaded] = await loadCases(cases);
+      expect(loaded?.golden[0]?.severity).toBe("dont_post");
     },
     TIMEOUT,
   );

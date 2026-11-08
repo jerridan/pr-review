@@ -1,5 +1,7 @@
 // Score the posted findings of one run record against the golden findings
 // of its case: exact matches first, then the judge on the ambiguous pairs.
+// The posted goldens go first. The not-real goldens then take the posted
+// findings that are still free.
 import { readHeadFile } from "../find/evidence.js";
 import { loadPrompt, render, type PromptFile } from "../prompts/load.js";
 import type { Finding } from "../schemas/finding.js";
@@ -8,15 +10,23 @@ import type { RunRecord } from "../schemas/record.js";
 import type { SdkClient } from "../sdk/client.js";
 import type { RunOptions } from "../sdk/options.js";
 import { wrapUntrusted } from "../untrusted.js";
-import type { GoldenFinding } from "./case.js";
+import { isPostedGolden, type GoldenFinding } from "./case.js";
 import { classifyPair, type PairKind } from "./match.js";
 
 export type ScoreResult = {
+  /** The matches to posted goldens. A match to a not-real golden is not here. */
   matched: { posted: number; golden: number; via: "exact" | "judge" }[];
   judgeCalls: number;
   judgeUnknown: number;
   judgeCostUsd: number;
+  /** Over the matches to posted goldens only. */
   severityAgreement: { same: number; matched: number };
+  /** The posted findings that match a not-real golden. Each is a false positive. */
+  notRealMatches: number;
+  /** The goldens with blocking, suggestion or nit. */
+  postedGoldenCount: number;
+  /** The indices of the posted findings that match no golden at all. */
+  unmatchedPosted: number[];
 };
 
 /** prompts/judge.md, loaded: the system prompt and the user message texts. */
@@ -113,10 +123,12 @@ function maximumMatching(postedCount: number, pairs: [number, number][]): [numbe
 /**
  * Score "record" against "golden". Each posted finding and each golden
  * finding is in at most one match. The pairs go in the order of the posted
- * findings, then of the golden findings. All exact matches come first. The
- * judge then gets one query for each ambiguous pair in which neither
- * finding has a match yet. Only the answer "yes" is a match. A failed
- * query counts as "unknown".
+ * findings, then of the golden findings. The posted goldens go first: all
+ * exact matches, then the judge. The posted findings that are still free
+ * then go to the not-real goldens in the same two steps. So a posted
+ * golden wins over a not-real golden. The judge gets one query for each
+ * ambiguous pair in which neither finding has a match yet. Only the answer
+ * "yes" is a match. A failed query counts as "unknown".
  */
 export async function scoreRecord(
   record: RunRecord,
@@ -126,23 +138,26 @@ export async function scoreRecord(
 ): Promise<ScoreResult> {
   const posted = record.posted.findings;
   const kinds: PairKind[][] = posted.map((p) => golden.map((g) => classifyPair(p, g)));
+  const postedGolden = golden.map(isPostedGolden);
   const matched: ScoreResult["matched"] = [];
+  let notRealMatches = 0;
   const postedMatched = new Set<number>();
   const goldenMatched = new Set<number>();
   const free = (p: number, g: number): boolean => !postedMatched.has(p) && !goldenMatched.has(g);
   const take = (p: number, g: number, via: "exact" | "judge"): void => {
-    matched.push({ posted: p, golden: g, via });
+    if (postedGolden[g]) matched.push({ posted: p, golden: g, via });
+    else notRealMatches += 1;
     postedMatched.add(p);
     goldenMatched.add(g);
   };
 
-  // Walk every pair of one kind, in order.
-  const pairsOf = (kind: PairKind): [number, number][] =>
+  // Walk every free pair of one kind whose golden is posted or not, in order.
+  const pairsOf = (kind: PairKind, posts: boolean): [number, number][] =>
     kinds.flatMap((row, p) =>
-      row.flatMap((k, g): [number, number][] => (k === kind ? [[p, g]] : [])),
+      row.flatMap((k, g): [number, number][] =>
+        k === kind && postedGolden[g] === posts && free(p, g) ? [[p, g]] : [],
+      ),
     );
-
-  for (const [p, g] of maximumMatching(posted.length, pairsOf("exact"))) take(p, g, "exact");
 
   let judgeCalls = 0;
   let judgeUnknown = 0;
@@ -192,16 +207,25 @@ export async function scoreRecord(
     }
   };
 
-  for (const [p, g] of pairsOf("ambiguous")) {
-    if (!free(p, g)) continue;
-    const postedFinding = posted[p];
-    const goldenFinding = golden[g];
-    if (!postedFinding || !goldenFinding) continue;
-    judgeCalls += 1;
-    const answer = await ask(postedFinding, goldenFinding);
-    if (answer === "yes") take(p, g, "judge");
-    else if (answer === "unknown") judgeUnknown += 1;
-  }
+  // Match the free posted findings to the goldens that post, or to the
+  // goldens that do not: exact matches first, then the judge.
+  const matchTo = async (posts: boolean): Promise<void> => {
+    for (const [p, g] of maximumMatching(posted.length, pairsOf("exact", posts))) {
+      take(p, g, "exact");
+    }
+    for (const [p, g] of pairsOf("ambiguous", posts)) {
+      if (!free(p, g)) continue;
+      const postedFinding = posted[p];
+      const goldenFinding = golden[g];
+      if (!postedFinding || !goldenFinding) continue;
+      judgeCalls += 1;
+      const answer = await ask(postedFinding, goldenFinding);
+      if (answer === "yes") take(p, g, "judge");
+      else if (answer === "unknown") judgeUnknown += 1;
+    }
+  };
+  await matchTo(true);
+  await matchTo(false);
 
   const same = matched.filter((m) => posted[m.posted]?.severity === golden[m.golden]?.severity);
   return {
@@ -210,5 +234,8 @@ export async function scoreRecord(
     judgeUnknown,
     judgeCostUsd,
     severityAgreement: { same: same.length, matched: matched.length },
+    notRealMatches,
+    postedGoldenCount: postedGolden.filter(Boolean).length,
+    unmatchedPosted: posted.flatMap((_, p) => (postedMatched.has(p) ? [] : [p])),
   };
 }

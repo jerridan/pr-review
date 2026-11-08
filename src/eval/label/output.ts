@@ -134,10 +134,10 @@ export async function writeCaseFiles(dir: string, result: CaseResult): Promise<v
 }
 
 /**
- * Rewrite golden.json in "caseDir" with the chosen posted severities. The
- * category and every other field and the order of the keys stay. A finding whose chosen
- * severity does not post keeps its entry. The file does not change when
- * no finding changes.
+ * Rewrite golden.json in "caseDir" with the chosen labels, all six of them.
+ * The category and every other field and the order of the keys stay. A
+ * finding with no chosen label keeps its entry. The file does not change
+ * when no finding changes.
  */
 export async function writeGolden(caseDir: string, entries: FindingEntry[]): Promise<void> {
   const path = join(caseDir, "golden.json");
@@ -147,7 +147,7 @@ export async function writeGolden(caseDir: string, entries: FindingEntry[]): Pro
   let changed = false;
   for (const e of entries) {
     const target = golden.findings[e.index];
-    if (!target || e.chosen === null || !POSTED_SEVERITIES.includes(e.chosen.severity)) continue;
+    if (!target || e.chosen === null) continue;
     if (target.severity !== e.chosen.severity) {
       target.severity = e.chosen.severity;
       changed = true;

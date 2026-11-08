@@ -4,19 +4,30 @@ import { access, readdir, readFile, realpath } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { z } from "zod";
 import { runGit } from "../gather/worktree.js";
-import { CATEGORIES, SEVERITIES, type Category, type Severity } from "../schemas/finding.js";
+import { CATEGORIES, type Category } from "../schemas/finding.js";
+import { LABEL_SEVERITIES, POSTED_SEVERITIES } from "../schemas/label.js";
 
 export type CaseSource = "fixture" | "pr" | "reviewbench" | "martian" | "injection" | "record";
 
+/**
+ * A golden finding carries one of the six labels of the severity policy.
+ * A golden with blocking, suggestion or nit is a posted golden. A golden
+ * with dont_post, not_real or unsure is a not-real golden.
+ */
 export type GoldenFinding = {
   file: string;
   start_line: number;
   end_line: number;
   category: Category;
-  severity: Severity;
+  severity: (typeof LABEL_SEVERITIES)[number];
   claim: string;
   note?: string;
 };
+
+/** Give true when the label of "g" posts: blocking, suggestion or nit. */
+export function isPostedGolden(g: GoldenFinding): boolean {
+  return POSTED_SEVERITIES.includes(g.severity);
+}
 
 export type Case = {
   dir: string;
@@ -66,7 +77,7 @@ const GoldenFindingSchema = z
     start_line: z.int().min(1),
     end_line: z.int(),
     category: z.enum(CATEGORIES),
-    severity: z.enum(SEVERITIES),
+    severity: z.enum(LABEL_SEVERITIES),
     claim: z.string(),
     note: z.string().optional(),
   })
