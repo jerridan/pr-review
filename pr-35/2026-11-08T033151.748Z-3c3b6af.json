@@ -1,0 +1,2212 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 35,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Add the severity labeler, pr-review label",
+      "draft": true,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/35"
+    },
+    "run_kind": "later",
+    "prior": {
+      "head": "95476aba3c0d824c7402b924aa6d5bd797714408",
+      "source": "record",
+      "record": "/home/runner/work/_temp/pr-review-records/pr-35/2026-11-08T031308.348Z-95476ab.json",
+      "open": [],
+      "dismissed": [],
+      "fetch_failed": false
+    },
+    "base": "b07bf9398b8cfaf33463e8ea266e98123899c3ec",
+    "head": "3c3b6af0a37c5aecc9c9241e2debc0480995cc7c",
+    "started_at": "2026-11-08T03:31:51.748Z",
+    "tool_version": "0.2.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Add the severity labeler, pr-review label\n\nAdds `pr-review label`, the severity labeler of D5 in TICKETS.md. A scorer on Claude Opus 5.5 labels each golden finding under `docs/design/severity-policy.md`. A judge on GPT-6.1 Sol, through the Codex CLI as a subprocess, accepts the label or rejects it with a reason, and a rejected label goes back to the scorer at most twice. The loop runs three times per finding; a majority of the converged runs sets the label, and the rest go to a human queue. Per case it writes `labels.json`, `disagreements.json` and `human-queue.json`; per run, `label-summary.json` with the first-pass acceptance rate and the run agreement rate. `--write-golden` writes the three posted labels back to `golden.json`.\n\nThe scorer call reuses the SDK option builder, so it runs with `settingSources: []`, no auto memory, no persisted session and no claude.ai MCP servers. The codex runner lives under `src/eval/label/` and nothing in the run pipeline imports it; codex finds its own login and the tool reads no credential. Version bumped to 0.3.0.\n\nOne real `codex exec` smoke call with the exact flags passed before the build. Tests fake the SDK and put a codex shim on PATH. `npm test` (1157 tests), `npm run lint`, `npm run typecheck` and `npm run build` pass.\n\nTwo notes for the reader. The policy is read from `docs/`, which the package's `files` list does not include; a run from the repo or the action works, an installed package would not find it. Each real judge call carries about 15,000 tokens of Codex overhead.\n\nCrew record: `~/.claude/crew/d5-severity-labeler-2eae`. The spec and the decisions follow.\n\n---\n\n# Spec: the severity labeler\n\nThe labeler gives each golden finding a severity and a category under `docs/design/severity-policy.md`. A scorer on Claude labels the finding. A judge from another model family accepts or rejects the label. Each finding goes through three independent runs of this loop. This spec covers the labeler only. It does not cover the case files, the per-stage metrics or the pooled key.\n\n## Requirements\n\n### R1. A `label` subcommand of the CLI\n\nThe CLI accepts this command:\n\n`pr-review label --cases <dir> [--runs <n>] [--concurrency <n>] [--write-golden] [--only <case>] [--out <dir>] [--format table|json] [--allow-api-key]`\n\n1. `--cases` is required. `--runs` defaults to 3. `--concurrency` defaults to 2 and bounds how many findings are in flight at once. `--write-golden` is off by default. `--only` limits the work to one case name. `--out` defaults to the case directory itself (see R5). `--format` defaults to `table`. `--allow-api-key` has the meaning it has on `eval`, and is off by default.\n2. Exit codes follow the repo. Exit 0 when every call succeeded. Exit 1 when a case checkout failed, or when any call failed after its retry (R2.7); the command still writes every output file before it exits. Exit 2 on a usage error: a missing `--cases`, a cases directory that holds no case, `--runs` or `--concurrency` below 1, or an `--only` name that matches no case.\n3. The label module lives under `src/eval/label/`. It exports `registerLabelCommand(program: Command, deps: ProgramDeps): void`. The project lead registers it in `src/cli.ts` at integration. The module does not edit `src/cli.ts`.\n4. No file under `src/reviewers/`, `src/verify/`, `src/merge/` or `src/find/` changes. `src/run.ts` changes only where it guards the `judge` role: the two guards at `src/run.ts:189` and `src/run.ts:218` reject `labeler` the same way, and nothing else in that file changes. The module reuses `readHeadFile` from `src/find/evidence.ts` and `cloneCase` from `src/eval/checkout.ts` without change.\n\nAcceptance:\n- A vitest test builds a `Command` of its own, calls `registerLabelCommand`, sets `exitOverride`, and drives it as `test/eval-cli.test.ts` drives `createProgram`. The test observes exit 0 on a clean run, exit 1 when a call fails after its retry, and exit 2 for each usage error of item 2.\n- A test shows the default of 3 runs per finding when `--runs` is absent, and that `--only <case>` labels no other case.\n- After integration, `node dist/cli.js label --help` exits 0 and names `--cases`, `--write-golden` and `--runs`.\n- `git diff main --stat` lists no file under `src/reviewers/`, `src/verify/`, `src/merge/` or `src/find/`, and no change to `src/eval/checkout.ts`. `git diff main -- src/run.ts` touches only the two guard lines.\n\n### R2. The loop, per golden finding, per run\n\n1. The inputs per finding are:\n   - the finding: file, span, category, severity as currently written, claim and note;\n   - the head file text from the case checkout, 100 lines above and 100 lines below the span, numbered like the verifier's input (the `numberLines` pattern in `src/verify/index.ts`);\n   - the section of `diff.patch` for that file, split per file as `diffSections` does;\n   - the full text of `docs/design/severity-policy.md`.\n\n   The case checkout from `repo.bundle` is the working directory of every call.\n2. The scorer returns `{ severity, category, policy_section, rationale }`. `severity` is one of the six policy labels: blocking, suggestion, nit, dont_post, not_real, unsure. `category` is one of the golden categories. `policy_section` is the `##` heading of the policy that the label rests on. `rationale` is one or two sentences.\n3. The judge gets the same inputs plus the scorer's result. It returns `{ accept: boolean, policy_section, reason }`.\n4. A rejected label goes back to the scorer with the judge's reason appended to the scorer's user message. A run makes at most two re-scores. So one run makes at most 3 scorer calls and 3 judge calls.\n5. A run converges when the judge accepts. Its result is `{ converged: true, severity, category, first_pass_accepted: boolean, calls: [...] }`. A run that never converges is `{ converged: false, ... }`.\n6. Each finding gets three runs, as set by `--runs`. The runs are independent: no run sees the calls of another. The runs of one finding go in sequence. Findings go in parallel under the repo's semaphore (`src/semaphore.ts`), bounded by `--concurrency`. The default is 2, because the judge is a subscription CLI with a rate window.\n7. A failed call is a scorer query that returns `ok: false`, or a judge call that R4.4 defines as failed. The labeler retries a failed call once. A call that fails again ends its run as `{ converged: false, failed: true, error }`. The other runs of the finding and the other findings continue. The command exits 1 at the end when any run failed this way.\n8. The chosen severity is the severity on which a majority of the runs agree, counted over converged runs only, and at least two runs. With the default of three runs, that is two runs that agree. The chosen category is the majority category among the converged runs, and the finding's current category when there is no majority. When no majority exists, or fewer than two runs converged, the finding goes to the human queue and gets no label.\n\nAcceptance: vitest tests with a fake SDK and a fake `codex` observe each of these:\n- A finding whose three runs each converge to `blocking` gets `blocking`. The judge's first-pass acceptance counts in the output.\n- A run whose judge rejects every scorer label makes exactly 3 scorer calls and 3 judge calls, is marked `converged: false`, and the finding still gets the label on which the other two runs agree.\n- A rejection reason reaches the next scorer call in the recorded request.\n- A finding whose three runs converge to three different labels gets no label and appears in the human queue.\n- A finding with two or more unresolved runs gets no label and appears in the human queue.\n- The recorded scorer requests of one run hold nothing from another run of the same finding.\n- The recorded request holds the 100-line window, the numbered lines, the diff section for the file and the policy text.\n- With a concurrency of 2, no more than 2 findings are in flight at once.\n- A scorer call that fails once and succeeds on the retry gives a converged run. A judge call that fails twice ends the run as failed, the finding still gets the label the other runs agree on, and the command exits 1.\n\n### R3. The scorer: Claude through the SDK\n\n1. `QueryRole` gains a member `labeler`. Its defaults sit in `src/config/models.ts` beside the judge defaults: model `claude-opus-5-5`, effort `high`, no tools, `maxTurns` 5, `maxBudgetUsd` 0.5, `timeoutMs` 300000. `roleConfig(\"labeler\")` returns them. The role follows the `judge` pattern: it is not in `ROLES`, a run record has no entry for it, and no repo-config key sets it.\n2. The prompt lives in `prompts/label-scorer.md`. Its frontmatter holds `role: labeler` and `kind: system`, a `user_message` template, and a `feedback_text` template for the re-score. The body is the system prompt. Code loads it with `loadPrompt` and fills it with `render`. The data goes in tagged untrusted blocks, as in the judge prompt.\n3. The call goes through `SdkClient.query` with a zod schema for the scorer's result. The schema uses `ciEnum` for its enums.\n4. The SDK options come from `buildQueryOptions` unchanged. So `settingSources: []`, `permissionMode: \"dontAsk\"`, `persistSession: false` and `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` hold. The labeler adds `ENABLE_CLAUDEAI_MCP_SERVERS: \"false\"` to the `env` of the `RunOptions` it passes, and passes `allowApiKey` from `--allow-api-key`.\n5. The `cwd` of the call is the case checkout.\n\nAcceptance:\n- A test drives the labeler with `createSdkClient(fakeQuery)`, where `fakeQuery` is a fake SDK `query` function that records the `Options` of each call and yields a canned result. The test asserts on the recorded `Options` of every scorer call: model `claude-opus-5-5`, effort `high`, `cwd` equal to the case checkout, `settingSources: []`, `persistSession: false`, `permissionMode: \"dontAsk\"`, `env.CLAUDE_CODE_DISABLE_AUTO_MEMORY` equal to `\"1\"` and `env.ENABLE_CLAUDEAI_MCP_SERVERS` equal to `\"false\"`.\n- A test asserts that `roleConfig(\"labeler\")` returns the values of item 1, and that `ROLES` does not hold `labeler`.\n- A test asserts that the scorer schema rejects a severity outside the six labels and accepts the six.\n- `prompts/label-scorer.md` has YAML frontmatter with the keys of item 2, and a test loads it with `loadPrompt`.\n\n### R4. The judge: GPT-6.1 Sol through the Codex CLI\n\n1. A codex runner module under `src/eval/label/` spawns `codex` with `execFile` and returns the judge's parsed result. The runner resolves `codex` from `PATH` and never uses a hard-coded path.\n2. The argv is exactly:\n   `exec --ephemeral --ignore-user-config --skip-git-repo-check -C <checkout> -s read-only -m gpt-6.1-sol -c model_reasoning_effort=high --output-schema <schema file> -o <out file> <prompt>`\n   The prompt is the last argument. The schema file and the out file live in a temp directory that the runner creates and removes.\n3. The prompt text comes from `prompts/label-judge.md`, with frontmatter `role: labeler-judge` and `kind: system`. The runner renders it with the same blocks as the scorer prompt. The system text and the user text go in one string, because `codex exec` takes one prompt.\n4. The runner reads the out file and parses it with a zod schema for the judge's result. It returns the result. A non-zero exit, a missing out file, or output that fails the schema is a failed call, and R2.7 says what a failed call does to the run. The record of the call holds stderr, cut to 2000 characters.\n5. The code reads nothing from `~/.codex`. It sets and logs no environment variable that holds a key or a token. The runner passes the parent environment through unchanged.\n6. The model id and the effort are constants in the runner. The runner exports them, so a test and the docs read one source.\n7. The GPT path stays out of the run pipeline. Nothing outside `src/eval/label/` and its tests imports the runner.\n\nAcceptance:\n- Tests fake `codex` with an executable shell shim first on `PATH`, in the pattern of the `gh` shim at `test/eval-cli.test.ts:537-547`. The shim logs its argv and writes a canned JSON out file.\n- One test checks the logged argv, word for word, against item 2 for every judge call.\n- One test shows that a non-zero exit gives a failed call and not a crash, that the run is not converged, and that the case continues.\n- One test shows that a missing out file and an out file that fails the judge schema each give a failed call.\n- One test shows that the recorded stderr is at most 2000 characters.\n- One test shows that the temp directory is gone after the call.\n- A grep over the repo finds no import of the codex runner outside `src/eval/label/` and its tests, and no read of `~/.codex/auth.json` or of any `.codex` path.\n\n### R5. Outputs\n\nThe labeler writes the per-case files inside each case directory, beside `golden.json`, or under `<out>/<case name>/` when `--out` is given. It writes the summary file in the cases directory, or in `<out>/` when `--out` is given.\n\n1. `labels.json`, one per case, holds every finding:\n   `{ case, runs_per_finding, findings: [{ index, file, start_line, end_line, claim, current_severity, chosen: { severity, category } | null, runs: [RunResult] }], first_pass_acceptance_rate, run_agreement_rate }`.\n   A `RunResult` holds `converged`, `failed`, `severity`, `category`, `first_pass_accepted` and `calls`. Each call holds `kind` (`scorer` or `judge`), `severity` or `accept`, `policy_section` and, on a failed call, `error`.\n   `first_pass_acceptance_rate` is the count of runs whose first label the judge accepted, over the count of runs that made a first judge call. `run_agreement_rate` is the count of findings whose runs all converged to one severity, over the count of findings whose runs all converged. Each rate is `null` when its denominator is 0.\n2. `disagreements.json`, one per case: one entry per finding whose runs did not all agree or did not all converge, in the same shape as a `labels.json` finding entry. It is the log a person reads to find the policy rules that read two ways.\n3. `human-queue.json`, one per case: `{ findings: [...] }`, one entry per finding with no chosen label, and one per finding whose chosen severity is `dont_post`, `not_real` or `unsure`, in the same shape, plus a `reason` of `no_majority`, `too_few_converged` or `not_posted_label`. The queue is the same with and without `--write-golden`.\n4. `label-summary.json`, one per run of the command, over every case labeled: `{ cases: [{ case, findings, labeled, queued, failed_runs, scorer_cost_usd }], first_pass_acceptance_rate, run_agreement_rate, scorer_cost_usd }`. `labeled` counts the findings whose chosen severity is `blocking`, `suggestion` or `nit`. `queued` counts the entries of `human-queue.json`. A finding counts in one of the two. The two rates pool the counts over the cases, with the same numerators and denominators as item 1.\n5. With `--write-golden`, `golden.json` is rewritten with the chosen severity and category on each finding whose chosen severity is `blocking`, `suggestion` or `nit`. A finding whose chosen severity is `dont_post`, `not_real` or `unsure` keeps its current `golden.json` entry and keeps its `chosen` in `labels.json`. The golden schema of this package allows the three posted labels only, so `--write-golden` writes those three until a later D5 package widens the schema; this narrows the charter's \"carries the chosen labels\" on purpose. Other fields stay unchanged, and keys keep their existing order. Without the flag, `golden.json` is byte-identical before and after the run. A rewritten `golden.json` loads with `loadCases` without error.\n6. The totals print to stdout as a table with one row per case and a totals row: case, findings, labeled, queued, failed runs, first-pass acceptance, run agreement, scorer cost. `--format json` prints `label-summary.json` to stdout.\n\nAcceptance: a vitest test runs `label` over a cases directory with two cases, one with three golden findings and one with one, with a fake SDK and a fake `codex` on `PATH`, and observes:\n- a finding whose three runs each converge to `blocking` has `blocking` in `labels.json`, and the first-pass acceptance counts;\n- a finding with one unresolved run still has the label that the other two runs agree on;\n- a finding whose three runs converge to three different labels is in `human-queue.json` with `chosen: null` and the reason `no_majority`;\n- a finding whose runs converge to `not_real` keeps its `golden.json` severity under `--write-golden` and is in `human-queue.json` with the reason `not_posted_label`;\n- `disagreements.json` holds only the findings of item 2, each with every run's label, the policy section of each call and whether the run converged;\n- `labels.json` of each case and `label-summary.json` hold the two rates, with values the test computes by hand from the fakes, and the summary's rates differ from each case's own because they pool two cases;\n- `golden.json` is byte-identical without `--write-golden`; with the flag it holds the chosen posted labels, the other fields unchanged, the keys in the old order, and `loadCases` loads it;\n- the stdout table has the columns of item 6, and `--format json` prints parseable JSON equal to `label-summary.json`.\n\n### R6. Docs and tickets\n\n1. `README.md` gains a `## Label` section in the shape of `## Evaluate`: a purpose line, a usage block, a flag table and a prose tail. It sits before `## Evaluate`.\n2. `docs/design/high-level-design.md` section 8 gains one paragraph. The labeler's models are pinned apart from the pipeline's. Gold does not change when the pipeline's models change. The section 9 interfaces block gains the `label` line.\n3. The D5 bullet in `TICKETS.md` is rewritten to describe this loop and the three runs. The sentence \"The GPT credential stays outside the tool: `scripts/` only, never `src/`\" becomes: the judge runs through the Codex CLI as a subprocess that finds its own login, the tool reads no credential, the codex runner lives under `src/eval/label/`, and nothing in the run pipeline imports it.\n4. `docs/design/severity-policy.md` does not change in this package. The golden schema still allows the three posted labels, so its line \"A golden finding has one of the three posted labels\" stays true. In `TICKETS.md`, the case-set bullet at line 31 stays word for word. The rewritten labeler bullet gains one sentence: \"With `--write-golden` the labeler writes the three posted labels; the six-label schema of the case-set bullet is a later package of D5.\"\n\nAcceptance (checklist, each item can fail on a read of the diff):\n- `README.md` has `## Label` directly before `## Evaluate`, with a usage block that names `--cases`, `--runs`, `--concurrency`, `--write-golden`, `--only`, `--out`, `--format` and `--allow-api-key`.\n- Section 8 of the design holds the pinned-models paragraph. The section 9 block holds a `label` line.\n- The D5 labeler bullet in `TICKETS.md` holds no \"three-pass\" wording and no \"scripts/ only\" wording. It names the loop, the three runs, the human queue, the disagreement log and the `--write-golden` sentence of R6.4. The case-set bullet at `TICKETS.md:31` is unchanged.\n- `git diff main --stat` lists no change to `docs/design/severity-policy.md`.\n- Every changed markdown line is ASD-STE100 prose, and the diff names no employer, colleague or internal document.\n\n## Global constraints\n\n- TypeScript, ESM, Node 20 or later. No `require`.\n- Every change has a vitest test that needs no network and no credentials. Tests observe behaviour at a boundary. Fakes only for the SDK and the codex process.\n- Every prompt lives in markdown with YAML frontmatter under `prompts/`.\n- No credential is read, written, logged or committed. No file under `~/.codex` is read.\n- ASD-STE100 prose in markdown and comments.\n- The repo is public: no employer, colleague or internal document is named.\n- `npm test`, `npm run lint`, `npm run typecheck`, `npm run build` pass.\n- The version bump (package.json and the two `.claude-plugin` manifests) is the project lead's at integration, not the IC'",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": true,
+      "truncated": true
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": ".claude-plugin/marketplace.json",
+        "hunks": 1
+      },
+      {
+        "path": ".claude-plugin/plugin.json",
+        "hunks": 1
+      },
+      {
+        "path": "README.md",
+        "hunks": 1
+      },
+      {
+        "path": "TICKETS.md",
+        "hunks": 2
+      },
+      {
+        "path": "docs/design/high-level-design.md",
+        "hunks": 2
+      },
+      {
+        "path": "package.json",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/label-judge.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/label-scorer.md",
+        "hunks": 1
+      },
+      {
+        "path": "src/cli.ts",
+        "hunks": 2
+      },
+      {
+        "path": "src/config/models.ts",
+        "hunks": 2
+      },
+      {
+        "path": "src/eval/label/codex.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/label/index.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/label/loop.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/label/output.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/label/policy.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/label/prompts.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/run.ts",
+        "hunks": 2
+      },
+      {
+        "path": "src/schemas/label.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/label-cli.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/label-codex.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/label-loop.test.ts",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [
+      {
+        "path": "package-lock.json",
+        "reason": "generated"
+      }
+    ],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "Adds a new `pr-review label` subcommand with new logic: subprocess spawning of codex, a scorer/judge loop, aggregation, golden.json rewriting, a new model role and a CLI interface.",
+      "confidence": "high",
+      "categories": [
+        "bug",
+        "security",
+        "test",
+        "docs",
+        "other"
+      ],
+      "hotspots": [
+        "src/eval/label/codex.ts (execFile argv, env passthrough, prompt as argv, timeout, temp files)",
+        "src/eval/label/loop.ts (aggregate majority and queue rules, retry logic, run state)",
+        "src/eval/label/output.ts (writeGolden rewrite, rate denominators, excluded counts)",
+        "src/eval/label/index.ts (checkout failure handling, exit codes, semaphore, env for scorer)",
+        "src/eval/label/prompts.ts (truncation caps, untrusted block wrapping)",
+        "src/config/models.ts and src/run.ts (new labeler role in QueryRole)",
+        "src/cli.ts (command registration and circular import of EXIT_* from cli.js)",
+        "src/eval/label/policy.ts (path resolution from src and dist)"
+      ],
+      "file_notes": [
+        {
+          "file": "src/eval/label/codex.ts",
+          "note": "new subprocess runner for the codex CLI; argv, timeout, error handling"
+        },
+        {
+          "file": "src/eval/label/loop.ts",
+          "note": "new scorer/judge loop and aggregation logic"
+        },
+        {
+          "file": "src/eval/label/output.ts",
+          "note": "new output files, rates, and golden.json rewrite"
+        },
+        {
+          "file": "src/eval/label/index.ts",
+          "note": "new CLI command, exit codes, concurrency"
+        },
+        {
+          "file": "src/eval/label/prompts.ts",
+          "note": "new prompt building with truncation"
+        },
+        {
+          "file": "src/eval/label/policy.ts",
+          "note": "new policy file reader with a relative path"
+        },
+        {
+          "file": "src/schemas/label.ts",
+          "note": "new zod schemas for scorer and judge results"
+        },
+        {
+          "file": "src/config/models.ts",
+          "note": "new labeler role defaults"
+        },
+        {
+          "file": "src/run.ts",
+          "note": "labeler role guards added"
+        },
+        {
+          "file": "src/cli.ts",
+          "note": "registers the label command"
+        },
+        {
+          "file": "prompts/label-scorer.md",
+          "note": "new prompt"
+        },
+        {
+          "file": "prompts/label-judge.md",
+          "note": "new prompt"
+        },
+        {
+          "file": "test/label-cli.test.ts",
+          "note": "new tests with a fake codex shim"
+        },
+        {
+          "file": "test/label-codex.test.ts",
+          "note": "new tests"
+        },
+        {
+          "file": "test/label-loop.test.ts",
+          "note": "new tests"
+        },
+        {
+          "file": "README.md",
+          "note": "docs for the label command"
+        },
+        {
+          "file": "TICKETS.md",
+          "note": "docs wording"
+        },
+        {
+          "file": "docs/design/high-level-design.md",
+          "note": "docs of the exception for the GPT judge"
+        },
+        {
+          "file": "package.json",
+          "note": "version bump to 0.3.0"
+        },
+        {
+          "file": ".claude-plugin/plugin.json",
+          "note": "version bump"
+        },
+        {
+          "file": ".claude-plugin/marketplace.json",
+          "note": "version bump"
+        }
+      ],
+      "summary": "Adds a `pr-review label` subcommand that labels each golden finding with a severity and category. A Claude scorer labels, and a GPT judge run through the Codex CLI accepts or rejects. Rejected labels go back to the scorer up to twice. Runs are aggregated by majority into labels.json, disagreements.json, human-queue.json and label-summary.json, and `--write-golden` can rewrite golden.json. It also adds a pinned labeler role, prompts, schemas, tests and docs, and bumps the version to 0.3.0."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: Adds a new `pr-review label` subcommand with new logic: subprocess spawning of codex, a scorer/judge loop, aggregation, golden.json rewriting, a new model role and a CLI interface.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 8181,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 44396,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0044496,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 614,
+              "cacheReadInputTokens": 5136,
+              "cacheCreationInputTokens": 43901,
+              "webSearchRequests": 0,
+              "costUSD": 0.36452320000000005,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 138,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.36897280000000005
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/label/output.ts",
+            "start_line": 153,
+            "end_line": 159,
+            "category": "docs",
+            "severity_estimate": "suggestion",
+            "confidence": "high",
+            "claim": "The spec (R5.5) says that `--write-golden` writes the chosen severity and category to golden.json, but writeGolden writes only the severity.",
+            "evidence": "      target.severity = e.chosen.severity;",
+            "suggested_fix": "Also write `target.category = e.chosen.category`, or change the spec to say that the category stays as it is.",
+            "explanation": "The chosen category never reaches golden.json, so the code does not do what the spec says.",
+            "needs_context": false
+          },
+          {
+            "file": "src/eval/label/prompts.ts",
+            "start_line": 97,
+            "end_line": 106,
+            "category": "docs",
+            "severity_estimate": "suggestion",
+            "confidence": "high",
+            "claim": "The spec (R2.1) says that each call gets the finding's current severity and its note, but the finding block leaves both out.",
+            "evidence": "  const shown = {\n    file: f.file,\n    start_line: f.start_line,\n    end_line: f.end_line,\n    category: f.category,\n    claim: f.claim,\n  };",
+            "suggested_fix": "Say in the description that the severity and the note are left out on purpose, or add them to the block.",
+            "explanation": "The scorer and the judge get different inputs from the ones the spec lists, and the description does not mention this change.",
+            "needs_context": false
+          },
+          {
+            "file": "src/eval/label/prompts.ts",
+            "start_line": 110,
+            "end_line": 113,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The code cuts the diff and the head window at character limits, and the description does not mention this.",
+            "evidence": "  return `${text.slice(0, limit)}\\n[The ${what} was cut here. The limit is ${limit} characters.]`;",
+            "explanation": "The spec says each call gets the full diff section and the full 100-line window, but the code can cut both, and only the README says so.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 12673,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 44384,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0044484,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 1008,
+              "cacheReadInputTokens": 5094,
+              "cacheCreationInputTokens": 43889,
+              "webSearchRequests": 0,
+              "costUSD": 0.3722988,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 301,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.3767472
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/label/prompts.ts",
+            "start_line": 10,
+            "end_line": 18,
+            "category": "bug",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "The prompt caps count characters, not bytes, and they leave out the policy, so the judge prompt can pass the 131072-byte limit on one argument and fail with E2BIG.",
+            "evidence": "export const DIFF_SECTION_LIMIT = 65536;",
+            "suggested_fix": "Measure the whole judge prompt with Buffer.byteLength and cap it in bytes, or pass the prompt on stdin.",
+            "explanation": "In UTF-8, text that is not ASCII takes up to 3 bytes per character, and the policy and the prompt text add to the diff and the window in the same argument, so a capped diff can still go over MAX_ARG_STRLEN.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 15380,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 44384,
+              "outputTokens": 19,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0044479,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 1255,
+              "cacheReadInputTokens": 5039,
+              "cacheCreationInputTokens": 43889,
+              "webSearchRequests": 0,
+              "costUSD": 0.3772278,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 537,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.3816757
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/label/prompts.ts",
+            "start_line": 11,
+            "end_line": 18,
+            "category": "bug",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "The caps do not keep the judge prompt under the Linux limit for one argument (131072 bytes). The diff and head caps alone total 98304 characters, the policy is added with no cap, and the caps count characters instead of bytes.",
+            "evidence": "export const DIFF_SECTION_LIMIT = 65536;",
+            "suggested_fix": "Cap the whole prompt by its byte length (Buffer.byteLength) to stay under 131072 bytes, or send the prompt to codex on stdin.",
+            "explanation": "A large diff, a large window, or non-ASCII text can push the prompt over the limit, so `execFile` fails with `E2BIG` on both tries and the run ends as failed.",
+            "needs_context": true
+          },
+          {
+            "file": "src/eval/label/output.ts",
+            "start_line": 149,
+            "end_line": 157,
+            "category": "bug",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "writeGolden writes only the chosen severity, but spec R5.5 says to write the chosen severity and category.",
+            "evidence": "      target.severity = e.chosen.severity;",
+            "suggested_fix": "Also set target.category = e.chosen.category, or confirm that the change from the spec is intended.",
+            "explanation": "The chosen category never reaches golden.json. The README says this is on purpose, so it may be a deliberate change from the spec.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 14716,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 44384,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0044484,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 1195,
+              "cacheReadInputTokens": 5039,
+              "cacheCreationInputTokens": 43889,
+              "webSearchRequests": 0,
+              "costUSD": 0.37602779999999997,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 301,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.3804762
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 10520,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 44376,
+              "outputTokens": 19,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0044471,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 909,
+              "cacheReadInputTokens": 5046,
+              "cacheCreationInputTokens": 43881,
+              "webSearchRequests": 0,
+              "costUSD": 0.37024520000000005,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 371,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.37469230000000003
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 9827,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 51625,
+              "outputTokens": 19,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.005172,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 521,
+              "cacheReadInputTokens": 61452,
+              "cacheCreationInputTokens": 51437,
+              "webSearchRequests": 0,
+              "costUSD": 0.4342224,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 360,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.4393944
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/label/codex.ts",
+            "start_line": 30,
+            "end_line": 48,
+            "category": "security",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "The judge runs codex with the untrusted case checkout as its working root, so project instruction files in that checkout, such as AGENTS.md, can reach the judge as trusted instructions.",
+            "evidence": "    \"--ignore-user-config\",\n    \"--skip-git-repo-check\",\n    \"-C\",\n    checkout,",
+            "suggested_fix": "Run codex in a clean temp directory with no project docs, or turn off project-doc loading (for example `-c project_doc_max_bytes=0`), and give the checkout only as data.",
+            "explanation": "`--ignore-user-config` skips only the user config. Codex still loads AGENTS.md from the repo, and that file lands outside the untrusted-block wrapping, so a case repo can steer the gold label.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 11095,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 44392,
+              "outputTokens": 19,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0044487,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 766,
+              "cacheReadInputTokens": 54171,
+              "cacheCreationInputTokens": 46238,
+              "webSearchRequests": 0,
+              "costUSD": 0.3960742,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 312,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.4005229
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/label/index.ts",
+            "start_line": 73,
+            "end_line": 73,
+            "category": "security",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The case name from case.json goes into the output path with no check, so a name such as \"../x\" can write files outside `--out`.",
+            "evidence": "const dir = opts.out === undefined ? c.dir : join(resolve(opts.out), c.name);",
+            "suggested_fix": "Reject a case name that holds a path separator or \"..\", or check that the resolved dir stays under `--out`.",
+            "explanation": "A case set from another repo holds untrusted data, and its name controls a write path.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 9253,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 44390,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.004449,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 526,
+              "cacheReadInputTokens": 54169,
+              "cacheCreationInputTokens": 44965,
+              "webSearchRequests": 0,
+              "costUSD": 0.38108980000000003,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 149,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.3855388
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "test/label-loop.test.ts",
+            "start_line": 356,
+            "end_line": 356,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "The test asserts that an exported constant equals a literal, which only restates the code.",
+            "evidence": "expect(DIFF_SECTION_LIMIT).toBe(65536);",
+            "suggested_fix": "Remove the constant check. Assert on the length of the diff block in the prompt instead.",
+            "explanation": "This assertion repeats the constant and checks no behaviour; the cut-line regex below it already observes the limit.",
+            "needs_context": false
+          },
+          {
+            "file": "src/eval/label/loop.ts",
+            "start_line": 121,
+            "end_line": 123,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "No test covers the path where the scorer query throws, which records the error as 'thrown:' and retries.",
+            "evidence": "  } catch (err) {\n    return { ok: false, error: `thrown: ${messageOf(err)}` };\n  }",
+            "suggested_fix": "Add a loop test where the fake client throws once and then succeeds, and assert that the run converges.",
+            "explanation": "If the catch breaks, a thrown SDK error would crash the case, and no test would fail.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 12550,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 44386,
+              "outputTokens": 19,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0044481,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 995,
+              "cacheReadInputTokens": 55507,
+              "cacheCreationInputTokens": 45104,
+              "webSearchRequests": 0,
+              "costUSD": 0.39184939999999996,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 272,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.39629749999999997
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "src/eval/label/output.ts",
+          "start_line": 153,
+          "end_line": 159,
+          "category": "docs",
+          "severity_estimate": "suggestion",
+          "confidence": "high",
+          "claim": "The spec (R5.5) says that `--write-golden` writes the chosen severity and category to golden.json, but writeGolden writes only the severity.",
+          "evidence": "      target.severity = e.chosen.severity;",
+          "suggested_fix": "Also write `target.category = e.chosen.category`, or change the spec to say that the category stays as it is.",
+          "explanation": "The chosen category never reaches golden.json, so the code does not do what the spec says.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "      target.severity = e.chosen.severity;",
+            " * Rewrite golden.json in \"caseDir\" with the chosen posted severities. The\n * category and every other field and the order of the keys stay."
+          ],
+          "rationale": "writeGolden writes only `severity`, while the spec R5.5 says it writes severity and category. The code and the test (`expect(a1?.category).toBe(\"test\")`) deliberately keep the category, so this is a conscious spec deviation. The spec or the code should change to match.",
+          "score": 58,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "      target.severity = e.chosen.severity;",
+            " * Rewrite golden.json in \"caseDir\" with the chosen posted severities. The\n * category and every other field and the order of the keys stay."
+          ],
+          "rationale": "writeGolden writes only `severity`, while the spec R5.5 says it writes severity and category. The code and the test (`expect(a1?.category).toBe(\"test\")`) deliberately keep the category, so this is a conscious spec deviation. The spec or the code should change to match.",
+          "score": 58,
+          "severity": "suggestion"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "src/eval/label/prompts.ts",
+          "start_line": 97,
+          "end_line": 106,
+          "category": "docs",
+          "severity_estimate": "suggestion",
+          "confidence": "high",
+          "claim": "The spec (R2.1) says that each call gets the finding's current severity and its note, but the finding block leaves both out.",
+          "evidence": "  const shown = {\n    file: f.file,\n    start_line: f.start_line,\n    end_line: f.end_line,\n    category: f.category,\n    claim: f.claim,\n  };",
+          "suggested_fix": "Say in the description that the severity and the note are left out on purpose, or add them to the block.",
+          "explanation": "The scorer and the judge get different inputs from the ones the spec lists, and the description does not mention this change.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const shown = {\n    file: f.file,\n    start_line: f.start_line,\n    end_line: f.end_line,\n    category: f.category,\n    claim: f.claim,\n  };"
+          ],
+          "rationale": "The finding block omits the severity and the note, though spec R2.1 lists both as inputs and GoldenFinding has both fields. The omission may be deliberate to avoid anchoring, but nothing documents it, so it is a spec and code mismatch with no bug today.",
+          "score": 58,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const shown = {\n    file: f.file,\n    start_line: f.start_line,\n    end_line: f.end_line,\n    category: f.category,\n    claim: f.claim,\n  };"
+          ],
+          "rationale": "The finding block omits the severity and the note, though spec R2.1 lists both as inputs and GoldenFinding has both fields. The omission may be deliberate to avoid anchoring, but nothing documents it, so it is a spec and code mismatch with no bug today.",
+          "score": 58,
+          "severity": "suggestion"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "src/eval/label/prompts.ts",
+          "start_line": 110,
+          "end_line": 113,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The code cuts the diff and the head window at character limits, and the description does not mention this.",
+          "evidence": "  return `${text.slice(0, limit)}\\n[The ${what} was cut here. The limit is ${limit} characters.]`;",
+          "explanation": "The spec says each call gets the full diff section and the full 100-line window, but the code can cut both, and only the README says so.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "return `${text.slice(0, limit)}\\n[The ${what} was cut here. The limit is ${limit} characters.]`;",
+            "export const DIFF_SECTION_LIMIT = 65536;",
+            "export const HEAD_WINDOW_LIMIT = 32768;"
+          ],
+          "rationale": "The code does cut the diff section and head window at fixed limits, and the spec wording promises the full section and window. But the cut is a deliberate, commented safeguard for the argv size limit, and the model is told about each cut. Only the description, not the code, is incomplete, so the finding has little value.",
+          "score": 22,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "return `${text.slice(0, limit)}\\n[The ${what} was cut here. The limit is ${limit} characters.]`;",
+            "export const DIFF_SECTION_LIMIT = 65536;",
+            "export const HEAD_WINDOW_LIMIT = 32768;"
+          ],
+          "rationale": "The code does cut the diff section and head window at fixed limits, and the spec wording promises the full section and window. But the cut is a deliberate, commented safeguard for the argv size limit, and the model is told about each cut. Only the description, not the code, is incomplete, so the finding has little value.",
+          "score": 22,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "src/eval/label/prompts.ts",
+          "start_line": 11,
+          "end_line": 18,
+          "category": "bug",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "The caps do not keep the judge prompt under the Linux limit for one argument (131072 bytes). The diff and head caps alone total 98304 characters, the policy is added with no cap, and the caps count characters instead of bytes.",
+          "evidence": "export const DIFF_SECTION_LIMIT = 65536;",
+          "suggested_fix": "Cap the whole prompt by its byte length (Buffer.byteLength) to stay under 131072 bytes, or send the prompt to codex on stdin.",
+          "explanation": "A large diff, a large window, or non-ASCII text can push the prompt over the limit, so `execFile` fails with `E2BIG` on both tries and the run ends as failed.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "export const DIFF_SECTION_LIMIT = 65536;",
+            "export const HEAD_WINDOW_LIMIT = 32768;",
+            "if (text.length <= limit) return text;",
+            "policy: wrapUntrusted(\"policy\", input.policy).block,",
+            "prompt,\n  ];"
+          ],
+          "rationale": "The caps count characters, not bytes, and the whole prompt goes as one argv element with no total cap. Diff plus head window is 98304 characters, so ASCII input plus the policy (about 68 lines) stays under 131072. Non-ASCII-heavy diffs could exceed it, so the claim is real but overstated and the case is rare.",
+          "score": 40,
+          "severity": "suggestion"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "Linux limits one\n * argv element to 131072 bytes, and the judge prompt is one argument.",
+            "export const DIFF_SECTION_LIMIT = 65536;",
+            "export const HEAD_WINDOW_LIMIT = 32768;",
+            "if (text.length <= limit) return text;",
+            "policy: wrapUntrusted(\"policy\", input.policy).block,",
+            "    outFile,\n    prompt,\n  ];"
+          ],
+          "rationale": "The comment says the caps keep the judge prompt under the 131072-byte limit for one argv element. But the caps count UTF-16 characters, not bytes. Together they allow 98304 characters before the uncapped policy (several KB), the system prompt and the scorer result are added. The whole prompt goes to codex as one argv element. So a diff and a window that are both near their caps, or non-ASCII text, can cause E2BIG. Each such call fails, and so does its retry. The run is recorded as failed, not crashed, and this happens only on large inputs, so it is a strong suggestion rather than a sure blocker.",
+          "score": 72,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "Linux limits one\n * argv element to 131072 bytes, and the judge prompt is one argument.",
+            "export const DIFF_SECTION_LIMIT = 65536;",
+            "export const HEAD_WINDOW_LIMIT = 32768;",
+            "if (text.length <= limit) return text;",
+            "policy: wrapUntrusted(\"policy\", input.policy).block,",
+            "    outFile,\n    prompt,\n  ];"
+          ],
+          "rationale": "The comment says the caps keep the judge prompt under the 131072-byte limit for one argv element. But the caps count UTF-16 characters, not bytes. Together they allow 98304 characters before the uncapped policy (several KB), the system prompt and the scorer result are added. The whole prompt goes to codex as one argv element. So a diff and a window that are both near their caps, or non-ASCII text, can cause E2BIG. Each such call fails, and so does its retry. The run is recorded as failed, not crashed, and this happens only on large inputs, so it is a strong suggestion rather than a sure blocker.",
+          "score": 72,
+          "severity": "suggestion"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "src/eval/label/output.ts",
+          "start_line": 149,
+          "end_line": 157,
+          "category": "bug",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "writeGolden writes only the chosen severity, but spec R5.5 says to write the chosen severity and category.",
+          "evidence": "      target.severity = e.chosen.severity;",
+          "suggested_fix": "Also set target.category = e.chosen.category, or confirm that the change from the spec is intended.",
+          "explanation": "The chosen category never reaches golden.json. The README says this is on purpose, so it may be a deliberate change from the spec.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "target.severity = e.chosen.severity;",
+            " * Rewrite golden.json in \"caseDir\" with the chosen posted severities. The\n * category and every other field and the order of the keys stay."
+          ],
+          "rationale": "The code writes only severity, while spec R5.5 says severity and category. The README flag table says \"The category does not change\" and the code comment says the category stays, so the deviation looks deliberate. It is a documented spec mismatch, not a bug.",
+          "score": 30,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "target.severity = e.chosen.severity;",
+            " * Rewrite golden.json in \"caseDir\" with the chosen posted severities. The\n * category and every other field and the order of the keys stay."
+          ],
+          "rationale": "The code writes only severity, while spec R5.5 says severity and category. The README flag table says \"The category does not change\" and the code comment says the category stays, so the deviation looks deliberate. It is a documented spec mismatch, not a bug.",
+          "score": 30,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "src/eval/label/index.ts",
+          "start_line": 73,
+          "end_line": 73,
+          "category": "security",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The case name from case.json goes into the output path with no check, so a name such as \"../x\" can write files outside `--out`.",
+          "evidence": "const dir = opts.out === undefined ? c.dir : join(resolve(opts.out), c.name);",
+          "suggested_fix": "Reject a case name that holds a path separator or \"..\", or check that the resolved dir stays under `--out`.",
+          "explanation": "A case set from another repo holds untrusted data, and its name controls a write path.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "if (meta.name !== name) {",
+            "names = entries.filter((e) => e.isDirectory()).map((e) => e.name);",
+            "const dir = opts.out === undefined ? c.dir : join(resolve(opts.out), c.name);"
+          ],
+          "rationale": "loadCase rejects any case whose case.json name differs from its directory name. The directory name comes from readdir, so it cannot hold a path separator or be \"..\". A traversal name therefore never reaches the join at line 73.",
+          "score": 4,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": false,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "const dir = opts.out === undefined ? c.dir : join(resolve(opts.out), c.name);",
+            "if (meta.name !== name) {",
+            "names = entries.filter((e) => e.isDirectory()).map((e) => e.name);"
+          ],
+          "rationale": "The finding is false. `loadCases` rejects any case whose case.json name is not the same as its directory entry name, and readdir only gives single path components. It never gives \".\" or \"..\". So `c.name` cannot hold \"../x\" or a separator, and it cannot escape `--out`.",
+          "score": 4,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": false,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "const dir = opts.out === undefined ? c.dir : join(resolve(opts.out), c.name);",
+            "if (meta.name !== name) {",
+            "names = entries.filter((e) => e.isDirectory()).map((e) => e.name);"
+          ],
+          "rationale": "The finding is false. `loadCases` rejects any case whose case.json name is not the same as its directory entry name, and readdir only gives single path components. It never gives \".\" or \"..\". So `c.name` cannot hold \"../x\" or a separator, and it cannot escape `--out`.",
+          "score": 4,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "src/eval/label/codex.ts",
+          "start_line": 30,
+          "end_line": 48,
+          "category": "security",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "The judge runs codex with the untrusted case checkout as its working root, so project instruction files in that checkout, such as AGENTS.md, can reach the judge as trusted instructions.",
+          "evidence": "    \"--ignore-user-config\",\n    \"--skip-git-repo-check\",\n    \"-C\",\n    checkout,",
+          "suggested_fix": "Run codex in a clean temp directory with no project docs, or turn off project-doc loading (for example `-c project_doc_max_bytes=0`), and give the checkout only as data.",
+          "explanation": "`--ignore-user-config` skips only the user config. Codex still loads AGENTS.md from the repo, and that file lands outside the untrusted-block wrapping, so a case repo can steer the gold label.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"--ignore-user-config\",",
+            "\"--skip-git-repo-check\",",
+            "\"-C\",\n    checkout,",
+            "const result = await exec(codexArgs(checkout, schemaFile, outFile, prompt), checkout);"
+          ],
+          "rationale": "Codex runs with the case checkout as both `-C` and cwd. `--ignore-user-config` does not stop Codex from loading the repo's AGENTS.md, and nothing in the label code disables project docs. The risk is real, but the spec fixes the argv and the case repos are probably curated, so it is a hardening suggestion and not a bug.",
+          "score": 55,
+          "severity": "suggestion"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"--ignore-user-config\",",
+            "\"-C\",\n    checkout,",
+            "const result = await exec(codexArgs(checkout, schemaFile, outFile, prompt), checkout);"
+          ],
+          "rationale": "The judge runs codex with the case checkout as its root (`-C checkout` and cwd = checkout). `--ignore-user-config` only skips the user's ~/.codex config, so Codex still loads a project AGENTS.md from the repo as trusted instructions, outside the untrusted-block wrapping. The scorer is shielded the same way with `settingSources: []`, so this is a real gap: a case repo can steer the gold label. The spec does fix this argv, which makes it less certain the team would act on it, and it is a hardening suggestion rather than a functional bug.",
+          "score": 70,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"--ignore-user-config\",",
+            "\"-C\",\n    checkout,",
+            "const result = await exec(codexArgs(checkout, schemaFile, outFile, prompt), checkout);"
+          ],
+          "rationale": "The judge runs codex with the case checkout as its root (`-C checkout` and cwd = checkout). `--ignore-user-config` only skips the user's ~/.codex config, so Codex still loads a project AGENTS.md from the repo as trusted instructions, outside the untrusted-block wrapping. The scorer is shielded the same way with `settingSources: []`, so this is a real gap: a case repo can steer the gold label. The spec does fix this argv, which makes it less certain the team would act on it, and it is a hardening suggestion rather than a functional bug.",
+          "score": 70,
+          "severity": "suggestion"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "test/label-loop.test.ts",
+          "start_line": 356,
+          "end_line": 356,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "The test asserts that an exported constant equals a literal, which only restates the code.",
+          "evidence": "expect(DIFF_SECTION_LIMIT).toBe(65536);",
+          "suggested_fix": "Remove the constant check. Assert on the length of the diff block in the prompt instead.",
+          "explanation": "This assertion repeats the constant and checks no behaviour; the cut-line regex below it already observes the limit.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(DIFF_SECTION_LIMIT).toBe(65536);",
+            "expect(message).toMatch(/cut[^\\n]*65536|65536[^\\n]*cut/);"
+          ],
+          "rationale": "The assertion does exist and is redundant with the 65536 cut-line regex in the same test. But a pinned-constant check is a minor, defensible habit, and the cited line (356) is wrong, since the assertion is at line 363. It is a very low-value nit.",
+          "score": 15,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(DIFF_SECTION_LIMIT).toBe(65536);",
+            "expect(message).toMatch(/cut[^\\n]*65536|65536[^\\n]*cut/);"
+          ],
+          "rationale": "The assertion does exist and is redundant with the 65536 cut-line regex in the same test. But a pinned-constant check is a minor, defensible habit, and the cited line (356) is wrong, since the assertion is at line 363. It is a very low-value nit.",
+          "score": 15,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "src/eval/label/loop.ts",
+          "start_line": 121,
+          "end_line": 123,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "No test covers the path where the scorer query throws, which records the error as 'thrown:' and retries.",
+          "evidence": "  } catch (err) {\n    return { ok: false, error: `thrown: ${messageOf(err)}` };\n  }",
+          "suggested_fix": "Add a loop test where the fake client throws once and then succeeds, and assert that the run converges.",
+          "explanation": "If the catch breaks, a thrown SDK error would crash the case, and no test would fail.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "} catch (err) {\n    return { ok: false, error: `thrown: ${messageOf(err)}` };\n  }",
+            "if (step.fail) {\n      return { ok: false, failure: { kind: \"no-structured-output\", message: \"bad\" }, raw: META };"
+          ],
+          "rationale": "The scorer fake in test/label-loop.test.ts only simulates `ok: false` outcomes and never throws. No test covers the `thrown:` catch branch in `scoreOnce`. The gap is real but minor, because the branch is a small defensive handler.",
+          "score": 50,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "} catch (err) {\n    return { ok: false, error: `thrown: ${messageOf(err)}` };\n  }",
+            "if (step.fail) {\n      return { ok: false, failure: { kind: \"no-structured-output\", message: \"bad\" }, raw: META };"
+          ],
+          "rationale": "The scorer fake in test/label-loop.test.ts only simulates `ok: false` outcomes and never throws. No test covers the `thrown:` catch branch in `scoreOnce`. The gap is real but minor, because the branch is a small defensive handler.",
+          "score": 50,
+          "severity": "suggestion"
+        },
+        "passed": false
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5816446303,
+      "review_url": "https://github.com/jerridan/pr-review/pull/35#pullrequestreview-5816446303",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 128616574575
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 9157,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 51032,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0051142,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1336,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 50545,
+            "webSearchRequests": 0,
+            "costUSD": 0.2156702,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.22078440000000002
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 8181,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 44396,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0044496,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 614,
+            "cacheReadInputTokens": 5136,
+            "cacheCreationInputTokens": 43901,
+            "webSearchRequests": 0,
+            "costUSD": 0.36452320000000005,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 138,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.36897280000000005
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "model": "claude-opus-5-5",
+        "duration_ms": 10520,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 44376,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0044471,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 909,
+            "cacheReadInputTokens": 5046,
+            "cacheCreationInputTokens": 43881,
+            "webSearchRequests": 0,
+            "costUSD": 0.37024520000000005,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 371,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.37469230000000003
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "model": "claude-opus-5-5",
+        "duration_ms": 12673,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 44384,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0044484,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1008,
+            "cacheReadInputTokens": 5094,
+            "cacheCreationInputTokens": 43889,
+            "webSearchRequests": 0,
+            "costUSD": 0.3722988,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 301,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.3767472
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 14716,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 44384,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0044484,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1195,
+            "cacheReadInputTokens": 5039,
+            "cacheCreationInputTokens": 43889,
+            "webSearchRequests": 0,
+            "costUSD": 0.37602779999999997,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 301,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.3804762
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 15380,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 44384,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0044479,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1255,
+            "cacheReadInputTokens": 5039,
+            "cacheCreationInputTokens": 43889,
+            "webSearchRequests": 0,
+            "costUSD": 0.3772278,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 537,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.3816757
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "model": "claude-opus-5-5",
+        "duration_ms": 9827,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 51625,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.005172,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 521,
+            "cacheReadInputTokens": 61452,
+            "cacheCreationInputTokens": 51437,
+            "webSearchRequests": 0,
+            "costUSD": 0.4342224,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 360,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.4393944
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 9253,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 44390,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.004449,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 526,
+            "cacheReadInputTokens": 54169,
+            "cacheCreationInputTokens": 44965,
+            "webSearchRequests": 0,
+            "costUSD": 0.38108980000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 149,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.3855388
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 11095,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 44392,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0044487,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 766,
+            "cacheReadInputTokens": 54171,
+            "cacheCreationInputTokens": 46238,
+            "webSearchRequests": 0,
+            "costUSD": 0.3960742,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 312,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.4005229
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "model": "claude-opus-5-5",
+        "duration_ms": 12550,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 44386,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0044481,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 995,
+            "cacheReadInputTokens": 55507,
+            "cacheCreationInputTokens": 45104,
+            "webSearchRequests": 0,
+            "costUSD": 0.39184939999999996,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 272,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.39629749999999997
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 9345,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 14221,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0014336,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 1051,
+            "cacheReadInputTokens": 39697,
+            "cacheCreationInputTokens": 14796,
+            "webSearchRequests": 0,
+            "costUSD": 0.0736757,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 205,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0751093
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 12850,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16132,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016242000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 1174,
+            "cacheReadInputTokens": 44063,
+            "cacheCreationInputTokens": 17619,
+            "webSearchRequests": 0,
+            "costUSD": 0.08663429999999998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 533,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0882585
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6786,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16148,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016253,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 682,
+            "cacheReadInputTokens": 23439,
+            "cacheCreationInputTokens": 16624,
+            "webSearchRequests": 0,
+            "costUSD": 0.07566790000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 155,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0772932
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 12052,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 14164,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0014264,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 1320,
+            "cacheReadInputTokens": 61181,
+            "cacheCreationInputTokens": 17979,
+            "webSearchRequests": 0,
+            "costUSD": 0.0912501,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 305,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0926765
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 8697,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 12300,
+            "outputTokens": 15,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012375,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 771,
+            "cacheReadInputTokens": 35974,
+            "cacheCreationInputTokens": 13474,
+            "webSearchRequests": 0,
+            "costUSD": 0.0652154,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 181,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.06645290000000001
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 16199,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 14268,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0014383,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 1498,
+            "cacheReadInputTokens": 60615,
+            "cacheCreationInputTokens": 17401,
+            "webSearchRequests": 0,
+            "costUSD": 0.0906615,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 534,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.09209980000000001
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 10301,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11122,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011242000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 1258,
+            "cacheReadInputTokens": 18413,
+            "cacheCreationInputTokens": 11435,
+            "webSearchRequests": 0,
+            "costUSD": 0.0601693,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 668,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0612935
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 5805,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 26670,
+            "outputTokens": 15,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0026745000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 613,
+            "cacheReadInputTokens": 3889,
+            "cacheCreationInputTokens": 26183,
+            "webSearchRequests": 0,
+            "costUSD": 0.1112549,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 268,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1139294
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 10822,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 18292,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0018392,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 978,
+            "cacheReadInputTokens": 71190,
+            "cacheCreationInputTokens": 20062,
+            "webSearchRequests": 0,
+            "costUSD": 0.097163,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 107,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0990022
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 9914,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 12306,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012396,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 754,
+            "cacheReadInputTokens": 36022,
+            "cacheCreationInputTokens": 13566,
+            "webSearchRequests": 0,
+            "costUSD": 0.1308364,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 165,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.132076
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 15008,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11118,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011248,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 1355,
+            "cacheReadInputTokens": 18401,
+            "cacheCreationInputTokens": 11337,
+            "webSearchRequests": 0,
+            "costUSD": 0.12149220000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 734,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.122617
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 23096,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 14248,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0014348000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 10,
+            "outputTokens": 1833,
+            "cacheReadInputTokens": 81431,
+            "cacheCreationInputTokens": 18237,
+            "webSearchRequests": 0,
+            "costUSD": 0.1988822,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 724,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.20031700000000002
+      }
+    ],
+    "total_cost_usd": 4.946227499999999,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 51,
+      "gather": 177,
+      "scope": 8,
+      "triage": 9953,
+      "find_verify": 64494,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
