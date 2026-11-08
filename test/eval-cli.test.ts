@@ -235,6 +235,8 @@ type ScriptOptions = {
    * query throws with "message", so the review is incomplete.
    */
   reviewerFailure?: { message: string; runs: number[] };
+  /** The verifier says that the claim of the planted finding does not hold. */
+  rejectPlanted?: boolean;
 };
 
 /**
@@ -304,6 +306,17 @@ function evalFake(opts: ScriptOptions = {}) {
       }
       case "verifier":
       case "verifier-escalation":
+        if (opts.rejectPlanted && req.userMessage.includes("CLAIM-off-by-one")) {
+          return out({
+            in_scope: true,
+            claim_holds: false,
+            introduced_by_pr: true,
+            quotes: ["i <= values.length"],
+            rationale: "r",
+            score: 10,
+            severity: "blocking",
+          });
+        }
         return out({
           in_scope: true,
           claim_holds: true,
@@ -391,15 +404,25 @@ describe("pr-review eval: the end-to-end report (R10.1, R5.1, R5.4, R5.6)", () =
           [2, 0, 0, 2, TRIAGE_COST, false],
         ],
       ]);
+      const perRepeat = {
+        raw_recall: 0.5,
+        recall: 0.5,
+        precision: 0.25,
+        findings_per_case: 2,
+        cost_per_case: 0.1,
+        drops: {},
+      };
       expect(report.repeats).toEqual([
-        { repeat: 1, recall: 0.5, precision: 0.25, findings_per_case: 2, cost_per_case: 0.1 },
-        { repeat: 2, recall: 0.5, precision: 0.25, findings_per_case: 2, cost_per_case: 0.1 },
+        { repeat: 1, ...perRepeat },
+        { repeat: 2, ...perRepeat },
       ]);
       expect(report.aggregate).toEqual({
+        raw_recall: { mean: 0.5, min: 0.5, max: 0.5 },
         recall: { mean: 0.5, min: 0.5, max: 0.5 },
         precision: { mean: 0.25, min: 0.25, max: 0.25 },
         findings_per_case: { mean: 2, min: 2, max: 2 },
         cost_per_case: { mean: 0.1, min: 0.1, max: 0.1 },
+        drops: {},
       });
       expect(report.judge).toEqual({ calls: 0, unknown: 0, cost_usd: 0 });
       expect(report.failed_repeats).toEqual([]);
@@ -426,6 +449,34 @@ describe("pr-review eval: the end-to-end report (R10.1, R5.1, R5.4, R5.6)", () =
         );
         expect(r.run_ms).toBeGreaterThanOrEqual(0);
       }
+    },
+    RUN_TIMEOUT,
+  );
+
+  it(
+    "gives raw recall and the drops per repeat and in the aggregate when the verifier drops a golden hit",
+    async () => {
+      const cases = casesDir([{ name: "dropped", golden: [PLANTED()] }]);
+      const { code, report } = await evalJson(
+        evalFake({ rejectPlanted: true }),
+        cases,
+        "--repeat",
+        "2",
+      );
+      expect(code, stderr).toBe(0);
+      if (!report) throw new Error("no report");
+      expect(
+        report.cases[0]?.repeats.map((r) => [r.raw_recall, r.recall, r.raw_matched, r.drops]),
+      ).toEqual([
+        [1, 0, 1, { verify: 1 }],
+        [1, 0, 1, { verify: 1 }],
+      ]);
+      expect(report.repeats.map((r) => [r.repeat, r.raw_recall, r.recall, r.drops])).toEqual([
+        [1, 1, 0, { verify: 1 }],
+        [2, 1, 0, { verify: 1 }],
+      ]);
+      expect(report.aggregate.raw_recall).toEqual({ mean: 1, min: 1, max: 1 });
+      expect(report.aggregate.drops).toEqual({ verify: 2 });
     },
     RUN_TIMEOUT,
   );
@@ -983,6 +1034,9 @@ describe("pr-review eval: the report outputs (R5.5, R5.6, R5.7)", () => {
       expect(stdout).toContain("b-unmatched");
       expect(stdout).toMatch(/^recall\s+0\.500\s+0\.500\s+0\.500\s*$/m);
       expect(stdout).toMatch(/^findings per case\s+2\.000\s+2\.000\s+2\.000\s*$/m);
+      expect(stdout).toMatch(/^repeat\s+raw recall\s+recall\s+precision\s+posted\s+drops\s+cost$/m);
+      expect(stdout).toMatch(/^raw recall\s+0\.500\s+0\.500\s+0\.500\s*$/m);
+      expect(stdout).toMatch(/^drops\s+-\s*$/m);
       const report = JSON.parse(readFileSync(join(out, "report.json"), "utf8")) as Report;
       expect(report.aggregate.recall.mean).toBe(0.5);
     },

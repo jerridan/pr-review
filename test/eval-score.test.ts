@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DEFAULT_REPO_CONFIG } from "../src/config/repo-config.js";
 import type { GoldenFinding } from "../src/eval/case.js";
 import { scoreRecord } from "../src/eval/score.js";
-import type { Category, Severity } from "../src/schemas/finding.js";
+import type { Category, Finding, Severity } from "../src/schemas/finding.js";
 import { JudgeOutputSchema } from "../src/schemas/judge.js";
 import type { PostedFinding, RunRecord } from "../src/schemas/record.js";
 import type { QueryMeta, QueryOutcome, QueryRequest } from "../src/sdk/client.js";
@@ -79,7 +79,8 @@ function golden(
   };
 }
 
-function record(findings: PostedFinding[]): RunRecord {
+// "raw" holds the findings of each reviewer entry, one entry per list.
+function record(findings: PostedFinding[], raw: Finding[][] = []): RunRecord {
   return {
     identity: {
       repo: "/repo",
@@ -114,7 +115,14 @@ function record(findings: PostedFinding[]): RunRecord {
       },
     },
     stages: {
-      reviewers: [],
+      reviewers: raw.map((list, i) => ({
+        name: `r${i}`,
+        pass: 1,
+        status: "ok" as const,
+        findings: list,
+        dropped: [],
+        meta: null,
+      })),
       verifications: [],
       merges: [],
       capped: [],
@@ -522,5 +530,82 @@ describe("scoreRecord: not-real goldens", () => {
     expect(result.matched).toEqual([{ posted: 0, golden: 0, via: "exact" }]);
     expect(result.notRealMatches).toBe(1);
     expect(result.unmatchedPosted).toEqual([1]);
+  });
+});
+
+describe("scoreRecord: the raw candidates", () => {
+  function scoreRaw(
+    findings: PostedFinding[],
+    raw: Finding[][],
+    goldens: GoldenFinding[],
+    fake: ReturnType<typeof judgeFake>,
+  ) {
+    return scoreRecord(record(findings, raw), goldens, head, {
+      client: fake,
+      model: SONNET,
+      options: OPTIONS,
+    });
+  }
+
+  it("matches a raw candidate that did not post, and keeps it out of the posted matches", async () => {
+    const result = await scoreRaw(
+      [],
+      [[posted("src/a.ts", 10, 10)]],
+      [golden("src/a.ts", 10, 10)],
+      judgeFake([]),
+    );
+    expect(result.matched).toEqual([]);
+    expect(result.raw.matched).toEqual([{ posted: 0, golden: 0, via: "exact" }]);
+    expect(result.raw.candidates).toBe(1);
+  });
+
+  it("collapses raw candidates with the same file, span and claim into one", async () => {
+    const result = await scoreRaw(
+      [],
+      [[posted("src/a.ts", 10, 10)], [posted("src/a.ts", 10, 10), posted("src/a.ts", 30, 30)]],
+      [golden("src/a.ts", 10, 10)],
+      judgeFake([]),
+    );
+    expect(result.raw.candidates).toBe(2);
+    expect(result.raw.matched).toHaveLength(1);
+  });
+
+  it("counts a raw candidate that matches a not-real golden", async () => {
+    const result = await scoreRaw(
+      [],
+      [[posted("src/a.ts", 10, 10)]],
+      [golden("src/a.ts", 10, 10, { severity: "not_real" })],
+      judgeFake([]),
+    );
+    expect(result.raw.matched).toEqual([]);
+    expect(result.raw.notRealMatches).toBe(1);
+  });
+
+  it("reuses the judge answer of the posted pass for an equal raw candidate", async () => {
+    const fake = judgeFake(["yes", "yes"]);
+    const result = await scoreRaw(
+      [posted("src/a.ts", 20, 20)],
+      [[posted("src/a.ts", 20, 20)]],
+      [golden("src/a.ts", 12, 12)],
+      fake,
+    );
+    expect(fake.calls).toHaveLength(1);
+    expect(result.judgeCalls).toBe(1);
+    expect(result.matched).toEqual([{ posted: 0, golden: 0, via: "judge" }]);
+    expect(result.raw.matched).toEqual([{ posted: 0, golden: 0, via: "judge" }]);
+  });
+
+  it("asks the judge about a raw candidate that differs from every posted finding, and counts the call and its cost", async () => {
+    const fake = judgeFake(["yes"], 0.02);
+    const result = await scoreRaw(
+      [],
+      [[posted("src/a.ts", 20, 20)]],
+      [golden("src/a.ts", 12, 12)],
+      fake,
+    );
+    expect(fake.calls).toHaveLength(1);
+    expect(result.judgeCalls).toBe(1);
+    expect(result.judgeCostUsd).toBeCloseTo(0.02, 10);
+    expect(result.raw.matched).toEqual([{ posted: 0, golden: 0, via: "judge" }]);
   });
 });
