@@ -91,7 +91,9 @@ export async function runCodexJudge(prompt: string, checkout: string): Promise<C
     const outFile = join(dir, "out.json");
     await writeFile(schemaFile, JSON.stringify(toSdkJsonSchema(JudgeResultSchema)));
     const result = await exec(codexArgs(checkout, schemaFile, outFile, prompt), checkout);
-    stderr = result.stderr.slice(0, STDERR_LIMIT);
+    // Codex prints its banner and the whole prompt first, and an error last.
+    // So the record keeps the end of stderr, not the start.
+    stderr = result.stderr.slice(-STDERR_LIMIT);
     if (result.error) return fail(exitMessage(result.error));
     let text: string;
     try {

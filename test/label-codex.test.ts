@@ -169,12 +169,12 @@ describe("the codex runner", () => {
     expect((await runCodexJudge("PROMPT", checkout)).ok).toBe(false);
   });
 
-  it("cuts the recorded stderr to 2000 characters", async () => {
-    plan({ default: [{ exit: 1, stderr: "e".repeat(5000) }] });
+  it("cuts the recorded stderr to its last 2000 characters, so the error at the end survives", async () => {
+    plan({ default: [{ exit: 1, stderr: "e".repeat(5000) + "\nERROR: usage limit" }] });
     const outcome = await runCodexJudge("PROMPT", checkout);
     expect(outcome.ok).toBe(false);
-    expect(outcome.stderr.length).toBeGreaterThan(0);
     expect(outcome.stderr.length).toBeLessThanOrEqual(2000);
+    expect(outcome.stderr).toContain("ERROR: usage limit");
   });
 });
 
