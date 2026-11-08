@@ -1,0 +1,1850 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 36,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Add shallow bundle support for large cases",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/36"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "f4f1a04248fd5a93b1de22aba88b51e96d1e3ffd",
+    "head": "ad382f4919a41dc159a095a55fcd01e39882b5ab",
+    "started_at": "2026-11-08T05:44:56.187Z",
+    "tool_version": "0.3.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Add shallow bundle support for large cases\n\n## What\n\n- `cloneCase` reads an optional `shallow` file in a case. When it is present, the eval fetches `repo.bundle` into an empty repo that holds the same shallow marks, because git refuses to clone a bundle made from a shallow repo.\n- `scripts/make-case.sh` writes `shallow` into the case when the source repo is shallow, and gives the bundle step the shallow marks so it does not stop at a missing object.\n- New `scripts/fetch-pr.sh <url> <merge-base> <head> <dir>`: a shallow repo that holds the merge base, the head and the commits between them, and nothing older.\n- README: the `shallow` file and the fetch script. Version 0.3.1.\n\n## Why\n\nD5 builds the first case set from Martian and ReviewBench. A full clone of sentry or cal.com makes a bundle of hundreds of megabytes. Two snapshots of the tree are 30 to 60 MB.\n\n## Tests\n\nTwo new tests in `test/eval-case.test.ts`: a shallow case checks out; the same bundle without the shallow file is rejected with the case name. Two in `test/eval-scripts.test.ts`: `fetch-pr.sh` then `make-case.sh` gives a case that `cloneCase` checks out with the three-dot diff available; `fetch-pr.sh` stops when the directory exists. `npm test` 1169 passed, lint, typecheck and build exit 0.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZgggAoxaZA98nRCMsW",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": ".claude-plugin/marketplace.json",
+        "hunks": 1
+      },
+      {
+        "path": ".claude-plugin/plugin.json",
+        "hunks": 1
+      },
+      {
+        "path": "README.md",
+        "hunks": 2
+      },
+      {
+        "path": "package.json",
+        "hunks": 1
+      },
+      {
+        "path": "scripts/fetch-pr.sh",
+        "hunks": 1
+      },
+      {
+        "path": "scripts/make-case.sh",
+        "hunks": 3
+      },
+      {
+        "path": "src/eval/checkout.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/eval-case.test.ts",
+        "hunks": 5
+      },
+      {
+        "path": "test/eval-scripts.test.ts",
+        "hunks": 2
+      }
+    ],
+    "excluded_files": [
+      {
+        "path": "package-lock.json",
+        "reason": "generated"
+      }
+    ],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "Adds new shell script logic and changes the checkout logic in cloneCase and make-case.sh to handle shallow repos, which is a behavior change in code paths with git edge cases.",
+      "confidence": "high",
+      "categories": [
+        "bug",
+        "test",
+        "docs",
+        "other"
+      ],
+      "hotspots": [
+        "scripts/fetch-pr.sh (deepen loop, final --depth cut, ancestor checks)",
+        "src/eval/checkout.ts cloneCase shallow branch (init, copy shallow file, fetch refs/case/*)",
+        "scripts/make-case.sh (shallow file copy into alternates-based refs.git and the case)",
+        "test/eval-scripts.test.ts fetch-pr tests"
+      ],
+      "file_notes": [
+        {
+          "file": "scripts/fetch-pr.sh",
+          "note": "New script. Makes a shallow repo and deepens until base is an ancestor of head. Then cuts history at base. Check the loop bounds and the depth math."
+        },
+        {
+          "file": "scripts/make-case.sh",
+          "note": "Copies the shallow file into the temporary refs repo and into the case output. Uses a common git dir."
+        },
+        {
+          "file": "src/eval/checkout.ts",
+          "note": "New shallow branch: init, copy shallow marks, then fetch the bundle. The non-shallow path is unchanged."
+        },
+        {
+          "file": "test/eval-case.test.ts",
+          "note": "New shallow-bundle fixtures and two cloneCase tests."
+        },
+        {
+          "file": "test/eval-scripts.test.ts",
+          "note": "New fetch-pr.sh tests, including the end-to-end path through make-case and cloneCase."
+        },
+        {
+          "file": "README.md",
+          "note": "Documents the optional shallow file and fetch-pr.sh."
+        },
+        {
+          "file": ".claude-plugin/marketplace.json",
+          "note": "Version bump to 0.3.1."
+        },
+        {
+          "file": ".claude-plugin/plugin.json",
+          "note": "Version bump to 0.3.1."
+        },
+        {
+          "file": "package.json",
+          "note": "Version bump to 0.3.1."
+        }
+      ],
+      "summary": "The change lets the eval handle cases made from shallow repos. A new script, fetch-pr.sh, makes a shallow repo that holds a PR's merge base and head. make-case.sh now writes a shallow file into the case, and cloneCase uses it to init an empty repo, copy the shallow marks and fetch the bundle. It also adds tests, README docs and a version bump to 0.3.1."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: Adds new shell script logic and changes the checkout logic in cloneCase and make-case.sh to handle shallow repos, which is a behavior change in code paths with git edge cases.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "test/eval-case.test.ts",
+            "start_line": 305,
+            "end_line": 306,
+            "category": "convention",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The new tests sit between the existing `// R1.8` tag and the test that the tag belonged to, so the tag now labels the shallow test.",
+            "evidence": "  // R1.8\n  it(\"checks out a case made from a shallow repo, when the case holds its shallow file\", async () => {",
+            "suggested_fix": "Put the new tests above the `// R1.8` comment, or move the comment back above the 'rejects a bundle that lacks base' test.",
+            "explanation": "In this file, a requirement tag comment sits directly above the test that it marks, and this insertion breaks that pairing.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 8117,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 9717,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0009822000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 566,
+              "cacheReadInputTokens": 14358,
+              "cacheCreationInputTokens": 14714,
+              "webSearchRequests": 0,
+              "costUSD": 0.1319196,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 138,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.13290180000000001
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7749,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 9719,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0009824,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 581,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 14318,
+              "webSearchRequests": 0,
+              "costUSD": 0.126172,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 169,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1271544
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/checkout.ts",
+            "start_line": 36,
+            "end_line": 38,
+            "category": "bug",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "In the shallow branch, `git init` succeeds on a target that already exists and is not empty, where `git clone` fails on it. So a stale or existing repo at `into` gets reused without any error.",
+            "evidence": "await runGit(c.dir, [\"init\", \"--quiet\", target]).catch((err) =>",
+            "suggested_fix": "Before the init, check that the target does not exist or is empty, and fail the same way as clone does.",
+            "explanation": "The shallow and non-shallow paths treat an existing target differently. In the shallow path, refs and the shallow file are written over an existing repo with no error.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 10301,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 9715,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.000982,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 781,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 14259,
+              "webSearchRequests": 0,
+              "costUSD": 0.1297,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 465,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.13068200000000002
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 11292,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 9715,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0009815,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 882,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 14259,
+              "webSearchRequests": 0,
+              "costUSD": 0.13172,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 505,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1327015
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "README.md",
+            "start_line": 629,
+            "end_line": 629,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "medium",
+            "claim": "The README says a case has four files, but the table now lists an optional fifth file, `shallow`.",
+            "evidence": "A case is one directory with four files:",
+            "suggested_fix": "Write \"A case is one directory with four files and an optional `shallow` file:\".",
+            "explanation": "The change adds `shallow` to the table, so the stated count of files is now wrong.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6396,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 9707,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0009807000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 376,
+              "cacheReadInputTokens": 14258,
+              "cacheCreationInputTokens": 14476,
+              "webSearchRequests": 0,
+              "costUSD": 0.1261956,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 48,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1271763
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 11613,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 16197,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0016302,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 6,
+              "outputTokens": 733,
+              "cacheReadInputTokens": 23922,
+              "cacheCreationInputTokens": 18524,
+              "webSearchRequests": 0,
+              "costUSD": 0.16766040000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 402,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1692906
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "scripts/fetch-pr.sh",
+            "start_line": 35,
+            "end_line": 39,
+            "category": "security",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The url, base and head arguments reach git without a `--` separator or a sha check, so a value that starts with `-` is read as a git option.",
+            "evidence": "git -C \"$dir\" fetch --quiet --depth=1 origin \"$base\"",
+            "suggested_fix": "Check that base and head are hex shas, with a test such as [[ $base =~ ^[0-9a-f]{40}$ ]]. Put `--` before url in `remote add`.",
+            "explanation": "An argument that is not checked can add git options, for example --upload-pack.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5099,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 9713,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0009813,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 378,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 11296,
+              "webSearchRequests": 0,
+              "costUSD": 0.0985478,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 82,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.09952910000000001
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "scripts/fetch-pr.sh",
+            "start_line": 37,
+            "end_line": 40,
+            "category": "security",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The base and head arguments go to git fetch with no `--` and no sha check, so a value that starts with '-' is read as an option.",
+            "evidence": "git -C \"$dir\" fetch --quiet --depth=1 origin \"$base\"",
+            "suggested_fix": "Before the fetch, check that base and head match ^[0-9a-f]{7,40}$.",
+            "explanation": "A crafted argument such as --upload-pack=... can make git run a command, and the script does not validate its arguments.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5813,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 9713,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0009818000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 402,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 11296,
+              "webSearchRequests": 0,
+              "costUSD": 0.0990278,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 123,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1000096
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "scripts/fetch-pr.sh",
+            "start_line": 51,
+            "end_line": 53,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "No test checks that the final depth cut leaves no commit older than the merge base.",
+            "evidence": "git -C \"$dir\" fetch --quiet --depth=\"$((count + 1))\" origin \"$head\"",
+            "suggested_fix": "Assert that the shallow file lists the merge base, or that `git rev-list --count head2` equals count + 1.",
+            "explanation": "The test checks only the count of base..head, so it still passes if the cut is removed and older history stays in the bundle.",
+            "needs_context": false
+          },
+          {
+            "file": "scripts/fetch-pr.sh",
+            "start_line": 42,
+            "end_line": 46,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "No test covers the error path where base is not an ancestor of head within 1000 commits.",
+            "evidence": "echo \"fetch-pr: $base is not an ancestor of $head within 1000 commits\" >&2",
+            "suggested_fix": "Add a test that passes a base that is not an ancestor and asserts a non-zero exit and the message.",
+            "explanation": "This new error branch has no test, so a broken exit or loop would go unnoticed.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7452,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 9713,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0009813,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 677,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 11967,
+              "webSearchRequests": 0,
+              "costUSD": 0.1098958,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 185,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1108771
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "README.md",
+          "start_line": 629,
+          "end_line": 629,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "medium",
+          "claim": "The README says a case has four files, but the table now lists an optional fifth file, `shallow`.",
+          "evidence": "A case is one directory with four files:",
+          "suggested_fix": "Write \"A case is one directory with four files and an optional `shallow` file:\".",
+          "explanation": "The change adds `shallow` to the table, so the stated count of files is now wrong.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "A case is one directory with four files:",
+            "| `shallow` | Optional. Present when the bundle comes from a shallow repo:"
+          ],
+          "rationale": "The PR adds a fifth row (`shallow`, optional) to the table but leaves the sentence \"A case is one directory with four files:\" unchanged. The count is now slightly misleading, though a small docs inconsistency.",
+          "score": 70,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "A case is one directory with four files:",
+            "| `shallow` | Optional. Present when the bundle comes from a shallow repo: the commits whose parents the bundle does not hold, one sha per line. The eval fetches the bundle into a repo with these shallow marks, because git refuses to clone such a bundle. |"
+          ],
+          "rationale": "The change adds an optional fifth row, `shallow`, to the table, but the line that introduces the table still says \"four files\". The line is now stale, though only a little, since the new row says it is optional.",
+          "score": 72,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "A case is one directory with four files:",
+            "| `shallow` | Optional. Present when the bundle comes from a shallow repo: the commits whose parents the bundle does not hold, one sha per line. The eval fetches the bundle into a repo with these shallow marks, because git refuses to clone such a bundle. |"
+          ],
+          "rationale": "The change adds an optional fifth row, `shallow`, to the table, but the line that introduces the table still says \"four files\". The line is now stale, though only a little, since the new row says it is optional.",
+          "score": 72,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "test/eval-case.test.ts",
+          "start_line": 305,
+          "end_line": 306,
+          "category": "convention",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The new tests sit between the existing `// R1.8` tag and the test that the tag belonged to, so the tag now labels the shallow test.",
+          "evidence": "  // R1.8\n  it(\"checks out a case made from a shallow repo, when the case holds its shallow file\", async () => {",
+          "suggested_fix": "Put the new tests above the `// R1.8` comment, or move the comment back above the 'rejects a bundle that lacks base' test.",
+          "explanation": "In this file, a requirement tag comment sits directly above the test that it marks, and this insertion breaks that pairing.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "  // R1.8\n  it(\"checks out a case made from a shallow repo, when the case holds its shallow file\", async () => {",
+            "  it(\"rejects a bundle that lacks base, and names the case and the sha\", async () => {"
+          ],
+          "rationale": "The diff shows the existing `// R1.8` context line now sits above the new shallow test, and the 'lacks base' test it used to label is below the inserted tests without a tag. This is a minor tagging and traceability nit with no behavioral impact.",
+          "score": 55,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "  // R1.8\n  it(\"checks out a case made from a shallow repo, when the case holds its shallow file\", async () => {",
+            "  it(\"rejects a bundle that lacks base, and names the case and the sha\", async () => {"
+          ],
+          "rationale": "The diff shows the existing `// R1.8` context line now sits above the new shallow test, and the 'lacks base' test it used to label is below the inserted tests without a tag. This is a minor tagging and traceability nit with no behavioral impact.",
+          "score": 55,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "src/eval/checkout.ts",
+          "start_line": 36,
+          "end_line": 38,
+          "category": "bug",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "In the shallow branch, `git init` succeeds on a target that already exists and is not empty, where `git clone` fails on it. So a stale or existing repo at `into` gets reused without any error.",
+          "evidence": "await runGit(c.dir, [\"init\", \"--quiet\", target]).catch((err) =>",
+          "suggested_fix": "Before the init, check that the target does not exist or is empty, and fail the same way as clone does.",
+          "explanation": "The shallow and non-shallow paths treat an existing target differently. In the shallow path, refs and the shallow file are written over an existing repo with no error.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "await runGit(c.dir, [\"init\", \"--quiet\", target]).catch((err) =>",
+            "await runGit(c.dir, [\"clone\", \"--quiet\", \"--no-checkout\", bundle, target]).catch((err) =>"
+          ],
+          "rationale": "The behavioral difference is real: `git init` reinitializes an existing directory where `git clone` fails on a non-empty one. All three callers pass fresh temp-dir paths (`join(root, c.name)`, `join(tmp, \"repo\")`), so it cannot cause a bug today.",
+          "score": 25,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "await runGit(c.dir, [\"init\", \"--quiet\", target]).catch((err) =>",
+            "await runGit(c.dir, [\"clone\", \"--quiet\", \"--no-checkout\", bundle, target]).catch((err) =>",
+            "const tmp = await mkdtemp(join(tmpdir(), \"pr-review-eval-\"));",
+            "const checkout = await cloneCase(c, join(tmp, \"repo\"));"
+          ],
+          "rationale": "The claim is technically true: `git init` succeeds on a directory that already exists, and `git clone` does not. But every caller passes a fresh path inside a new mkdtemp directory, so the target is never stale and there is no bug in practice. The finding has little value.",
+          "score": 30,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "await runGit(c.dir, [\"init\", \"--quiet\", target]).catch((err) =>",
+            "await runGit(c.dir, [\"clone\", \"--quiet\", \"--no-checkout\", bundle, target]).catch((err) =>",
+            "const tmp = await mkdtemp(join(tmpdir(), \"pr-review-eval-\"));",
+            "const checkout = await cloneCase(c, join(tmp, \"repo\"));"
+          ],
+          "rationale": "The claim is technically true: `git init` succeeds on a directory that already exists, and `git clone` does not. But every caller passes a fresh path inside a new mkdtemp directory, so the target is never stale and there is no bug in practice. The finding has little value.",
+          "score": 30,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "scripts/fetch-pr.sh",
+          "start_line": 35,
+          "end_line": 39,
+          "category": "security",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The url, base and head arguments reach git without a `--` separator or a sha check, so a value that starts with `-` is read as a git option.",
+          "evidence": "git -C \"$dir\" fetch --quiet --depth=1 origin \"$base\"",
+          "suggested_fix": "Check that base and head are hex shas, with a test such as [[ $base =~ ^[0-9a-f]{40}$ ]]. Put `--` before url in `remote add`.",
+          "explanation": "An argument that is not checked can add git options, for example --upload-pack.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "git -C \"$dir\" remote add origin \"$url\"",
+            "git -C \"$dir\" fetch --quiet --depth=1 origin \"$base\"",
+            "git -C \"$dir\" update-ref refs/heads/base \"$base\""
+          ],
+          "rationale": "The args are passed to git unvalidated and without `--`, so option injection is technically possible. But this is a manually run maintainer script that takes args from the operator, so the practical risk is very low and a careful reviewer would probably not post it.",
+          "score": 25,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "git -C \"$dir\" remote add origin \"$url\"",
+            "git -C \"$dir\" fetch --quiet --depth=1 origin \"$base\"",
+            "git -C \"$dir\" update-ref refs/heads/base \"$base\""
+          ],
+          "rationale": "The args are passed to git unvalidated and without `--`, so option injection is technically possible. But this is a manually run maintainer script that takes args from the operator, so the practical risk is very low and a careful reviewer would probably not post it.",
+          "score": 25,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "scripts/fetch-pr.sh",
+          "start_line": 37,
+          "end_line": 40,
+          "category": "security",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The base and head arguments go to git fetch with no `--` and no sha check, so a value that starts with '-' is read as an option.",
+          "evidence": "git -C \"$dir\" fetch --quiet --depth=1 origin \"$base\"",
+          "suggested_fix": "Before the fetch, check that base and head match ^[0-9a-f]{7,40}$.",
+          "explanation": "A crafted argument such as --upload-pack=... can make git run a command, and the script does not validate its arguments.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "git -C \"$dir\" fetch --quiet --depth=1 origin \"$base\"",
+            "git -C \"$dir\" update-ref refs/heads/base \"$base\"",
+            "base=\"$2\""
+          ],
+          "rationale": "Technically a leading '-' in base or head would be parsed by git as an option, since there is no `--` and no validation. But this is a developer-run CLI helper whose caller already controls the url and every other argument, so no trust boundary is crossed and the practical risk is very low.",
+          "score": 22,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "git -C \"$dir\" fetch --quiet --depth=1 origin \"$base\"",
+            "git -C \"$dir\" update-ref refs/heads/base \"$base\"",
+            "base=\"$2\""
+          ],
+          "rationale": "Technically a leading '-' in base or head would be parsed by git as an option, since there is no `--` and no validation. But this is a developer-run CLI helper whose caller already controls the url and every other argument, so no trust boundary is crossed and the practical risk is very low.",
+          "score": 22,
+          "severity": "nit"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "scripts/fetch-pr.sh",
+          "start_line": 51,
+          "end_line": 53,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "No test checks that the final depth cut leaves no commit older than the merge base.",
+          "evidence": "git -C \"$dir\" fetch --quiet --depth=\"$((count + 1))\" origin \"$head\"",
+          "suggested_fix": "Assert that the shallow file lists the merge base, or that `git rev-list --count head2` equals count + 1.",
+          "explanation": "The test checks only the count of base..head, so it still passes if the cut is removed and older history stays in the bundle.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "git -C \"$dir\" fetch --quiet --depth=\"$((count + 1))\" origin \"$head\"",
+            "expect(await git(dir, [\"rev-list\", \"--count\", `${mergeBase}..${head2}`])).toBe(\"2\");"
+          ],
+          "rationale": "The fetch-pr test only asserts the count of base..head, which is the same with or without the final depth cut, so it would not catch the cut being removed. The gap is real but low-impact.",
+          "score": 50,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "git -C \"$dir\" fetch --quiet --depth=\"$((count + 1))\" origin \"$head\"",
+            "expect(await git(dir, [\"rev-list\", \"--count\", `${mergeBase}..${head2}`])).toBe(\"2\");"
+          ],
+          "rationale": "The fetch-pr test only asserts the count of base..head, which is the same with or without the final depth cut, so it would not catch the cut being removed. The gap is real but low-impact.",
+          "score": 50,
+          "severity": "suggestion"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "scripts/fetch-pr.sh",
+          "start_line": 42,
+          "end_line": 46,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "No test covers the error path where base is not an ancestor of head within 1000 commits.",
+          "evidence": "echo \"fetch-pr: $base is not an ancestor of $head within 1000 commits\" >&2",
+          "suggested_fix": "Add a test that passes a base that is not an ancestor and asserts a non-zero exit and the message.",
+          "explanation": "This new error branch has no test, so a broken exit or loop would go unnoticed.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "echo \"fetch-pr: $base is not an ancestor of $head within 1000 commits\" >&2",
+            "if [ \"$depth\" -ge 1000 ]; then"
+          ],
+          "rationale": "Tests for fetch-pr.sh cover only the success path and the existing-directory path. Nothing exercises the \"not an ancestor within 1000 commits\" branch. This is a real but minor coverage gap, and testing it would need a long deepen loop or an unrelated base.",
+          "score": 30,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "echo \"fetch-pr: $base is not an ancestor of $head within 1000 commits\" >&2",
+            "if [ \"$depth\" -ge 1000 ]; then"
+          ],
+          "rationale": "Tests for fetch-pr.sh cover only the success path and the existing-directory path. Nothing exercises the \"not an ancestor within 1000 commits\" branch. This is a real but minor coverage gap, and testing it would need a long deepen loop or an unrelated base.",
+          "score": 30,
+          "severity": "nit"
+        },
+        "passed": false
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5816801303,
+      "review_url": "https://github.com/jerridan/pr-review/pull/36#pullrequestreview-5816801303",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 128643078244
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6973,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8916,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009021000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 929,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 9691,
+            "webSearchRequests": 0,
+            "costUSD": 0.048058000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.048960100000000006
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6396,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9707,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009807000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 376,
+            "cacheReadInputTokens": 14258,
+            "cacheCreationInputTokens": 14476,
+            "webSearchRequests": 0,
+            "costUSD": 0.1261956,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 48,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1271763
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7749,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9719,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009824,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 581,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 14318,
+            "webSearchRequests": 0,
+            "costUSD": 0.126172,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 169,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1271544
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 8117,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9717,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009822000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 566,
+            "cacheReadInputTokens": 14358,
+            "cacheCreationInputTokens": 14714,
+            "webSearchRequests": 0,
+            "costUSD": 0.1319196,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 138,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.13290180000000001
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 10301,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9715,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.000982,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 781,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 14259,
+            "webSearchRequests": 0,
+            "costUSD": 0.1297,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 465,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.13068200000000002
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 11292,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9715,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009815,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 882,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 14259,
+            "webSearchRequests": 0,
+            "costUSD": 0.13172,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 505,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1327015
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5099,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9713,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009813,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 378,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 11296,
+            "webSearchRequests": 0,
+            "costUSD": 0.0985478,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 82,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.09952910000000001
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5813,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9713,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009818000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 402,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 11296,
+            "webSearchRequests": 0,
+            "costUSD": 0.0990278,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 123,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1000096
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 5518,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 25217,
+            "outputTokens": 16,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0025297,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 471,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 28619,
+            "webSearchRequests": 0,
+            "costUSD": 0.11918999999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.12171969999999999
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7452,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9713,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009813,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 677,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 11967,
+            "webSearchRequests": 0,
+            "costUSD": 0.1098958,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 185,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1108771
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "model": "claude-opus-5-5",
+        "duration_ms": 11613,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16197,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016302,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 733,
+            "cacheReadInputTokens": 23922,
+            "cacheCreationInputTokens": 18524,
+            "webSearchRequests": 0,
+            "costUSD": 0.16766040000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 402,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1692906
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6816,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9998,
+            "outputTokens": 374,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011868,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 351,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 661,
+            "cacheReadInputTokens": 13400,
+            "cacheCreationInputTokens": 13788,
+            "webSearchRequests": 0,
+            "costUSD": 0.06311,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 206,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0642968
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 8450,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 4325,
+            "outputTokens": 516,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0006904999999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 495,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 756,
+            "cacheReadInputTokens": 19785,
+            "cacheCreationInputTokens": 4813,
+            "webSearchRequests": 0,
+            "costUSD": 0.028802499999999998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 88,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.029493
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 4555,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 25213,
+            "outputTokens": 13,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0025278,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 356,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 28607,
+            "webSearchRequests": 0,
+            "costUSD": 0.235984,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.2385118
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6958,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 4354,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00044640000000000006,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 686,
+            "cacheReadInputTokens": 3889,
+            "cacheCreationInputTokens": 3867,
+            "webSearchRequests": 0,
+            "costUSD": 0.022720900000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 332,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.023167300000000002
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 7086,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 4353,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0004463,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 555,
+            "cacheReadInputTokens": 3889,
+            "cacheCreationInputTokens": 3866,
+            "webSearchRequests": 0,
+            "costUSD": 0.0214069,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 202,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0218532
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6867,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 4340,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.000447,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 569,
+            "cacheReadInputTokens": 11631,
+            "cacheCreationInputTokens": 4256,
+            "webSearchRequests": 0,
+            "costUSD": 0.0238851,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 96,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.024332100000000002
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 11168,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 4360,
+            "outputTokens": 28,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00045000000000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 913,
+            "cacheReadInputTokens": 19817,
+            "cacheCreationInputTokens": 5825,
+            "webSearchRequests": 0,
+            "costUSD": 0.0344237,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 299,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.034873699999999994
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 8886,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 4335,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00044450000000000007,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 712,
+            "cacheReadInputTokens": 11618,
+            "cacheCreationInputTokens": 5675,
+            "webSearchRequests": 0,
+            "costUSD": 0.0619796,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 178,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0624241
+      }
+    ],
+    "total_cost_usd": 1.7999542000000002,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 36,
+      "gather": 115,
+      "triage": 7856,
+      "find_verify": 35004,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
