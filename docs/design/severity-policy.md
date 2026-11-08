@@ -1,6 +1,6 @@
 # Severity policy
 
-Status: draft, 2026-11-07. Part of D5 in TICKETS.md.
+Status: draft, 2026-11-07, amended 2026-11-08 after the first labeling round. Part of D5 in TICKETS.md.
 
 This policy gives one rule set for the severity of a review finding. Three readers apply it: the labeler who writes `golden.json` for an eval case, the verifier when it sets the severity of a finding, and the judge of the labeling loop. One policy in three places makes the severity agreement of the eval measure one thing.
 
@@ -46,6 +46,10 @@ The verifier posts blocking, suggestion and nit. It records don't post, not real
 
 A path is normal when a person can reach it with supported controls or documented calls, however rarely they do. A path is unusual only when it needs one of these first: a failure, a race or specific timing, a second actor, or a client that is behind the deploy. How often a path is used never changes the label. The consequence decides the label, together with whether the person sees it at the time and can put it right.
 
+Rare inputs are not unusual paths. An edge value, a numeric corner case, a near-tolerance input or an uncommon configuration that a supported call accepts is a normal path. A documented example, an installation step or a CI setup that the repository describes is a normal path. The list above is the whole test for an unusual path.
+
+A defect on a normal path whose only consequence is a loss the person sees at the time and can put right is a suggestion. The Stored data section says when a person sees a loss.
+
 A defect that needs the person to act before a visible loading state finishes is a suggestion, or a nit when the window is short. If no loading state is shown, or a failed load leaves the page in the same state, the path is normal.
 
 ## Stored data
@@ -59,6 +63,8 @@ Stale or wrong stored data that reaches a user, or a system outside the project,
 ## Switches, and clients that are behind
 
 A client, app build or integration that is behind the deploy does not make a path normal. If the coupling is additive, or sits behind a switch that this change adds and leaves off, the finding is a suggestion. A switch that existed before the change counts as live.
+
+This holds also when the change exists to add the feature behind the switch. No user reaches the path until a later change turns the switch on, and that change is the one that makes the defect blocking. The source of a golden finding may rate such a defect higher; the label follows this policy, not the source.
 
 A switch or an input that can take a state the code does not handle is a latent defect: a suggestion, whatever an operator is likely to do.
 
