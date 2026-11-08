@@ -52,12 +52,14 @@ type ExecResult = { error: Error | null; stderr: string };
 
 function exec(args: string[], cwd: string): Promise<ExecResult> {
   return new Promise((resolve) => {
-    execFile(
+    const child = execFile(
       "codex",
       args,
       { cwd, timeout: CODEX_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024, encoding: "utf8" },
       (error, _stdout, stderr) => resolve({ error, stderr: String(stderr ?? "") }),
     );
+    // Codex reads stdin when it is not a TTY. Close it, so codex does not wait.
+    child.stdin?.end();
   });
 }
 
