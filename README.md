@@ -556,6 +556,41 @@ The GitHub review adds these keys:
 
 The JSON output holds `reviewers_skipped`, `reviewers_without_bash` and `sensitive_without_hunks` in its `coverage` object. The table output shows the same three lists on its `Coverage` line.
 
+## Label
+
+The labeler gives each golden finding of each case a severity and a category under `docs/design/severity-policy.md`. A scorer on Claude labels the finding. A judge from another model family accepts or rejects the label.
+
+```bash
+pr-review label --cases <dir> [--runs <n>] [--concurrency <n>] [--write-golden] [--only <case>] [--out <dir>] [--format table|json] [--allow-api-key]
+```
+
+The labeler makes real model calls. It needs a Claude login for the scorer. It needs the Codex CLI on your `PATH`, with its own login, for the judge. The tool reads no credential of either.
+
+| Flag | Meaning | Default |
+|------|---------|---------|
+| `--cases <dir>` | The cases directory. It holds one subdirectory per case. | required |
+| `--runs <n>` | The independent runs of each finding. A positive integer. | 3 |
+| `--concurrency <n>` | The most findings in flight at once. A positive integer. | 2 |
+| `--write-golden` | Write the chosen `blocking`, `suggestion` and `nit` labels to `golden.json`. | off |
+| `--only <case>` | Label only the case with this name. | every case |
+| `--out <dir>` | The directory for the output files. | each case directory |
+| `--format table\|json` | The format of the totals on stdout. | `table` |
+| `--allow-api-key` | Keep `ANTHROPIC_API_KEY` in the environment of the scorer. | off |
+
+For each run of a finding, the scorer gets the finding, the head file from 100 lines above the span to 100 lines below it, the diff of the file and the policy. It gives a severity, a category, the policy section it uses and a rationale. The judge gets the same data and the label. It accepts the label or rejects it with a reason. A rejected label goes back to the scorer with the reason, at most twice. A run converges when the judge accepts. A call that fails gets one retry. A call that fails again ends its run as failed.
+
+The runs of one finding go in sequence, and no run sees the calls of another. Findings go in parallel up to `--concurrency`. The default is low, because the judge runs on a subscription with a rate window. The scorer is `claude-opus-5-5` at high effort through the Agent SDK. The judge is `gpt-6.1-sol` at high effort through `codex exec`. The case checkout is the working directory of every call.
+
+A severity that at least two converged runs agree on, and that a majority of the converged runs hold, is the chosen label. Each case gets three files beside `golden.json`, or under `<out>/<case>/`:
+
+| File | Content |
+|------|---------|
+| `labels.json` | Every finding with its runs, its calls and its chosen label, and the first-pass acceptance rate and the run agreement rate of the case. |
+| `disagreements.json` | The findings whose runs did not all converge to one severity. Read it to find the policy rules that read two ways. |
+| `human-queue.json` | The findings with no chosen label, and the findings whose chosen severity is `dont_post`, `not_real` or `unsure`. Each has a `reason`. |
+
+`label-summary.json` goes in the cases directory, or in `<out>/`. It holds the counts of each case and the two rates over all cases. The command exits 0 when every call succeeded. It exits 1 when a case checkout failed or a call failed after its retry, and it still writes every file. It exits 2 on a usage error. Without `--write-golden`, `golden.json` does not change. With it, only the findings whose chosen label posts change, and every other field stays.
+
 ## Evaluate
 
 The eval measures a change to a prompt, a threshold or a model before it ships. It reviews a set of frozen cases several times. Then it scores the posted findings against the golden findings of each case.

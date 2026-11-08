@@ -311,11 +311,14 @@ Prompts follow Anthropic's current prompting guidance for the 5.5 family, summar
 - Online: track addressed rate by re-running the verifier on the next push, and reaction counts. Compare to offline before trusting offline alone.
 - With few cases: record every run from day one, local runs included, so the set grows on its own. Seed the first set three ways: ReviewBench and Martian cases for breadth, bug injection into merged PRs of the user's own repos for known-answer recall, and findings dismissed or acted on in real runs for precision. Synthetic cases overstate absolute scores, so use the harness for regression between two versions, not for an absolute number, until the real set reaches about 30 cases.
 
+The labeler sets the severity of the golden findings with its own models. The scorer is `claude-opus-5-5` in the `labeler` role, and the judge is `gpt-6.1-sol` through the Codex CLI. These pins are apart from the pins of the pipeline roles. A change to a pipeline model does not change them, so the gold does not change when the pipeline's models change. The judge runs only in `src/eval/label/`, and nothing in the run pipeline imports it.
+
 ## 9. Interfaces
 
 ```
 pr-review run   [--base <sha>] [--head <sha>] [--pr <n>] [--github-repo <owner/repo>] [--fresh] [--tier full|fast|skip] [--format github|json|table|md]
 pr-review eval  --cases <dir> [--repeat <n>] [--baseline <file>] [--write-baseline] [--out <dir>] [--format table|json] [--tier full|fast|skip] [--judge-model <id>] [--allow-api-key] [--allow-same-judge]
+pr-review label --cases <dir> [--runs <n>] [--concurrency <n>] [--write-golden] [--only <case>] [--out <dir>] [--format table|json] [--allow-api-key]
 pr-review list  (reviewers that would run, with the trigger that selected them)
 pr-review explain <record.json> [--format table|json]   (why each finding was kept or dropped)
 ```
