@@ -197,7 +197,7 @@ async function runRepeat(ctx: EvalContext, c: Case, repeat: number): Promise<Rep
       model: ctx.judgeModel,
       options: ctx.options,
     });
-    return { kind: "done", metrics: metrics(result.record, score, c.golden.length, repeat) };
+    return { kind: "done", metrics: metrics(result.record, score, repeat) };
   } catch (err) {
     return failed(messageOf(err));
   } finally {

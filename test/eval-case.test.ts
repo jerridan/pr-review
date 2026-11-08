@@ -5,7 +5,15 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { CaseError, casesRef, loadCases, type Case, type CaseSource } from "../src/eval/case.js";
+import {
+  CaseError,
+  casesRef,
+  isPostedGolden,
+  loadCases,
+  type Case,
+  type CaseSource,
+  type GoldenFinding,
+} from "../src/eval/case.js";
 import { cloneCase } from "../src/eval/checkout.js";
 
 const run = promisify(execFile);
@@ -187,6 +195,18 @@ describe("loadCases", () => {
     expect(loaded?.golden[0]?.note).toBe("Confirmed by the principal.");
   });
 
+  it.each(["dont_post", "not_real", "unsure"])(
+    "loads a golden finding with the label %s",
+    async (severity) => {
+      const root = newCasesDir();
+      const golden = validGolden();
+      golden.findings[0] = { ...golden.findings[0], severity };
+      writeCase(root, `label-${severity}`, { golden });
+      const [loaded] = await loadCases(root);
+      expect(loaded?.golden[0]?.severity).toBe(severity);
+    },
+  );
+
   // R1.1
   it.each(["repo.bundle", "diff.patch", "golden.json"])(
     "rejects a case without %s and names the case and the file",
@@ -354,5 +374,26 @@ describe("casesRef", () => {
 
   it("gives null for a directory outside any git work tree", async () => {
     expect(await casesRef(newCasesDir())).toBeNull();
+  });
+});
+
+describe("isPostedGolden", () => {
+  it.each<[GoldenFinding["severity"], boolean]>([
+    ["blocking", true],
+    ["suggestion", true],
+    ["nit", true],
+    ["dont_post", false],
+    ["not_real", false],
+    ["unsure", false],
+  ])("gives the label %s the result %s", (severity, expected) => {
+    const g: GoldenFinding = {
+      file: "src/a.ts",
+      start_line: 1,
+      end_line: 1,
+      category: "bug",
+      severity,
+      claim: "c",
+    };
+    expect(isPostedGolden(g)).toBe(expected);
   });
 });

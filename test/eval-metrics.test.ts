@@ -3,7 +3,9 @@ import { DEFAULT_REPO_CONFIG } from "../src/config/repo-config.js";
 import type { Gate } from "../src/eval/baseline.js";
 import { failedMetrics, metrics, type RepeatMetrics } from "../src/eval/metrics.js";
 import { buildReport, renderTable } from "../src/eval/report.js";
-import type { ScoreResult } from "../src/eval/score.js";
+import type { GoldenFinding } from "../src/eval/case.js";
+import { scoreRecord, type ScoreResult } from "../src/eval/score.js";
+import { createFakeSdkClient } from "../src/sdk/fake.js";
 import type { PostedFinding, RunRecord } from "../src/schemas/record.js";
 
 function posted(line: number): PostedFinding {
@@ -112,6 +114,9 @@ function scoreOf(parts: Partial<ScoreResult> = {}): ScoreResult {
     judgeUnknown: 0,
     judgeCostUsd: 0,
     severityAgreement: { same: 0, matched: 0 },
+    notRealMatches: 0,
+    postedGoldenCount: 0,
+    unmatchedPosted: [],
     ...parts,
   };
 }
@@ -128,8 +133,11 @@ describe("metrics (R5.1, R5.2)", () => {
       judgeUnknown: 1,
       judgeCostUsd: 0.25,
       severityAgreement: { same: 1, matched: 1 },
+      notRealMatches: 1,
+      postedGoldenCount: 2,
+      unmatchedPosted: [2, 3],
     });
-    expect(metrics(rec, score, 2, 3)).toEqual({
+    expect(metrics(rec, score, 3)).toEqual({
       repeat: 3,
       failed: false,
       error: null,
@@ -143,26 +151,62 @@ describe("metrics (R5.1, R5.2)", () => {
       judge_unknown: 1,
       judge_cost_usd: 0.25,
       severity_agreement: { same: 1, matched: 1 },
+      not_real_matches: 1,
     });
   });
 
   it("keeps the judge cost out of cost_usd", () => {
     const rec = record([posted(1)], { total: 0.1, stageMs: {} });
-    const m = metrics(rec, scoreOf({ judgeCalls: 1, judgeCostUsd: 0.25 }), 1, 1);
+    const m = metrics(rec, scoreOf({ judgeCalls: 1, judgeCostUsd: 0.25, postedGoldenCount: 1 }), 1);
     expect(m.cost_usd).toBe(0.1);
     expect(m.judge_cost_usd).toBe(0.25);
   });
 
-  it("gives null recall for a case with no golden finding", () => {
-    expect(metrics(record([posted(1)], { total: 0, stageMs: {} }), scoreOf(), 0, 1).recall).toBe(
-      null,
-    );
+  it("gives null recall for a case with no posted golden finding", () => {
+    expect(metrics(record([posted(1)], { total: 0, stageMs: {} }), scoreOf(), 1).recall).toBe(null);
   });
 
   it("gives null precision when no finding posted", () => {
-    const m = metrics(record([], { total: 0, stageMs: {} }), scoreOf(), 2, 1);
+    const m = metrics(record([], { total: 0, stageMs: {} }), scoreOf({ postedGoldenCount: 2 }), 1);
     expect(m.precision).toBeNull();
     expect(m.recall).toBe(0);
+  });
+
+  // A posted finding at the span of a not_real golden, and one posted
+  // golden elsewhere that no finding matches.
+  it("gives recall over the posted goldens only, and counts the not-real match as a false positive", async () => {
+    const rec = record([posted(10)], { total: 0, stageMs: {} });
+    const goldens: GoldenFinding[] = [
+      {
+        file: "src/b.ts",
+        start_line: 5,
+        end_line: 5,
+        category: "bug",
+        severity: "blocking",
+        claim: "g",
+      },
+      {
+        file: "src/a.ts",
+        start_line: 10,
+        end_line: 10,
+        category: "bug",
+        severity: "not_real",
+        claim: "n",
+      },
+    ];
+    const noJudge = createFakeSdkClient(() => {
+      throw new Error("no judge query is expected");
+    });
+    const score = await scoreRecord(rec, goldens, "/nonexistent", {
+      client: noJudge,
+      model: "claude-sonnet-5-5",
+      options: { allowApiKey: false, env: {} },
+    });
+    const m = metrics(rec, score, 1);
+    expect(m.recall).toBe(0);
+    expect(m.precision).toBe(0);
+    expect(m.matched).toBe(0);
+    expect(m.not_real_matches).toBe(1);
   });
 });
 
@@ -182,6 +226,7 @@ describe("failedMetrics (R3.8)", () => {
       judge_unknown: 0,
       judge_cost_usd: 0,
       severity_agreement: { same: 0, matched: 0 },
+      not_real_matches: 0,
     });
   });
 });
@@ -205,6 +250,7 @@ function rm(repeat: number, parts: Partial<RepeatMetrics> = {}): RepeatMetrics {
     judge_unknown: 0,
     judge_cost_usd: 0,
     severity_agreement: { same: 0, matched: 0 },
+    not_real_matches: 0,
     ...parts,
   };
 }

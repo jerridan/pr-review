@@ -66,7 +66,7 @@ function golden(
   file: string,
   start: number,
   end: number,
-  parts: { category?: Category; severity?: Severity; note?: string } = {},
+  parts: { category?: Category; severity?: GoldenFinding["severity"]; note?: string } = {},
 ): GoldenFinding {
   return {
     file,
@@ -459,5 +459,68 @@ describe("scoreRecord: severity agreement (R4.7)", () => {
       judgeFake(["yes"]),
     );
     expect(result.severityAgreement).toEqual({ same: 1, matched: 1 });
+  });
+});
+
+describe("scoreRecord: not-real goldens", () => {
+  it("counts a posted finding at the span of a not_real golden as a not-real match, not a match", async () => {
+    const result = await score(
+      [posted("src/a.ts", 10, 10)],
+      [golden("src/b.ts", 40, 40), golden("src/a.ts", 10, 10, { severity: "not_real" })],
+      judgeFake([]),
+    );
+    expect(result.matched).toEqual([]);
+    expect(result.notRealMatches).toBe(1);
+    expect(result.postedGoldenCount).toBe(1);
+    expect(result.unmatchedPosted).toEqual([]);
+    expect(result.severityAgreement).toEqual({ same: 0, matched: 0 });
+  });
+
+  it.each(["dont_post", "unsure"] as const)(
+    "counts a judge match to a %s golden as a not-real match",
+    async (severity) => {
+      const result = await score(
+        [posted("src/a.ts", 20, 20)],
+        [golden("src/a.ts", 12, 12, { severity })],
+        judgeFake(["yes"]),
+      );
+      expect(result.matched).toEqual([]);
+      expect(result.notRealMatches).toBe(1);
+      expect(result.postedGoldenCount).toBe(0);
+    },
+  );
+
+  it("matches a posted finding to the posted golden when it also overlaps a not-real golden", async () => {
+    const result = await score(
+      [posted("src/a.ts", 10, 12)],
+      [golden("src/a.ts", 10, 10, { severity: "not_real" }), golden("src/a.ts", 12, 12)],
+      judgeFake([]),
+    );
+    expect(result.matched).toEqual([{ posted: 0, golden: 1, via: "exact" }]);
+    expect(result.notRealMatches).toBe(0);
+    expect(result.postedGoldenCount).toBe(1);
+  });
+
+  it("asks the judge about a near posted golden before it takes an exact not-real golden", async () => {
+    const fake = judgeFake(["yes"]);
+    const result = await score(
+      [posted("src/a.ts", 10, 10)],
+      [golden("src/a.ts", 10, 10, { severity: "not_real" }), golden("src/a.ts", 15, 15)],
+      fake,
+    );
+    expect(fake.calls).toHaveLength(1);
+    expect(result.matched).toEqual([{ posted: 0, golden: 1, via: "judge" }]);
+    expect(result.notRealMatches).toBe(0);
+  });
+
+  it("lists the posted findings that match no golden at all", async () => {
+    const result = await score(
+      [posted("src/a.ts", 10, 10), posted("src/a.ts", 30, 30), posted("src/b.ts", 5, 5)],
+      [golden("src/a.ts", 10, 10), golden("src/b.ts", 5, 5, { severity: "unsure" })],
+      judgeFake([]),
+    );
+    expect(result.matched).toEqual([{ posted: 0, golden: 0, via: "exact" }]);
+    expect(result.notRealMatches).toBe(1);
+    expect(result.unmatchedPosted).toEqual([1]);
   });
 });
