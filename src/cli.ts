@@ -61,6 +61,8 @@ interface EvalCliOptions {
   judgeModel?: string;
   allowApiKey?: boolean;
   allowSameJudge?: boolean;
+  /** Commander gives false for --no-extras, and true by default. */
+  extras: boolean;
 }
 
 // Commander exits with 1 on a usage error. This makes it 2. Help and
@@ -299,6 +301,10 @@ export function createProgram(deps: ProgramDeps): Command {
       "keep ANTHROPIC_API_KEY and the other provider variables in the SDK environment, also for the judge",
     )
     .option("--allow-same-judge", "allow the judge model to equal a reviewer model")
+    .option(
+      "--no-extras",
+      "do not ask the extras judge about the posted findings that match no golden finding",
+    )
     .action(async (options: EvalCliOptions, command: Command) => {
       if (options.writeBaseline === true && options.baseline === undefined) {
         command.error("error: --write-baseline needs --baseline", { exitCode: EXIT_USAGE });
@@ -316,6 +322,7 @@ export function createProgram(deps: ProgramDeps): Command {
             ...(options.judgeModel !== undefined ? { judgeModel: options.judgeModel } : {}),
             allowApiKey: options.allowApiKey === true,
             allowSameJudge: options.allowSameJudge === true,
+            extras: options.extras,
           },
           deps,
         );

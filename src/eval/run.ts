@@ -2,7 +2,7 @@
 // sequence, score each record against the golden findings of its case,
 // and report the metrics. The gate compares the report with a baseline.
 import { existsSync, readFileSync } from "node:fs";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { EXIT_FAILURE, EXIT_GATE, EXIT_OK, EXIT_USAGE, type ProgramDeps } from "../cli.js";
@@ -21,7 +21,7 @@ import {
   type Baseline,
   type Gate,
 } from "./baseline.js";
-import { CaseError, casesRef, loadCases, type Case } from "./case.js";
+import { CaseError, casesRef, loadCases, type Case, type GoldenFinding } from "./case.js";
 import { cloneCase } from "./checkout.js";
 import { failedMetrics, metrics, type RepeatMetrics } from "./metrics.js";
 import { buildReport, renderTable, type Report } from "./report.js";
@@ -39,6 +39,8 @@ export type EvalOptions = {
   judgeModel?: string;
   allowApiKey: boolean;
   allowSameJudge: boolean;
+  /** False for --no-extras: no extras judge and no candidates.json. */
+  extras: boolean;
 };
 
 function messageOf(err: unknown): string {
@@ -149,7 +151,55 @@ type EvalContext = {
   client: SdkClient;
   options: RunOptions;
   judgeModel: string;
+  /** The ISO time when runEval started. */
+  startedAt: string;
 };
+
+/** The entries of candidates.json, in the golden finding format. */
+type CandidatesFile = { findings: GoldenFinding[] };
+
+/**
+ * Add the posted findings that the extras judge accepted to
+ * "<out>/<case>/candidates.json". One file holds the extras of every
+ * repeat of the case. An entry with the same file, span and claim as an
+ * entry in the file is not added again. golden.json does not change.
+ */
+async function addCandidates(
+  ctx: EvalContext,
+  c: Case,
+  record: RunRecord,
+  accepted: number[],
+  repeat: number,
+): Promise<void> {
+  if (accepted.length === 0) return;
+  const dir = join(ctx.out, c.name);
+  const path = join(dir, "candidates.json");
+  const file: CandidatesFile = existsSync(path)
+    ? (JSON.parse(await readFile(path, "utf8")) as CandidatesFile)
+    : { findings: [] };
+  const key = (f: Pick<GoldenFinding, "file" | "start_line" | "end_line" | "claim">): string =>
+    JSON.stringify([f.file, f.start_line, f.end_line, f.claim]);
+  const known = new Set(file.findings.map(key));
+  const note =
+    `Extra accepted by the extras judge ${ctx.judgeModel} on the eval run ${ctx.out}, ` +
+    `started ${ctx.startedAt}, repeat ${repeat}.`;
+  for (const index of accepted) {
+    const f = record.posted.findings[index];
+    if (!f || known.has(key(f))) continue;
+    known.add(key(f));
+    file.findings.push({
+      file: f.file,
+      start_line: f.start_line,
+      end_line: f.end_line,
+      category: f.category,
+      severity: f.severity,
+      claim: f.claim,
+      note,
+    });
+  }
+  await mkdir(dir, { recursive: true });
+  await writeFile(path, `${JSON.stringify(file, null, 2)}\n`);
+}
 
 // The error of a repeat whose review is incomplete. It holds each
 // distinct error of the record, in record order.
@@ -192,11 +242,14 @@ async function runRepeat(ctx: EvalContext, c: Case, repeat: number): Promise<Rep
     if (same.length > 0 && !ctx.opts.allowSameJudge) {
       return { kind: "same-judge", reviewers: same.map((r) => r.name) };
     }
-    const score = await scoreRecord(result.record, c.golden, checkout, {
-      client: ctx.client,
-      model: ctx.judgeModel,
-      options: ctx.options,
-    });
+    const score = await scoreRecord(
+      result.record,
+      c.golden,
+      checkout,
+      { client: ctx.client, model: ctx.judgeModel, options: ctx.options },
+      { extras: ctx.opts.extras },
+    );
+    await addCandidates(ctx, c, result.record, score.extras.accepted, repeat);
     return { kind: "done", metrics: metrics(result.record, score, repeat) };
   } catch (err) {
     return failed(messageOf(err));
@@ -222,6 +275,7 @@ function gateMessage(gate: Gate): string {
  * configuration error, 3 when the gate failed. Exit code 1 wins over 3.
  */
 export async function runEval(opts: EvalOptions, deps: ProgramDeps): Promise<number> {
+  const startedAt = new Date().toISOString();
   // Every check comes before the first model call.
   let judgeModel: string;
   try {
@@ -270,6 +324,7 @@ export async function runEval(opts: EvalOptions, deps: ProgramDeps): Promise<num
     client: await clientOf(deps),
     options: { allowApiKey: opts.allowApiKey, env: process.env },
     judgeModel,
+    startedAt,
   };
 
   // The runs go in sequence: case by case, and repeat by repeat.

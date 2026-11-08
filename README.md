@@ -621,6 +621,7 @@ The eval makes real SDK calls. It needs a Claude login and it costs money.
 | `--judge-model <id>` | The model of the judge. An alias or an exact ID. | `claude-sonnet-5-5` |
 | `--allow-api-key` | Keep `ANTHROPIC_API_KEY` in the environment, also for the judge. | off |
 | `--allow-same-judge` | Let the judge model equal a reviewer model. | off |
+| `--no-extras` | Do not ask the extras judge about the posted findings that match no golden finding. Adjudicated precision is then null, and the eval writes no `candidates.json`. | extras on |
 
 For each case in name order, the eval clones the case into a temporary directory and runs the review there, once for each repeat. The runs go one at a time. The run takes the `title` and the `body` of the case as the PR text. It makes no `gh` call. Each run writes a normal record in `<out>/<case>/<repeat>/`.
 
@@ -680,6 +681,14 @@ The eval also scores the raw candidates: the findings of every reviewer entry in
 
 The two matchings share the judge answers. The judge sees the file, the span, the category, the claim and the evidence of a finding. When a raw candidate shows the judge the same text as a posted finding, its pair with a golden reuses the answer of the posted pair. Only a new pair gets a query. Each new query counts in `judge_calls` and `judge_cost_usd`.
 
+A golden set can be incomplete, so a posted finding that matches no golden is not always false. The extras judge checks each such finding. A finding that matches a not-real golden does not go to the extras judge, because it is already a false positive. The extras judge runs on the judge model, with the prompt `prompts/extras-judge.md`. It gets four blocks: the posted finding, the head file lines from 20 lines above its span to 20 lines below it, the diff section of its file, and the full severity policy. It answers if the finding names a real defect of the change that the policy posts as blocking, suggestion or nit. The answer is `yes`, `no` or `unknown`. A failed query counts as `unknown`. Each query counts in `judge_calls`, `judge_unknown` and `judge_cost_usd`.
+
+Strict precision counts the matches only. Adjudicated precision also counts the extras that the judge accepted: the matched findings plus the accepted extras, divided by the posted findings. The gate uses strict precision.
+
+The eval adds each accepted extra to `<out>/<case>/candidates.json`, as `{ "findings": [...] }` in the format of `golden.json`. An entry takes the file, the span, the category, the severity and the claim of the posted finding. Its note names the extras judge model, the eval out directory, the start time of the eval and the repeat. One file holds the extras of every repeat of the case. An entry with the same file, span and claim as an entry in the file is not added again. Read the file, and copy a candidate to `golden.json` by hand when it is right. The eval never changes `golden.json`.
+
+`--no-extras` turns the extras judge off. The eval then asks no extras query, adjudicated precision is null, and the eval writes no `candidates.json`.
+
 ### The report
 
 The report gives these metrics for each case and each repeat:
@@ -699,8 +708,11 @@ The report gives these metrics for each case and each repeat:
 | `raw_matched` | The raw candidates that match a posted golden. |
 | `raw_candidates` | The number of raw candidates, after the same file, span and claim collapse into one. |
 | `drops` | The findings that the pipeline dropped, counted by stage, such as `{ "verify": 7, "merge": 1 }`. The counts come from the rows of `pr-review explain` with the outcome `dropped`. A stage is in the object only when it dropped a finding. |
+| `extras_judged` | The posted findings that the extras judge checked. |
+| `extras_accepted` | The posted findings that the extras judge accepted as real. |
+| `adjudicated_precision` | The matched posted findings plus the accepted extras, divided by the posted findings. Null when no finding posted, or with `--no-extras`. |
 
-For each repeat, the report gives the mean over the cases of raw recall, recall, findings per case and cost per case. It also gives the drops of the repeat, summed over its cases. The aggregate gives the drops summed over every repeat that did not fail. A mean leaves out null values. The report pools the precision of a repeat over its cases: the sum of `matched` divided by the sum of `posted`. It is null when no case posted a finding. So one case with one wrong finding moves the precision by its share of the findings, not by a whole case. The aggregate gives the mean, the minimum and the maximum of those per-repeat values. `--format table` prints one table per case and a summary. A case table has the columns `repeat`, `raw recall`, `recall`, `precision`, `posted`, `drops` and `cost`. The `drops` column shows the stages in pipeline order, such as `verify 7, merge 1`, or `-` when nothing dropped. The summary has a `raw recall` row and a `drops` row. `--format json` prints the same document that the eval writes to `<out>/report.json`. The report lists a failed repeat in `failed_repeats`, with null metrics.
+For each repeat, the report gives the mean over the cases of raw recall, recall, findings per case, cost per case and judge cost per case (`judge_cost_per_case`). The report pools the adjudicated precision of a repeat like the precision, over the cases with a value. It also gives the drops of the repeat, summed over its cases. The aggregate gives the drops summed over every repeat that did not fail. A mean leaves out null values. The report pools the precision of a repeat over its cases: the sum of `matched` divided by the sum of `posted`. It is null when no case posted a finding. So one case with one wrong finding moves the precision by its share of the findings, not by a whole case. The aggregate gives the mean, the minimum and the maximum of those per-repeat values. `--format table` prints a `cost per PR` heading line, one table per case and a summary. The heading line says that `cost` is the cost of the review run and `judge cost` is the cost of the judge, for one PR. A case table has the columns `repeat`, `raw recall`, `recall`, `precision`, `adj precision`, `posted`, `drops`, `cost` and `judge cost`. `adj precision` shows `-` when it is null. The `drops` column shows the stages in pipeline order, such as `verify 7, merge 1`, or `-` when nothing dropped. The summary has the rows `raw recall`, `recall`, `precision`, `adj precision`, `findings per case`, `cost per PR`, `judge cost per PR` and `drops`. In `report.json`, `cost per PR` is `cost_per_case` and `judge cost per PR` is `judge_cost_per_case`. `--format json` prints the same document that the eval writes to `<out>/report.json`. The report lists a failed repeat in `failed_repeats`, with null metrics.
 
 ### The gate and the baseline
 

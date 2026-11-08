@@ -28,20 +28,29 @@ export type RepeatMetrics = {
   raw_candidates: number;
   /** The findings that the pipeline dropped, by stage. See countDrops. */
   drops: Record<string, number>;
+  /** The posted findings that the extras judge checked. */
+  extras_judged: number;
+  /** The posted findings that the extras judge accepted as real. */
+  extras_accepted: number;
+  /** The matched and the accepted posted findings, over the posted findings. */
+  adjudicated_precision: number | null;
 };
 
 /**
  * The metrics of a repeat whose run gave a record. Recall and raw recall
  * count the posted goldens only, and are null for a case with no posted
- * golden. Precision is null when no finding posted. A posted finding that
- * matches a not-real golden is a false positive. The review cost holds no
- * judge cost.
+ * golden. Precision is strict: matches only. It is null when no finding
+ * posted. Adjudicated precision also counts the extras that the extras
+ * judge accepted. It is null when no finding posted or when extras are
+ * off. A posted finding that matches a not-real golden is a false
+ * positive. The review cost holds no judge cost.
  */
 export function metrics(record: RunRecord, score: ScoreResult, repeat: number): RepeatMetrics {
   const posted = record.posted.findings.length;
   // Each match holds one posted golden and one posted finding.
   const matched = score.matched.length;
   const rawMatched = score.raw.matched.length;
+  const accepted = score.extras.accepted.length;
   const goldens = score.postedGoldenCount;
   return {
     repeat,
@@ -62,6 +71,10 @@ export function metrics(record: RunRecord, score: ScoreResult, repeat: number): 
     raw_matched: rawMatched,
     raw_candidates: score.raw.candidates,
     drops: countDrops(explain(record)),
+    extras_judged: score.extras.judged,
+    extras_accepted: accepted,
+    adjudicated_precision:
+      !score.extras.enabled || posted === 0 ? null : (matched + accepted) / posted,
   };
 }
 
@@ -86,5 +99,8 @@ export function failedMetrics(repeat: number, error: string, run_ms: number): Re
     raw_matched: 0,
     raw_candidates: 0,
     drops: {},
+    extras_judged: 0,
+    extras_accepted: 0,
+    adjudicated_precision: null,
   };
 }
