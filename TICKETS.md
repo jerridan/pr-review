@@ -37,7 +37,7 @@ Done so far: `docs/design/severity-policy.md`, merged in PR #32.
 
 ## D4b: More eval cases
 
-Goal: grow the case set in small revisions, about five cases each. Depends on D5: every new case takes its severity labels from the three-pass labeler.
+Goal: grow the case set in small revisions, about five cases each. Depends on D5: every new case takes its severity labels from the labeler.
 
 - Add more cases from Martian and ReviewBench while the set stays under about 30. Keep the spread of language, category and size.
 - Add cases from jerridan/websites, jerridan/walle and jerridan/pr-review, picked for variety of size and change type, not for their record. Build their goldens from a pool: two blind reviews each by a Claude model and a GPT model with no sight of any comment, plus the findings of every recorded run. Anonymise the pool. Both families adjudicate each item. Keep an item both rate at 75 or above. A PR whose pool adjudicates to nothing is a clean case and measures precision only.

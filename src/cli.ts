@@ -5,12 +5,15 @@
 // the gate passed or did not run, 1 for a failed repeat or a run error, 2
 // for a usage error, an invalid case or a configuration error, 3 when the
 // gate failed. Exit codes of explain: 0 on success, 2 for a usage error or
-// a file that is missing, is not JSON, or is not a run record.
+// a file that is missing, is not JSON, or is not a run record. Exit codes
+// of label: 0 when every call succeeded, 1 when a case checkout failed or a
+// call failed after its retry, 2 on a usage error.
 import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { Command, CommanderError, InvalidArgumentError, Option } from "commander";
 import { z } from "zod";
 import { JUDGE_DEFAULTS, ROLE_DEFAULTS, resolveModel } from "./config/models.js";
+import { registerLabelCommand } from "./eval/label/index.js";
 import { runEval } from "./eval/run.js";
 import { explain } from "./explain/index.js";
 import { renderExplainJson, renderExplainTable } from "./explain/format.js";
@@ -346,6 +349,8 @@ export function createProgram(deps: ProgramDeps): Command {
     .action(async (options: { allowApiKey?: boolean }) => {
       await runSmoke(deps, options.allowApiKey === true);
     });
+
+  registerLabelCommand(program, deps);
 
   return program;
 }
