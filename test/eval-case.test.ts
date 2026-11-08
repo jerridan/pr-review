@@ -40,6 +40,9 @@ let work: string;
 // A bundle that holds base and head, and a bundle that holds head only.
 let fullBundle: string;
 let headOnlyBundle: string;
+let shallowRepo: string;
+let shallowBundle: string;
+let shallowFile: string;
 
 beforeAll(async () => {
   fixture = await makeFixture();
@@ -50,6 +53,16 @@ beforeAll(async () => {
   // commit comes after the fork, so the history of head does not hold it.
   await git(fixture.repo, ["bundle", "create", "--quiet", fullBundle, "main", "feature"]);
   await git(fixture.repo, ["bundle", "create", "--quiet", headOnlyBundle, "feature"]);
+  // A shallow repo that holds base and head without their parents, and a
+  // bundle made from it. Git refuses to clone such a bundle.
+  shallowRepo = join(work, "shallow-repo");
+  shallowBundle = join(work, "shallow.bundle");
+  shallowFile = join(shallowRepo, ".git", "shallow");
+  await git(".", ["init", "--quiet", shallowRepo]);
+  const source = `file://${fixture.repo}`;
+  await git(shallowRepo, ["fetch", "--quiet", "--depth=1", source, "main:refs/heads/base"]);
+  await git(shallowRepo, ["fetch", "--quiet", "--depth=1", source, "feature:refs/heads/feature"]);
+  await git(shallowRepo, ["bundle", "create", "--quiet", shallowBundle, "base", "feature"]);
 }, 30_000);
 
 afterAll(() => {
@@ -89,6 +102,7 @@ type CaseParts = {
   meta?: Record<string, unknown>;
   golden?: unknown;
   bundle?: string;
+  shallow?: string;
   omit?: string[];
 };
 
@@ -117,6 +131,9 @@ function writeCase(root: string, name: string, parts: CaseParts = {}): string {
   }
   if (!omit.includes("repo.bundle")) {
     copyFileSync(parts.bundle ?? fullBundle, join(dir, "repo.bundle"));
+  }
+  if (parts.shallow) {
+    copyFileSync(parts.shallow, join(dir, "shallow"));
   }
   return dir;
 }
@@ -286,6 +303,24 @@ describe("cloneCase", () => {
   });
 
   // R1.8
+  it("checks out a case made from a shallow repo, when the case holds its shallow file", async () => {
+    const c = await loadOne("clone-shallow", { bundle: shallowBundle, shallow: shallowFile });
+    const path = await cloneCase(c, join(work, "clone-shallow"));
+    expect(await git(path, ["rev-parse", "HEAD"])).toBe(fixture.head);
+    expect(await git(path, ["rev-parse", "--verify", `${fixture.base}^{commit}`])).toBe(
+      fixture.base,
+    );
+    const planted = readFileSync(join(path, fixture.file), "utf8").split("\n")[fixture.line - 1];
+    expect(planted).toContain("<=");
+  });
+
+  it("rejects a bundle made from a shallow repo when the case has no shallow file", async () => {
+    const c = await loadOne("clone-shallow-no-file", { bundle: shallowBundle });
+    const err = await rejection(cloneCase(c, join(work, "clone-shallow-no-file")));
+    expect(err.message).toContain("clone-shallow-no-file");
+    expect(err.message).toContain("repo.bundle");
+  });
+
   it("rejects a bundle that lacks base, and names the case and the sha", async () => {
     const c = await loadOne("no-base", { bundle: headOnlyBundle });
     const err = await rejection(cloneCase(c, join(work, "no-base")));

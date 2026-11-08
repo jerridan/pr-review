@@ -22,6 +22,7 @@ const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
 const FIXTURE_SCRIPT = fileURLToPath(new URL("../scripts/make-fixture.sh", import.meta.url));
 const MAKE_CASE = fileURLToPath(new URL("../scripts/make-case.sh", import.meta.url));
 const FETCH_CASES = fileURLToPath(new URL("../scripts/fetch-cases.sh", import.meta.url));
+const FETCH_PR = fileURLToPath(new URL("../scripts/fetch-pr.sh", import.meta.url));
 
 // Do not let the user's git config change the result.
 const ENV: NodeJS.ProcessEnv = {
@@ -227,6 +228,60 @@ describe("scripts/make-case.sh (R2.10)", () => {
     );
     expect(result.code).not.toBe(0);
     expect(existsSync(join(out, "bad"))).toBe(false);
+  }, 30_000);
+});
+
+describe("scripts/fetch-pr.sh", () => {
+  // A fixture whose head is two commits past the merge base, so the first
+  // shallow fetch does not hold the base and the script must deepen.
+  let remote: string;
+  let mergeBase: string;
+  let head2: string;
+
+  beforeAll(async () => {
+    const { stdout } = await run("bash", [FIXTURE_SCRIPT, "--second-push"]);
+    const value = (key: string) =>
+      stdout
+        .split("\n")
+        .find((l) => l.startsWith(`${key}=`))
+        ?.slice(key.length + 1) ?? "";
+    remote = value("FIXTURE");
+    head2 = value("HEAD2");
+    mergeBase = await git(remote, ["merge-base", value("BASE"), head2]);
+    // Let a fetch name a commit by sha, as GitHub does.
+    await git(remote, ["config", "uploadpack.allowReachableSHA1InWant", "true"]);
+  }, 30_000);
+
+  afterAll(() => {
+    rmSync(remote, { recursive: true, force: true });
+  });
+
+  it("gives a shallow repo from which make-case.sh makes a case that cloneCase checks out", async () => {
+    const dir = join(newDir("fetch-pr"), "src");
+    const result = await runScript(FETCH_PR, [`file://${remote}`, mergeBase, head2, dir], work);
+    expect(result.code).toBe(0);
+    expect(await git(dir, ["rev-list", "--count", `${mergeBase}..${head2}`])).toBe("2");
+
+    const out = newDir("fetch-pr-case");
+    await runScript(MAKE_CASE, [dir, mergeBase, head2, "fetched"], out);
+    writeFileSync(join(out, "fetched", "golden.json"), JSON.stringify(GOLDEN()));
+    const [c] = await loadCases(out);
+    if (!c) throw new Error("no case loaded");
+    const path = await cloneCase(c, join(work, "fetched-clone"));
+    expect(await git(path, ["rev-parse", "HEAD"])).toBe(head2);
+    expect(await git(path, ["rev-parse", `${mergeBase}^{commit}`])).toBe(mergeBase);
+    expect((await git(path, ["diff", "--stat", `${mergeBase}...${head2}`])).length).toBeGreaterThan(
+      0,
+    );
+  }, 60_000);
+
+  it("exits non-zero and changes nothing when the directory exists", async () => {
+    const dir = newDir("fetch-pr-taken");
+    writeFileSync(join(dir, "keep.txt"), "keep\n");
+    const result = await runScript(FETCH_PR, [`file://${remote}`, mergeBase, head2, dir], work);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain(dir);
+    expect(readdirSync(dir)).toEqual(["keep.txt"]);
   }, 30_000);
 });
 
