@@ -11,16 +11,22 @@ export type Report = {
   cases: CaseMetrics[];
   repeats: {
     repeat: number;
+    raw_recall: number | null;
     recall: number | null;
     precision: number | null;
     findings_per_case: number | null;
     cost_per_case: number | null;
+    /** The drops of the repeat, summed over its cases. */
+    drops: Record<string, number>;
   }[];
   aggregate: {
+    raw_recall: Spread;
     recall: Spread;
     precision: Spread;
     findings_per_case: Spread;
     cost_per_case: Spread;
+    /** The drops of every repeat that did not fail, summed. */
+    drops: Record<string, number>;
   };
   judge: { calls: number; unknown: number; cost_usd: number };
   failed_repeats: { case: string; repeat: number; error: string }[];
@@ -53,9 +59,38 @@ function pooledPrecision(repeats: RepeatMetrics[]): number | null {
   return repeats.reduce((sum, r) => sum + r.matched, 0) / posted;
 }
 
+/** Add the drop counts of "parts" by stage. A failed repeat has none. */
+function sumDrops(parts: Record<string, number>[]): Record<string, number> {
+  const total: Record<string, number> = {};
+  for (const drops of parts) {
+    for (const [stage, n] of Object.entries(drops)) total[stage] = (total[stage] ?? 0) + n;
+  }
+  return total;
+}
+
+/** The stages in pipeline order. The drops print in this order. */
+const STAGE_ORDER = ["reviewer", "verify", "suppress", "merge", "cap", "scope", "post"];
+
+/**
+ * The drops as text, such as "verify 7, merge 1", or "-" for none. The
+ * stages go in pipeline order. A stage outside that order goes last, by
+ * name.
+ */
+function dropsText(drops: Record<string, number>): string {
+  const rank = (stage: string): number => {
+    const i = STAGE_ORDER.indexOf(stage);
+    return i === -1 ? STAGE_ORDER.length : i;
+  };
+  const stages = Object.keys(drops).sort(
+    (a, b) => rank(a) - rank(b) || (a < b ? -1 : a > b ? 1 : 0),
+  );
+  if (stages.length === 0) return "-";
+  return stages.map((s) => `${s} ${drops[s]}`).join(", ");
+}
+
 /**
  * Build the report. A failed repeat has no metric values, so it is not in
- * any mean. The judge counts are sums over every repeat.
+ * any mean or drop sum. The judge counts are sums over every repeat.
  */
 export function buildReport(
   cases: CaseMetrics[],
@@ -68,20 +103,24 @@ export function buildReport(
     const ok = all.filter(({ r }) => r.repeat === repeat && !r.failed).map(({ r }) => r);
     return {
       repeat,
+      raw_recall: mean(ok.map((r) => r.raw_recall)),
       recall: mean(ok.map((r) => r.recall)),
       precision: pooledPrecision(ok),
       findings_per_case: mean(ok.map((r) => r.posted)),
       cost_per_case: mean(ok.map((r) => r.cost_usd)),
+      drops: sumDrops(ok.map((r) => r.drops)),
     };
   });
   return {
     cases,
     repeats,
     aggregate: {
+      raw_recall: spread(repeats.map((r) => r.raw_recall)),
       recall: spread(repeats.map((r) => r.recall)),
       precision: spread(repeats.map((r) => r.precision)),
       findings_per_case: spread(repeats.map((r) => r.findings_per_case)),
       cost_per_case: spread(repeats.map((r) => r.cost_per_case)),
+      drops: sumDrops(repeats.map((r) => r.drops)),
     },
     judge: {
       calls: all.reduce((sum, { r }) => sum + r.judge_calls, 0),
@@ -124,16 +163,18 @@ export function renderTable(report: Report, baselineCasesRef: string | null = nu
   const lines: string[] = [];
   for (const c of report.cases) {
     lines.push(`Case: ${c.name}`);
-    const rows = [["repeat", "recall", "precision", "posted", "cost"]];
+    const rows = [["repeat", "raw recall", "recall", "precision", "posted", "drops", "cost"]];
     for (const r of c.repeats) {
       rows.push(
         r.failed
           ? [String(r.repeat), `failed: ${r.error ?? ""}`]
           : [
               String(r.repeat),
+              ratio(r.raw_recall),
               ratio(r.recall),
               ratio(r.precision),
               String(r.posted),
+              dropsText(r.drops),
               usd(r.cost_usd),
             ],
       );
@@ -146,6 +187,7 @@ export function renderTable(report: Report, baselineCasesRef: string | null = nu
   lines.push(
     ...columns([
       ["metric", "mean", "min", "max"],
+      ["raw recall", ratio(a.raw_recall.mean), ratio(a.raw_recall.min), ratio(a.raw_recall.max)],
       ["recall", ratio(a.recall.mean), ratio(a.recall.min), ratio(a.recall.max)],
       ["precision", ratio(a.precision.mean), ratio(a.precision.min), ratio(a.precision.max)],
       [
@@ -160,6 +202,8 @@ export function renderTable(report: Report, baselineCasesRef: string | null = nu
         usd(a.cost_per_case.min),
         usd(a.cost_per_case.max),
       ],
+      // The drops are one sum over the eval, not a spread.
+      ["drops", dropsText(a.drops)],
     ]),
   );
   lines.push(

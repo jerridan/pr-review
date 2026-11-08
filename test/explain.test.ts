@@ -8,7 +8,7 @@ import { CommanderError } from "commander";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createProgram } from "../src/cli.js";
 import { DEFAULT_REPO_CONFIG, type RepoConfig } from "../src/config/repo-config.js";
-import { explain, type ExplainRow } from "../src/explain/index.js";
+import { countDrops, explain, type ExplainRow } from "../src/explain/index.js";
 import { runReview } from "../src/run.js";
 import type { Category, Finding } from "../src/schemas/finding.js";
 import { RecordSchema, type PostedFinding, type RunRecord } from "../src/schemas/record.js";
@@ -491,6 +491,37 @@ function rowsOf(findings: Finding[], parts: Parts): ExplainRow[] {
 
 const brief = (row: ExplainRow | undefined) =>
   row && { stage: row.stage, outcome: row.outcome, reason: row.reason };
+
+describe("countDrops", () => {
+  const row = (stage: string, outcome: "kept" | "dropped"): ExplainRow => ({
+    reviewer: "r",
+    pass: 1,
+    file: "src/a.ts",
+    span: [1, 1],
+    category: "bug",
+    claim: "c",
+    fingerprint: null,
+    stage,
+    outcome,
+    reason: "r",
+    finding: null,
+  });
+
+  it("counts the dropped rows by stage, with a key only for a stage that dropped a row", () => {
+    const rows = [
+      row("verify", "dropped"),
+      row("post", "kept"),
+      row("merge", "dropped"),
+      row("verify", "dropped"),
+      row("scope", "kept"),
+    ];
+    expect(countDrops(rows)).toEqual({ verify: 2, merge: 1 });
+  });
+
+  it("gives an empty object when no row dropped", () => {
+    expect(countDrops([row("post", "kept")])).toEqual({});
+  });
+});
 
 describe("explain: the reviewer stage (R7.4)", () => {
   it("names the out-of-range quote check", () => {

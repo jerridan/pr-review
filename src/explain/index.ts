@@ -108,6 +108,20 @@ function looksPreExisting(v: Verification, threshold: { t: number }): boolean {
   return !v.first.in_scope && v.first.claim_holds && v.first.score >= threshold.t;
 }
 
+/**
+ * Count the dropped rows by stage. A stage is a key only when it dropped
+ * at least one row, so a run with no drop gives an empty object. Kept rows
+ * do not count.
+ */
+export function countDrops(rows: ExplainRow[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const row of rows) {
+    if (row.outcome !== "dropped") continue;
+    counts[row.stage] = (counts[row.stage] ?? 0) + 1;
+  }
+  return counts;
+}
+
 /** Give one row for each finding that the record holds. */
 export function explain(record: RunRecord): ExplainRow[] {
   const { stages, posted } = record;

@@ -117,6 +117,7 @@ function scoreOf(parts: Partial<ScoreResult> = {}): ScoreResult {
     notRealMatches: 0,
     postedGoldenCount: 0,
     unmatchedPosted: [],
+    raw: { matched: [], notRealMatches: 0, candidates: 0 },
     ...parts,
   };
 }
@@ -136,6 +137,14 @@ describe("metrics (R5.1, R5.2)", () => {
       notRealMatches: 1,
       postedGoldenCount: 2,
       unmatchedPosted: [2, 3],
+      raw: {
+        matched: [
+          { posted: 0, golden: 0, via: "exact" },
+          { posted: 2, golden: 1, via: "judge" },
+        ],
+        notRealMatches: 0,
+        candidates: 5,
+      },
     });
     expect(metrics(rec, score, 3)).toEqual({
       repeat: 3,
@@ -152,6 +161,10 @@ describe("metrics (R5.1, R5.2)", () => {
       judge_cost_usd: 0.25,
       severity_agreement: { same: 1, matched: 1 },
       not_real_matches: 1,
+      raw_recall: 1,
+      raw_matched: 2,
+      raw_candidates: 5,
+      drops: {},
     });
   });
 
@@ -208,6 +221,53 @@ describe("metrics (R5.1, R5.2)", () => {
     expect(m.matched).toBe(0);
     expect(m.not_real_matches).toBe(1);
   });
+
+  it("gives null raw recall for a case with no posted golden finding", () => {
+    expect(metrics(record([], { total: 0, stageMs: {} }), scoreOf(), 1).raw_recall).toBeNull();
+  });
+
+  // The reviewer found the golden bug, and the verifier dropped it, so it
+  // did not post.
+  it("gives raw recall 1, recall 0 and one verify drop when the verifier drops a golden hit", async () => {
+    const rec = record([], { total: 0, stageMs: {} });
+    const {
+      verifier: _v,
+      fingerprint: _f,
+      severity: _s,
+      score: _sc,
+      span_text: _t,
+      ...hit
+    } = posted(10);
+    rec.stages.reviewers = [
+      { name: "r", pass: 1, status: "ok", findings: [hit], dropped: [], meta: null },
+    ];
+    const rejected = { ...posted(10).verifier, claim_holds: false, score: 20 };
+    rec.stages.verifications = [{ finding: hit, first: rejected, final: null, passed: false }];
+    const goldens: GoldenFinding[] = [
+      {
+        file: "src/a.ts",
+        start_line: 10,
+        end_line: 10,
+        category: "bug",
+        severity: "blocking",
+        claim: "g",
+      },
+    ];
+    const noJudge = createFakeSdkClient(() => {
+      throw new Error("no judge query is expected");
+    });
+    const score = await scoreRecord(rec, goldens, "/nonexistent", {
+      client: noJudge,
+      model: "claude-sonnet-5-5",
+      options: { allowApiKey: false, env: {} },
+    });
+    const m = metrics(rec, score, 1);
+    expect(m.raw_recall).toBe(1);
+    expect(m.recall).toBe(0);
+    expect(m.raw_matched).toBe(1);
+    expect(m.raw_candidates).toBe(1);
+    expect(m.drops).toEqual({ verify: 1 });
+  });
 });
 
 describe("failedMetrics (R3.8)", () => {
@@ -227,6 +287,10 @@ describe("failedMetrics (R3.8)", () => {
       judge_cost_usd: 0,
       severity_agreement: { same: 0, matched: 0 },
       not_real_matches: 0,
+      raw_recall: null,
+      raw_matched: 0,
+      raw_candidates: 0,
+      drops: {},
     });
   });
 });
@@ -251,6 +315,10 @@ function rm(repeat: number, parts: Partial<RepeatMetrics> = {}): RepeatMetrics {
     judge_cost_usd: 0,
     severity_agreement: { same: 0, matched: 0 },
     not_real_matches: 0,
+    raw_recall: 1,
+    raw_matched: 0,
+    raw_candidates: 0,
+    drops: {},
     ...parts,
   };
 }
@@ -278,8 +346,8 @@ describe("buildReport (R5.3, R5.4, R5.6)", () => {
     // Repeat 1: 1 matched of 2 posted, and a case with none posted: 0.5.
     // Repeat 2: 1 matched of 1 posted, and 0 matched of 3 posted: 1 of 4.
     expect(repeats.map(({ cost_per_case: _cost, ...rest }) => rest)).toEqual([
-      { repeat: 1, recall: 0.5, precision: 0.5, findings_per_case: 1 },
-      { repeat: 2, recall: 0.5, precision: 0.25, findings_per_case: 2 },
+      { repeat: 1, raw_recall: 1, recall: 0.5, precision: 0.5, findings_per_case: 1, drops: {} },
+      { repeat: 2, raw_recall: 1, recall: 0.5, precision: 0.25, findings_per_case: 2, drops: {} },
     ]);
     expect(repeats[0]?.cost_per_case).toBeCloseTo(0.3, 10);
     expect(repeats[1]?.cost_per_case).toBeCloseTo(0.3, 10);
@@ -326,6 +394,34 @@ describe("buildReport (R5.3, R5.4, R5.6)", () => {
     expect(report.aggregate.precision).toEqual({ mean: null, min: null, max: null });
   });
 
+  it("gives the mean raw recall and the summed drops of each repeat, and both over the eval", () => {
+    const withDrops = [
+      {
+        name: "a-case",
+        repeats: [
+          rm(1, { raw_recall: 1, drops: { verify: 2, merge: 1 } }),
+          rm(2, { raw_recall: 0.5, drops: { verify: 1 } }),
+        ],
+      },
+      {
+        name: "b-case",
+        repeats: [
+          rm(1, { raw_recall: 0, drops: { cap: 1 } }),
+          rm(2, { raw_recall: null, drops: {} }),
+          failedMetrics(3, "boom", 1),
+        ],
+      },
+    ];
+    const report = buildReport(withDrops, null, null);
+    expect(report.repeats.map((r) => [r.repeat, r.raw_recall, r.drops])).toEqual([
+      [1, 0.5, { verify: 2, merge: 1, cap: 1 }],
+      [2, 0.5, { verify: 1 }],
+      [3, null, {}],
+    ]);
+    expect(report.aggregate.raw_recall).toEqual({ mean: 0.5, min: 0.5, max: 0.5 });
+    expect(report.aggregate.drops).toEqual({ verify: 3, merge: 1, cap: 1 });
+  });
+
   it("sums the judge calls, the unknown answers and the judge cost over the eval", () => {
     expect(buildReport(cases, null, null).judge).toEqual({ calls: 3, unknown: 1, cost_usd: 0.25 });
   });
@@ -348,10 +444,12 @@ describe("buildReport (R5.3, R5.4, R5.6)", () => {
     expect(report.failed_repeats).toEqual([{ case: "a-case", repeat: 2, error: "boom" }]);
     expect(report.repeats[1]).toEqual({
       repeat: 2,
+      raw_recall: 1,
       recall: 0.5,
       precision: 1,
       findings_per_case: 2,
       cost_per_case: 0.1,
+      drops: {},
     });
     expect(report.cases[0]?.repeats[1]?.failed).toBe(true);
   });
@@ -376,8 +474,14 @@ describe("renderTable (R5.5)", () => {
       {
         name: "a-case",
         repeats: [
-          rm(1, { recall: 1, precision: 0.5, posted: 2, cost_usd: 0.2 }),
-          rm(2, { recall: 0.5, precision: 1, posted: 1, cost_usd: 0.4 }),
+          rm(1, {
+            recall: 1,
+            precision: 0.5,
+            posted: 2,
+            cost_usd: 0.2,
+            drops: { merge: 1, verify: 2 },
+          }),
+          rm(2, { raw_recall: 0.5, recall: 0.5, precision: 1, posted: 1, cost_usd: 0.4 }),
         ],
       },
       { name: "b-case", repeats: [rm(1), failedMetrics(2, "the run threw", 1)] },
@@ -387,16 +491,28 @@ describe("renderTable (R5.5)", () => {
   );
   const text = renderTable(report);
 
-  it("prints one table for each case, with a row for each repeat and the four columns", () => {
+  it("prints one table for each case, with a row for each repeat and the six columns", () => {
     const lines = text.split("\n");
     for (const name of ["a-case", "b-case"]) expect(text).toContain(name);
     const header = lines.find((l) => /recall/.test(l) && /posted/.test(l)) ?? "";
-    for (const column of ["repeat", "recall", "precision", "posted", "cost"]) {
-      expect(header).toContain(column);
-    }
-    expect(lines.some((l) => /^\s*1\s+1\.000\s+0\.500\s+2\s+\$0\.2000\s*$/.test(l))).toBe(true);
-    expect(lines.some((l) => /^\s*2\s+0\.500\s+1\.000\s+1\s+\$0\.4000\s*$/.test(l))).toBe(true);
+    expect(header).toMatch(/^repeat\s+raw recall\s+recall\s+precision\s+posted\s+drops\s+cost$/);
+    // The drops go in the order of the pipeline stages.
+    expect(
+      lines.some((l) =>
+        /^\s*1\s+1\.000\s+1\.000\s+0\.500\s+2\s+verify 2, merge 1\s+\$0\.2000\s*$/.test(l),
+      ),
+    ).toBe(true);
+    expect(
+      lines.some((l) => /^\s*2\s+0\.500\s+0\.500\s+1\.000\s+1\s+-\s+\$0\.4000\s*$/.test(l)),
+    ).toBe(true);
     expect(text).toContain("the run threw");
+  });
+
+  it("prints the raw recall and the summed drops in the summary", () => {
+    const lines = text.split("\n");
+    // Raw recall per repeat: (1 + 1) / 2 = 1 and 0.5.
+    expect(lines.some((l) => /^raw recall\s+0\.750\s+0\.500\s+1\.000\s*$/.test(l))).toBe(true);
+    expect(lines.some((l) => /^drops\s+verify 2, merge 1\s*$/.test(l))).toBe(true);
   });
 
   it("prints the mean, the minimum and the maximum of the four aggregate metrics", () => {

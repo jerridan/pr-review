@@ -52,6 +52,10 @@ function repeat(n: number, recall: number | null, precision: number | null): Rep
     judge_cost_usd: 0,
     severity_agreement: { same: 0, matched: 0 },
     not_real_matches: 0,
+    raw_recall: recall,
+    raw_matched: 0,
+    raw_candidates: 0,
+    drops: {},
   };
 }
 

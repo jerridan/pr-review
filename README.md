@@ -676,6 +676,10 @@ The judge gets one query for each ambiguous pair. Its answer `yes` is a match. T
 
 The posted goldens get their matches first: the exact matches, then the judge. The posted findings that are still free then go to the not-real goldens in the same two steps. So when a posted finding can match a posted golden and a not-real golden, the posted golden wins. A match to a posted golden is a hit. Recall counts the posted goldens only. A posted finding that matches a not-real golden is a false positive. It counts in `not_real_matches` and not in `matched`.
 
+The eval also scores the raw candidates: the findings of every reviewer entry in `stages.reviewers`, before the verifier, the merge and the cap. Two candidates with the same file, the same span and the same claim count as one. The raw candidates get their own matching, with the same steps as the posted findings. A raw match to a posted golden is a raw hit. Raw recall shows what the reviewers found. Recall shows what the run posted. The gap between the two is what the pipeline dropped.
+
+The two matchings share the judge answers. The judge sees the file, the span, the category, the claim and the evidence of a finding. When a raw candidate shows the judge the same text as a posted finding, its pair with a golden reuses the answer of the posted pair. Only a new pair gets a query. Each new query counts in `judge_calls` and `judge_cost_usd`.
+
 ### The report
 
 The report gives these metrics for each case and each repeat:
@@ -691,8 +695,12 @@ The report gives these metrics for each case and each repeat:
 | `run_ms` | The run time of the review. |
 | `judge_calls`, `judge_cost_usd` | The judge queries of the run and their cost. |
 | `severity_agreement` | The matched pairs with the same severity, and all matched pairs. Only the matches to posted goldens count. |
+| `raw_recall` | The raw candidates that match a posted golden, divided by the posted goldens. Null for a case with no posted golden. |
+| `raw_matched` | The raw candidates that match a posted golden. |
+| `raw_candidates` | The number of raw candidates, after the same file, span and claim collapse into one. |
+| `drops` | The findings that the pipeline dropped, counted by stage, such as `{ "verify": 7, "merge": 1 }`. The counts come from the rows of `pr-review explain` with the outcome `dropped`. A stage is in the object only when it dropped a finding. |
 
-For each repeat, the report gives the mean over the cases of recall, findings per case and cost per case. A mean leaves out null values. The report pools the precision of a repeat over its cases: the sum of `matched` divided by the sum of `posted`. It is null when no case posted a finding. So one case with one wrong finding moves the precision by its share of the findings, not by a whole case. The aggregate gives the mean, the minimum and the maximum of those per-repeat values. `--format table` prints one table per case and a summary. `--format json` prints the same document that the eval writes to `<out>/report.json`. The report lists a failed repeat in `failed_repeats`, with null metrics.
+For each repeat, the report gives the mean over the cases of raw recall, recall, findings per case and cost per case. It also gives the drops of the repeat, summed over its cases. The aggregate gives the drops summed over every repeat that did not fail. A mean leaves out null values. The report pools the precision of a repeat over its cases: the sum of `matched` divided by the sum of `posted`. It is null when no case posted a finding. So one case with one wrong finding moves the precision by its share of the findings, not by a whole case. The aggregate gives the mean, the minimum and the maximum of those per-repeat values. `--format table` prints one table per case and a summary. A case table has the columns `repeat`, `raw recall`, `recall`, `precision`, `posted`, `drops` and `cost`. The `drops` column shows the stages in pipeline order, such as `verify 7, merge 1`, or `-` when nothing dropped. The summary has a `raw recall` row and a `drops` row. `--format json` prints the same document that the eval writes to `<out>/report.json`. The report lists a failed repeat in `failed_repeats`, with null metrics.
 
 ### The gate and the baseline
 
