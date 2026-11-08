@@ -1334,12 +1334,9 @@ describe(".github/workflows/ci.yml (R8)", () => {
       expect([ciJob("eval").needs].flat()).toEqual(["checks"]);
     });
 
-    it("runs on dispatch and on a pull request from the same repo", () => {
+    it("runs on dispatch only", () => {
       expect(gate(ciContext("workflow_dispatch"))).toBe(true);
-      expect(gate(ciContext("pull_request"))).toBe(true);
-    });
-
-    it("skips a pull request from a fork", () => {
+      expect(gate(ciContext("pull_request"))).toBe(false);
       expect(gate(ciContext("pull_request", { headRepo: "someone/pr-review" }))).toBe(false);
     });
   });

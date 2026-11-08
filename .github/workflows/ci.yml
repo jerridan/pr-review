@@ -1,8 +1,6 @@
 # The CI of pr-review. The checks job runs on every pull request. On a pull
 # request it also checks that a change to the shipped files bumps the
-# version. The eval
-# job runs the eval gate when a change touches the prompts, the code, the
-# eval pin or the lockfile, and on a manual dispatch.
+# version. The eval job runs on a manual dispatch only.
 #
 # Security rules for this file:
 # - The workflow reads two secrets. The token of the cases repo goes only to
@@ -76,11 +74,9 @@ jobs:
   eval:
     needs: checks
     runs-on: ubuntu-latest
-    # A fork pull request has no secrets, so the job skips it and does not fail.
-    if: >-
-      github.event_name == 'workflow_dispatch'
-      || (github.event_name == 'pull_request'
-        && github.event.pull_request.head.repo.full_name == github.repository)
+    # The eval runs on a manual dispatch only. One person maintains this
+    # repo and runs the eval locally before a change to behaviour merges.
+    if: github.event_name == 'workflow_dispatch'
     steps:
       - name: Check out pr-review
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
