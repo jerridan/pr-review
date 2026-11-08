@@ -15,6 +15,8 @@ export type LabelsFile = {
   findings: FindingEntry[];
   first_pass_acceptance_rate: number | null;
   run_agreement_rate: number | null;
+  /** The findings that the run agreement rate leaves out: a run did not converge. */
+  run_agreement_excluded: number;
 };
 
 export type QueueEntry = FindingEntry & { reason: QueueReason };
@@ -32,6 +34,7 @@ export type SummaryFile = {
   cases: SummaryCase[];
   first_pass_acceptance_rate: number | null;
   run_agreement_rate: number | null;
+  run_agreement_excluded: number;
   scorer_cost_usd: number;
 };
 
@@ -44,6 +47,8 @@ export type CaseResult = {
   summary: SummaryCase;
   firstPass: Ratio;
   agreement: Ratio;
+  /** The findings with a run that did not converge. */
+  excluded: number;
 };
 
 // A run made a first judge call when one judge call of it gave a verdict.
@@ -85,6 +90,7 @@ export function caseResult(name: string, runs: number, outcomes: FindingOutcome[
       findings: entries,
       first_pass_acceptance_rate: rate(firstPass),
       run_agreement_rate: rate(agreement),
+      run_agreement_excluded: entries.length - agreement.den,
     },
     disagreements: entries.filter((e) => !allAgree(e)),
     queue,
@@ -98,6 +104,7 @@ export function caseResult(name: string, runs: number, outcomes: FindingOutcome[
     },
     firstPass,
     agreement,
+    excluded: entries.length - agreement.den,
   };
 }
 
@@ -111,6 +118,7 @@ export function summaryOf(results: CaseResult[]): SummaryFile {
     cases: results.map((r) => r.summary),
     first_pass_acceptance_rate: rate(sum(results.map((r) => r.firstPass))),
     run_agreement_rate: rate(sum(results.map((r) => r.agreement))),
+    run_agreement_excluded: results.reduce((total, r) => total + r.excluded, 0),
     scorer_cost_usd: results.reduce((total, r) => total + r.summary.scorer_cost_usd, 0),
   };
 }
@@ -126,8 +134,8 @@ export async function writeCaseFiles(dir: string, result: CaseResult): Promise<v
 }
 
 /**
- * Rewrite golden.json in "caseDir" with the chosen posted labels. Every
- * other field and the order of the keys stay. A finding whose chosen
+ * Rewrite golden.json in "caseDir" with the chosen posted severities. The
+ * category and every other field and the order of the keys stay. A finding whose chosen
  * severity does not post keeps its entry. The file does not change when
  * no finding changes.
  */
@@ -140,9 +148,8 @@ export async function writeGolden(caseDir: string, entries: FindingEntry[]): Pro
   for (const e of entries) {
     const target = golden.findings[e.index];
     if (!target || e.chosen === null || !POSTED_SEVERITIES.includes(e.chosen.severity)) continue;
-    if (target.severity !== e.chosen.severity || target.category !== e.chosen.category) {
+    if (target.severity !== e.chosen.severity) {
       target.severity = e.chosen.severity;
-      target.category = e.chosen.category;
       changed = true;
     }
   }

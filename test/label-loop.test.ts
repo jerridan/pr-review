@@ -379,7 +379,18 @@ describe("the loop", () => {
     const diffOf = (m: string) => /<diff_[0-9a-f]+>\n([\s\S]*?)\n<\/diff_[0-9a-f]+>/.exec(m)?.[1];
     expect(diffOf(messages[0] ?? "")).toBe(diffOf(messages[1] ?? ""));
     // The prompt of the judge stays under the limit of one argument.
-    expect((messages[1] ?? "").length).toBeLessThan(131072 / 2);
+    expect((messages[1] ?? "").length).toBeLessThan(100000);
+  });
+
+  it("cuts a head window over the limit, for the scorer and the judge, and says so", async () => {
+    writeFileSync(join(checkout, "a.ts"), `${"x".repeat(50000)} ENDOFWINDOW\n`);
+    judgePlan({ default: [{ accept: true }] });
+    const { client } = scorerFake({});
+    await label([golden("MARK-a", 1, 1)], client, { runs: 1 });
+    for (const message of [client.calls[0]?.userMessage ?? "", judgePrompts()[0] ?? ""]) {
+      expect(message).not.toContain("ENDOFWINDOW");
+      expect(message).toMatch(/cut[^\n]*32768/);
+    }
   });
 
   it("sends a diff section under the limit whole, with no cut line", async () => {

@@ -116,7 +116,8 @@ export const JUDGE_DEFAULTS: RoleConfig = {
  * pipeline roles, so a golden label does not change when they change.
  */
 export const LABELER_DEFAULTS: RoleConfig = {
-  model: MODEL_IDS.opus,
+  // The literal id is on purpose: the pin stays apart from the pipeline roles.
+  model: "claude-opus-5-5",
   effort: "high",
   maxTurns: 5,
   maxBudgetUsd: 0.5,
