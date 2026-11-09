@@ -47,9 +47,10 @@ export type ScoreResult = {
   /**
    * The score of the raw candidates: the reviewer findings, with the same
    * file, span and claim collapsed into one. They match the posted goldens
-   * only, because raw recall counts nothing else. Without "rawJudge", the
-   * matches are exact only. "posted" in a match is an index into that
-   * list. "candidates" is its length.
+   * only, because raw recall counts nothing else. Without "rawJudge", a
+   * match is exact, or uses a "yes" that the posted pass got for the same
+   * judge text. "posted" in a match is an index into that list.
+   * "candidates" is its length.
    */
   raw: { matched: Match[]; candidates: number };
   /**
@@ -206,13 +207,15 @@ function rawCandidates(record: RunRecord): Finding[] {
  * go first: all exact matches, then the judge. The posted findings that
  * are still free then go to the not-real goldens in the same two steps. So
  * a posted golden wins over a not-real golden. The raw candidates go to
- * the posted goldens only, because raw recall counts nothing else. By
- * default the raw matching takes exact matches only, because the raw
- * candidates are many. With "rawJudge" on, it also asks the judge. The
- * judge gets one query for each ambiguous pair in which neither finding
- * has a match yet. Only the answer "yes" is a match. A failed query counts
- * as "unknown". The two matchings share the judge answers: a pair with the
- * same judge text and the same golden gets one query only. With "extras"
+ * the posted goldens only, because raw recall counts nothing else. The
+ * raw candidates are many, so by default the raw matching sends no judge
+ * query. It takes the exact matches, and an ambiguous pair only when the
+ * posted pass already got "yes" for the same judge text and golden. With
+ * "rawJudge" on, it also asks the judge. The judge gets one query for each
+ * ambiguous pair in which neither finding has a match yet. Only the answer
+ * "yes" is a match. A failed query counts as "unknown". The two matchings
+ * share the judge answers: a pair with the same judge text and the same
+ * golden gets one query only. With "extras"
  * on, each posted finding that matches no golden then gets one query of
  * the extras judge. Extras are off by default. An unknown answer of the
  * extras judge counts in "extras.unknown", not in "judgeUnknown".
@@ -295,8 +298,9 @@ export async function scoreRecord(
   // The judge sees the same text for two findings with the same
   // describePosted text, so their answer for one golden is the same.
   const answers = new Map<string, JudgeOutput["same_issue"]>();
+  const keyOf = (p: Finding, g: number): string => `${describePosted(p)}\u0000${g}`;
   const ask = async (p: Finding, g: number): Promise<JudgeOutput["same_issue"]> => {
-    const key = `${describePosted(p)}\u0000${g}`;
+    const key = keyOf(p, g);
     const known = answers.get(key);
     if (known !== undefined) return known;
     const goldenFinding = golden[g];
@@ -309,7 +313,9 @@ export async function scoreRecord(
 
   // Match "findings" to the goldens: the posted goldens first, then, when
   // "notReal" is true, the not-real goldens. Each step does exact matches
-  // first and then, when "useJudge" is true, the judge.
+  // first and then the ambiguous pairs. When "useJudge" is true, the judge
+  // answers them. When it is false, only an answer that the cache already
+  // holds can match, and no new query goes out.
   const matchAll = async (
     findings: Finding[],
     notReal: boolean,
@@ -338,11 +344,12 @@ export async function scoreRecord(
       for (const [p, g] of maximumMatching(findings.length, pairsOf("exact", posts))) {
         take(p, g, "exact");
       }
-      if (!useJudge) continue;
       for (const [p, g] of pairsOf("ambiguous", posts)) {
         const finding = findings[p];
         if (!free(p, g) || !finding) continue;
-        if ((await ask(finding, g)) === "yes") take(p, g, "judge");
+        // Without the judge, only a cached answer can match: no new query.
+        const answer = useJudge ? await ask(finding, g) : answers.get(keyOf(finding, g));
+        if (answer === "yes") take(p, g, "judge");
       }
     }
     return { matched, notRealMatches, taken };

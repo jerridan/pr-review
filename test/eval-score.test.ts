@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DEFAULT_REPO_CONFIG } from "../src/config/repo-config.js";
 import type { GoldenFinding } from "../src/eval/case.js";
 import { readPolicy } from "../src/eval/label/policy.js";
+import { metrics } from "../src/eval/metrics.js";
 import { ExtrasOutputSchema, scoreRecord } from "../src/eval/score.js";
 import { loadPrompt } from "../src/prompts/load.js";
 import type { Category, Finding, Severity } from "../src/schemas/finding.js";
@@ -644,6 +645,24 @@ describe("scoreRecord: the raw candidates", () => {
     expect(fake.calls).toHaveLength(0);
     expect(result.judgeCalls).toBe(0);
     expect(result.raw.matched).toEqual([]);
+  });
+
+  // The finding posts unchanged, so the raw candidate shows the judge the
+  // same text. The posted pass already has the answer "yes".
+  it("takes the cached yes for an unchanged raw candidate without rawJudge, and asks once", async () => {
+    const fake = judgeFake(["yes", "yes"]);
+    const rec = record([posted("src/a.ts", 20, 20)], [[posted("src/a.ts", 20, 20)]]);
+    const result = await scoreRecord(rec, [golden("src/a.ts", 12, 12)], head, {
+      client: fake,
+      model: SONNET,
+      options: OPTIONS,
+    });
+    expect(fake.calls).toHaveLength(1);
+    expect(result.judgeCalls).toBe(1);
+    expect(result.raw.matched).toEqual([{ posted: 0, golden: 0, via: "judge" }]);
+    const m = metrics(rec, result, 1);
+    expect(m.recall).toBe(1);
+    expect(m.raw_recall).toBe(1);
   });
 
   it("reuses the judge answer of the posted pass for an equal raw candidate, with rawJudge", async () => {

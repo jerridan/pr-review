@@ -34,7 +34,11 @@ export type Report = {
     adjudicated_precision: Spread;
     judge_cost_per_case: Spread;
   };
-  judge: { calls: number; unknown: number; cost_usd: number };
+  /**
+   * "calls" and "cost_usd" hold both judges. "unknown" holds the match
+   * judge only, and "extras_unknown" the extras judge only.
+   */
+  judge: { calls: number; unknown: number; extras_unknown: number; cost_usd: number };
   failed_repeats: { case: string; repeat: number; error: string }[];
   gate: Gate | null;
   cases_ref: string | null;
@@ -148,6 +152,7 @@ export function buildReport(
     judge: {
       calls: all.reduce((sum, { r }) => sum + r.judge_calls, 0),
       unknown: all.reduce((sum, { r }) => sum + r.judge_unknown, 0),
+      extras_unknown: all.reduce((sum, { r }) => sum + r.extras_unknown, 0),
       cost_usd: all.reduce((sum, { r }) => sum + r.judge_cost_usd, 0),
     },
     failed_repeats: all
@@ -260,7 +265,8 @@ export function renderTable(report: Report, baselineCasesRef: string | null = nu
   );
   lines.push(
     "",
-    `Judge: ${report.judge.calls} calls, ${report.judge.unknown} unknown, ${usd(report.judge.cost_usd)}`,
+    `Judge: ${report.judge.calls} calls, ${report.judge.unknown} unknown, ` +
+      `${report.judge.extras_unknown} extras unknown, ${usd(report.judge.cost_usd)}`,
   );
   for (const f of report.failed_repeats) {
     lines.push(`Failed: ${f.case} repeat ${f.repeat}: ${f.error}`);
