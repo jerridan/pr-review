@@ -2,7 +2,7 @@
 
 Status: draft, 2026-11-07, amended 2026-11-08 after the first labeling round. Part of D5 in TICKETS.md.
 
-This policy gives one rule set for the severity of a review finding. Three readers apply it: the labeler who writes `golden.json` for an eval case, the verifier when it sets the severity of a finding, and the judge of the labeling loop. One policy in three places makes the severity agreement of the eval measure one thing.
+This policy gives one rule set for the severity of a review finding. Four readers apply it: the labeler who writes `golden.json` for an eval case, the verifier when it sets the severity of a finding, the judge of the labeling loop, and the extras judge of the eval when it checks a posted finding that matches no golden finding. One policy in four places makes the severity agreement of the eval measure one thing.
 
 The policy decides a label from the consequence of the defect and from the path a person needs to reach it. It never decides a label from the size of the fix, from how often a path is used, or from how the author feels about the finding.
 

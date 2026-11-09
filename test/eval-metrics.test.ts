@@ -117,7 +117,7 @@ function scoreOf(parts: Partial<ScoreResult> = {}): ScoreResult {
     notRealMatches: 0,
     postedGoldenCount: 0,
     unmatchedPosted: [],
-    raw: { matched: [], notRealMatches: 0, candidates: 0 },
+    raw: { matched: [], candidates: 0 },
     extras: { enabled: false, judged: 0, accepted: [] },
     ...parts,
   };
@@ -143,7 +143,6 @@ describe("metrics (R5.1, R5.2)", () => {
           { posted: 0, golden: 0, via: "exact" },
           { posted: 2, golden: 1, via: "judge" },
         ],
-        notRealMatches: 0,
         candidates: 5,
       },
       extras: { enabled: true, judged: 2, accepted: [3] },

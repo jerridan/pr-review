@@ -161,7 +161,7 @@ export function registerLabelCommand(program: Command, deps: ProgramDeps): void 
       parseCount,
       2,
     )
-    .option("--write-golden", "write the chosen blocking, suggestion and nit labels to golden.json")
+    .option("--write-golden", "write every chosen label to golden.json")
     .option("--only <case>", "label only the case with this name")
     .option("--out <dir>", "the output directory (default: each case directory)")
     .addOption(

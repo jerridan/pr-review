@@ -1,8 +1,9 @@
 // Score the posted findings and the raw candidates of one run record
 // against the golden findings of its case: exact matches first, then the
 // judge on the ambiguous pairs. The posted goldens go first. The not-real
-// goldens then take the findings that are still free. With extras on, the
-// extras judge then checks each posted finding that matches no golden.
+// goldens then take the posted findings that are still free. The raw
+// candidates go to the posted goldens only. With extras on, the extras
+// judge then checks each posted finding that matches no golden.
 import { z } from "zod";
 import { readHeadFile } from "../find/evidence.js";
 import { diffSections } from "../gather/diff.js";
@@ -43,10 +44,11 @@ export type ScoreResult = {
   unmatchedPosted: number[];
   /**
    * The score of the raw candidates: the reviewer findings, with the same
-   * file, span and claim collapsed into one. "posted" in a match is an
+   * file, span and claim collapsed into one. They match the posted goldens
+   * only, because raw recall counts nothing else. "posted" in a match is an
    * index into that list. "candidates" is its length.
    */
-  raw: { matched: Match[]; notRealMatches: number; candidates: number };
+  raw: { matched: Match[]; candidates: number };
   /**
    * The extras judge. "enabled" is false when the caller did not ask for
    * it. "judged" is the count of queries. "accepted" holds the indices of
@@ -189,13 +191,15 @@ function rawCandidates(record: RunRecord): Finding[] {
  * candidates each get their own matching. In one matching, each finding
  * and each golden finding is in at most one match. The pairs go in the
  * order of the findings, then of the golden findings. The posted goldens
- * go first: all exact matches, then the judge. The findings that are still
- * free then go to the not-real goldens in the same two steps. So a posted
- * golden wins over a not-real golden. The judge gets one query for each
- * ambiguous pair in which neither finding has a match yet. Only the answer
- * "yes" is a match. A failed query counts as "unknown". The two matchings
- * share the judge answers: a pair with the same judge text and the same
- * golden gets one query only. With "extras" on, each posted finding that
+ * go first: all exact matches, then the judge. The posted findings that
+ * are still free then go to the not-real goldens in the same two steps. So
+ * a posted golden wins over a not-real golden. The raw candidates go to
+ * the posted goldens only, because raw recall counts nothing else. So a
+ * not-real golden costs no judge query in the raw matching. The judge gets
+ * one query for each ambiguous pair in which neither finding has a match
+ * yet. Only the answer "yes" is a match. A failed query counts as
+ * "unknown". The two matchings share the judge answers: a pair with the
+ * same judge text and the same golden gets one query only. With "extras" on, each posted finding that
  * matches no golden then gets one query of the extras judge. Extras are
  * off by default.
  */
@@ -272,10 +276,12 @@ export async function scoreRecord(
     return answer;
   };
 
-  // Match "findings" to the goldens: the posted goldens first, then the
-  // not-real goldens, each with exact matches first and then the judge.
+  // Match "findings" to the goldens: the posted goldens first, then, when
+  // "notReal" is true, the not-real goldens. Each step does exact matches
+  // first and then the judge.
   const matchAll = async (
     findings: Finding[],
+    notReal: boolean,
   ): Promise<{ matched: Match[]; notRealMatches: number; taken: Set<number> }> => {
     const kinds: PairKind[][] = findings.map((p) => golden.map((g) => classifyPair(p, g)));
     const matched: Match[] = [];
@@ -296,7 +302,7 @@ export async function scoreRecord(
           k === kind && postedGolden[g] === posts && free(p, g) ? [[p, g]] : [],
         ),
       );
-    for (const posts of [true, false]) {
+    for (const posts of notReal ? [true, false] : [true]) {
       for (const [p, g] of maximumMatching(findings.length, pairsOf("exact", posts))) {
         take(p, g, "exact");
       }
@@ -310,9 +316,9 @@ export async function scoreRecord(
   };
 
   const posted = record.posted.findings;
-  const fromPosted = await matchAll(posted);
+  const fromPosted = await matchAll(posted, true);
   const candidates = rawCandidates(record);
-  const fromRaw = await matchAll(candidates);
+  const fromRaw = await matchAll(candidates, false);
 
   const unmatchedPosted = posted.flatMap((_, p) => (fromPosted.taken.has(p) ? [] : [p]));
 
@@ -384,7 +390,6 @@ export async function scoreRecord(
     unmatchedPosted,
     raw: {
       matched: fromRaw.matched,
-      notRealMatches: fromRaw.notRealMatches,
       candidates: candidates.length,
     },
     extras: { enabled, judged, accepted },

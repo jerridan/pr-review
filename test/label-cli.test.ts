@@ -540,6 +540,14 @@ describe("label --write-golden", () => {
 });
 
 describe("label options and exit codes", () => {
+  it("says in --help that --write-golden writes every chosen label", async () => {
+    const code = await labelCli({ client: scorerFake({}) }, "--help");
+    expect(code).toBe(0);
+    expect(stdout.replace(/\s+/g, " ")).toContain(
+      "--write-golden write every chosen label to golden.json",
+    );
+  });
+
   it(
     "prints label-summary.json with --format json, and writes under --out",
     async () => {
