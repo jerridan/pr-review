@@ -47,8 +47,9 @@ function uniqueNames(runs: ReviewerRun[]): string[] {
  * The reviewers that ran with no failed pass, the reviewers with a failed
  * pass, the selected reviewers or passes that did not run, the custom
  * reviewers that ran without the Bash they asked for, the sensitive paths
- * with no text hunk, and the findings dropped because their verifier call
- * failed or because code rejected their verifier result.
+ * with no text hunk, the findings dropped because their verifier call
+ * failed or because code rejected their verifier result, and the findings
+ * that ended unsure, with the part of them that ended on a limit stop.
  */
 export function coverage(
   reviewerRuns: ReviewerRun[],
@@ -56,6 +57,7 @@ export function coverage(
   skipped: SkippedReviewer[] = [],
   withoutBash: { name: string; reason: string }[] = [],
   sensitiveWithoutHunks: string[] = [],
+  unsure: { unsure: number; unsureOnLimit: number } = { unsure: 0, unsureOnLimit: 0 },
 ): RunRecord["posted"]["coverage"] {
   const failed = new Set(reviewerRuns.filter((r) => r.status === "failed").map((r) => r.name));
   const names = uniqueNames(reviewerRuns);
@@ -66,6 +68,8 @@ export function coverage(
     reviewers_without_bash: withoutBash,
     sensitive_without_hunks: sensitiveWithoutHunks,
     findings_dropped_by_failed_verifier: verifierFailures,
+    findings_unsure: unsure.unsure,
+    findings_unsure_on_limit: unsure.unsureOnLimit,
   };
 }
 
@@ -79,8 +83,11 @@ function failureOf(value: VerifierCall | undefined): QueryFailure | null {
  * Count from the stage outputs: the findings dropped because a verifier
  * call failed or because code rejected a result that the verifier passed
  * (for coverage); every failed verifier call, first or escalation, and
- * every rejected result (for the verdict); and every reviewer or verifier
- * call that ended in a refusal.
+ * every rejected result (for the verdict); every reviewer or verifier
+ * call that ended in a refusal; and the findings that ended unsure, with
+ * the part of them that ended on a limit stop. A limit stop is not a
+ * failed verifier call (R4). A not_real result that says the claim holds
+ * is not a rejected result.
  */
 export function verificationCounts(
   reviewerRuns: ReviewerRun[],
@@ -90,22 +97,38 @@ export function verificationCounts(
   failedVerifierCalls: number;
   rejectedResults: number;
   refusals: number;
+  unsure: number;
+  unsureOnLimit: number;
 } {
   let droppedByFailedVerifier = 0;
   let failedVerifierCalls = 0;
   let rejectedResults = 0;
+  let unsure = 0;
+  let unsureOnLimit = 0;
   let refusals = reviewerRuns.filter((r) => r.failure?.kind === "refusal").length;
   for (const v of verifications) {
     // A failed first call stops the verification, so at most one call of
     // a finding fails, and the finding is dropped.
     const failures = [failureOf(v.first), failureOf(v.escalated)].filter(
-      (f): f is QueryFailure => f !== null,
+      (f): f is QueryFailure => f !== null && f.kind !== "limit",
     );
-    // A rejected result drops a finding that the verifier confirmed.
-    if (v.rejected) rejectedResults += 1;
-    if (failures.length > 0 || v.rejected) droppedByFailedVerifier += 1;
+    // A rejected result drops a finding that the verifier confirmed. A
+    // final result with the severity not_real is the verifier's own
+    // rejection, not a rejection by code, so it does not count.
+    const rejected = v.rejected !== undefined && v.final?.severity !== "not_real";
+    if (rejected) rejectedResults += 1;
+    if (failures.length > 0 || rejected) droppedByFailedVerifier += 1;
     failedVerifierCalls += failures.length;
     refusals += failures.filter((f) => f.kind === "refusal").length;
+    if (v.unsure !== undefined) unsure += 1;
+    if (v.unsure === "limit") unsureOnLimit += 1;
   }
-  return { droppedByFailedVerifier, failedVerifierCalls, rejectedResults, refusals };
+  return {
+    droppedByFailedVerifier,
+    failedVerifierCalls,
+    rejectedResults,
+    refusals,
+    unsure,
+    unsureOnLimit,
+  };
 }

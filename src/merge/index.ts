@@ -5,7 +5,7 @@ import { loadPrompt, render } from "../prompts/load.js";
 import type { Finding, Severity } from "../schemas/finding.js";
 import { MergeOutputSchema, type MergeOutput } from "../schemas/merge.js";
 import type { PostedFinding, QueryFailure, RunRecord } from "../schemas/record.js";
-import type { VerifierResult } from "../schemas/verifier.js";
+import { isPostedSeverity, type VerifierResult } from "../schemas/verifier.js";
 import type { SdkClient } from "../sdk/client.js";
 import type { RunOptions } from "../sdk/options.js";
 import type { Semaphore } from "../semaphore.js";
@@ -17,6 +17,17 @@ type Verified = { finding: Finding; result: VerifierResult };
 type MergeRecord = RunRecord["stages"]["merges"][number];
 
 const SEVERITY_RANK: Record<Severity, number> = { blocking: 0, suggestion: 1, nit: 2 };
+
+/**
+ * The severity of a verified result, as one of the three labels that
+ * post. A passed verification always holds one, so throw on any other.
+ */
+function postedSeverity(result: VerifierResult): Severity {
+  if (!isPostedSeverity(result.severity)) {
+    throw new Error(`A verified finding has the severity ${result.severity}, which does not post.`);
+  }
+  return result.severity;
+}
 
 /**
  * Group findings whose line ranges overlap in one file. Overlap is
@@ -95,7 +106,7 @@ function rejection(output: MergeOutput, members: Verified[]): string | null {
   }
   for (const entry of output.merged) {
     const member = members[entry.member_index] as Verified;
-    if (SEVERITY_RANK[entry.severity] < SEVERITY_RANK[member.result.severity]) {
+    if (SEVERITY_RANK[entry.severity] < SEVERITY_RANK[postedSeverity(member.result)]) {
       return `The merge result upgrades the severity of member ${entry.member_index} from ${member.result.severity} to ${entry.severity}.`;
     }
   }
@@ -120,7 +131,7 @@ export function toPostedFinding(
   return {
     ...finding,
     fingerprint: fingerprint(finding, headFileText),
-    severity: result.severity,
+    severity: postedSeverity(result),
     score: result.score,
     verifier: result,
     span_text: fingerprintSpanText(finding, headFileText),

@@ -633,6 +633,27 @@ describe("explain: the verify stage (R7.4)", () => {
     expect(rows[0]).toMatchObject({ reviewer: "r", pass: 1 });
   });
 
+  it("names a severity that does not post", () => {
+    const r = result({ severity: "dont_post" });
+    const rows = rowsOf([finding(1)], { verifications: [dropped(r)] });
+    expect(brief(rows[0])).toEqual({
+      stage: "verify",
+      outcome: "dropped",
+      reason: "verifier: severity dont_post, scored 95",
+    });
+  });
+
+  it("names the contradiction of a claim that holds and is not real", () => {
+    const r = result({ severity: "not_real" });
+    const rejected = "The verifier says that the claim holds, but gives the severity not_real.";
+    const rows = rowsOf([finding(1)], { verifications: [dropped(r, { rejected })] });
+    expect(brief(rows[0])).toEqual({
+      stage: "verify",
+      outcome: "dropped",
+      reason: `verifier rejected: ${rejected}`,
+    });
+  });
+
   it("names the threshold that the config sets for the reviewer", () => {
     const rows = rowsOf([finding(1)], {
       verifications: [
@@ -668,6 +689,53 @@ describe("explain: the verify stage (R7.4)", () => {
       outcome: "dropped",
       reason: "no later stage in the record",
     });
+  });
+});
+
+describe("explain: an unsure verification (R3)", () => {
+  const unsure = result({ severity: "unsure" });
+
+  it("names unsure as the reason of a model-said unsure, and counts it apart from verify", () => {
+    const rows = rowsOf([finding(1)], {
+      verifications: [
+        verified(finding(1), { first: unsure, final: unsure, passed: false, unsure: "claim" }),
+      ],
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.outcome).toBe("dropped");
+    expect(rows[0]?.reason).toMatch(/^verifier: unsure/);
+    expect(rows[0]?.reason).toMatch(/claim/);
+    expect(countDrops(rows)).toEqual({ unsure: 1 });
+  });
+
+  it("names the limit stop as the cause of unsure", () => {
+    const rows = rowsOf([finding(1)], {
+      verifications: [
+        verified(finding(1), {
+          first: result({ score: 70 }),
+          escalated: { kind: "limit", message: "m" },
+          final: null,
+          passed: false,
+          unsure: "limit",
+        }),
+      ],
+    });
+    expect(rows[0]?.reason).toMatch(/^verifier: unsure/);
+    expect(rows[0]?.reason).toMatch(/limit/);
+    expect(countDrops(rows)).toEqual({ unsure: 1 });
+  });
+
+  it("keeps a failed verifier call under verify", () => {
+    const rows = rowsOf([finding(1)], {
+      verifications: [
+        verified(finding(1), {
+          first: { kind: "thrown", message: "m" },
+          final: null,
+          passed: false,
+        }),
+      ],
+    });
+    expect(countDrops(rows)).toEqual({ verify: 1 });
   });
 });
 

@@ -215,6 +215,8 @@ describe("coverage (A8)", () => {
       reviewers_without_bash: [],
       sensitive_without_hunks: [],
       findings_dropped_by_failed_verifier: 3,
+      findings_unsure: 0,
+      findings_unsure_on_limit: 0,
     });
     expect(coverage([], 0)).toEqual({
       reviewers_ran: [],
@@ -223,6 +225,8 @@ describe("coverage (A8)", () => {
       reviewers_without_bash: [],
       sensitive_without_hunks: [],
       findings_dropped_by_failed_verifier: 0,
+      findings_unsure: 0,
+      findings_unsure_on_limit: 0,
     });
     const skipped = [{ name: "docs", reason: "disabled by config" as const }];
     expect(coverage(runs, 0, skipped).reviewers_skipped).toEqual(skipped);
@@ -263,6 +267,8 @@ describe("coverage (A8)", () => {
       failedVerifierCalls: 4,
       rejectedResults: 0,
       refusals: 3,
+      unsure: 0,
+      unsureOnLimit: 0,
     });
   });
 
@@ -285,6 +291,8 @@ describe("coverage (A8)", () => {
       failedVerifierCalls: 0,
       rejectedResults: 2,
       refusals: 0,
+      unsure: 0,
+      unsureOnLimit: 0,
     });
     expect(coverage(runs, counts.droppedByFailedVerifier).findings_dropped_by_failed_verifier).toBe(
       2,
@@ -298,6 +306,74 @@ describe("coverage (A8)", () => {
         posted: [],
       }),
     ).toBe("incomplete");
+  });
+});
+
+describe("unsure counts (R3, R4)", () => {
+  const limit: QueryFailure = { kind: "limit", message: "The result subtype is error_max_turns" };
+
+  it("counts unsure findings apart from failed verifier calls, and the limit stops among them", () => {
+    const runs = [run("diff-bugs", "ok")];
+    const unsureResult = { ...vresult(90), severity: "unsure" as const };
+    const counts = verificationCounts(runs, [
+      {
+        first: unsureResult,
+        final: unsureResult,
+        passed: false,
+        pre_existing: false,
+        unsure: "claim",
+      },
+      { first: limit, final: null, passed: false, pre_existing: false, unsure: "limit" },
+      {
+        first: vresult(70),
+        escalated: limit,
+        final: null,
+        passed: false,
+        pre_existing: false,
+        unsure: "limit",
+      },
+      { first: thrown, final: null, passed: false, pre_existing: false },
+    ]);
+    expect(counts).toEqual({
+      droppedByFailedVerifier: 1,
+      failedVerifierCalls: 1,
+      rejectedResults: 0,
+      refusals: 0,
+      unsure: 3,
+      unsureOnLimit: 2,
+    });
+  });
+
+  it("keeps the verdict complete for a claim that holds and is not real, and the entry keeps the reason", async () => {
+    const notReal = { ...vresult(95), severity: "not_real" as const };
+    const out = await verifyFinding(
+      createFakeSdkClient(() => ({ ok: true, output: notReal, raw: META })),
+      OPTIONS,
+      finding(1),
+      { cwd: head, diff: DIFF, semaphore: createSemaphore(2), config: DEFAULT_VERIFY_CONFIG },
+    );
+    expect(out.passed).toBe(false);
+    expect(out.rejected).toMatch(/not_real/);
+    const runs = [run("diff-bugs", "ok")];
+    const counts = verificationCounts(runs, [out]);
+    expect(counts.rejectedResults).toBe(0);
+    expect(counts.droppedByFailedVerifier).toBe(0);
+    expect(
+      decideVerdict({
+        tier: "full",
+        reviewerRuns: runs,
+        verifierFailures: counts.failedVerifierCalls + counts.rejectedResults,
+        refusals: counts.refusals,
+        posted: [],
+      }),
+    ).toBe("would approve");
+  });
+
+  it("writes the unsure counts in the coverage block", () => {
+    const c = coverage([run("diff-bugs", "ok")], 1, [], [], [], { unsure: 3, unsureOnLimit: 2 });
+    expect(c.findings_dropped_by_failed_verifier).toBe(1);
+    expect(c.findings_unsure).toBe(3);
+    expect(c.findings_unsure_on_limit).toBe(2);
   });
 });
 
@@ -387,7 +463,10 @@ describe("the query failure rule: each condition and each stage outcome (A8)", (
       expect(coverage(runs, 0).reviewers_failed).toEqual(["diff-bugs"]);
     });
 
-    it(`${kind}: a failed verifier drops the finding into the coverage count`, async () => {
+    // A limit stop gives the unsure result (R4). It is not a failed call.
+    const isLimit = kind === "limit";
+
+    it(`${kind}: a failed verifier ${isLimit ? "gives unsure" : "drops the finding into the coverage count"}`, async () => {
       const out = await verifyFinding(
         createFakeSdkClient(() => failed),
         OPTIONS,
@@ -399,13 +478,21 @@ describe("the query failure rule: each condition and each stage outcome (A8)", (
           config: DEFAULT_VERIFY_CONFIG,
         },
       );
-      expect(out).toEqual({ first: failure, final: null, passed: false, pre_existing: false });
+      expect(out).toEqual({
+        first: failure,
+        final: null,
+        passed: false,
+        pre_existing: false,
+        ...(isLimit ? { unsure: "limit" } : {}),
+      });
       const counts = verificationCounts([run("diff-bugs", "ok")], [out]);
-      expect(counts.droppedByFailedVerifier).toBe(1);
+      expect(counts.droppedByFailedVerifier).toBe(isLimit ? 0 : 1);
+      expect(counts.unsure).toBe(isLimit ? 1 : 0);
+      expect(counts.unsureOnLimit).toBe(isLimit ? 1 : 0);
       expect(
         coverage([run("diff-bugs", "ok")], counts.droppedByFailedVerifier)
           .findings_dropped_by_failed_verifier,
-      ).toBe(1);
+      ).toBe(isLimit ? 0 : 1);
       expect(
         decideVerdict({
           tier: "full",
@@ -414,10 +501,10 @@ describe("the query failure rule: each condition and each stage outcome (A8)", (
           refusals: counts.refusals,
           posted: [],
         }),
-      ).toBe("incomplete");
+      ).toBe(isLimit ? "would approve" : "incomplete");
     });
 
-    it(`${kind}: a failed escalation drops the finding and the verdict is incomplete`, async () => {
+    it(`${kind}: a failed escalation ${isLimit ? "gives unsure and the verdict is complete" : "drops the finding and the verdict is incomplete"}`, async () => {
       const fake = createFakeSdkClient((req) =>
         req.role === "verifier" ? { ok: true, output: vresult(84), raw: META } : failed,
       );
@@ -433,14 +520,16 @@ describe("the query failure rule: each condition and each stage outcome (A8)", (
         final: null,
         passed: false,
         pre_existing: false,
+        ...(isLimit ? { unsure: "limit" } : {}),
       });
       const runs = [run("diff-bugs", "ok")];
       const counts = verificationCounts(runs, [out]);
-      expect(counts.droppedByFailedVerifier).toBe(1);
-      expect(counts.failedVerifierCalls).toBe(1);
+      expect(counts.droppedByFailedVerifier).toBe(isLimit ? 0 : 1);
+      expect(counts.failedVerifierCalls).toBe(isLimit ? 0 : 1);
+      expect(counts.unsureOnLimit).toBe(isLimit ? 1 : 0);
       expect(
         coverage(runs, counts.droppedByFailedVerifier).findings_dropped_by_failed_verifier,
-      ).toBe(1);
+      ).toBe(isLimit ? 0 : 1);
       expect(
         decideVerdict({
           tier: "full",
@@ -449,7 +538,7 @@ describe("the query failure rule: each condition and each stage outcome (A8)", (
           refusals: counts.refusals,
           posted: [],
         }),
-      ).toBe("incomplete");
+      ).toBe(isLimit ? "would approve" : "incomplete");
     });
 
     it(`${kind}: a failed merge posts the group unmerged`, async () => {

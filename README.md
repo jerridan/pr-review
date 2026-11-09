@@ -180,7 +180,7 @@ The review body has these parts, in this order:
 - **The tier and the tier reason.**
 - **The counts.** A table of blocking findings, suggestions and nits. When earlier runs hold open blocking findings, a line names how many.
 - **Findings outside the diff.** One entry for each posted finding that does not go inline. An entry holds the severity in bold, the title, the claim, a permalink and a fingerprint marker.
-- **Coverage and cost.** A folded block. It lists the reviewers that ran, each coverage part that is not empty, the number of candidate findings and how many the verifier dropped, the cost and the run time. The table output holds the same coverage parts on one line.
+- **Coverage and cost.** A folded block. It lists the reviewers that ran, each coverage part that is not empty, the number of candidate findings and how many the verifier dropped, the cost and the run time. The coverage parts include the findings that ended unsure, and how many of them ended unsure on a limit stop. The table output holds the same coverage parts on one line.
 - **The tool version.**
 
 A finding goes inline when every line of its span is a right-side line of one hunk. The hunk is in the PR diff at the head. An added line and a context line are right-side lines. Any other finding goes in the body.
@@ -535,6 +535,8 @@ The run record has these keys, added with the `.pr-review/` directory.
 | `posted.coverage.reviewers_skipped` | For each selected reviewer or pass that did not run: `name`, `reason` and, for `token ceiling`, `pass`. |
 | `posted.coverage.reviewers_without_bash` | For each custom reviewer that asked for Bash and did not get it: `name` and `reason`. |
 | `posted.coverage.sensitive_without_hunks` | The sensitive paths with no text hunk, for example a mode flip or a binary. |
+| `posted.coverage.findings_unsure` | The findings that ended unsure. The verifier said that the repository does not settle the claim, or a verifier call stopped on its budget or turn limit. An unsure finding does not post and does not make the review incomplete. A record from before this count does not hold it, and absent means 0. |
+| `posted.coverage.findings_unsure_on_limit` | The part of `findings_unsure` that ended unsure because a verifier call stopped on its limit. Absent means 0. |
 
 A sensitive path with no text hunk does not raise the tier. The record and the coverage line name it.
 

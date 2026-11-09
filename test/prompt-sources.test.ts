@@ -115,6 +115,25 @@ describe("A13: no prompt text in src", () => {
   });
 });
 
+describe("the verifier rubric asks one question (R1)", () => {
+  const body = loadPrompt("verifier.md").body;
+
+  it("has no question on whether to post the finding", () => {
+    const rubric = body.slice(body.indexOf("## Rubric"), body.indexOf("## Fields of the result"));
+    const questions = rubric.split("\n").filter((line) => /^\d+\.\s/.test(line));
+    expect(questions.length).toBeGreaterThan(0);
+    expect(questions.filter((q) => /\bpost/i.test(q))).toEqual([]);
+    expect(body).not.toMatch(/careful reviewer/i);
+    expect(body).not.toMatch(/worth posting/i);
+  });
+
+  it("lists the six labels of the severity policy", () => {
+    for (const label of ["blocking", "suggestion", "nit", "dont_post", "not_real", "unsure"]) {
+      expect(body).toMatch(new RegExp(`^\\s*- ${label}: `, "m"));
+    }
+  });
+});
+
 const META: QueryMeta = {
   model: "m",
   durationMs: 1,

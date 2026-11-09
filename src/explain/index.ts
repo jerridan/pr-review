@@ -1,8 +1,8 @@
 // Explain a run record: one row for each finding that the record holds,
 // with the last stage it reached, the outcome, and the check that decided it.
 import type { Category, Finding } from "../schemas/finding.js";
-import type { PostedFinding, QueryFailure, RunRecord } from "../schemas/record.js";
-import type { VerifierResult } from "../schemas/verifier.js";
+import type { PostedFinding, QueryFailure, RunRecord, UnsureCause } from "../schemas/record.js";
+import { isPostedSeverity, type VerifierResult } from "../schemas/verifier.js";
 import {
   findingKey,
   firstFree,
@@ -80,15 +80,31 @@ function thresholdOf(record: RunRecord, name: string | undefined): { t: number; 
 }
 
 /**
+ * The reason of an unsure verification (R3). It starts with "verifier:
+ * unsure" and names the cause.
+ */
+function unsureReason(v: Verification, cause: UnsureCause): string {
+  if (cause === "claim") return "verifier: unsure, the repository does not settle the claim";
+  const call = v.escalated === undefined ? "verifier call" : "escalation call";
+  return `verifier: unsure, the ${call} stopped on its limit`;
+}
+
+/**
  * The reason that a verification did not pass. The checks go in the order
- * of the code: a failed call, then scope, then the claim, then the score,
- * then the quote. An escalated result decides when the record holds one.
+ * of the code: a failed call, then scope, then the claim, then a severity
+ * that does not post, then the score, then the quote. An escalated result
+ * decides when the record holds one.
  */
 function verifyReason(v: Verification, threshold: { t: number; exact: boolean }): string {
   const one = (r: VerifierResult | QueryFailure): string => {
     if (isFailure(r)) return `verifier call failed: ${r.kind}`;
     if (!r.in_scope) return `verifier: out of scope, scored ${r.score}`;
     if (!r.claim_holds) return `verifier: the claim does not hold, scored ${r.score}`;
+    if (!isPostedSeverity(r.severity)) {
+      return v.rejected !== undefined
+        ? `verifier rejected: ${v.rejected}`
+        : `verifier: severity ${r.severity}, scored ${r.score}`;
+    }
     if (r.score < threshold.t) {
       return threshold.exact
         ? `verifier scored ${r.score}, below the threshold ${threshold.t}`
@@ -102,10 +118,15 @@ function verifyReason(v: Verification, threshold: { t: number; exact: boolean })
 
 // True when the first result of a verification passes every check of a
 // pre-existing finding that the record can show: out of scope, a claim
-// that holds, and a score at or above the threshold.
+// that holds, a severity that posts, and a score at or above the threshold.
 function looksPreExisting(v: Verification, threshold: { t: number }): boolean {
   if (v.passed || v.escalated !== undefined || isFailure(v.first)) return false;
-  return !v.first.in_scope && v.first.claim_holds && v.first.score >= threshold.t;
+  return (
+    !v.first.in_scope &&
+    v.first.claim_holds &&
+    isPostedSeverity(v.first.severity) &&
+    v.first.score >= threshold.t
+  );
 }
 
 /**
@@ -130,15 +151,18 @@ export function explain(record: RunRecord): ExplainRow[] {
   const ties = tieVerifications(stages.verifications, refs);
   const thresholds = ties.map((t) => thresholdOf(record, t[0]?.name));
 
-  // The verify stage.
+  // The verify stage. An unsure verification has its own stage, so the
+  // drop counts show it apart from the other verify drops (R3).
   const units: Unit[] = stages.verifications.map((v, i) => ({
     refs: ties[i] ?? [],
     finding: v.finding,
-    stage: "verify",
+    stage: v.unsure === undefined ? "verify" : "unsure",
     outcome: "dropped",
     reason: v.passed
       ? "no later stage in the record"
-      : verifyReason(v, thresholds[i] ?? { t: 0, exact: false }),
+      : v.unsure !== undefined
+        ? unsureReason(v, v.unsure)
+        : verifyReason(v, thresholds[i] ?? { t: 0, exact: false }),
     suffix: "",
   }));
   const all = units.map((_, i) => i);

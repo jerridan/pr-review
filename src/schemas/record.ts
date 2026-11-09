@@ -23,6 +23,15 @@ export type QueryFailure = {
   message: string;
 };
 
+/**
+ * The cause of an unsure result: "claim" when the verifier said that the
+ * repository does not settle the claim, "limit" when a verifier call
+ * stopped on its budget or turn limit.
+ */
+export type UnsureCause = "claim" | "limit";
+
+export const UNSURE_CAUSES = ["claim", "limit"] as const satisfies readonly UnsureCause[];
+
 export type PostedFinding = Finding & {
   fingerprint: string;
   severity: "blocking" | "suggestion" | "nit";
@@ -166,6 +175,8 @@ export type RunRecord = {
       final: VerifierResult | null;
       passed: boolean;
       rejected?: string;
+      /** Present when the finding ended unsure. "passed" is then false. */
+      unsure?: UnsureCause;
     }[];
     merges: { group: number[]; result: MergeOutput | QueryFailure; rejected?: string }[];
     capped: PostedFinding[];
@@ -191,6 +202,13 @@ export type RunRecord = {
        */
       sensitive_without_hunks: string[];
       findings_dropped_by_failed_verifier: number;
+      /**
+       * The findings that ended unsure, and the part of them that ended
+       * unsure on a limit stop. A run writes both. A record from before
+       * them has neither, and absent means 0.
+       */
+      findings_unsure?: number;
+      findings_unsure_on_limit?: number;
     };
     findings: PostedFinding[];
     /** What the run posted with --format github, or null when it tried no review. */
@@ -378,6 +396,7 @@ const StagesSchema = z.strictObject({
       final: VerifierResultSchema.nullable(),
       passed: z.boolean(),
       rejected: z.string().optional(),
+      unsure: z.enum(UNSURE_CAUSES).optional(),
     }),
   ),
   merges: z.array(
@@ -418,6 +437,8 @@ const PostedSchema = z.strictObject({
     reviewers_without_bash: z.array(z.strictObject({ name: z.string(), reason: z.string() })),
     sensitive_without_hunks: z.array(z.string()),
     findings_dropped_by_failed_verifier: integer(),
+    findings_unsure: integer().optional(),
+    findings_unsure_on_limit: integer().optional(),
   }),
   findings: z.array(PostedFindingSchema),
   github: PostedGitHubSchema.nullable(),
