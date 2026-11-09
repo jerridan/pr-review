@@ -56,14 +56,19 @@ export async function loadPrContext(
 
 /**
  * The description of a --pr run: the sanitized title, a blank line and
- * the sanitized body. Each flag is true when it is true for either part.
+ * the sanitized body. When the PR has labels, a line of the sanitized
+ * labels goes between them, with a blank line on each side. Each flag is
+ * true when it is true for any part.
  */
 export function prDescription(pr: PullRequest): Sanitized {
   const title = sanitizeGitHubText(pr.title);
   const body = sanitizeGitHubText(pr.body);
+  const labels =
+    pr.labels.length > 0 ? sanitizeGitHubText(`Labels: ${pr.labels.join(", ")}`) : null;
+  const parts = [title, ...(labels ? [labels] : []), body];
   return {
-    text: `${title.text}\n\n${body.text}`,
-    sanitized: title.sanitized || body.sanitized,
-    truncated: title.truncated || body.truncated,
+    text: parts.map((p) => p.text).join("\n\n"),
+    sanitized: parts.some((p) => p.sanitized),
+    truncated: parts.some((p) => p.truncated),
   };
 }

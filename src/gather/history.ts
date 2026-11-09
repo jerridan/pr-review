@@ -112,11 +112,67 @@ export async function gatherHistory(
   mergeBase: string,
   hunks: { path: string; ranges: { start: number; end: number }[] }[],
 ): Promise<{ text: string; truncated: boolean } | null> {
-  const parts: string[] = [];
-  for (const { path, ranges } of hunks) {
-    const part = await fileHistory(repo, mergeBase, path, ranges);
-    if (part !== null) parts.push(part);
+  const parts = await historyParts(
+    repo,
+    mergeBase,
+    hunks.map((h) => ({ ...h, key: h.path })),
+  );
+  return joinHistory(parts);
+}
+
+/** The history part of one file, with the key that the caller gave. */
+export type HistoryPart = { key: string; text: string };
+
+/**
+ * Run blame and log at the merge base for each file, in order. "path" is
+ * the path at the merge base. "key" names the part, for example the head
+ * path of a renamed file. A file that the merge base does not have gets
+ * no part.
+ */
+export async function historyParts(
+  repo: string,
+  mergeBase: string,
+  files: { key: string; path: string; ranges: LineRange[] }[],
+): Promise<HistoryPart[]> {
+  const parts: HistoryPart[] = [];
+  for (const { key, path, ranges } of files) {
+    const text = await fileHistory(repo, mergeBase, path, ranges);
+    if (text !== null) parts.push({ key, text });
   }
+  return parts;
+}
+
+/**
+ * The history block of the history reviewer: every part, joined with a
+ * blank line and cut to fit HISTORY_CAP_BYTES. Give null for no part.
+ */
+export function joinHistory(parts: HistoryPart[]): { text: string; truncated: boolean } | null {
   if (parts.length === 0) return null;
-  return capText(parts.join("\n\n"), HISTORY_CAP_BYTES);
+  return capText(parts.map((p) => p.text).join("\n\n"), HISTORY_CAP_BYTES);
+}
+
+/** The most bytes of the git facts of one file. A longer text is cut at a line end. */
+export const FILE_HISTORY_CAP_BYTES = 16384;
+
+/**
+ * The git facts of each file, by key: the history part of the file alone,
+ * cut at a line end to fit FILE_HISTORY_CAP_BYTES.
+ */
+export function capFileHistory(
+  parts: HistoryPart[],
+): Record<string, { text: string; truncated: boolean }> {
+  return Object.fromEntries(parts.map((p) => [p.key, capText(p.text, FILE_HISTORY_CAP_BYTES)]));
+}
+
+/**
+ * Run blame and log at the merge base for each file, and give the git
+ * facts of each file by key. A file that the merge base does not have
+ * gets no entry.
+ */
+export async function gatherFileHistory(
+  repo: string,
+  mergeBase: string,
+  files: { key: string; path: string; ranges: LineRange[] }[],
+): Promise<Record<string, { text: string; truncated: boolean }>> {
+  return capFileHistory(await historyParts(repo, mergeBase, files));
 }

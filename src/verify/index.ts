@@ -2,6 +2,7 @@
 // verifier on a middle-band score or when the finding needs context.
 import { normalizeWs, readHeadFile } from "../find/evidence.js";
 import { diffSections } from "../gather/diff.js";
+import type { GatherResult } from "../gather/index.js";
 import { loadPrompt, render, type PromptFile } from "../prompts/load.js";
 import type { RepoConfig } from "../config/repo-config.js";
 import type { Finding } from "../schemas/finding.js";
@@ -51,7 +52,18 @@ export type VerifyContext = {
    * verifier can check a claim about the description. Absent means empty.
    */
   description?: string;
+  /**
+   * The git facts of each changed file, from gather. The verifier gets the
+   * facts of its finding's file only. Absent means no facts.
+   */
+  fileHistory?: GatherResult["fileHistory"];
 };
+
+/** A head file with more lines than this is not inlined whole. */
+export const INLINE_FILE_MAX_LINES = 600;
+
+/** The lines before and after the span that a window of a long head file shows. */
+export const WINDOW_LINES = 150;
 
 export type Verification = {
   first: VerifierResult | QueryFailure;
@@ -131,11 +143,44 @@ function describeFinding(f: Finding): string {
   return JSON.stringify(shown, null, 2);
 }
 
-function numberLines(text: string): string {
+function fileLines(text: string): string[] {
   const lines = text.split("\n");
   if (lines.at(-1) === "") lines.pop();
+  return lines;
+}
+
+// Number the lines "first" to "last" (1-based, inclusive) of "lines". The
+// width of the numbers is the width of the last line number of the file.
+function numberLines(lines: string[], first = 1, last = lines.length): string {
   const width = String(lines.length).length;
-  return lines.map((line, i) => `${String(i + 1).padStart(width)}| ${line}`).join("\n");
+  return lines
+    .slice(first - 1, last)
+    .map((line, i) => `${String(first + i).padStart(width)}| ${line}`)
+    .join("\n");
+}
+
+/**
+ * The head file as the user message shows it. A file of
+ * INLINE_FILE_MAX_LINES lines or fewer shows whole. A longer file shows
+ * the window of WINDOW_LINES lines on each side of the finding's span,
+ * clamped to the file, under a header that names the lines.
+ */
+function headFileView(
+  texts: VerifierTexts,
+  finding: Finding,
+  text: string | null,
+): { header: string | null; body: string } {
+  if (text === null) return { header: null, body: texts.noFileText };
+  const lines = fileLines(text);
+  if (lines.length <= INLINE_FILE_MAX_LINES) return { header: null, body: numberLines(lines) };
+  const first = Math.max(1, finding.start_line - WINDOW_LINES);
+  const last = Math.min(lines.length, finding.end_line + WINDOW_LINES);
+  const header = render(texts.windowText.trim(), {
+    first: String(first),
+    last: String(last),
+    total: String(lines.length),
+  });
+  return { header, body: numberLines(lines, first, last) };
 }
 
 /** The texts of prompts/verifier.md that the user message uses. */
@@ -144,6 +189,9 @@ export type VerifierTexts = {
   noFileText: string;
   noDiffText: string;
   noDescriptionText: string;
+  noHistoryText: string;
+  historyCutText: string;
+  windowText: string;
 };
 
 function field(prompt: PromptFile, name: string): string {
@@ -161,6 +209,9 @@ export function verifierTexts(prompt: PromptFile): VerifierTexts {
     noFileText: field(prompt, "no_file_text"),
     noDiffText: field(prompt, "no_diff_text"),
     noDescriptionText: field(prompt, "no_description_text"),
+    noHistoryText: field(prompt, "no_history_text"),
+    historyCutText: field(prompt, "history_cut_text"),
+    windowText: field(prompt, "window_text"),
   };
 }
 
@@ -175,9 +226,11 @@ export function loadVerifierPrompt(): VerifierPrompt {
 
 /**
  * Build the verifier user message: the finding, the head file, the
- * description of the change and the file's diff. "text" is the head file,
- * or null when the head has no such file. "fileDiff" is the diff section
- * of the finding's file, or "" when the diff does not change the file.
+ * description of the change, the git facts of the file and the file's
+ * diff. "text" is the head file, or null when the head has no such file.
+ * "fileDiff" is the diff section of the finding's file, or "" when the
+ * diff does not change the file. "facts" is the blame and log of the
+ * file from gather, or undefined when the file has none.
  */
 export function buildVerifierMessage(
   texts: VerifierTexts,
@@ -185,14 +238,19 @@ export function buildVerifierMessage(
   text: string | null,
   fileDiff: string,
   description = "",
+  facts?: { text: string; truncated: boolean },
 ): string {
+  const view = headFileView(texts, finding, text);
+  const fileBlock = wrapUntrusted("head_file", view.body).block;
+  const factsBlock = wrapUntrusted("git_facts", facts?.text ?? texts.noHistoryText).block;
   const blocks = {
     finding: wrapUntrusted("finding", describeFinding(finding)).block,
-    file: wrapUntrusted("head_file", text === null ? texts.noFileText : numberLines(text)).block,
+    file: view.header === null ? fileBlock : `${view.header}\n\n${fileBlock}`,
     description: wrapUntrusted(
       "description",
       description.trim() === "" ? texts.noDescriptionText : description,
     ).block,
+    history: facts?.truncated ? `${factsBlock}\n\n${texts.historyCutText.trim()}` : factsBlock,
     diff: wrapUntrusted("diff", fileDiff.trim() === "" ? texts.noDiffText : fileDiff).block,
   };
   return render(texts.template, blocks);
@@ -214,7 +272,9 @@ export async function verifyFinding(
   const prompt = ctx.prompt ?? loadVerifierPrompt();
   const sections = ctx.sections ?? diffSections(ctx.diff ?? "");
   const fileDiff = sections.get(finding.file) ?? "";
-  // One read serves both verifier messages and the quote check.
+  const facts = ctx.fileHistory?.[finding.file];
+  // One read serves both verifier messages and the quote check. The quote
+  // check reads the whole file, also when the message shows a window.
   const headText = readHeadFile(ctx.cwd, finding.file);
 
   const ask = async (
@@ -227,6 +287,7 @@ export async function verifyFinding(
       headText,
       fileDiff,
       ctx.description,
+      facts,
     );
     try {
       const outcome = await ctx.semaphore(() =>

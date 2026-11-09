@@ -109,20 +109,31 @@ Built-in reviewers for v1, split by evidence source:
 | description-drift | the description block, compared with what the code does | full |
 | docs-and-comments | stale comments and docs touched by the change | full |
 
-The history reviewer has no Bash. Gather reads the blame and log, not the reviewer. The history reviewer quotes its evidence from the head file or the diff, never from the blame block. The verifier gets the description block for every finding and never sees the history block. So a history finding states a claim that the head file shows.
+The history reviewer has no Bash. Gather reads the blame and log, not the reviewer. The history reviewer quotes its evidence from the head file or the diff, never from the blame block. So a history finding states a claim that the head file shows.
+
+Gather also builds the git facts of each changed file: the blame and log of its changed lines at the merge base, cut at a line end to fit 16384 bytes. Gather builds them for every run that verifies findings, also when the history reviewer is off. The verifier gets the description block and the git facts of its finding's file. It does not get the joined history block, and it does not get the facts of another file. The verifier has no Bash either.
 
 ### 3.5 Verify (one Sonnet call per finding)
 
-Each finding goes to a verifier with the finding, the quoted evidence, the full current file, and the diff hunk. The verifier scores 0–100 against a fixed rubric:
+Each finding goes to a verifier with the finding, the head file, the description block, the git facts of the finding's file, and the diff of that file against the merge base. A head file of 600 lines or fewer goes in whole. A longer file shows only the window of 150 lines on each side of the finding's span, under a line that names the lines shown. The verifier uses Read for the rest. The quote check still runs against the whole head file.
 
-- Is the claim true of the code as written?
-- Was the problem introduced or exposed by this PR?
-- Would a careful reviewer on this team post it?
-- Is it in scope? Scope is the only exclusion. Suppressions apply at merge, not here.
+The rubric asks one question for the score: is the claim true of the code as written? The score is the confidence, from 0 to 100, that the claim holds. Scope, worth and severity do not change the score. The verifier also answers whether the change introduced the problem, and whether the finding is in scope. Scope is the only exclusion. Suppressions apply at merge, not here.
 
-Scope is a gate before the score: a finding on code the PR did not add, change or aggravate fails verification whatever its score, and is tagged pre-existing in the record. Findings under the threshold are dropped but kept in the record. Default threshold 80, configurable per repo and per reviewer. The effective threshold of a reviewer is `reviewers.<name>.threshold` from the repo config when set. Otherwise it is the higher of the frontmatter value and `thresholds.default`. The verifier gets the description block for every finding, so it can check a description-drift claim. It never sees which reviewer produced the finding, and it never sees the history block.
+The verifier gives one of the six labels of the severity policy (`severity-policy.md`). A finding posts only when its final result has a claim that holds, is in scope, has a score at or above the threshold, has a quote in the head file, and has the label blocking, suggestion or nit. One rule decides the outcome of the final result, in this order:
 
-Verification starts per finding as soon as its reviewer returns. Merge is the only barrier, so the slowest reviewer delays only its own findings. The verifier runs on Sonnet 5.5 at high effort with thinking on, a different model from the finders, as Anthropic's evaluation guidance recommends. It has the full file in context and read-only tools to find its own supporting quotes, and must retract a finding it cannot quote. It escalates to Opus 5.5 at high when the reviewer marks a finding `needs_context: true` or when the score lands in a middle band, following Anthropic's two-pass pattern. The band is `thresholds.middle_band` from the repo config, with the default 60 to 85. It is a fixed score range. It does not move when a reviewer threshold changes. The band's upper bound must be at least `thresholds.default`, and no reviewer threshold may be above it, or a score above the band and below the threshold could never escalate and never pass; the config loader rejects such a config. The verifier also assigns severity, because reviewers rate their own findings too high. Merge may downgrade a severity when it sees the full set, never upgrade.
+1. The label unsure gives the unsure result, whatever the claim says.
+2. A claim that does not hold is rejected.
+3. A claim that holds with the label not real contradicts itself. It is rejected, and the record names the contradiction. It does not make the review incomplete.
+4. A claim that holds with the label don't post does not post. The record shows the label.
+5. Then the scope, threshold and quote checks apply.
+
+When the first and the escalated result both say that the claim holds, the finding posts although the escalated score is below the threshold. The scope and quote checks still apply.
+
+The unsure result is for a claim that the repository cannot settle. A verifier call that stops on its budget or turn limit also gives unsure, with the cause "limit". A limit stop on the first call does not escalate. A limit stop is not a failed verifier call, so it alone does not make the review incomplete. An unsure finding never posts. The record marks the entry unsure with its cause. Explain, the eval drop counts and the coverage block count unsure findings apart from rejected findings and from failed verifier calls.
+
+Scope is a gate before the score: a finding on code the PR did not add, change or aggravate fails verification whatever its score, and is tagged pre-existing in the record. Findings under the threshold are dropped but kept in the record. Default threshold 80, configurable per repo and per reviewer. The effective threshold of a reviewer is `reviewers.<name>.threshold` from the repo config when set. Otherwise it is the higher of the frontmatter value and `thresholds.default`. The verifier gets the description block for every finding, so it can check a description-drift claim. It never sees which reviewer produced the finding. It gets the git facts of its finding's file only, as section 3.4 says.
+
+Verification starts per finding as soon as its reviewer returns. Merge is the only barrier, so the slowest reviewer delays only its own findings. The verifier runs on Sonnet 5.5 at high effort with thinking on, a different model from the finders, as Anthropic's evaluation guidance recommends. It has the head file, or the window of a long head file, in context and read-only tools to find its own supporting quotes, and must retract a finding it cannot quote. It escalates to Opus 5.5 at high when the reviewer marks a finding `needs_context: true` or when the score lands in a middle band, following Anthropic's two-pass pattern. The band is `thresholds.middle_band` from the repo config, with the default 60 to 85. It is a fixed score range. It does not move when a reviewer threshold changes. The band's upper bound must be at least `thresholds.default`, and no reviewer threshold may be above it, or a score above the band and below the threshold could never escalate and never pass; the config loader rejects such a config. The verifier also assigns severity, because reviewers rate their own findings too high. Merge may downgrade a severity when it sees the full set, never upgrade.
 
 | Severity | Test | Posts on later runs |
 |----------|------|---------------------|

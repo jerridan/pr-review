@@ -169,7 +169,7 @@ The run sanitizes the PR title, the PR body and the commit messages before they 
 - Normalize the text to NFC.
 - Cut the text at 20000 characters.
 
-With `--pr`, the description is the sanitized title, a blank line and the sanitized body. The record key `identity.description_meta` says whether sanitizing changed or cut the text.
+With `--pr`, the description is the sanitized title, a blank line and the sanitized body. When the PR has labels, a line of the sanitized labels goes between the title and the body. The record key `identity.description_meta` says whether sanitizing changed or cut the text.
 
 ## The review body
 
@@ -504,7 +504,7 @@ Seven built-in reviewers exist. The tier and the triggers decide which of them r
 
 `diff-bugs` is the original reviewer. The other six are new. All seven run on every change at or above their lowest tier. At the fast tier, every reviewer runs one pass.
 
-The description is the sanitized PR title and body with `--pr`. Without `--pr`, it is the sanitized subject and body of each commit between the base and the head. Every reviewer and the verifier get it. When the description is empty, `description-drift` does not run, and coverage lists it under `reviewers_skipped` with the reason `no description`. The same list names a reviewer that the config disables, with the reason `disabled by config`.
+The description is the sanitized PR title, labels and body with `--pr`. Without `--pr`, it is the sanitized subject and body of each commit between the base and the head. Every reviewer and the verifier get it. When the description is empty, `description-drift` does not run, and coverage lists it under `reviewers_skipped` with the reason `no description`. The same list names a reviewer that the config disables, with the reason `disabled by config`.
 
 All passes of a reviewer use the same input. The run removes repeated findings by fingerprint before verification, so the verifier checks one copy. The record keeps the findings of every pass.
 
@@ -528,7 +528,7 @@ The run record has these keys, added with the `.pr-review/` directory.
 | `identity.config.files` | The paths of the loaded `.pr-review/` files. |
 | `identity.config.values` | The validated config, with the defaults filled in. |
 | `identity.config.custom_reviewers` | For each custom reviewer: `name`, `bash_granted` and `reason`. |
-| `identity.description` | The sanitized description that every reviewer and the verifier got. |
+| `identity.description` | The sanitized description that every reviewer and the verifier got. With `--pr`, it holds the title, the labels and the body. |
 | `identity.history` | `built` and `truncated`, for the history block. The history block has a cap of 65536 bytes. |
 | `identity.injected` | For each injected rules file: `path` and `truncated`. |
 | `stages.suppressed` | For each finding that a suppression removed: `finding`, `reviewer` and `rule`. `posted.findings` omits these findings. |
