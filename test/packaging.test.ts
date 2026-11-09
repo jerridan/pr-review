@@ -1520,7 +1520,7 @@ describe(".github/workflows/ci.yml (R8)", () => {
       const result = runEval(ciContext("pull_request"), 0);
       expect(result.status).toBe(0);
       expect(result.args).toBe(
-        "dist/cli.js eval --cases eval/cases --repeat 3 --baseline eval/baseline.json --out pr-review-eval",
+        "dist/cli.js eval --cases eval/cases --repeat 3 --baseline eval/baseline.json --no-extras --out pr-review-eval",
       );
       expect(result.summary).toBe(`BEFORE\n${FENCE}\nREPORT-TABLE\n${FENCE}\n`);
       expect(result.tokenSet).toBe(true);
