@@ -572,15 +572,20 @@ describe("scoreRecord: the raw candidates", () => {
     expect(result.raw.matched).toHaveLength(1);
   });
 
-  it("counts a raw candidate that matches a not-real golden", async () => {
+  // Raw recall counts posted goldens only, so a not-real golden needs no
+  // query in the raw pass. The pair here is ambiguous: the spans overlap
+  // and the categories differ.
+  it("asks the judge nothing for a raw candidate near a not-real golden", async () => {
+    const fake = judgeFake(["yes"]);
     const result = await scoreRaw(
       [],
-      [[posted("src/a.ts", 10, 10)]],
+      [[posted("src/a.ts", 10, 10, { category: "security" })]],
       [golden("src/a.ts", 10, 10, { severity: "not_real" })],
-      judgeFake([]),
+      fake,
     );
+    expect(fake.calls).toHaveLength(0);
+    expect(result.judgeCalls).toBe(0);
     expect(result.raw.matched).toEqual([]);
-    expect(result.raw.notRealMatches).toBe(1);
   });
 
   it("reuses the judge answer of the posted pass for an equal raw candidate", async () => {
