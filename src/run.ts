@@ -56,7 +56,7 @@ import type {
   SkippedReviewer,
 } from "./schemas/record.js";
 import type { TriageBrief } from "./schemas/triage.js";
-import type { VerifierResult } from "./schemas/verifier.js";
+import { isPostedSeverity, type VerifierResult } from "./schemas/verifier.js";
 import { usageTokens, type QueryOutcome, type QueryRequest, type SdkClient } from "./sdk/client.js";
 import type { RunOptions } from "./sdk/options.js";
 import { createSemaphore } from "./semaphore.js";
@@ -739,7 +739,10 @@ export async function runReview(input: RunInput): Promise<RunResult> {
       // fingerprint: the first in file and line order.
       const preExistingSorted: PostedFinding[] = applySuppressions(
         verifications.flatMap((v, i) =>
-          preExistingFlags[i] === true && !isFailure(v.first) && v.first !== undefined
+          preExistingFlags[i] === true &&
+          !isFailure(v.first) &&
+          v.first !== undefined &&
+          isPostedSeverity(v.first.severity)
             ? [
                 {
                   finding: v.finding,
@@ -795,7 +798,8 @@ export async function runReview(input: RunInput): Promise<RunResult> {
 
       // A failed or refused verifier call, first or escalation, drops its
       // finding and makes the verdict incomplete. So does a result that code
-      // rejected after the verifier passed it.
+      // rejected. A call that stopped on its limit gives the unsure result
+      // instead, and the verdict does not count it.
       const counts = verificationCounts(
         runs,
         verifications.map((v, i) => ({ ...v, pre_existing: preExistingFlags[i] === true })),
@@ -907,6 +911,7 @@ export async function runReview(input: RunInput): Promise<RunResult> {
             allSkipped,
             withoutBash,
             sensitiveWithoutHunks(gathered),
+            counts,
           ),
           findings: postedFindings,
           github: null,

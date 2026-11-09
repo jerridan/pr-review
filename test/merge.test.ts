@@ -146,6 +146,20 @@ describe("mergeFindings (A7)", () => {
     expect(out.merges).toEqual([]);
   });
 
+  it("refuses a verified finding whose severity does not post (R1)", async () => {
+    for (const severity of ["dont_post", "not_real", "unsure"] as const) {
+      const f = finding(3, 3);
+      await expect(
+        mergeFindings(
+          noMergeClient(),
+          OPTIONS,
+          [{ finding: f, result: { ...result(90, "nit"), severity } }],
+          ctx(),
+        ),
+      ).rejects.toThrow(severity);
+    }
+  });
+
   it("gives each posted finding the normalized span text that the fingerprint hashes (R8)", async () => {
     const f = finding(3, 4);
     const out = await mergeFindings(

@@ -163,6 +163,55 @@ afterAll(() => {
   if (outRoot) rmSync(outRoot, { recursive: true, force: true });
 });
 
+describe("an unsure verification in the record (R8)", () => {
+  function withUnsure(): RunRecord {
+    const copy: RunRecord = JSON.parse(JSON.stringify(record));
+    const v = copy.stages.verifications[0]!;
+    const unsure: VerifierResult = { ...result(90), severity: "unsure" };
+    copy.stages.verifications = [
+      { ...v, first: unsure, final: unsure, passed: false, unsure: "claim" },
+      {
+        ...v,
+        first: result(70),
+        escalated: { kind: "limit", message: "The result subtype is error_max_budget_usd" },
+        final: null,
+        passed: false,
+        unsure: "limit",
+      },
+    ];
+    copy.posted.coverage.findings_unsure = 2;
+    copy.posted.coverage.findings_unsure_on_limit = 1;
+    return copy;
+  }
+
+  it("round-trips through the record schema", () => {
+    const copy = withUnsure();
+    const parsed = RecordSchema.safeParse(JSON.parse(JSON.stringify(copy)));
+    expect(parsed.error).toBeUndefined();
+    expect(parsed.data).toEqual(copy);
+  });
+
+  it("rejects an unknown unsure cause", () => {
+    const copy = withUnsure() as unknown as {
+      stages: { verifications: { unsure: string }[] };
+    };
+    copy.stages.verifications[0]!.unsure = "budget";
+    expect(RecordSchema.safeParse(copy).success).toBe(false);
+  });
+
+  it("parses a record without the unsure counts, written before them", () => {
+    const copy = withUnsure();
+    delete copy.posted.coverage.findings_unsure;
+    delete copy.posted.coverage.findings_unsure_on_limit;
+    expect(RecordSchema.safeParse(copy).error).toBeUndefined();
+  });
+
+  it("writes both unsure counts in a run", () => {
+    expect(record.posted.coverage.findings_unsure).toBe(0);
+    expect(record.posted.coverage.findings_unsure_on_limit).toBe(0);
+  });
+});
+
 describe("the record file (A9)", () => {
   it("is named by the timestamp without colons and the 7-char head sha", () => {
     expect(recordFileName(new Date("2026-10-13T12:34:56.789Z"), "abcdef0123456789")).toBe(
@@ -527,6 +576,8 @@ describe("the record parts", () => {
       reviewers_without_bash: [],
       sensitive_without_hunks: [],
       findings_dropped_by_failed_verifier: 1,
+      findings_unsure: 0,
+      findings_unsure_on_limit: 0,
     });
   });
 

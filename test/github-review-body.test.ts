@@ -387,6 +387,33 @@ describe("renderCoverage (R5)", () => {
     expect(renderCoverage(record)).toMatch(/^Coverage: reviewers ran: diff-bugs, tests;/);
     expect(formatTable(record).split("\n")).toContain(renderCoverage(record));
   });
+
+  it("shows the unsure counts, and 0 for a record written before them (R3)", () => {
+    const record = makeRecord([]);
+    expect(renderCoverage(record)).toContain("findings unsure: 0");
+    expect(renderCoverage(record)).toContain("findings unsure on a limit stop: 0");
+    record.posted.coverage.findings_unsure = 3;
+    record.posted.coverage.findings_unsure_on_limit = 1;
+    expect(renderCoverage(record)).toContain("findings unsure: 3");
+    expect(renderCoverage(record)).toContain("findings unsure on a limit stop: 1");
+  });
+});
+
+describe("the unsure counts in the review body (R3)", () => {
+  const body = (record: RunRecord): string =>
+    renderReviewBody({ marker: MARKER, record, slug: SLUG, bodyFindings: [], carriedMarkers: [] });
+
+  it("lists the unsure counts only when they are above 0", () => {
+    const quiet = makeRecord([]);
+    quiet.posted.coverage.findings_unsure = 0;
+    quiet.posted.coverage.findings_unsure_on_limit = 0;
+    expect(body(quiet)).not.toMatch(/Findings unsure/);
+    const news = makeRecord([]);
+    news.posted.coverage.findings_unsure = 2;
+    news.posted.coverage.findings_unsure_on_limit = 1;
+    expect(body(news)).toContain("- Findings unsure: 2");
+    expect(body(news)).toContain("- Findings unsure on a limit stop: 1");
+  });
 });
 
 describe("renderCheckRun (R6)", () => {

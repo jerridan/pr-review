@@ -308,6 +308,17 @@ describe("json output", () => {
     expect(doc.coverage.reviewers_without_bash).toEqual(withoutBash);
   });
 
+  it("holds the unsure counts in its coverage, and the table names them (R3)", () => {
+    const r = record([]);
+    const coverage = { ...r.posted.coverage, findings_unsure: 2, findings_unsure_on_limit: 1 };
+    const withUnsure = { ...r, posted: { ...r.posted, coverage } };
+    const doc = JSON.parse(formatJson(withUnsure, "/out/r.json"));
+    expect(doc.coverage.findings_unsure).toBe(2);
+    expect(doc.coverage.findings_unsure_on_limit).toBe(1);
+    expect(formatTable(withUnsure)).toContain("findings unsure: 2");
+    expect(formatTable(withUnsure)).toContain("findings unsure on a limit stop: 1");
+  });
+
   it("holds the sensitive paths without hunks in its coverage", () => {
     const r = record([]);
     const paths = ["bin/run", "assets/key.bin"];

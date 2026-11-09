@@ -306,6 +306,26 @@ describe("schemas parse in code", () => {
     expect(FindingSchema.safeParse({ ...finding, start_line: 1.5 }).success).toBe(false);
   });
 
+  it("takes the six labels of the severity policy as the verifier severity, and no other (R1)", () => {
+    for (const severity of ["blocking", "suggestion", "nit", "dont_post", "not_real", "unsure"]) {
+      expect(VerifierResultSchema.parse({ ...verifierResult, severity }).severity).toBe(severity);
+    }
+    for (const severity of ["major", "dont post", "not real", "maybe", ""]) {
+      expect(VerifierResultSchema.safeParse({ ...verifierResult, severity }).success).toBe(false);
+    }
+  });
+
+  it("keeps three labels for the reviewer and merge severity (R1)", () => {
+    expect(FindingSchema.safeParse({ ...finding, severity_estimate: "unsure" }).success).toBe(
+      false,
+    );
+    expect(
+      MergeOutputSchema.safeParse({
+        merged: [{ member_index: 0, claim: "c", explanation: "e", severity: "dont_post" }],
+      }).success,
+    ).toBe(false);
+  });
+
   it("leaves numeric range checks to the code that uses the result", () => {
     expect(VerifierResultSchema.safeParse({ ...verifierResult, score: 150 }).success).toBe(true);
     expect(VerifierResultSchema.safeParse({ ...verifierResult, score: 80.5 }).success).toBe(false);

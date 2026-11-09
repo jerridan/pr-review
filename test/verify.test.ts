@@ -11,7 +11,12 @@ import type { ReviewerDefinition } from "../src/reviewers/loader.js";
 import type { Finding } from "../src/schemas/finding.js";
 import type { VerifierResult } from "../src/schemas/verifier.js";
 import { VerifierResultSchema } from "../src/schemas/verifier.js";
-import type { QueryMeta, QueryOutcome, QueryRequest } from "../src/sdk/client.js";
+import {
+  classifyResult,
+  type QueryMeta,
+  type QueryOutcome,
+  type QueryRequest,
+} from "../src/sdk/client.js";
 import { createFakeSdkClient, type FakeScript } from "../src/sdk/fake.js";
 import type { RunOptions } from "../src/sdk/options.js";
 import { createSemaphore } from "../src/semaphore.js";
@@ -167,7 +172,16 @@ describe("verifyFinding (A6)", () => {
       finding(),
       ctx(),
     );
-    expect(esc79.passed).toBe(false);
+    // Both results say the claim holds, so the escalated score of 79 does
+    // not stop the finding (R2). A claim that does not hold stops it.
+    expect(esc79.passed).toBe(true);
+    const esc79NoClaim = await verifyFinding(
+      createFakeSdkClient(script(result(80), result(79, { claim_holds: false }))),
+      OPTIONS,
+      finding(),
+      ctx(),
+    );
+    expect(esc79NoClaim.passed).toBe(false);
     const esc80 = await verifyFinding(
       createFakeSdkClient(script(result(79), result(80))),
       OPTIONS,
@@ -201,10 +215,10 @@ describe("verifyFinding (A6)", () => {
   });
 
   it("escalates a finding with needs_context, whatever its score", async () => {
-    const fake = createFakeSdkClient(script(result(97), result(40)));
+    const fake = createFakeSdkClient(script(result(97), result(40, { claim_holds: false })));
     const out = await verifyFinding(fake, OPTIONS, finding({ needs_context: true }), ctx());
     expect(roles(fake.calls)).toEqual(["verifier", "verifier-escalation"]);
-    expect(out.final).toEqual(result(40));
+    expect(out.final).toEqual(result(40, { claim_holds: false }));
     expect(out.passed).toBe(false);
   });
 
@@ -223,12 +237,12 @@ describe("verifyFinding (A6)", () => {
       pre_existing: false,
     });
     const down = await verifyFinding(
-      createFakeSdkClient(script(result(84), result(50))),
+      createFakeSdkClient(script(result(84), result(50, { claim_holds: false }))),
       OPTIONS,
       finding(),
       ctx(),
     );
-    expect(down.final).toEqual(result(50));
+    expect(down.final).toEqual(result(50, { claim_holds: false }));
     expect(down.passed).toBe(false);
     const outOfScope = await verifyFinding(
       createFakeSdkClient(script(result(70), result(95, { in_scope: false }))),
@@ -535,6 +549,141 @@ describe("a verified pre-existing finding (R6)", () => {
       ctx(),
     );
     expect(out.pre_existing).toBe(false);
+  });
+});
+
+describe("the posting rule of a verifier result (R2)", () => {
+  const verify = (first: VerifierResult, second?: VerifierResult) =>
+    verifyFinding(createFakeSdkClient(script(first, second)), OPTIONS, finding(), ctx());
+
+  it("posts a claim that holds with a score at the threshold", async () => {
+    const out = await verify(result(90, { severity: "suggestion" }));
+    expect(out.passed).toBe(true);
+    expect(out.unsure).toBeUndefined();
+  });
+
+  it("does not post a claim that does not hold, whatever its severity other than unsure", async () => {
+    for (const severity of ["blocking", "dont_post", "not_real"] as const) {
+      const out = await verify(result(95, { claim_holds: false, severity }));
+      expect(out.passed).toBe(false);
+      expect(out.unsure).toBeUndefined();
+      expect(out.rejected).toBeUndefined();
+    }
+  });
+
+  it("does not post a don't post result, and the record keeps its severity", async () => {
+    const out = await verify(result(95, { severity: "dont_post" }));
+    expect(out.passed).toBe(false);
+    expect(out.unsure).toBeUndefined();
+    expect(out.rejected).toBeUndefined();
+    expect(out.final?.severity).toBe("dont_post");
+  });
+
+  it("posts when the first and the escalated results agree that the claim holds, below the threshold", async () => {
+    const out = await verify(result(70), result(50));
+    expect(out.escalated).toEqual(result(50));
+    expect(out.passed).toBe(true);
+  });
+
+  it("keeps the scope, quote and severity checks when the two results agree on the claim", async () => {
+    expect((await verify(result(70), result(50, { in_scope: false }))).passed).toBe(false);
+    const noQuote = await verify(result(70), result(50, { quotes: ["not in the file"] }));
+    expect(noQuote.passed).toBe(false);
+    expect(noQuote.rejected).toMatch(/quote/i);
+    expect((await verify(result(70), result(50, { severity: "dont_post" }))).passed).toBe(false);
+  });
+
+  it("does not apply the override when the first result says the claim does not hold", async () => {
+    const fake = createFakeSdkClient(script(result(70, { claim_holds: false }), result(50)));
+    const out = await verifyFinding(fake, OPTIONS, finding({ needs_context: true }), ctx());
+    expect(out.passed).toBe(false);
+  });
+});
+
+describe("the unsure result (R3)", () => {
+  const verify = (first: VerifierResult, second?: VerifierResult) =>
+    verifyFinding(createFakeSdkClient(script(first, second)), OPTIONS, finding(), ctx());
+
+  it("does not post a model-said unsure result, and names the claim as the cause", async () => {
+    const out = await verify(result(95, { severity: "unsure" }));
+    expect(out.passed).toBe(false);
+    expect(out.unsure).toBe("claim");
+    expect(out.rejected).toBeUndefined();
+  });
+
+  it("gives unsure for the severity unsure when claim_holds is false", async () => {
+    const out = await verify(result(30, { claim_holds: false, severity: "unsure" }));
+    expect(out.passed).toBe(false);
+    expect(out.unsure).toBe("claim");
+    expect(out.rejected).toBeUndefined();
+  });
+
+  it("gives unsure when the escalated result says unsure", async () => {
+    const out = await verify(result(70), result(90, { severity: "unsure" }));
+    expect(out.passed).toBe(false);
+    expect(out.unsure).toBe("claim");
+  });
+
+  it("rejects a result that says the claim holds and is not real, and names the contradiction", async () => {
+    const out = await verify(result(95, { severity: "not_real" }));
+    expect(out.passed).toBe(false);
+    expect(out.unsure).toBeUndefined();
+    expect(out.rejected).toMatch(/not_real/);
+    expect(out.rejected).toMatch(/claim/i);
+  });
+
+  it("gives unsure, not pre-existing, for an out-of-scope result that says unsure", async () => {
+    const out = await verify(result(95, { in_scope: false, severity: "unsure" }));
+    expect(out.unsure).toBe("claim");
+    expect(out.pre_existing).toBe(false);
+    expect(out.passed).toBe(false);
+  });
+
+  it("does not flag an out-of-scope result with a severity that does not post as pre-existing", async () => {
+    for (const severity of ["dont_post", "not_real"] as const) {
+      const out = await verify(result(95, { in_scope: false, severity }));
+      expect(out.pre_existing).toBe(false);
+      expect(out.unsure).toBeUndefined();
+    }
+  });
+});
+
+describe("a verifier call that stops on its limit (R4)", () => {
+  const limit = (subtype: string): QueryOutcome<unknown> =>
+    classifyResult({ subtype, duration_ms: 1, stop_reason: null }, "m", VerifierResultSchema);
+
+  it("gives unsure on a first call that stops on its turns, with no escalation", async () => {
+    const fake = createFakeSdkClient(script(limit("error_max_turns"), result(95)));
+    const out = await verifyFinding(fake, OPTIONS, finding({ needs_context: true }), ctx());
+    expect(roles(fake.calls)).toEqual(["verifier"]);
+    expect(out.first).toMatchObject({ kind: "limit" });
+    expect(out.final).toBeNull();
+    expect(out.passed).toBe(false);
+    expect(out.unsure).toBe("limit");
+  });
+
+  it("gives unsure on an escalation that stops on its budget", async () => {
+    const out = await verifyFinding(
+      createFakeSdkClient(script(result(70), limit("error_max_budget_usd"))),
+      OPTIONS,
+      finding(),
+      ctx(),
+    );
+    expect(out.escalated).toMatchObject({ kind: "limit" });
+    expect(out.final).toBeNull();
+    expect(out.passed).toBe(false);
+    expect(out.unsure).toBe("limit");
+  });
+
+  it("does not give unsure for a failure of another kind", async () => {
+    const out = await verifyFinding(
+      createFakeSdkClient(script(result(70), limit("error_during_execution"))),
+      OPTIONS,
+      finding(),
+      ctx(),
+    );
+    expect(out.escalated).toMatchObject({ kind: "subtype" });
+    expect(out.unsure).toBeUndefined();
   });
 });
 

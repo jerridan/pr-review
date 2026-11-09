@@ -5,8 +5,12 @@ import { diffSections } from "../gather/diff.js";
 import { loadPrompt, render, type PromptFile } from "../prompts/load.js";
 import type { RepoConfig } from "../config/repo-config.js";
 import type { Finding } from "../schemas/finding.js";
-import type { QueryFailure } from "../schemas/record.js";
-import { VerifierResultSchema, type VerifierResult } from "../schemas/verifier.js";
+import type { QueryFailure, UnsureCause } from "../schemas/record.js";
+import {
+  isPostedSeverity,
+  VerifierResultSchema,
+  type VerifierResult,
+} from "../schemas/verifier.js";
 import type { SdkClient } from "../sdk/client.js";
 import type { RunOptions } from "../sdk/options.js";
 import type { Semaphore } from "../semaphore.js";
@@ -54,12 +58,22 @@ export type Verification = {
   escalated?: VerifierResult | QueryFailure;
   final: VerifierResult | null;
   passed: boolean;
-  /** Why code failed a final result that the model passed. */
+  /**
+   * Why code failed a final result: a result that the model passed with
+   * no real quote, or a result that says the claim holds and is not real.
+   */
   rejected?: string;
   /**
+   * Present when the finding ended unsure (R3, R4): "claim" when the final
+   * result has the severity "unsure", "limit" when a call stopped on its
+   * limit. "passed" is then false.
+   */
+  unsure?: UnsureCause;
+  /**
    * True for a verified pre-existing finding (R6): the first result is out
-   * of scope, the claim holds, the score is at or above the threshold, and
-   * a quote of the verifier is in the head file. "passed" stays false.
+   * of scope, the claim holds, the severity posts, the score is at or
+   * above the threshold, and a quote of the verifier is in the head file.
+   * "passed" stays false.
    */
   pre_existing: boolean;
 };
@@ -237,8 +251,13 @@ export async function verifyFinding(
   const { threshold, bandLow, bandHigh } = ctx.config;
   // The verifier must quote the code that supports the claim. A result
   // that passes on the model's own fields fails when no quote is real.
-  const decide = (r: VerifierResult): { passed: boolean; rejected?: string } => {
-    if (!(r.in_scope && r.claim_holds && r.score >= threshold)) return { passed: false };
+  // "agreed" is true when the first and the escalated results both say
+  // that the claim holds. Then a score below the threshold does not stop
+  // the finding (R2).
+  const decide = (r: VerifierResult, agreed = false): Decision => {
+    const settled = settle(r);
+    if (settled !== null) return settled;
+    if (!(r.in_scope && (agreed || r.score >= threshold))) return { passed: false };
     if (!quoteMatches(r.quotes, headText)) {
       return {
         passed: false,
@@ -249,14 +268,21 @@ export async function verifyFinding(
   };
 
   const first = await ask("verifier");
-  if (isQueryFailure(first)) return { first, final: null, passed: false, pre_existing: false };
+  if (isQueryFailure(first)) {
+    // A limit stop gives the unsure result at once, with no escalation.
+    return { first, final: null, passed: false, ...limitStop(first), pre_existing: false };
+  }
   // The scope gate comes before the score, and an out-of-scope finding
   // does not escalate. A real issue with a real quote that the change did
-  // not bring is a pre-existing finding.
+  // not bring is a pre-existing finding. Its severity must post.
   if (!first.in_scope) {
+    const settled = settle(first);
     const preExisting =
-      first.claim_holds && first.score >= threshold && quoteMatches(first.quotes, headText);
-    return { first, final: first, passed: false, pre_existing: preExisting };
+      settled === null &&
+      isPostedSeverity(first.severity) &&
+      first.score >= threshold &&
+      quoteMatches(first.quotes, headText);
+    return { first, final: first, passed: false, ...settled, pre_existing: preExisting };
   }
 
   const inBand = first.score >= bandLow && first.score <= bandHigh;
@@ -266,9 +292,52 @@ export async function verifyFinding(
 
   const escalated = await ask("verifier-escalation");
   // The second check did not occur, so the finding has no final result
-  // and is not posted. The verdict counts this as a failed verifier call.
+  // and is not posted. The verdict counts this as a failed verifier call,
+  // except for a limit stop, which gives the unsure result.
   if (isQueryFailure(escalated)) {
-    return { first, escalated, final: null, passed: false, pre_existing: false };
+    return {
+      first,
+      escalated,
+      final: null,
+      passed: false,
+      ...limitStop(escalated),
+      pre_existing: false,
+    };
   }
-  return { first, escalated, final: escalated, ...decide(escalated), pre_existing: false };
+  const agreed = first.claim_holds && escalated.claim_holds;
+  return {
+    first,
+    escalated,
+    final: escalated,
+    ...decide(escalated, agreed),
+    pre_existing: false,
+  };
+}
+
+type Decision = { passed: boolean; rejected?: string; unsure?: UnsureCause };
+
+/** The unsure result of a call that stopped on its limit, or nothing. */
+function limitStop(failure: QueryFailure): { unsure?: UnsureCause } {
+  return failure.kind === "limit" ? { unsure: "limit" } : {};
+}
+
+/**
+ * Apply the first part of the outcome rule (R3), in its order. The
+ * severity "unsure" gives unsure, whatever claim_holds says, because the
+ * label is the model's explicit signal. Then a claim that does not hold
+ * fails, whatever its severity. Then "not_real" contradicts the claim and
+ * is rejected, and "dont_post" fails. Return null when the result has a
+ * claim that holds and a severity that posts, so the other checks decide.
+ */
+function settle(r: VerifierResult): Decision | null {
+  if (r.severity === "unsure") return { passed: false, unsure: "claim" };
+  if (!r.claim_holds) return { passed: false };
+  if (r.severity === "not_real") {
+    return {
+      passed: false,
+      rejected: "The verifier says that the claim holds, but gives the severity not_real.",
+    };
+  }
+  if (!isPostedSeverity(r.severity)) return { passed: false };
+  return null;
 }

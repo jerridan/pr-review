@@ -29,8 +29,13 @@ import { describeSelected, runReview } from "../src/run.js";
 import type { Finding } from "../src/schemas/finding.js";
 import type { RunRecord } from "../src/schemas/record.js";
 import type { TriageBrief } from "../src/schemas/triage.js";
-import type { VerifierResult } from "../src/schemas/verifier.js";
-import type { QueryMeta, QueryOutcome, QueryRequest } from "../src/sdk/client.js";
+import { VerifierResultSchema, type VerifierResult } from "../src/schemas/verifier.js";
+import {
+  classifyResult,
+  type QueryMeta,
+  type QueryOutcome,
+  type QueryRequest,
+} from "../src/sdk/client.js";
 import { createFakeSdkClient } from "../src/sdk/fake.js";
 import { buildQueryOptions } from "../src/sdk/options.js";
 import { UNTRUSTED_SYSTEM_LINE } from "../src/untrusted.js";
@@ -527,6 +532,116 @@ describe("a verifier result that the quote check rejects", () => {
         message: expect.stringMatching(new RegExp(`^${fx.file}:${fx.line} rejected: .*quote`, "i")),
       },
     ]);
+  });
+});
+
+describe("a verifier call that stops on its limit (R4)", () => {
+  // The SDK result of a call that stops on its limit, as the client
+  // classifies it.
+  const stopped = (subtype: string): QueryOutcome<unknown> =>
+    classifyResult(
+      { subtype, duration_ms: 3, stop_reason: null, total_cost_usd: 1 },
+      "m",
+      VerifierResultSchema,
+    );
+
+  function limitScript(role: "verifier" | "verifier-escalation", subtype: string) {
+    return (req: QueryRequest): QueryOutcome<unknown> => {
+      if (req.role === role) return stopped(subtype);
+      // A first score in the band sends the finding to the escalation.
+      if (req.role === "verifier") return { ok: true, output: { ...PASS, score: 70 }, raw: META };
+      return script(fx)(req);
+    };
+  }
+
+  it("gives unsure on an escalation budget stop, and the review completes", async () => {
+    const fake = createFakeSdkClient(limitScript("verifier-escalation", "error_max_budget_usd"));
+    const result = await runReview({
+      repo: fx.repo,
+      base: fx.base,
+      head: fx.head,
+      outDir: join(outRoot, "limit-escalation"),
+      format: "json",
+      allowApiKey: false,
+      client: fake,
+    });
+    const { record } = result;
+    // The eval scores a repeat that exits 0 with a verdict that is not incomplete.
+    expect(result.exitCode).toBe(0);
+    expect(record.posted.verdict).not.toBe("incomplete");
+    expect(record.stages.verifications[0]).toMatchObject({
+      escalated: { kind: "limit" },
+      final: null,
+      passed: false,
+      unsure: "limit",
+    });
+    expect(record.posted.findings).toEqual([]);
+    expect(record.posted.coverage.findings_unsure).toBe(1);
+    expect(record.posted.coverage.findings_unsure_on_limit).toBe(1);
+    expect(record.posted.coverage.findings_dropped_by_failed_verifier).toBe(0);
+  });
+
+  it("gives unsure on a first call that stops on its turns, with no escalation call", async () => {
+    const fake = createFakeSdkClient(limitScript("verifier", "error_max_turns"));
+    const { record } = await runReview({
+      repo: fx.repo,
+      base: fx.base,
+      head: fx.head,
+      outDir: join(outRoot, "limit-first"),
+      format: "json",
+      allowApiKey: false,
+      client: fake,
+    });
+    expect(fake.calls.filter((c) => c.role === "verifier-escalation")).toEqual([]);
+    expect(record.stages.verifications[0]).toMatchObject({
+      first: { kind: "limit" },
+      unsure: "limit",
+    });
+    expect(record.posted.verdict).not.toBe("incomplete");
+    expect(record.posted.coverage.findings_unsure_on_limit).toBe(1);
+  });
+
+  it("keeps the verdict incomplete for an escalation failure of another kind", async () => {
+    const fake = createFakeSdkClient(limitScript("verifier-escalation", "error_during_execution"));
+    const { record } = await runReview({
+      repo: fx.repo,
+      base: fx.base,
+      head: fx.head,
+      outDir: join(outRoot, "limit-other"),
+      format: "json",
+      allowApiKey: false,
+      client: fake,
+    });
+    expect(record.stages.verifications[0]?.escalated).toMatchObject({ kind: "subtype" });
+    expect(record.stages.verifications[0]?.unsure).toBeUndefined();
+    expect(record.posted.verdict).toBe("incomplete");
+    expect(record.posted.coverage.findings_dropped_by_failed_verifier).toBe(1);
+    expect(record.posted.coverage.findings_unsure).toBe(0);
+  });
+});
+
+describe("a model-said unsure result in a run (R3)", () => {
+  it("is not posted, and the coverage block counts it apart from failed verifier calls", async () => {
+    const fake = createFakeSdkClient((req) =>
+      req.role === "verifier" || req.role === "verifier-escalation"
+        ? { ok: true, output: { ...PASS, severity: "unsure" }, raw: META }
+        : script(fx)(req),
+    );
+    const { record } = await runReview({
+      repo: fx.repo,
+      base: fx.base,
+      head: fx.head,
+      outDir: join(outRoot, "unsure-claim"),
+      format: "json",
+      allowApiKey: false,
+      client: fake,
+    });
+    expect(record.stages.verifications[0]).toMatchObject({ passed: false, unsure: "claim" });
+    expect(record.posted.findings).toEqual([]);
+    expect(record.posted.verdict).toBe("would approve");
+    expect(record.posted.coverage.findings_unsure).toBe(1);
+    expect(record.posted.coverage.findings_unsure_on_limit).toBe(0);
+    expect(record.posted.coverage.findings_dropped_by_failed_verifier).toBe(0);
   });
 });
 

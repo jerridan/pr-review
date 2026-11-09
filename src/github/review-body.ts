@@ -131,6 +131,10 @@ function coverageParts(record: RunRecord): { text: string; news: boolean }[] {
     text: `${label}: ${list(names)}`,
     news: names.length > 0,
   });
+  const counted = (label: string, n: number): { text: string; news: boolean } => ({
+    text: `${label}: ${n}`,
+    news: n > 0,
+  });
   return [
     { text: `reviewers ran: ${list(c.reviewers_ran)}`, news: true },
     named("reviewers failed", c.reviewers_failed),
@@ -141,6 +145,9 @@ function coverageParts(record: RunRecord): { text: string; news: boolean }[] {
       text: `findings dropped by failed verifier calls: ${c.findings_dropped_by_failed_verifier}`,
       news: c.findings_dropped_by_failed_verifier > 0,
     },
+    // A record from before the unsure counts has neither. Absent means 0.
+    counted("findings unsure", c.findings_unsure ?? 0),
+    counted("findings unsure on a limit stop", c.findings_unsure_on_limit ?? 0),
     // A later run with no prior record, or a fresh run that could not
     // fetch the last reviewed head, says so (R7).
     ...(prior?.source === "marker" && !prior.fetch_failed

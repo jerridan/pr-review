@@ -91,8 +91,11 @@ function sumDrops(parts: Record<string, number>[]): Record<string, number> {
   return total;
 }
 
-/** The stages in pipeline order. The drops print in this order. */
-const STAGE_ORDER = ["reviewer", "verify", "suppress", "merge", "cap", "scope", "post"];
+/**
+ * The stages in pipeline order. The drops print in this order. "unsure"
+ * counts the unsure verifications apart from the other verify drops.
+ */
+const STAGE_ORDER = ["reviewer", "verify", "unsure", "suppress", "merge", "cap", "scope", "post"];
 
 /**
  * The drops as text, such as "verify 7, merge 1", or "-" for none. The

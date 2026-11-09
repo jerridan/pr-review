@@ -291,6 +291,36 @@ describe("metrics (R5.1, R5.2)", () => {
     expect(m.raw_candidates).toBe(1);
     expect(m.drops).toEqual({ verify: 1 });
   });
+
+  it("counts an unsure verification apart from the verify drops (R3)", async () => {
+    const rec = record([], { total: 0, stageMs: {} });
+    const {
+      verifier: _v,
+      fingerprint: _f,
+      severity: _s,
+      score: _sc,
+      span_text: _t,
+      ...hit
+    } = posted(10);
+    const failedHit = { ...hit, start_line: 20, end_line: 20, claim: "other" };
+    rec.stages.reviewers = [
+      { name: "r", pass: 1, status: "ok", findings: [hit, failedHit], dropped: [], meta: null },
+    ];
+    const unsure = { ...posted(10).verifier, severity: "unsure" as const };
+    rec.stages.verifications = [
+      { finding: hit, first: unsure, final: unsure, passed: false, unsure: "claim" },
+      { finding: failedHit, first: { kind: "thrown", message: "x" }, final: null, passed: false },
+    ];
+    const noJudge = createFakeSdkClient(() => {
+      throw new Error("no judge query is expected");
+    });
+    const score = await scoreRecord(rec, [], "/nonexistent", {
+      client: noJudge,
+      model: "claude-sonnet-5-5",
+      options: { allowApiKey: false, env: {} },
+    });
+    expect(metrics(rec, score, 1).drops).toEqual({ verify: 1, unsure: 1 });
+  });
 });
 
 describe("failedMetrics (R3.8)", () => {
@@ -636,6 +666,17 @@ describe("renderTable (R5.5)", () => {
     expect(
       lines.some((l) => /^judge cost per PR\s+\$0\.0125\s+\$0\.0000\s+\$0\.0250\s*$/.test(l)),
     ).toBe(true);
+  });
+
+  it("prints the unsure drops apart from the verify drops, after them (R3, R8)", () => {
+    const withUnsure = renderTable(
+      buildReport(
+        [{ name: "u-case", repeats: [rm(1, { drops: { merge: 1, unsure: 3, verify: 2 } })] }],
+        null,
+        null,
+      ),
+    );
+    expect(withUnsure).toMatch(/verify 2, unsure 3, merge 1/);
   });
 
   it("prints the raw recall and the summed drops in the summary", () => {
