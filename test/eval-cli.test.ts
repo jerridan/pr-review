@@ -792,6 +792,7 @@ describe("pr-review eval: usage errors (R3.1, R3.9)", () => {
       "--allow-api-key",
       "--allow-same-judge",
       "--no-extras",
+      "--raw-judge",
     ]) {
       expect(stdout).toContain(flag);
     }
@@ -1078,6 +1079,44 @@ describe("pr-review eval: the report outputs (R5.5, R5.6, R5.7)", () => {
   );
 });
 
+describe("pr-review eval: --raw-judge", () => {
+  // The verifier drops the planted finding, so only the raw pass sees it.
+  // The golden has another category, so the raw pair is ambiguous.
+  const rawCase = () =>
+    casesDir([{ name: "raw", golden: [{ ...PLANTED(), category: "security" }] }]);
+
+  it(
+    "asks the judge nothing about an ambiguous raw candidate without --raw-judge",
+    async () => {
+      const fake = evalFake({ rejectPlanted: true });
+      const { code, report } = await evalJson(fake, rawCase(), "--repeat", "1", "--no-extras");
+      expect(code, stderr).toBe(0);
+      expect(judgeCalls(fake)).toHaveLength(0);
+      expect(report?.cases[0]?.repeats[0]).toMatchObject({ raw_recall: 0, judge_calls: 0 });
+    },
+    RUN_TIMEOUT,
+  );
+
+  it(
+    "asks the judge about an ambiguous raw candidate with --raw-judge",
+    async () => {
+      const fake = evalFake({ rejectPlanted: true, judgeAnswer: "yes" });
+      const { code, report } = await evalJson(
+        fake,
+        rawCase(),
+        "--repeat",
+        "1",
+        "--no-extras",
+        "--raw-judge",
+      );
+      expect(code, stderr).toBe(0);
+      expect(judgeCalls(fake)).toHaveLength(1);
+      expect(report?.cases[0]?.repeats[0]).toMatchObject({ raw_recall: 1, judge_calls: 1 });
+    },
+    RUN_TIMEOUT,
+  );
+});
+
 describe("pr-review eval: the extras judge", () => {
   type CandidatesFile = { findings: Record<string, unknown>[] };
   const candidatesOf = (out: string, name: string): CandidatesFile =>
@@ -1119,10 +1158,14 @@ describe("pr-review eval: the extras judge", () => {
         severity: "blocking",
         claim: "CLAIM-off-by-one",
       });
-      expect(String(findings[0]?.note)).toMatch(
-        /^Extra accepted by the extras judge claude-sonnet-5-5 on the eval run .+, started \d{4}-\d\d-\d\dT[^,]+Z, repeat 1\.$/,
+      // The note names the judge model, the start time and the repeat, and
+      // says that the severity is not a label yet. It holds no local path.
+      const note = String(findings[0]?.note);
+      expect(note).toMatch(
+        /^Extra accepted by the extras judge claude-sonnet-5-5 in the eval that started \d{4}-\d\d-\d\dT[^,]+Z, repeat 1\. /,
       );
-      expect(String(findings[0]?.note)).toContain(out);
+      expect(note).toMatch(/severity .*reviewer.*not labeled/);
+      expect(note).not.toContain(out);
       expect(readFileSync(join(cases, "extra", "golden.json")).equals(goldenBefore)).toBe(true);
     },
     RUN_TIMEOUT,
@@ -1145,6 +1188,43 @@ describe("pr-review eval: the extras judge", () => {
       expect(r).toMatchObject({ precision: 0, adjudicated_precision: null, extras_judged: 0 });
       expect(report?.repeats[0]?.adjudicated_precision).toBeNull();
       expect(existsSync(join(out, "extra", "candidates.json"))).toBe(false);
+    },
+    RUN_TIMEOUT,
+  );
+
+  it(
+    "warns and keeps the metrics of the repeat when candidates.json in a reused --out is not valid",
+    async () => {
+      const out = newDir("out");
+      mkdirSync(join(out, "extra"));
+      writeFileSync(join(out, "extra", "candidates.json"), "{}");
+      const fake = evalFake({ plantedOnly: true, extrasAnswer: "yes" });
+      const code = await exitCodeOf(
+        createProgram({ client: fake }).parseAsync([
+          "node",
+          "pr-review",
+          "eval",
+          "--cases",
+          extraCase(),
+          "--out",
+          out,
+          "--repeat",
+          "1",
+          "--format",
+          "json",
+        ]),
+      );
+      expect(code, stderr).toBe(0);
+      const report = JSON.parse(stdout) as Report;
+      const [r] = report.cases[0]?.repeats ?? [];
+      expect(r).toMatchObject({ failed: false, adjudicated_precision: 1, extras_accepted: 1 });
+      expect(report.failed_repeats).toEqual([]);
+      const warnings = stderr.split("\n").filter((l) => /warning/.test(l) && /candidates/.test(l));
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain("extra");
+      expect(warnings[0]).toContain("repeat 1");
+      // The file that is not valid does not change.
+      expect(readFileSync(join(out, "extra", "candidates.json"), "utf8")).toBe("{}");
     },
     RUN_TIMEOUT,
   );

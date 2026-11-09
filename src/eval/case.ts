@@ -71,7 +71,8 @@ const CaseMetaSchema = z.strictObject({
   language: z.string(),
 });
 
-const GoldenFindingSchema = z
+/** One golden finding. candidates.json of the eval uses the same format. */
+export const GoldenFindingSchema = z
   .strictObject({
     file: z.string(),
     start_line: z.int().min(1),
@@ -86,7 +87,8 @@ const GoldenFindingSchema = z
     path: ["end_line"],
   });
 
-const GoldenSchema = z.strictObject({ findings: z.array(GoldenFindingSchema) });
+/** golden.json, and candidates.json of the eval. */
+export const GoldenSchema = z.strictObject({ findings: z.array(GoldenFindingSchema) });
 
 /** The files that every case holds, apart from case.json. */
 const CASE_FILES = ["repo.bundle", "diff.patch", "golden.json"] as const;

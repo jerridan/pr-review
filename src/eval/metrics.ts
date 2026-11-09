@@ -32,6 +32,8 @@ export type RepeatMetrics = {
   extras_judged: number;
   /** The posted findings that the extras judge accepted as real. */
   extras_accepted: number;
+  /** The unknown answers of the extras judge. judge_unknown does not hold them. */
+  extras_unknown: number;
   /** The matched and the accepted posted findings, over the posted findings. */
   adjudicated_precision: number | null;
 };
@@ -73,6 +75,7 @@ export function metrics(record: RunRecord, score: ScoreResult, repeat: number): 
     drops: countDrops(explain(record)),
     extras_judged: score.extras.judged,
     extras_accepted: accepted,
+    extras_unknown: score.extras.unknown,
     adjudicated_precision:
       !score.extras.enabled || posted === 0 ? null : (matched + accepted) / posted,
   };
@@ -101,6 +104,7 @@ export function failedMetrics(repeat: number, error: string, run_ms: number): Re
     drops: {},
     extras_judged: 0,
     extras_accepted: 0,
+    extras_unknown: 0,
     adjudicated_precision: null,
   };
 }

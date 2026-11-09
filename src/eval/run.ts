@@ -21,11 +21,18 @@ import {
   type Baseline,
   type Gate,
 } from "./baseline.js";
-import { CaseError, casesRef, loadCases, type Case, type GoldenFinding } from "./case.js";
+import {
+  CaseError,
+  casesRef,
+  GoldenSchema,
+  loadCases,
+  type Case,
+  type GoldenFinding,
+} from "./case.js";
 import { cloneCase } from "./checkout.js";
 import { failedMetrics, metrics, type RepeatMetrics } from "./metrics.js";
 import { buildReport, renderTable, type Report } from "./report.js";
-import { scoreRecord } from "./score.js";
+import { findingKey, scoreRecord } from "./score.js";
 
 /** The flags of "pr-review eval". */
 export type EvalOptions = {
@@ -41,6 +48,8 @@ export type EvalOptions = {
   allowSameJudge: boolean;
   /** False for --no-extras: no extras judge and no candidates.json. */
   extras: boolean;
+  /** True for --raw-judge: the raw pass also asks the judge. */
+  rawJudge: boolean;
 };
 
 function messageOf(err: unknown): string {
@@ -155,7 +164,7 @@ type EvalContext = {
   startedAt: string;
 };
 
-/** The entries of candidates.json, in the golden finding format. */
+/** candidates.json has the format of golden.json. */
 type CandidatesFile = { findings: GoldenFinding[] };
 
 /**
@@ -163,6 +172,8 @@ type CandidatesFile = { findings: GoldenFinding[] };
  * "<out>/<case>/candidates.json". One file holds the extras of every
  * repeat of the case. An entry with the same file, span and claim as an
  * entry in the file is not added again. golden.json does not change.
+ * Throw when the file is not valid JSON or does not match the schema. The
+ * file then does not change.
  */
 async function addCandidates(
   ctx: EvalContext,
@@ -175,18 +186,18 @@ async function addCandidates(
   const dir = join(ctx.out, c.name);
   const path = join(dir, "candidates.json");
   const file: CandidatesFile = existsSync(path)
-    ? (JSON.parse(await readFile(path, "utf8")) as CandidatesFile)
+    ? GoldenSchema.parse(JSON.parse(await readFile(path, "utf8")))
     : { findings: [] };
-  const key = (f: Pick<GoldenFinding, "file" | "start_line" | "end_line" | "claim">): string =>
-    JSON.stringify([f.file, f.start_line, f.end_line, f.claim]);
-  const known = new Set(file.findings.map(key));
+  const known = new Set(file.findings.map(findingKey));
+  // The note holds no local path. The severity is the reviewer's own.
   const note =
-    `Extra accepted by the extras judge ${ctx.judgeModel} on the eval run ${ctx.out}, ` +
-    `started ${ctx.startedAt}, repeat ${repeat}.`;
+    `Extra accepted by the extras judge ${ctx.judgeModel} in the eval that started ` +
+    `${ctx.startedAt}, repeat ${repeat}. The severity is the reviewer's own and is not ` +
+    "labeled: label it before the entry becomes a golden finding.";
   for (const index of accepted) {
     const f = record.posted.findings[index];
-    if (!f || known.has(key(f))) continue;
-    known.add(key(f));
+    if (!f || known.has(findingKey(f))) continue;
+    known.add(findingKey(f));
     file.findings.push({
       file: f.file,
       start_line: f.start_line,
@@ -247,9 +258,16 @@ async function runRepeat(ctx: EvalContext, c: Case, repeat: number): Promise<Rep
       c.golden,
       checkout,
       { client: ctx.client, model: ctx.judgeModel, options: ctx.options },
-      { extras: ctx.opts.extras },
+      { extras: ctx.opts.extras, rawJudge: ctx.opts.rawJudge },
     );
-    await addCandidates(ctx, c, result.record, score.extras.accepted, repeat);
+    // A candidates.json problem does not fail a repeat with a good score.
+    try {
+      await addCandidates(ctx, c, result.record, score.extras.accepted, repeat);
+    } catch (err) {
+      say(
+        `warning: case ${c.name}, repeat ${repeat}: cannot update candidates.json: ${messageOf(err)}`,
+      );
+    }
     return { kind: "done", metrics: metrics(result.record, score, repeat) };
   } catch (err) {
     return failed(messageOf(err));
