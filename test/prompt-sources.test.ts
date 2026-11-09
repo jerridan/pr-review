@@ -349,10 +349,9 @@ describe("A13: every query takes its prompts from the prompt files", () => {
 
   it("sends the judge text for a span past the end of the head file from prompts/judge.md", () => {
     const judges = calls.filter((c) => c.role === "judge");
-    // Two queries come from the posted pass, one for each golden. Four come
-    // from the raw candidates A and B, whose text differs from the merged
-    // posted finding. The posted pass asks first.
-    expect(judges).toHaveLength(6);
+    // The two queries come from the posted pass, one for each golden. The
+    // raw pass takes exact matches only by default, so it asks nothing.
+    expect(judges).toHaveLength(2);
     expect(blocks(judges[0]?.userMessage ?? "").get("golden_span")).not.toBe(
       field("judge.md", "no_span_text").trim(),
     );

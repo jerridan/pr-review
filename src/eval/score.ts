@@ -2,8 +2,9 @@
 // against the golden findings of its case: exact matches first, then the
 // judge on the ambiguous pairs. The posted goldens go first. The not-real
 // goldens then take the posted findings that are still free. The raw
-// candidates go to the posted goldens only. With extras on, the extras
-// judge then checks each posted finding that matches no golden.
+// candidates go to the posted goldens only, with exact matches only unless
+// the caller asks for the raw judge. With extras on, the extras judge then
+// checks each posted finding that matches no golden.
 import { z } from "zod";
 import { readHeadFile } from "../find/evidence.js";
 import { diffSections } from "../gather/diff.js";
@@ -31,8 +32,11 @@ export const ExtrasOutputSchema: z.ZodType<ExtrasOutput> = z.strictObject({
 export type ScoreResult = {
   /** The matches to posted goldens. A match to a not-real golden is not here. */
   matched: Match[];
+  /** The queries of both judges. */
   judgeCalls: number;
+  /** The unknown answers of the match judge only. */
   judgeUnknown: number;
+  /** The cost of both judges. */
   judgeCostUsd: number;
   /** Over the matches to posted goldens only. */
   severityAgreement: { same: number; matched: number };
@@ -40,21 +44,21 @@ export type ScoreResult = {
   notRealMatches: number;
   /** The goldens with blocking, suggestion or nit. */
   postedGoldenCount: number;
-  /** The indices of the posted findings that match no golden at all. */
-  unmatchedPosted: number[];
   /**
    * The score of the raw candidates: the reviewer findings, with the same
    * file, span and claim collapsed into one. They match the posted goldens
-   * only, because raw recall counts nothing else. "posted" in a match is an
-   * index into that list. "candidates" is its length.
+   * only, because raw recall counts nothing else. Without "rawJudge", the
+   * matches are exact only. "posted" in a match is an index into that
+   * list. "candidates" is its length.
    */
   raw: { matched: Match[]; candidates: number };
   /**
    * The extras judge. "enabled" is false when the caller did not ask for
    * it. "judged" is the count of queries. "accepted" holds the indices of
-   * the posted findings with the answer "yes".
+   * the posted findings with the answer "yes". "unknown" counts the
+   * unknown answers, also a failed query.
    */
-  extras: { enabled: boolean; judged: number; accepted: number[] };
+  extras: { enabled: boolean; judged: number; accepted: number[]; unknown: number };
 };
 
 type Match = { posted: number; golden: number; via: "exact" | "judge" };
@@ -168,6 +172,14 @@ function maximumMatching(postedCount: number, pairs: [number, number][]): [numbe
 }
 
 /**
+ * The identity of a finding for a dedupe: its file, its span and its
+ * claim. The raw candidates and candidates.json use it.
+ */
+export function findingKey(f: Pick<Finding, "file" | "start_line" | "end_line" | "claim">): string {
+  return JSON.stringify([f.file, f.start_line, f.end_line, f.claim]);
+}
+
+/**
  * The raw candidates of a record: the findings of every reviewer entry, in
  * record order. Two findings with the same file, span and claim collapse
  * into the first one.
@@ -177,7 +189,7 @@ function rawCandidates(record: RunRecord): Finding[] {
   const out: Finding[] = [];
   for (const entry of record.stages.reviewers) {
     for (const f of entry.findings) {
-      const key = JSON.stringify([f.file, f.start_line, f.end_line, f.claim]);
+      const key = findingKey(f);
       if (seen.has(key)) continue;
       seen.add(key);
       out.push(f);
@@ -194,21 +206,23 @@ function rawCandidates(record: RunRecord): Finding[] {
  * go first: all exact matches, then the judge. The posted findings that
  * are still free then go to the not-real goldens in the same two steps. So
  * a posted golden wins over a not-real golden. The raw candidates go to
- * the posted goldens only, because raw recall counts nothing else. So a
- * not-real golden costs no judge query in the raw matching. The judge gets
- * one query for each ambiguous pair in which neither finding has a match
- * yet. Only the answer "yes" is a match. A failed query counts as
- * "unknown". The two matchings share the judge answers: a pair with the
- * same judge text and the same golden gets one query only. With "extras" on, each posted finding that
- * matches no golden then gets one query of the extras judge. Extras are
- * off by default.
+ * the posted goldens only, because raw recall counts nothing else. By
+ * default the raw matching takes exact matches only, because the raw
+ * candidates are many. With "rawJudge" on, it also asks the judge. The
+ * judge gets one query for each ambiguous pair in which neither finding
+ * has a match yet. Only the answer "yes" is a match. A failed query counts
+ * as "unknown". The two matchings share the judge answers: a pair with the
+ * same judge text and the same golden gets one query only. With "extras"
+ * on, each posted finding that matches no golden then gets one query of
+ * the extras judge. Extras are off by default. An unknown answer of the
+ * extras judge counts in "extras.unknown", not in "judgeUnknown".
  */
 export async function scoreRecord(
   record: RunRecord,
   golden: GoldenFinding[],
   headDir: string,
   judge: { client: SdkClient; model: string; options: RunOptions },
-  opts: { extras?: boolean } = {},
+  opts: { extras?: boolean; rawJudge?: boolean } = {},
 ): Promise<ScoreResult> {
   const postedGolden = golden.map(isPostedGolden);
 
@@ -227,6 +241,35 @@ export async function scoreRecord(
     return fileLines.get(file) ?? null;
   };
 
+  // One judge query of either judge. It adds the cost. A failed query or a
+  // query that throws gives "unknown". "pick" takes the answer from the
+  // output.
+  const queryJudge = async <T, A extends string>(
+    system: string,
+    userMessage: string,
+    schema: z.ZodType<T>,
+    pick: (output: T) => A,
+  ): Promise<A | "unknown"> => {
+    judgeCalls += 1;
+    try {
+      const outcome = await judge.client.query<T>(
+        {
+          role: "judge",
+          systemPrompt: system,
+          userMessage,
+          schema,
+          cwd: headDir,
+          overrides: { model: judge.model },
+        },
+        judge.options,
+      );
+      judgeCostUsd += outcome.raw?.costUsd ?? 0;
+      return outcome.ok ? pick(outcome.output) : "unknown";
+    } catch {
+      return "unknown";
+    }
+  };
+
   const query = async (p: Finding, g: GoldenFinding): Promise<JudgeOutput["same_issue"]> => {
     prompt ??= loadJudgePrompt();
     const blocks = {
@@ -241,23 +284,12 @@ export async function scoreRecord(
         spanText(linesOf(g.file), g.start_line, g.end_line, prompt.noSpanText),
       ).block,
     };
-    try {
-      const outcome = await judge.client.query<JudgeOutput>(
-        {
-          role: "judge",
-          systemPrompt: prompt.system,
-          userMessage: render(prompt.template, blocks),
-          schema: JudgeOutputSchema,
-          cwd: headDir,
-          overrides: { model: judge.model },
-        },
-        judge.options,
-      );
-      judgeCostUsd += outcome.raw?.costUsd ?? 0;
-      return outcome.ok ? outcome.output.same_issue : "unknown";
-    } catch {
-      return "unknown";
-    }
+    return queryJudge(
+      prompt.system,
+      render(prompt.template, blocks),
+      JudgeOutputSchema,
+      (out) => out.same_issue,
+    );
   };
 
   // The judge sees the same text for two findings with the same
@@ -269,7 +301,6 @@ export async function scoreRecord(
     if (known !== undefined) return known;
     const goldenFinding = golden[g];
     if (!goldenFinding) return "no";
-    judgeCalls += 1;
     const answer = await query(p, goldenFinding);
     if (answer === "unknown") judgeUnknown += 1;
     answers.set(key, answer);
@@ -278,10 +309,11 @@ export async function scoreRecord(
 
   // Match "findings" to the goldens: the posted goldens first, then, when
   // "notReal" is true, the not-real goldens. Each step does exact matches
-  // first and then the judge.
+  // first and then, when "useJudge" is true, the judge.
   const matchAll = async (
     findings: Finding[],
     notReal: boolean,
+    useJudge: boolean,
   ): Promise<{ matched: Match[]; notRealMatches: number; taken: Set<number> }> => {
     const kinds: PairKind[][] = findings.map((p) => golden.map((g) => classifyPair(p, g)));
     const matched: Match[] = [];
@@ -306,6 +338,7 @@ export async function scoreRecord(
       for (const [p, g] of maximumMatching(findings.length, pairsOf("exact", posts))) {
         take(p, g, "exact");
       }
+      if (!useJudge) continue;
       for (const [p, g] of pairsOf("ambiguous", posts)) {
         const finding = findings[p];
         if (!free(p, g) || !finding) continue;
@@ -316,16 +349,19 @@ export async function scoreRecord(
   };
 
   const posted = record.posted.findings;
-  const fromPosted = await matchAll(posted, true);
+  const fromPosted = await matchAll(posted, true, true);
   const candidates = rawCandidates(record);
-  const fromRaw = await matchAll(candidates, false);
+  const fromRaw = await matchAll(candidates, false, opts.rawJudge === true);
 
+  // The posted findings that match no golden at all. A not-real match is
+  // not here.
   const unmatchedPosted = posted.flatMap((_, p) => (fromPosted.taken.has(p) ? [] : [p]));
 
   // The extras judge: one query for each posted finding with no golden.
   const enabled = opts.extras === true;
   const accepted: number[] = [];
   let judged = 0;
+  let extrasUnknown = 0;
   if (enabled && unmatchedPosted.length > 0) {
     const extras = loadExtrasPrompt();
     // The diff of the change, split by file once. A git failure gives no diff.
@@ -338,7 +374,6 @@ export async function scoreRecord(
       const finding = posted[p];
       if (!finding) continue;
       judged += 1;
-      judgeCalls += 1;
       const section = (sections.get(finding.file) ?? "").trim();
       const blocks = {
         posted_finding: wrapUntrusted("posted_finding", describePosted(finding)).block,
@@ -354,26 +389,14 @@ export async function scoreRecord(
         diff: wrapUntrusted("diff", section === "" ? extras.noDiffText : section).block,
         policy: wrapUntrusted("policy", policy).block,
       };
-      let answer: ExtrasOutput["real"] = "unknown";
-      try {
-        const outcome = await judge.client.query<ExtrasOutput>(
-          {
-            role: "judge",
-            systemPrompt: extras.system,
-            userMessage: render(extras.template, blocks),
-            schema: ExtrasOutputSchema,
-            cwd: headDir,
-            overrides: { model: judge.model },
-          },
-          judge.options,
-        );
-        judgeCostUsd += outcome.raw?.costUsd ?? 0;
-        if (outcome.ok) answer = outcome.output.real;
-      } catch {
-        answer = "unknown";
-      }
+      const answer = await queryJudge(
+        extras.system,
+        render(extras.template, blocks),
+        ExtrasOutputSchema,
+        (out) => out.real,
+      );
       if (answer === "yes") accepted.push(p);
-      else if (answer === "unknown") judgeUnknown += 1;
+      else if (answer === "unknown") extrasUnknown += 1;
     }
   }
 
@@ -387,11 +410,10 @@ export async function scoreRecord(
     severityAgreement: { same: same.length, matched: matched.length },
     notRealMatches: fromPosted.notRealMatches,
     postedGoldenCount: postedGolden.filter(Boolean).length,
-    unmatchedPosted,
     raw: {
       matched: fromRaw.matched,
       candidates: candidates.length,
     },
-    extras: { enabled, judged, accepted },
+    extras: { enabled, judged, accepted, unknown: extrasUnknown },
   };
 }

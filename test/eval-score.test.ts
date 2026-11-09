@@ -472,17 +472,58 @@ describe("scoreRecord: severity agreement (R4.7)", () => {
   });
 });
 
+type Real = "yes" | "no" | "unknown" | "fail" | "throw";
+
+/** A fake whose extras queries give the answers in order. A match query gets "no". */
+function extrasFake(answers: Real[], costUsd = 0.01) {
+  let next = 0;
+  return createFakeSdkClient((req: QueryRequest): QueryOutcome<unknown> => {
+    if (req.role !== "judge") throw new Error(`unexpected role ${req.role}`);
+    if (req.schema !== ExtrasOutputSchema) {
+      return { ok: true, output: { same_issue: "no", reason: "r" }, raw: meta(costUsd) };
+    }
+    const answer = answers[next] ?? "no";
+    next += 1;
+    if (answer === "throw") throw new Error("the judge process crashed");
+    if (answer === "fail") {
+      return { ok: false, failure: { kind: "limit", message: "budget" }, raw: meta(costUsd) };
+    }
+    return { ok: true, output: { real: answer, reason: "r" }, raw: meta(costUsd) };
+  });
+}
+
+const extrasCalls = (fake: ReturnType<typeof extrasFake>) =>
+  fake.calls.filter((c) => c.schema === ExtrasOutputSchema);
+
+/** Score with the extras judge on. */
+function scoreWithExtras(
+  findings: PostedFinding[],
+  goldens: GoldenFinding[],
+  fake: ReturnType<typeof extrasFake>,
+) {
+  return scoreRecord(
+    record(findings),
+    goldens,
+    head,
+    { client: fake, model: SONNET, options: OPTIONS },
+    { extras: true },
+  );
+}
+
 describe("scoreRecord: not-real goldens", () => {
   it("counts a posted finding at the span of a not_real golden as a not-real match, not a match", async () => {
-    const result = await score(
+    const fake = extrasFake(["yes"]);
+    const result = await scoreWithExtras(
       [posted("src/a.ts", 10, 10)],
       [golden("src/b.ts", 40, 40), golden("src/a.ts", 10, 10, { severity: "not_real" })],
-      judgeFake([]),
+      fake,
     );
     expect(result.matched).toEqual([]);
     expect(result.notRealMatches).toBe(1);
     expect(result.postedGoldenCount).toBe(1);
-    expect(result.unmatchedPosted).toEqual([]);
+    // A not-real match is no extra, so the extras judge gets no query.
+    expect(extrasCalls(fake)).toHaveLength(0);
+    expect(result.extras.judged).toBe(0);
     expect(result.severityAgreement).toEqual({ same: 0, matched: 0 });
   });
 
@@ -523,15 +564,16 @@ describe("scoreRecord: not-real goldens", () => {
     expect(result.notRealMatches).toBe(0);
   });
 
-  it("lists the posted findings that match no golden at all", async () => {
-    const result = await score(
+  it("sends only the posted findings that match no golden at all to the extras judge", async () => {
+    const result = await scoreWithExtras(
       [posted("src/a.ts", 10, 10), posted("src/a.ts", 30, 30), posted("src/b.ts", 5, 5)],
       [golden("src/a.ts", 10, 10), golden("src/b.ts", 5, 5, { severity: "unsure" })],
-      judgeFake([]),
+      extrasFake(["yes"]),
     );
     expect(result.matched).toEqual([{ posted: 0, golden: 0, via: "exact" }]);
     expect(result.notRealMatches).toBe(1);
-    expect(result.unmatchedPosted).toEqual([1]);
+    expect(result.extras.judged).toBe(1);
+    expect(result.extras.accepted).toEqual([1]);
   });
 });
 
@@ -541,13 +583,29 @@ describe("scoreRecord: the raw candidates", () => {
     raw: Finding[][],
     goldens: GoldenFinding[],
     fake: ReturnType<typeof judgeFake>,
+    rawJudge = false,
   ) {
-    return scoreRecord(record(findings, raw), goldens, head, {
-      client: fake,
-      model: SONNET,
-      options: OPTIONS,
-    });
+    return scoreRecord(
+      record(findings, raw),
+      goldens,
+      head,
+      { client: fake, model: SONNET, options: OPTIONS },
+      { rawJudge },
+    );
   }
+
+  it("asks no judge query for a raw candidate that is ambiguous against a posted golden, by default", async () => {
+    const fake = judgeFake(["yes"]);
+    const result = await scoreRaw(
+      [],
+      [[posted("src/a.ts", 20, 20)]],
+      [golden("src/a.ts", 12, 12)],
+      fake,
+    );
+    expect(fake.calls).toHaveLength(0);
+    expect(result.judgeCalls).toBe(0);
+    expect(result.raw.matched).toEqual([]);
+  });
 
   it("matches a raw candidate that did not post, and keeps it out of the posted matches", async () => {
     const result = await scoreRaw(
@@ -588,13 +646,14 @@ describe("scoreRecord: the raw candidates", () => {
     expect(result.raw.matched).toEqual([]);
   });
 
-  it("reuses the judge answer of the posted pass for an equal raw candidate", async () => {
+  it("reuses the judge answer of the posted pass for an equal raw candidate, with rawJudge", async () => {
     const fake = judgeFake(["yes", "yes"]);
     const result = await scoreRaw(
       [posted("src/a.ts", 20, 20)],
       [[posted("src/a.ts", 20, 20)]],
       [golden("src/a.ts", 12, 12)],
       fake,
+      true,
     );
     expect(fake.calls).toHaveLength(1);
     expect(result.judgeCalls).toBe(1);
@@ -602,13 +661,14 @@ describe("scoreRecord: the raw candidates", () => {
     expect(result.raw.matched).toEqual([{ posted: 0, golden: 0, via: "judge" }]);
   });
 
-  it("asks the judge about a raw candidate that differs from every posted finding, and counts the call and its cost", async () => {
+  it("asks the judge about a raw candidate that differs from every posted finding with rawJudge, and counts the call and its cost", async () => {
     const fake = judgeFake(["yes"], 0.02);
     const result = await scoreRaw(
       [],
       [[posted("src/a.ts", 20, 20)]],
       [golden("src/a.ts", 12, 12)],
       fake,
+      true,
     );
     expect(fake.calls).toHaveLength(1);
     expect(result.judgeCalls).toBe(1);
@@ -618,29 +678,6 @@ describe("scoreRecord: the raw candidates", () => {
 });
 
 describe("scoreRecord: the extras judge", () => {
-  type Real = "yes" | "no" | "unknown" | "fail" | "throw";
-
-  /** A fake whose extras queries give the answers in order. A match query gets "no". */
-  function extrasFake(answers: Real[], costUsd = 0.01) {
-    let next = 0;
-    return createFakeSdkClient((req: QueryRequest): QueryOutcome<unknown> => {
-      if (req.role !== "judge") throw new Error(`unexpected role ${req.role}`);
-      if (req.schema !== ExtrasOutputSchema) {
-        return { ok: true, output: { same_issue: "no", reason: "r" }, raw: meta(costUsd) };
-      }
-      const answer = answers[next] ?? "no";
-      next += 1;
-      if (answer === "throw") throw new Error("the judge process crashed");
-      if (answer === "fail") {
-        return { ok: false, failure: { kind: "limit", message: "budget" }, raw: meta(costUsd) };
-      }
-      return { ok: true, output: { real: answer, reason: "r" }, raw: meta(costUsd) };
-    });
-  }
-
-  const extrasCalls = (fake: ReturnType<typeof extrasFake>) =>
-    fake.calls.filter((c) => c.schema === ExtrasOutputSchema);
-
   function scoreExtras(
     findings: PostedFinding[],
     goldens: GoldenFinding[],
@@ -667,7 +704,7 @@ describe("scoreRecord: the extras judge", () => {
     expect(blocks(extrasCalls(fake)[0]?.userMessage ?? "").get("posted_finding")).toContain(
       "POSTED-CLAIM-src/a.ts-40",
     );
-    expect(result.extras).toEqual({ enabled: true, judged: 1, accepted: [1] });
+    expect(result.extras).toEqual({ enabled: true, judged: 1, accepted: [1], unknown: 0 });
     expect(result.judgeCalls).toBe(1);
   });
 
@@ -683,9 +720,10 @@ describe("scoreRecord: the extras judge", () => {
       [],
       fake,
     );
-    expect(result.extras).toEqual({ enabled: true, judged: 4, accepted: [] });
+    // The unknown answers count for the extras judge, not for the match judge.
+    expect(result.extras).toEqual({ enabled: true, judged: 4, accepted: [], unknown: 3 });
     expect(result.judgeCalls).toBe(4);
-    expect(result.judgeUnknown).toBe(3);
+    expect(result.judgeUnknown).toBe(0);
     // The thrown query gives no cost.
     expect(result.judgeCostUsd).toBeCloseTo(0.06, 10);
   });
@@ -694,7 +732,7 @@ describe("scoreRecord: the extras judge", () => {
     const off = extrasFake(["yes"]);
     const result = await scoreExtras([posted("src/a.ts", 40, 40)], [], off, false);
     expect(off.calls).toHaveLength(0);
-    expect(result.extras).toEqual({ enabled: false, judged: 0, accepted: [] });
+    expect(result.extras).toEqual({ enabled: false, judged: 0, accepted: [], unknown: 0 });
     const byDefault = extrasFake(["yes"]);
     await score([posted("src/a.ts", 40, 40)], [], byDefault);
     expect(byDefault.calls).toHaveLength(0);

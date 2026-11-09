@@ -58,6 +58,7 @@ function repeat(n: number, recall: number | null, precision: number | null): Rep
     drops: {},
     extras_judged: 0,
     extras_accepted: 0,
+    extras_unknown: 0,
     adjudicated_precision: precision,
   };
 }

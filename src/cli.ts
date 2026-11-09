@@ -63,6 +63,7 @@ interface EvalCliOptions {
   allowSameJudge?: boolean;
   /** Commander gives false for --no-extras, and true by default. */
   extras: boolean;
+  rawJudge?: boolean;
 }
 
 // Commander exits with 1 on a usage error. This makes it 2. Help and
@@ -305,6 +306,10 @@ export function createProgram(deps: ProgramDeps): Command {
       "--no-extras",
       "do not ask the extras judge about the posted findings that match no golden finding",
     )
+    .option(
+      "--raw-judge",
+      "also ask the judge about the ambiguous pairs of the raw candidates (default: exact matches only)",
+    )
     .action(async (options: EvalCliOptions, command: Command) => {
       if (options.writeBaseline === true && options.baseline === undefined) {
         command.error("error: --write-baseline needs --baseline", { exitCode: EXIT_USAGE });
@@ -323,6 +328,7 @@ export function createProgram(deps: ProgramDeps): Command {
             allowApiKey: options.allowApiKey === true,
             allowSameJudge: options.allowSameJudge === true,
             extras: options.extras,
+            rawJudge: options.rawJudge === true,
           },
           deps,
         );

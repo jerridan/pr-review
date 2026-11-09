@@ -116,9 +116,8 @@ function scoreOf(parts: Partial<ScoreResult> = {}): ScoreResult {
     severityAgreement: { same: 0, matched: 0 },
     notRealMatches: 0,
     postedGoldenCount: 0,
-    unmatchedPosted: [],
     raw: { matched: [], candidates: 0 },
-    extras: { enabled: false, judged: 0, accepted: [] },
+    extras: { enabled: false, judged: 0, accepted: [], unknown: 0 },
     ...parts,
   };
 }
@@ -137,7 +136,6 @@ describe("metrics (R5.1, R5.2)", () => {
       severityAgreement: { same: 1, matched: 1 },
       notRealMatches: 1,
       postedGoldenCount: 2,
-      unmatchedPosted: [2, 3],
       raw: {
         matched: [
           { posted: 0, golden: 0, via: "exact" },
@@ -145,7 +143,7 @@ describe("metrics (R5.1, R5.2)", () => {
         ],
         candidates: 5,
       },
-      extras: { enabled: true, judged: 2, accepted: [3] },
+      extras: { enabled: true, judged: 2, accepted: [3], unknown: 1 },
     });
     expect(metrics(rec, score, 3)).toEqual({
       repeat: 3,
@@ -168,6 +166,8 @@ describe("metrics (R5.1, R5.2)", () => {
       drops: {},
       extras_judged: 2,
       extras_accepted: 1,
+      // The extras unknown stays apart from judge_unknown, which counts match queries.
+      extras_unknown: 1,
       // One match and one accepted extra of four posted findings.
       adjudicated_precision: 0.5,
     });
@@ -183,7 +183,11 @@ describe("metrics (R5.1, R5.2)", () => {
 
   it("gives null adjudicated precision when no finding posted", () => {
     const rec = record([], { total: 0, stageMs: {} });
-    const m = metrics(rec, scoreOf({ extras: { enabled: true, judged: 0, accepted: [] } }), 1);
+    const m = metrics(
+      rec,
+      scoreOf({ extras: { enabled: true, judged: 0, accepted: [], unknown: 0 } }),
+      1,
+    );
     expect(m.adjudicated_precision).toBeNull();
   });
 
@@ -312,6 +316,7 @@ describe("failedMetrics (R3.8)", () => {
       drops: {},
       extras_judged: 0,
       extras_accepted: 0,
+      extras_unknown: 0,
       adjudicated_precision: null,
     });
   });
@@ -343,6 +348,7 @@ function rm(repeat: number, parts: Partial<RepeatMetrics> = {}): RepeatMetrics {
     drops: {},
     extras_judged: 0,
     extras_accepted: 0,
+    extras_unknown: 0,
     adjudicated_precision: null,
     ...parts,
   };
