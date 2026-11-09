@@ -241,7 +241,7 @@ type ScriptOptions = {
   /** The conventions reviewer reports the planted finding only. */
   plantedOnly?: boolean;
   /** The answer of every extras judge query. The default is "no". */
-  extrasAnswer?: "yes" | "no";
+  extrasAnswer?: "yes" | "no" | "unknown";
 };
 
 /**
@@ -444,7 +444,7 @@ describe("pr-review eval: the end-to-end report (R10.1, R5.1, R5.4, R5.6)", () =
         judge_cost_per_case: { mean: 0, min: 0, max: 0 },
       });
       // Each repeat asks the extras judge about the three unmatched findings.
-      expect(report.judge).toEqual({ calls: 6, unknown: 0, cost_usd: 0 });
+      expect(report.judge).toEqual({ calls: 6, unknown: 0, extras_unknown: 0, cost_usd: 0 });
       expect(report.failed_repeats).toEqual([]);
       expect(report.gate).toBeNull();
       for (const key of ["cases", "repeats", "aggregate", "judge", "failed_repeats", "gate"]) {
@@ -941,7 +941,7 @@ describe("pr-review eval: the judge (R4.4, R5.2)", () => {
         judge_calls: 1,
         recall: 1,
       });
-      expect(report?.judge).toEqual({ calls: 1, unknown: 0, cost_usd: 0.25 });
+      expect(report?.judge).toEqual({ calls: 1, unknown: 0, extras_unknown: 0, cost_usd: 0.25 });
     },
     RUN_TIMEOUT,
   );
@@ -1225,6 +1225,22 @@ describe("pr-review eval: the extras judge", () => {
       expect(warnings[0]).toContain("repeat 1");
       // The file that is not valid does not change.
       expect(readFileSync(join(out, "extra", "candidates.json"), "utf8")).toBe("{}");
+    },
+    RUN_TIMEOUT,
+  );
+
+  it(
+    "shows the extras unknowns on the Judge line and warns about them",
+    async () => {
+      const fake = evalFake({ plantedOnly: true, extrasAnswer: "unknown" });
+      const { code } = await evalCli(fake, extraCase(), "--repeat", "1");
+      expect(code, stderr).toBe(0);
+      expect(stdout).toMatch(/^Judge: 1 calls, 0 unknown, 1 extras unknown, \$0\.0000$/m);
+      const warnings = stderr
+        .split("\n")
+        .filter((l) => /warning/.test(l) && /extras judge/.test(l));
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain("1 ");
     },
     RUN_TIMEOUT,
   );

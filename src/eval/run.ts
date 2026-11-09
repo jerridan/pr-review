@@ -405,8 +405,16 @@ export async function runEval(opts: EvalOptions, deps: ProgramDeps): Promise<num
   // match. Say so, because it lowers recall and precision with no other sign.
   if (report.judge.unknown > 0) {
     say(
-      `warning: ${report.judge.unknown} of ${report.judge.calls} judge queries gave no answer. ` +
+      `warning: ${report.judge.unknown} match judge queries gave no answer. ` +
         "The eval counts each one as no match.",
+    );
+  }
+  // An extras answer of "unknown" is no accepted extra, so it lowers the
+  // adjudicated precision with no other sign.
+  if (report.judge.extras_unknown > 0) {
+    say(
+      `warning: ${report.judge.extras_unknown} extras judge queries gave no answer. ` +
+        "The eval does not accept those findings as extras.",
     );
   }
   if (report.gate && !report.gate.passed) say(gateMessage(report.gate));

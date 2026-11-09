@@ -455,7 +455,28 @@ describe("buildReport (R5.3, R5.4, R5.6)", () => {
   });
 
   it("sums the judge calls, the unknown answers and the judge cost over the eval", () => {
-    expect(buildReport(cases, null, null).judge).toEqual({ calls: 3, unknown: 1, cost_usd: 0.25 });
+    expect(buildReport(cases, null, null).judge).toEqual({
+      calls: 3,
+      unknown: 1,
+      extras_unknown: 0,
+      cost_usd: 0.25,
+    });
+  });
+
+  it("sums the extras unknowns apart from the match unknowns", () => {
+    const withExtras = [
+      {
+        name: "a-case",
+        repeats: [rm(1, { judge_calls: 3, judge_unknown: 1, extras_unknown: 2 })],
+      },
+      { name: "b-case", repeats: [rm(1, { judge_calls: 1, extras_unknown: 1 })] },
+    ];
+    const report = buildReport(withExtras, null, null);
+    expect(report.cases[0]?.repeats[0]?.extras_unknown).toBe(2);
+    expect(report.judge).toEqual({ calls: 4, unknown: 1, extras_unknown: 3, cost_usd: 0 });
+    expect(renderTable(report)).toMatch(
+      /^Judge: 4 calls, 1 unknown, 3 extras unknown, \$0\.0000$/m,
+    );
   });
 
   it("lists a failed repeat and leaves it out of every mean", () => {
