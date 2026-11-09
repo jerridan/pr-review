@@ -1,0 +1,1282 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 38,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Finish D5: six-label goldens, raw recall, adjudicated extras, cost per PR",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/38"
+    },
+    "run_kind": "later",
+    "prior": {
+      "head": "5639188533d346927bb3e936333bc814fea0205c",
+      "source": "record",
+      "record": "/home/runner/work/_temp/pr-review-records/pr-38/2026-11-09T005656.253Z-5639188.json",
+      "open": [],
+      "dismissed": [],
+      "fetch_failed": false
+    },
+    "base": "00968d0bff46d48ecba2df83a44298efa40ecf7d",
+    "head": "73e50f0c6de3d056f3499986f5fe7dce073ee77b",
+    "started_at": "2026-11-09T01:00:05.225Z",
+    "tool_version": "0.3.1",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Finish D5: six-label goldens, raw recall, adjudicated extras, cost per PR\n\n## Spec\n\nFinishes the four remaining bullets of \"## D5: Eval foundation\" in TICKETS.md. Version 0.4.0.\n\n**R1 Six-label goldens.** The golden schema accepts the six labels of the severity policy. A golden labeled blocking, suggestion or nit is a posted golden; one labeled dont_post, not_real or unsure is a not-real golden. Recall and severity agreement count posted goldens only. A posted finding that matches a not-real golden is a false positive, counted in `not_real_matches`; the posted goldens get their matches first, so a posted golden wins over a not-real golden. `pr-review label --write-golden` writes every chosen label. The policy sentence that limited a golden to the three posted labels is replaced. In the cases repo, the 28 `not-real.json` findings moved into `golden.json` (jerridan/pr-review-cases branch `six-label-goldens`, 57 goldens: 29 posted, 28 not-real); `eval/cases.json` pins that commit, db6ad8e, so the cases branch waits for a merge by the owner.\n\n**R2 Raw recall and drops.** The eval scores the union of `stages.reviewers[].findings` against the goldens with the same two passes, reusing judge answers of pairs the posted pass already judged. It reports `raw_recall`, `raw_matched`, `raw_candidates` and `drops` (the dropped rows of `explain` by stage) per repeat and in the aggregate, and prints `raw recall` and `drops` columns.\n\n**R3 Adjudicated extras.** Every posted finding that matches no golden goes to the extras judge, a new prompt `prompts/extras-judge.md` (role judge) with the finding, the head window, the diff section of its file and the full policy as data blocks. The eval reports strict `precision` and `adjudicated_precision`, writes accepted extras to `<out>/<case>/candidates.json` in the golden format (one file per case, deduped on file, span and claim), never changes golden.json, and `--no-extras` turns it off.\n\n**R4 Cost per PR.** Every repeat row shows `cost` and `judge cost`; the summary shows `cost per PR` and `judge cost per PR`; report.json carries `judge_cost_per_case`. `eval/baseline.json` gains the `tool_version` key that `BaselineSchema` requires and that the hand-written file lacked; its values stand, and `cases_ref` moves to the new pin.\n\n## Decisions\n\n- Path: change path; four packages, one pr-review territory at deep band (the schema is the data shape every metric reads) and one cases-repo territory. Spec critic two rounds (13 of 13 findings and 8 of 8 applied), split critic two rounds (6 of 6 and 3 of 3 applied).\n- `--no-extras` and `<out>/<case>/candidates.json` chosen on recommendation, reversible.\n- The cases change sits on a pushed branch, not main; the pin names its head so `fetch-cases.sh` reaches it before the merge.\n- `--write-golden` writes the severity only; the category stays, as the labeler review decided.\n- The baseline keeps recall 0.287 and precision 0.636: the six-label goldens change neither the posted-golden denominator nor the strict matches. `tool_version` is 0.3.1, the run that produced them.\n- `test/prompt-sources.test.ts` joined p2's file set: its judge-query count rose from 2 to 6 by design (the raw pass).\n\n## Verification\n\nEvery package: red commit fails, head passes, `npm test` (1211), lint, typecheck, build exit 0, diff inside the file set. On the branch head: `scripts/check-version-bump.sh` passes; `node dist/cli.js eval --cases eval/cases --tier skip --repeat 1` exits 0 over the ten pinned cases and prints the new columns; `loadCases` gives 10 cases, 57 goldens, 29 posted; the stale-status sweep finds nothing.\n\nCrew record: `~/.claude/crew/d5-eval-foundation-finish-7f3a/`.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZgggAoxaZA98nRCMsW",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": true
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": ".claude-plugin/marketplace.json",
+        "hunks": 1
+      },
+      {
+        "path": ".claude-plugin/plugin.json",
+        "hunks": 1
+      },
+      {
+        "path": ".github/workflows/ci.yml",
+        "hunks": 1
+      },
+      {
+        "path": "README.md",
+        "hunks": 5
+      },
+      {
+        "path": "TICKETS.md",
+        "hunks": 2
+      },
+      {
+        "path": "docs/design/high-level-design.md",
+        "hunks": 2
+      },
+      {
+        "path": "docs/design/severity-policy.md",
+        "hunks": 2
+      },
+      {
+        "path": "eval/baseline.json",
+        "hunks": 1
+      },
+      {
+        "path": "eval/cases.json",
+        "hunks": 1
+      },
+      {
+        "path": "package.json",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/extras-judge.md",
+        "hunks": 1
+      },
+      {
+        "path": "src/cli.ts",
+        "hunks": 3
+      },
+      {
+        "path": "src/eval/case.ts",
+        "hunks": 3
+      },
+      {
+        "path": "src/eval/label/index.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/label/output.ts",
+        "hunks": 2
+      },
+      {
+        "path": "src/eval/metrics.ts",
+        "hunks": 4
+      },
+      {
+        "path": "src/eval/report.ts",
+        "hunks": 6
+      },
+      {
+        "path": "src/eval/run.ts",
+        "hunks": 7
+      },
+      {
+        "path": "src/eval/score.ts",
+        "hunks": 6
+      },
+      {
+        "path": "src/explain/index.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/schemas/label.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/eval-baseline.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/eval-case.test.ts",
+        "hunks": 3
+      },
+      {
+        "path": "test/eval-cli.test.ts",
+        "hunks": 11
+      },
+      {
+        "path": "test/eval-metrics.test.ts",
+        "hunks": 12
+      },
+      {
+        "path": "test/eval-score.test.ts",
+        "hunks": 5
+      },
+      {
+        "path": "test/explain.test.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/label-cli.test.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/packaging.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/prompt-sources.test.ts",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [
+      {
+        "path": "package-lock.json",
+        "reason": "generated"
+      }
+    ],
+    "sensitive_files": [
+      ".github/workflows/ci.yml"
+    ],
+    "triage": {
+      "tier": "full",
+      "reason": "Changes eval scoring logic, adds a new LLM judge pass with file writes, changes the golden schema and --write-golden behavior, adds CLI flags, and edits a CI workflow.",
+      "confidence": "high",
+      "categories": [
+        "bug",
+        "test",
+        "docs",
+        "convention",
+        "performance"
+      ],
+      "hotspots": [
+        "src/eval/score.ts (matchAll, ask cache, extras judge loop, queryJudge)",
+        "src/eval/run.ts (addCandidates, candidates.json dedupe and error handling)",
+        "src/eval/metrics.ts (metrics signature change, adjudicated_precision)",
+        "src/eval/label/output.ts (writeGolden now writes non-posted labels)",
+        "src/eval/case.ts (golden schema widened to six labels)",
+        "src/eval/report.ts (pooling, drops, table columns)",
+        "eval/baseline.json and eval/cases.json (cases_ref changed, baseline values not re-run)",
+        ".github/workflows/ci.yml (--no-extras)",
+        "prompts/extras-judge.md"
+      ],
+      "file_notes": [
+        {
+          "file": "src/eval/score.ts",
+          "note": "Major rewrite: not-real golden matching, raw candidate matching, shared judge answer cache, new extras judge with diff and policy context."
+        },
+        {
+          "file": "src/eval/run.ts",
+          "note": "Writes candidates.json; warning-only failure path; passes the new options to scoreRecord."
+        },
+        {
+          "file": "src/eval/metrics.ts",
+          "note": "metrics() drops its goldenCount param; adds raw, drops, extras and adjudicated fields."
+        },
+        {
+          "file": "src/eval/report.ts",
+          "note": "New report fields, table columns, and drops rendering; the summary row is renamed to cost per PR."
+        },
+        {
+          "file": "src/eval/case.ts",
+          "note": "Golden severity now accepts six labels; adds isPostedGolden and exports the schemas."
+        },
+        {
+          "file": "src/eval/label/output.ts",
+          "note": "writeGolden no longer filters to posted labels."
+        },
+        {
+          "file": "src/cli.ts",
+          "note": "New --no-extras and --raw-judge flags; commander's negated option makes extras default to true."
+        },
+        {
+          "file": "src/explain/index.ts",
+          "note": "New countDrops helper."
+        },
+        {
+          "file": "prompts/extras-judge.md",
+          "note": "New prompt with frontmatter fields the loader reads."
+        },
+        {
+          "file": ".github/workflows/ci.yml",
+          "note": "Adds --no-extras to the eval invocation; the packaging test asserts the exact args."
+        },
+        {
+          "file": "eval/baseline.json",
+          "note": "cases_ref bumped and tool_version added; the recall and precision values are unchanged."
+        },
+        {
+          "file": "eval/cases.json",
+          "note": "Pin moved to a new cases ref."
+        },
+        {
+          "file": "README.md",
+          "note": "Documents the new flags, metrics and behaviors."
+        },
+        {
+          "file": "TICKETS.md",
+          "note": "Doc status updates."
+        },
+        {
+          "file": "docs/design/high-level-design.md",
+          "note": "Doc updates."
+        },
+        {
+          "file": "docs/design/severity-policy.md",
+          "note": "Doc updates."
+        },
+        {
+          "file": ".claude-plugin/marketplace.json",
+          "note": "Version bump to 0.4.0."
+        },
+        {
+          "file": ".claude-plugin/plugin.json",
+          "note": "Version bump to 0.4.0."
+        },
+        {
+          "file": "package.json",
+          "note": "Version bump to 0.4.0."
+        },
+        {
+          "file": "src/eval/label/index.ts",
+          "note": "Help text only."
+        },
+        {
+          "file": "src/schemas/label.ts",
+          "note": "Comment only."
+        },
+        {
+          "file": "test/eval-cli.test.ts",
+          "note": "New end-to-end tests for the extras judge, --raw-judge and drops."
+        },
+        {
+          "file": "test/eval-metrics.test.ts",
+          "note": "Updated and new metrics and report tests."
+        },
+        {
+          "file": "test/eval-score.test.ts",
+          "note": "New tests for not-real goldens, raw candidates and the extras judge."
+        },
+        {
+          "file": "test/eval-case.test.ts",
+          "note": "Tests for the new labels and isPostedGolden."
+        },
+        {
+          "file": "test/eval-baseline.test.ts",
+          "note": "Fixture fields added."
+        },
+        {
+          "file": "test/explain.test.ts",
+          "note": "countDrops tests."
+        },
+        {
+          "file": "test/label-cli.test.ts",
+          "note": "Tests that --write-golden writes every label."
+        },
+        {
+          "file": "test/packaging.test.ts",
+          "note": "Updated CI args expectation."
+        },
+        {
+          "file": "test/prompt-sources.test.ts",
+          "note": "Comment only."
+        }
+      ],
+      "summary": "The change extends the eval harness. It scores raw reviewer candidates (raw recall) and per-stage drop counts. It treats not-real goldens as false positives, so the golden schema now takes six labels. It adds an extras judge that adjudicates unmatched posted findings, with adjudicated precision and an auto-written candidates.json. It also adds the --no-extras and --raw-judge flags, changes --write-golden to write all labels, bumps the version to 0.4.0 and the cases pin, and makes CI pass --no-extras."
+    },
+    "tier": "full",
+    "tier_reason": "Sensitive paths set a floor of full: .github/workflows/ci.yml.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 3057,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3680,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.00037850000000000004,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 224,
+              "cacheReadInputTokens": 5136,
+              "cacheCreationInputTokens": 3185,
+              "webSearchRequests": 0,
+              "costUSD": 0.0309952,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 20,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0313737
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1771,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3682,
+              "outputTokens": 23,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0003797,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 72,
+              "cacheReadInputTokens": 5094,
+              "cacheCreationInputTokens": 3187,
+              "webSearchRequests": 0,
+              "costUSD": 0.027962800000000003,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.028342500000000003
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1584,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3670,
+              "outputTokens": 23,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.00037850000000000004,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 66,
+              "cacheReadInputTokens": 5039,
+              "cacheCreationInputTokens": 3175,
+              "webSearchRequests": 0,
+              "costUSD": 0.027735799999999998,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0281143
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 2405,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3666,
+              "outputTokens": 26,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0003796,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 147,
+              "cacheReadInputTokens": 5039,
+              "cacheCreationInputTokens": 3171,
+              "webSearchRequests": 0,
+              "costUSD": 0.029323800000000004,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.029703400000000005
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5276,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3684,
+              "outputTokens": 23,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.00037990000000000007,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 320,
+              "cacheReadInputTokens": 13281,
+              "cacheCreationInputTokens": 3454,
+              "webSearchRequests": 0,
+              "costUSD": 0.036704200000000006,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 151,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0370841
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1677,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 35135,
+              "outputTokens": 19,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.003523,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 97,
+              "cacheReadInputTokens": 5161,
+              "cacheCreationInputTokens": 34640,
+              "webSearchRequests": 0,
+              "costUSD": 0.28010019999999997,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.28362319999999996
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1386,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3674,
+              "outputTokens": 23,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.00037890000000000005,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 71,
+              "cacheReadInputTokens": 5137,
+              "cacheCreationInputTokens": 3179,
+              "webSearchRequests": 0,
+              "costUSD": 0.0278874,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0282663
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1447,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3674,
+              "outputTokens": 26,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.00038040000000000003,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 63,
+              "cacheReadInputTokens": 5137,
+              "cacheCreationInputTokens": 3179,
+              "webSearchRequests": 0,
+              "costUSD": 0.0277274,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0281078
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 3575,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3670,
+              "outputTokens": 26,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.00038,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 287,
+              "cacheReadInputTokens": 5808,
+              "cacheCreationInputTokens": 3175,
+              "webSearchRequests": 0,
+              "costUSD": 0.0323096,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 39,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0326896
+        }
+      }
+    ],
+    "verifications": [],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5820569244,
+      "review_url": "https://github.com/jerridan/pr-review/pull/38#pullrequestreview-5820569244",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 128922527950
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 12156,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 57061,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0057166000000000005,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1785,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 56574,
+            "webSearchRequests": 0,
+            "costUSD": 0.2442762,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.2499928
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 1584,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3670,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00037850000000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 66,
+            "cacheReadInputTokens": 5039,
+            "cacheCreationInputTokens": 3175,
+            "webSearchRequests": 0,
+            "costUSD": 0.027735799999999998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0281143
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 2405,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3666,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0003796,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 147,
+            "cacheReadInputTokens": 5039,
+            "cacheCreationInputTokens": 3171,
+            "webSearchRequests": 0,
+            "costUSD": 0.029323800000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.029703400000000005
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 3057,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3680,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00037850000000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 224,
+            "cacheReadInputTokens": 5136,
+            "cacheCreationInputTokens": 3185,
+            "webSearchRequests": 0,
+            "costUSD": 0.0309952,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 20,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0313737
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "model": "claude-opus-5-5",
+        "duration_ms": 1771,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3682,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0003797,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 72,
+            "cacheReadInputTokens": 5094,
+            "cacheCreationInputTokens": 3187,
+            "webSearchRequests": 0,
+            "costUSD": 0.027962800000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.028342500000000003
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "model": "claude-opus-5-5",
+        "duration_ms": 1677,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 35135,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.003523,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 97,
+            "cacheReadInputTokens": 5161,
+            "cacheCreationInputTokens": 34640,
+            "webSearchRequests": 0,
+            "costUSD": 0.28010019999999997,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.28362319999999996
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 1386,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3674,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00037890000000000005,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 71,
+            "cacheReadInputTokens": 5137,
+            "cacheCreationInputTokens": 3179,
+            "webSearchRequests": 0,
+            "costUSD": 0.0278874,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0282663
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 1447,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3674,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00038040000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 63,
+            "cacheReadInputTokens": 5137,
+            "cacheCreationInputTokens": 3179,
+            "webSearchRequests": 0,
+            "costUSD": 0.0277274,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0281078
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5276,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3684,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00037990000000000007,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 320,
+            "cacheReadInputTokens": 13281,
+            "cacheCreationInputTokens": 3454,
+            "webSearchRequests": 0,
+            "costUSD": 0.036704200000000006,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 151,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0370841
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "model": "claude-opus-5-5",
+        "duration_ms": 3575,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3670,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00038,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 287,
+            "cacheReadInputTokens": 5808,
+            "cacheCreationInputTokens": 3175,
+            "webSearchRequests": 0,
+            "costUSD": 0.0323096,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 39,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0326896
+      }
+    ],
+    "total_cost_usd": 0.7772976999999999,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 37,
+      "gather": 391,
+      "scope": 8,
+      "triage": 13067,
+      "find_verify": 8499,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
