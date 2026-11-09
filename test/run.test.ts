@@ -1608,6 +1608,40 @@ describe("the history block and the history reviewer config", () => {
     return record;
   }
 
+  it("gives the verifier the git facts of its file when the history reviewer is off (D6 R6)", async () => {
+    const fake = createFakeSdkClient(script(disabled));
+    const record = await runReview({
+      repo: disabled.repo,
+      base: disabled.base,
+      head: disabled.head,
+      tierOverride: "fast",
+      outDir: join(outRoot, "facts-history-off"),
+      format: "json",
+      allowApiKey: false,
+      client: fake,
+    }).then((r) => r.record);
+    expect(record.identity.history).toEqual({ built: false, truncated: false });
+    const verifier = fake.calls.find((c) => c.role === "verifier");
+    const facts = [
+      ...(verifier?.userMessage ?? "").matchAll(
+        /<git_facts_[0-9a-f]{16}>\n([\s\S]*?)\n<\/git_facts_[0-9a-f]{16}>/g,
+      ),
+    ];
+    expect(facts).toHaveLength(1);
+    expect(facts[0]?.[1]).toMatch(new RegExp(`^git blame .* -- ${disabled.file}$`, "m"));
+    expect(facts[0]?.[1]).toMatch(/^git log /m);
+  });
+
+  it("records a failure of the git facts as a gather error, and completes the run (D6 R6)", async () => {
+    const stub = gitStub(true);
+    const record = await withGitStub(stub, () => review(disabled, "facts-fail"));
+    expect(record.cost.errors).toContainEqual({
+      stage: "gather",
+      message: expect.stringMatching(/^file history: git blame .* failed: STUB-BLAME-FAILED$/),
+    });
+    expect(record.posted.verdict).not.toBe("incomplete");
+  });
+
   it("builds the history block when the history reviewer is enabled", async () => {
     const stub = gitStub(false);
     const record = await withGitStub(stub, () => review(enabled, "history-on"));
@@ -1776,6 +1810,46 @@ describe("a run with a pull request (R2, R3, R4)", () => {
     });
     return { record, calls: fake.calls };
   }
+
+  // The text of the description block in one user message.
+  const descriptionOf = (message: string): string =>
+    /<description_[0-9a-f]{16}>\n([\s\S]*?)\n<\/description_[0-9a-f]{16}>/.exec(message)?.[1] ?? "";
+
+  it("gives the reviewers and the verifier the title, every label and the body (D6 R5)", async () => {
+    const { calls } = await reviewPr(
+      pullRequest({ title: "TITLE-avg", body: "BODY-avg", labels: ["LABEL-bug", "LABEL-perf"] }),
+      "pr-labels",
+    );
+    const reviewer = calls.find((c) => c.role === "reviewer");
+    const verifier = calls.find((c) => c.role === "verifier");
+    expect(reviewer).toBeDefined();
+    expect(verifier).toBeDefined();
+    for (const call of [reviewer, verifier]) {
+      const text = descriptionOf(call?.userMessage ?? "");
+      for (const part of ["TITLE-avg", "LABEL-bug", "LABEL-perf", "BODY-avg"]) {
+        expect(text, call?.role).toContain(part);
+      }
+    }
+  });
+
+  it("gives the reviewers and the verifier the commit messages without a pull request (D6 R5)", async () => {
+    const fake = createFakeSdkClient(script(fx));
+    await runReview({
+      repo: fx.repo,
+      base: fx.base,
+      head: fx.head,
+      outDir: join(outRoot, "no-pr-description"),
+      format: "json",
+      allowApiKey: false,
+      client: fake,
+    });
+    for (const role of ["reviewer", "verifier"] as const) {
+      const call = fake.calls.find((c) => c.role === role);
+      expect(descriptionOf(call?.userMessage ?? ""), role).toBe(
+        "Head: add average, move format helpers, bump lockfile, add CI",
+      );
+    }
+  });
 
   // Make a gh program that stands in for the real one, which is a third
   // party. The program answers the calls of a pull request run with canned

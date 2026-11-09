@@ -118,4 +118,5 @@ A repo convention broken with no wrong result for a reader or a user, such as a 
 - Blocking findings post on every run and set the verdict to "would request changes". Suggestions and nits post on the first run only, as section 3.5 of the high-level design says.
 - The non-blocking cap of section 3.6 applies to suggestions and nits, never to blocking findings.
 - Merge may downgrade a severity when it sees the full set. It never upgrades.
+- The verifier records don't post, not real and unsure, and posts none of them. An unsure finding has its own mark in the record, with its cause: the verifier said unsure, or a verifier call stopped on its limit. The record and the eval count unsure findings apart from rejected findings and from failed verifier calls. The coverage block holds the count of unsure findings and the count of those that stopped on a limit. The eval drop counts show unsure as its own stage, after verify.
 - The eval counts severity agreement on matched findings as exact equality of the posted label. The first-pass acceptance rate of the labeling loop is the bar that agreement is read against, not 100 percent.

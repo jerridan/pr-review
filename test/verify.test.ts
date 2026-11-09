@@ -6,7 +6,7 @@ import { DEFAULT_REPO_CONFIG } from "../src/config/repo-config.js";
 import { runReviewers } from "../src/find/index.js";
 import type { GatherResult } from "../src/gather/index.js";
 import { mergeFindings } from "../src/merge/index.js";
-import { loadPrompt } from "../src/prompts/load.js";
+import { loadPrompt, render } from "../src/prompts/load.js";
 import type { ReviewerDefinition } from "../src/reviewers/loader.js";
 import type { Finding } from "../src/schemas/finding.js";
 import type { VerifierResult } from "../src/schemas/verifier.js";
@@ -18,11 +18,13 @@ import {
   type QueryRequest,
 } from "../src/sdk/client.js";
 import { createFakeSdkClient, type FakeScript } from "../src/sdk/fake.js";
-import type { RunOptions } from "../src/sdk/options.js";
+import { buildQueryOptions, type RunOptions } from "../src/sdk/options.js";
 import { createSemaphore } from "../src/semaphore.js";
 import { UNTRUSTED_SYSTEM_LINE } from "../src/untrusted.js";
 import {
   DEFAULT_VERIFY_CONFIG,
+  INLINE_FILE_MAX_LINES,
+  WINDOW_LINES,
   verifyConfigFor,
   loadVerifierPrompt,
   verifyFinding,
@@ -864,7 +866,13 @@ describe("the description block in the verifier message (R2)", () => {
     expect(roles(fake.calls)).toEqual(["verifier", "verifier-escalation"]);
     for (const call of fake.calls) {
       const order = blockOrder(call.userMessage);
-      expect(order.map((b) => b.label)).toEqual(["finding", "head_file", "description", "diff"]);
+      expect(order.map((b) => b.label)).toEqual([
+        "finding",
+        "head_file",
+        "description",
+        "git_facts",
+        "diff",
+      ]);
       expect(order.find((b) => b.label === "description")?.text).toBe("DESC-of-change");
     }
   });
@@ -884,5 +892,151 @@ describe("the description block in the verifier message (R2)", () => {
     await verifyFinding(fake, OPTIONS, finding(), { ...ctx(), description: "d" });
     expect(fake.calls[0]?.reviewerName).toBeUndefined();
     expect(fake.calls[0]?.userMessage).not.toContain("diff-bugs");
+  });
+});
+
+const blocksOf = (message: string) =>
+  [...message.matchAll(/<([a-z][a-z0-9_]*)_[0-9a-f]{16}>\n([\s\S]*?)\n<\/\1_[0-9a-f]{16}>/g)].map(
+    (m) => ({ label: m[1] ?? "", text: m[2] ?? "" }),
+  );
+
+function verifierText(name: string): string {
+  const value = loadPrompt("verifier.md").frontmatter[name];
+  if (typeof value !== "string") throw new Error(`verifier.md has no ${name}`);
+  return value;
+}
+
+describe("the git facts block in the verifier message (D6 R6)", () => {
+  const FACTS = {
+    "src/stats.ts": { text: "FACTS-OF-STATS blame and log", truncated: false },
+    "src/other.ts": { text: "FACTS-OF-OTHER blame and log", truncated: false },
+  };
+
+  it("holds the facts of the finding's file and of no other file, and the diff of the file once", async () => {
+    const fake = createFakeSdkClient(script(result(95)));
+    await verifyFinding(fake, OPTIONS, finding(), { ...ctx(), fileHistory: FACTS });
+    const message = fake.calls[0]?.userMessage ?? "";
+    const facts = blocksOf(message).find((b) => b.label === "git_facts");
+    expect(facts?.text).toBe("FACTS-OF-STATS blame and log");
+    expect(message).not.toContain("FACTS-OF-OTHER");
+    expect(message.split("diff --git a/src/stats.ts").length - 1).toBe(1);
+    expect(message).not.toContain("OTHER-NEW");
+  });
+
+  it("says when the facts were cut", async () => {
+    const fake = createFakeSdkClient(script(result(95)));
+    const cut = { "src/stats.ts": { text: "FACTS-CUT", truncated: true } };
+    await verifyFinding(fake, OPTIONS, finding(), { ...ctx(), fileHistory: cut });
+    expect(fake.calls[0]?.userMessage).toContain(verifierText("history_cut_text").trim());
+    const whole = createFakeSdkClient(script(result(95)));
+    await verifyFinding(whole, OPTIONS, finding(), { ...ctx(), fileHistory: FACTS });
+    expect(whole.calls[0]?.userMessage).not.toContain(verifierText("history_cut_text").trim());
+  });
+
+  it("uses the prompt-file text when the file has no facts", async () => {
+    const fake = createFakeSdkClient(script(result(95)));
+    await verifyFinding(fake, OPTIONS, finding(), { ...ctx(), fileHistory: {} });
+    expect(
+      blocksOf(fake.calls[0]?.userMessage ?? "").find((b) => b.label === "git_facts")?.text,
+    ).toBe(verifierText("no_history_text").trim());
+  });
+
+  it("grants the verifier Read, Grep and Glob, and no Bash", async () => {
+    const fake = createFakeSdkClient(script(result(70), result(95)));
+    await verifyFinding(fake, OPTIONS, finding(), { ...ctx(), fileHistory: FACTS });
+    expect(fake.calls).toHaveLength(2);
+    for (const call of fake.calls) {
+      const options = buildQueryOptions(call, OPTIONS);
+      expect([...(options.tools as string[])].sort()).toEqual(["Glob", "Grep", "Read"]);
+      expect(options.disallowedTools).toContain("Bash");
+    }
+  });
+});
+
+describe("the window of a long head file (D6 R7)", () => {
+  const TOTAL = INLINE_FILE_MAX_LINES + 400;
+  const MIDDLE = Math.floor(TOTAL / 2);
+  const lineText = (n: number) => `const v${n} = ${n};`;
+  const longText = `${Array.from({ length: TOTAL }, (_, i) => lineText(i + 1)).join("\n")}\n`;
+  const capText = `${Array.from({ length: INLINE_FILE_MAX_LINES }, (_, i) => lineText(i + 1)).join("\n")}\n`;
+  writeFileSync(join(head, "src/long.ts"), longText);
+  writeFileSync(join(head, "src/cap.ts"), capText);
+
+  const longFinding = finding({
+    file: "src/long.ts",
+    start_line: MIDDLE,
+    end_line: MIDDLE,
+    evidence: lineText(MIDDLE),
+  });
+  const quoting = (quote: string) => result(95, { quotes: [quote] });
+
+  it("inlines only the window around the span, under a header", async () => {
+    const fake = createFakeSdkClient(script(quoting(lineText(MIDDLE))));
+    await verifyFinding(fake, OPTIONS, longFinding, ctx());
+    const message = fake.calls[0]?.userMessage ?? "";
+    const file = blocksOf(message).find((b) => b.label === "head_file")?.text ?? "";
+    const first = MIDDLE - WINDOW_LINES;
+    const last = MIDDLE + WINDOW_LINES;
+    for (const n of [first, MIDDLE, last]) {
+      expect(file).toMatch(new RegExp(`^\\s*${n}\\| ${lineText(n)}$`, "m"));
+    }
+    for (const n of [1, first - 1, last + 1, TOTAL]) {
+      expect(message).not.toContain(lineText(n));
+    }
+    expect(file.split("\n")).toHaveLength(last - first + 1);
+    expect(message).toContain(
+      render(verifierText("window_text").trim(), {
+        first: String(first),
+        last: String(last),
+        total: String(TOTAL),
+      }),
+    );
+  });
+
+  it("clamps the window to the file", async () => {
+    const fake = createFakeSdkClient(script(quoting(lineText(2))));
+    const near = finding({
+      file: "src/long.ts",
+      start_line: 2,
+      end_line: 3,
+      evidence: lineText(2),
+    });
+    await verifyFinding(fake, OPTIONS, near, ctx());
+    const file =
+      blocksOf(fake.calls[0]?.userMessage ?? "").find((b) => b.label === "head_file")?.text ?? "";
+    expect(file.split("\n")).toHaveLength(3 + WINDOW_LINES);
+    expect(file.split("\n")[0]).toMatch(new RegExp(`^\\s*1\\| ${lineText(1)}$`));
+  });
+
+  it("inlines a file of INLINE_FILE_MAX_LINES lines whole, with no header", async () => {
+    const fake = createFakeSdkClient(script(quoting(lineText(1))));
+    await verifyFinding(
+      fake,
+      OPTIONS,
+      finding({ file: "src/cap.ts", start_line: 300, end_line: 300, evidence: lineText(300) }),
+      ctx(),
+    );
+    const message = fake.calls[0]?.userMessage ?? "";
+    const file = blocksOf(message).find((b) => b.label === "head_file")?.text ?? "";
+    expect(file.split("\n")).toHaveLength(INLINE_FILE_MAX_LINES);
+    expect(message).toContain(lineText(1));
+    expect(message).toContain(lineText(INLINE_FILE_MAX_LINES));
+  });
+
+  it("matches a quote from outside the window against the whole head file", async () => {
+    const out = await verifyFinding(
+      createFakeSdkClient(script(quoting(lineText(1)))),
+      OPTIONS,
+      longFinding,
+      ctx(),
+    );
+    expect(out.passed).toBe(true);
+    expect(out.rejected).toBeUndefined();
+  });
+
+  it("keeps Read in the tools when the window is used", async () => {
+    const fake = createFakeSdkClient(script(quoting(lineText(MIDDLE))));
+    await verifyFinding(fake, OPTIONS, longFinding, ctx());
+    expect(buildQueryOptions(fake.calls[0]!, OPTIONS).tools).toContain("Read");
   });
 });

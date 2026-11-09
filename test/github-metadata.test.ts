@@ -180,4 +180,24 @@ describe("prDescription (R3)", () => {
     expect(out.sanitized).toBe(true);
     expect(out.text).toBe(`T\n\n${"b".repeat(20_000)}`);
   });
+
+  it("puts the labels between the title and the body (D6 R5)", () => {
+    const gh = createFakeGitHubClient({
+      title: "Add average",
+      body: "Body.",
+      labels: ["bug", "needs review"],
+    });
+    expect(prDescription(gh.state.pr)).toEqual({
+      text: "Add average\n\nLabels: bug, needs review\n\nBody.",
+      sanitized: false,
+      truncated: false,
+    });
+  });
+
+  it("sanitizes the label names", () => {
+    const gh = createFakeGitHubClient({ title: "T", body: "B", labels: ["bu‍g"] });
+    const out = prDescription(gh.state.pr);
+    expect(out.text).toBe("T\n\nLabels: bug\n\nB");
+    expect(out.sanitized).toBe(true);
+  });
 });

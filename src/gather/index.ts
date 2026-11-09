@@ -1,10 +1,17 @@
 // Gather: the three-dot diff between two commits, with rename detection,
 // the changed files with their hunk counts, the exclusions, the merge
-// base, the description of the change and the history block.
+// base, the description of the change, the history block and the git
+// facts of each file.
 import { sanitizeCommitMessages } from "../github/sanitize.js";
 import { diffSections, parseNameStatus } from "./diff.js";
 import { applyExclusions } from "./exclusions.js";
-import { gatherHistory, oldSideRanges } from "./history.js";
+import {
+  capFileHistory,
+  historyParts,
+  joinHistory,
+  oldSideRanges,
+  type HistoryPart,
+} from "./history.js";
 import { runGit } from "./worktree.js";
 
 export interface GatherResult {
@@ -32,6 +39,19 @@ export interface GatherResult {
    * literal of a GatherResult may omit it. Gather always sets it.
    */
   historyError?: string | null;
+  /**
+   * The git facts of each changed file that has old-side lines at the
+   * merge base, keyed by the head path: blame and log of its changed
+   * lines, cut to fit FILE_HISTORY_CAP_BYTES. The verifier gets the facts
+   * of its finding's file. The field is optional so a test literal may
+   * omit it. Gather always sets it: an empty object when it is off.
+   */
+  fileHistory?: Record<string, { text: string; truncated: boolean }>;
+  /**
+   * The message of the error that stopped the git facts, or null when
+   * they were built or were not wanted. Gather always sets it.
+   */
+  fileHistoryError?: string | null;
 }
 
 /** Give the full sha of the commit that "rev" names. Throw when it is not a commit. */
@@ -56,14 +76,21 @@ const DIFF_OPTIONS = [
  * Gather the diff of base...head. "globs" are the sensitive and generated
  * globs: the defaults with the repo config's globs added. "globs.history"
  * is true by default. When it is false, gather builds no history block.
- * A git failure in the history block gives a null history. It does not
- * stop the run, because the history is only extra context.
+ * "globs.fileHistory" is true by default. When it is false, gather builds
+ * no git facts per file. A git failure in the history gives a null history
+ * and no git facts. It does not stop the run, because the history is only
+ * extra context.
  */
 export async function gather(
   repo: string,
   base: string,
   head: string,
-  globs: { sensitive: readonly string[]; generated: readonly string[]; history?: boolean },
+  globs: {
+    sensitive: readonly string[];
+    generated: readonly string[];
+    history?: boolean;
+    fileHistory?: boolean;
+  },
 ): Promise<GatherResult> {
   const baseSha = await resolveCommit(repo, base);
   const headSha = await resolveCommit(repo, head);
@@ -73,6 +100,7 @@ export async function gather(
   const entries = parseNameStatus(nameStatus);
   const result = applyExclusions(entries, patch, globs);
   const wantHistory = globs.history !== false;
+  const wantFileHistory = globs.fileHistory !== false;
   const mergeBase = (
     await runGit(repo, ["merge-base", "--end-of-options", baseSha, headSha])
   ).trim();
@@ -83,12 +111,19 @@ export async function gather(
   const kept = new Set(result.changedFiles.map((f) => f.path));
   const hunks = entries
     .filter((e) => kept.has(e.path) && e.status !== "A")
-    .map((e) => ({ path: e.oldPath ?? e.path, ranges: oldSideRanges(sections.get(e.path) ?? "") }))
+    .map((e) => ({
+      key: e.path,
+      path: e.oldPath ?? e.path,
+      ranges: oldSideRanges(sections.get(e.path) ?? ""),
+    }))
     .filter((h) => h.ranges.length > 0);
 
-  const built = wantHistory
-    ? await tryGatherHistory(repo, mergeBase, hunks)
-    : { history: null, error: null };
+  // One git pass gives the parts of both the history block and the git
+  // facts per file.
+  const built =
+    wantHistory || wantFileHistory
+      ? await tryHistoryParts(repo, mergeBase, hunks)
+      : { parts: [], error: null };
 
   // A commit message is untrusted text, as PR text is, so it is sanitized.
   const description = sanitizeCommitMessages(await commitMessages(repo, baseSha, headSha));
@@ -100,8 +135,10 @@ export async function gather(
     mergeBase,
     description: description.text,
     descriptionMeta: { sanitized: description.sanitized, truncated: description.truncated },
-    history: built.history,
-    historyError: built.error,
+    history: wantHistory ? joinHistory(built.parts) : null,
+    historyError: wantHistory ? built.error : null,
+    fileHistory: wantFileHistory ? capFileHistory(built.parts) : {},
+    fileHistoryError: wantFileHistory ? built.error : null,
   };
 }
 
@@ -120,17 +157,17 @@ export async function prDiff(repo: string, base: string, head: string): Promise<
   ]);
 }
 
-// The history block is extra context. A git failure gives no block. The
-// caller gets the error message, so the run can show it in the record.
-async function tryGatherHistory(
+// The history is extra context. A git failure gives no part. The caller
+// gets the error message, so the run can show it in the record.
+async function tryHistoryParts(
   repo: string,
   mergeBase: string,
-  hunks: Parameters<typeof gatherHistory>[2],
-): Promise<{ history: GatherResult["history"]; error: string | null }> {
+  files: Parameters<typeof historyParts>[2],
+): Promise<{ parts: HistoryPart[]; error: string | null }> {
   try {
-    return { history: await gatherHistory(repo, mergeBase, hunks), error: null };
+    return { parts: await historyParts(repo, mergeBase, files), error: null };
   } catch (err) {
-    return { history: null, error: err instanceof Error ? err.message : String(err) };
+    return { parts: [], error: err instanceof Error ? err.message : String(err) };
   }
 }
 

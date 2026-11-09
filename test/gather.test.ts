@@ -17,7 +17,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DEFAULT_GLOBS, withRepoGlobs } from "../src/config/globs.js";
 import { countHunks, diffSections, filterDiff, parseNameStatus } from "../src/gather/diff.js";
 import { applyExclusions } from "../src/gather/exclusions.js";
-import { gatherHistory, HISTORY_CAP_BYTES, oldSideRanges } from "../src/gather/history.js";
+import {
+  FILE_HISTORY_CAP_BYTES,
+  gatherFileHistory,
+  gatherHistory,
+  HISTORY_CAP_BYTES,
+  oldSideRanges,
+} from "../src/gather/history.js";
 import { gather, prDiff, type GatherResult } from "../src/gather/index.js";
 import { withHeadWorktree } from "../src/gather/worktree.js";
 
@@ -412,6 +418,42 @@ describe("gather on the fixture repo (A2)", () => {
     expect(result.history?.text ?? "").not.toContain("ci.yml");
   });
 
+  describe("the git facts of each file (D6 R6)", () => {
+    it("gives the blame and log of the changed lines of one file, keyed by its head path", () => {
+      const facts = result.fileHistory?.["src/stats.ts"];
+      expect(facts?.truncated).toBe(false);
+      const text = facts?.text ?? "";
+      expect(text).toMatch(/^git blame .* -- src\/stats\.ts$/m);
+      expect(text).toMatch(/^\^?[0-9a-f]{7,} \(Fixture\s+2026-01-01\s+\d+\) /m);
+      expect(text).toContain("  return total;");
+      expect(text).toMatch(
+        /^[0-9a-f]{7,} 2026-01-01 Fixture Base: sum, format helpers, lockfile$/m,
+      );
+      expect(result.fileHistoryError).toBeNull();
+    });
+
+    it("holds no other file in the facts of one file", () => {
+      for (const [path, facts] of Object.entries(result.fileHistory ?? {})) {
+        for (const other of Object.keys(result.fileHistory ?? {})) {
+          if (other !== path) expect(facts.text).not.toContain(`-- ${other}`);
+        }
+      }
+    });
+
+    it("gives no entry for a file that the merge base does not have", () => {
+      expect(Object.keys(result.fileHistory ?? {}).some((p) => p.endsWith("ci.yml"))).toBe(false);
+    });
+
+    it("gives the facts when the history block is off", async () => {
+      const off = await gather(fixture.repo, fixture.base, fixture.head, {
+        ...DEFAULT_GLOBS,
+        history: false,
+      });
+      expect(off.history).toBeNull();
+      expect(off.fileHistory).toEqual(result.fileHistory);
+    });
+  });
+
   describe("the history block", () => {
     it("builds the history block when the history flag is true or absent", async () => {
       for (const globs of [{ ...DEFAULT_GLOBS, history: true }, DEFAULT_GLOBS]) {
@@ -428,13 +470,38 @@ describe("gather on the fixture repo (A2)", () => {
     it("skips the history block when the history flag is false", async () => {
       const stub = gitStub(false);
       const off = await withGitStub(stub, () =>
-        gather(fixture.repo, fixture.base, fixture.head, { ...DEFAULT_GLOBS, history: false }),
+        gather(fixture.repo, fixture.base, fixture.head, {
+          ...DEFAULT_GLOBS,
+          history: false,
+          fileHistory: false,
+        }),
       );
       expect(off.history).toBeNull();
       expect(off.historyError).toBeNull();
       expect(stub.blameCalls()).toBe(0);
       expect(off.changedFiles).toEqual(result.changedFiles);
       expect(off.description).toBe(result.description);
+    });
+
+    it("gives the same history block with the per-file facts on and off (D6 R6)", async () => {
+      const off = await gather(fixture.repo, fixture.base, fixture.head, {
+        ...DEFAULT_GLOBS,
+        fileHistory: false,
+      });
+      expect(off.fileHistory).toEqual({});
+      expect(result.history).not.toBeNull();
+      expect(off.history).toEqual(result.history);
+    });
+
+    it("gives empty per-file facts and an error, and does not stop, when git blame fails (D6 R6)", async () => {
+      const stub = gitStub(true);
+      const out = await withGitStub(stub, () =>
+        gather(fixture.repo, fixture.base, fixture.head, { ...DEFAULT_GLOBS, history: false }),
+      );
+      expect(out.fileHistory).toEqual({});
+      expect(out.fileHistoryError).toMatch(/^git blame .* failed: STUB-BLAME-FAILED$/);
+      expect(out.historyError).toBeNull();
+      expect(out.diff).toBe(result.diff);
     });
 
     it("gives null history, and does not stop, when git blame fails", async () => {
@@ -614,6 +681,32 @@ describe("gatherHistory", () => {
     expect(Buffer.byteLength(out?.text ?? "", "utf8")).toBeGreaterThan(HISTORY_CAP_BYTES - 200);
     expect(HISTORY_CAP_BYTES).toBe(65536);
     expect(out?.text.endsWith(";")).toBe(true);
+  });
+
+  it("cuts the facts of one file at a line end to fit 16384 bytes (D6 R6)", async () => {
+    expect(FILE_HISTORY_CAP_BYTES).toBe(16384);
+    const out = await gatherFileHistory(repo, sha, [
+      { key: "big.ts", path: "big.ts", ranges: [{ start: 1, end: 3000 }] },
+      { key: "small.ts", path: "small.ts", ranges: [{ start: 1, end: 3 }] },
+    ]);
+    const big = out["big.ts"];
+    expect(big?.truncated).toBe(true);
+    expect(Buffer.byteLength(big?.text ?? "", "utf8")).toBeLessThanOrEqual(FILE_HISTORY_CAP_BYTES);
+    expect(Buffer.byteLength(big?.text ?? "", "utf8")).toBeGreaterThan(
+      FILE_HISTORY_CAP_BYTES - 200,
+    );
+    expect(big?.text.endsWith(";")).toBe(true);
+    expect(out["small.ts"]?.truncated).toBe(false);
+    expect(out["small.ts"]?.text).toMatch(/\(Hist\s+2026-02-03\s+1\) one$/m);
+  });
+
+  it("keys the facts by the head path of a renamed file", async () => {
+    const out = await gatherFileHistory(repo, sha, [
+      { key: "renamed.ts", path: "small.ts", ranges: [{ start: 1, end: 1 }] },
+      { key: "gone.ts", path: "absent.ts", ranges: [{ start: 1, end: 1 }] },
+    ]);
+    expect(Object.keys(out)).toEqual(["renamed.ts"]);
+    expect(out["renamed.ts"]?.text).toContain("-- small.ts");
   });
 });
 

@@ -506,9 +506,13 @@ export async function runReview(input: RunInput): Promise<RunResult> {
         // tier runs no reviewer, so it builds no block. The rules before the
         // diff (--tier, a label, a skip rule) can already give skip.
         history: config.reviewers.history?.enabled !== false && preTier(tierInput)?.tier !== "skip",
+        // The verifier gets the git facts of its finding's file, also when
+        // the history reviewer is off. The skip tier verifies nothing.
+        fileHistory: preTier(tierInput)?.tier !== "skip",
       }),
     );
-    // With a pull request, the description is its sanitized title and body.
+    // With a pull request, the description is its sanitized title, labels
+    // and body.
     // Else it is the sanitized commit messages that gather gives. Every
     // reviewer and verifier wraps it as untrusted text.
     const prText = prContext
@@ -648,6 +652,7 @@ export async function runReview(input: RunInput): Promise<RunResult> {
               semaphore,
               config: verifyConfig,
               description: gathered.description,
+              fileHistory: gathered.fileHistory,
             });
           })
           .then(
@@ -929,6 +934,9 @@ export async function runReview(input: RunInput): Promise<RunResult> {
             ...loaded.warnings.map((message) => ({ stage: "config", message })),
             ...(gathered.historyError
               ? [{ stage: "gather", message: `history: ${gathered.historyError}` }]
+              : []),
+            ...(gathered.fileHistoryError
+              ? [{ stage: "gather", message: `file history: ${gathered.fileHistoryError}` }]
               : []),
             ...collectErrors(triageFailure, runs, verifications, merged.merges),
             ...(failed.value ? [failed.value] : []),

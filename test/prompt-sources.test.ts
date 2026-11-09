@@ -115,6 +115,22 @@ describe("A13: no prompt text in src", () => {
   });
 });
 
+describe("the description block text (D6 R5)", () => {
+  it("names the pull request title, labels and body, and does not name commit messages alone", () => {
+    for (const file of listFiles(PROMPTS, ".md")) {
+      const text = readFileSync(file, "utf8");
+      expect(text, relative(ROOT, file)).not.toMatch(
+        /description of the change, from the messages of its commits/,
+      );
+    }
+    for (const name of ["verifier.md", "reviewer-user.md"]) {
+      const text = readFileSync(join(PROMPTS, name), "utf8");
+      expect(text, name).toMatch(/title, labels and body/);
+      expect(text, name).toMatch(/commit messages|messages of its commits/);
+    }
+  });
+});
+
 describe("the verifier rubric asks one question (R1)", () => {
   const body = loadPrompt("verifier.md").body;
 
