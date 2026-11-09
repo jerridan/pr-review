@@ -163,7 +163,7 @@ jobs:
           set -o pipefail
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           status=0
-          node dist/cli.js eval --cases eval/cases --repeat "$REPEAT" --baseline eval/baseline.json --out pr-review-eval | tee -a "$GITHUB_STEP_SUMMARY" || status=$?
+          node dist/cli.js eval --cases eval/cases --repeat "$REPEAT" --baseline eval/baseline.json --no-extras --out pr-review-eval | tee -a "$GITHUB_STEP_SUMMARY" || status=$?
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           exit "$status"
 
