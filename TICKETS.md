@@ -58,12 +58,13 @@ Goal: make the verifier score whether a claim is true, and give it the inputs it
 - Give the verifier the git facts it needs as data blocks from gather: the log and blame of the changed lines and the diff against the merge base. Gather reads git, not the verifier. The verifier gets no Bash. Section 3.4 and section 6 keep that rule.
 - Inline a window of `WINDOW_LINES` around the span when the head file exceeds `INLINE_FILE_MAX_LINES`. Keep Read available for the rest.
 - Ship only when the eval shows precision at or above the baseline. Low noise is the first goal of section 1.
+- Done 2026-11-09: all seven items shipped. The eval at one repeat with `--no-extras` on the ten pinned cases gave recall 0.433 (baseline 0.287), strict precision 0.342 (baseline 0.636), cost per PR $4.41 (baseline $4.25), and all ten cases completed (the discourse case included). The 25 posted findings that matched no golden went through the D5 labeling round (Opus scorer, sol judge, three runs): 22 got a posting label (7 blocking, 13 suggestion, 2 nit) and 3 did not (2 don't post, 1 unsure), so 35 of 38 posted findings are real under the policy: adjudicated precision 0.921. The strict drop comes from the golden sets, not the verifier. The 22 labeled findings are candidates for the cases repo. The verifier gave don't post 15 times and not real 4 times over 92 verifications, and no limit stop occurred.
 
 ## D7: Reviewer briefing and reading plans
 
 Goal: give the finders the briefing and the reading procedure that find the serious items. Closes issues 20 and 25. Depends on D5 for the measurement.
 
-- Gather fills the description block with the PR title, labels and body when the run has a PR, as section 3.1 already says. Today it uses the commit messages always. Fix the gap.
+- Done 2026-11-09 in D6: the description block holds the PR title, labels and body when the run has a PR, else the commit messages, and every reviewer and the verifier get it.
 - The reviewer user message lists the changed files and tells the reviewer to read each one in full before it reports. Keep the triage hotspots. Keep the diff available, but not as the only context.
 - Give diff-bugs, history and tests a reading plan in concrete steps: the changed files in full, then the callers and callees of the changed code, then the tests that cover the changed behaviour. Write steps, not exhortations. The 5.5 guidance says a line such as "be thorough" costs tokens and adds nothing.
 - Each finding names the file and the line it rests on. This rule exists; keep it.
