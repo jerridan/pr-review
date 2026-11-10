@@ -93,9 +93,19 @@ function unsureReason(v: Verification, cause: UnsureCause): string {
  * The reason that a verification did not pass. The checks go in the order
  * of the code: a failed call, then scope, then the claim, then a severity
  * that does not post, then the score, then the quote. An escalated result
- * decides when the record holds one.
+ * decides when the record holds one. When the first and the escalated
+ * results both say that the claim holds, a score below the threshold does
+ * not stop the finding (D6 R2). Then a rejected text comes before the
+ * score. A record from before that rule has no rejected text for such a
+ * finding, so the score reason still shows.
  */
 function verifyReason(v: Verification, threshold: { t: number; exact: boolean }): string {
+  const agreed =
+    v.escalated !== undefined &&
+    !isFailure(v.first) &&
+    !isFailure(v.escalated) &&
+    v.first.claim_holds &&
+    v.escalated.claim_holds;
   const one = (r: VerifierResult | QueryFailure): string => {
     if (isFailure(r)) return `verifier call failed: ${r.kind}`;
     if (!r.in_scope) return `verifier: out of scope, scored ${r.score}`;
@@ -105,6 +115,7 @@ function verifyReason(v: Verification, threshold: { t: number; exact: boolean })
         ? `verifier rejected: ${v.rejected}`
         : `verifier: severity ${r.severity}, scored ${r.score}`;
     }
+    if (agreed && v.rejected !== undefined) return `verifier rejected: ${v.rejected}`;
     if (r.score < threshold.t) {
       return threshold.exact
         ? `verifier scored ${r.score}, below the threshold ${threshold.t}`

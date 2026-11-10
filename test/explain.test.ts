@@ -654,6 +654,28 @@ describe("explain: the verify stage (R7.4)", () => {
     });
   });
 
+  it("names the quote rejection of an agreed escalation below the threshold", () => {
+    const rejected = "No quote of the verifier is in the head file of the finding.";
+    const escalated = result({ score: 60, quotes: ["not in the file"] });
+    const rows = rowsOf([finding(1)], {
+      verifications: [dropped(result({ score: 70 }), { escalated, final: escalated, rejected })],
+      config: { reviewers: { r: { enabled: true, threshold: 80 } } },
+    });
+    expect(brief(rows[0])).toEqual({
+      stage: "verify",
+      outcome: "dropped",
+      reason: `escalated, verifier rejected: ${rejected}`,
+    });
+  });
+
+  it("names the claim when the escalated result does not agree that the claim holds", () => {
+    const escalated = result({ claim_holds: false, score: 60 });
+    const rows = rowsOf([finding(1)], {
+      verifications: [dropped(result({ score: 70 }), { escalated, final: escalated })],
+    });
+    expect(rows[0]?.reason).toBe("escalated, verifier: the claim does not hold, scored 60");
+  });
+
   it("names the threshold that the config sets for the reviewer", () => {
     const rows = rowsOf([finding(1)], {
       verifications: [

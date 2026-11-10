@@ -288,6 +288,24 @@ function isFailure(value: VerifierResult | QueryFailure | undefined): value is Q
   return value !== undefined && "kind" in value;
 }
 
+/**
+ * The gather errors of the record. One git pass builds the history block
+ * and the git facts, so one failure can stop both. Then the record gets
+ * one error that names both outputs. A failure of one output names that
+ * output only.
+ */
+function gatherErrors(gathered: GatherResult): { stage: string; message: string }[] {
+  const history = gathered.historyError ?? null;
+  const facts = gathered.fileHistoryError ?? null;
+  if (history !== null && history === facts) {
+    return [{ stage: "gather", message: `history and file history: ${history}` }];
+  }
+  return [
+    ...(history !== null ? [{ stage: "gather", message: `history: ${history}` }] : []),
+    ...(facts !== null ? [{ stage: "gather", message: `file history: ${facts}` }] : []),
+  ];
+}
+
 function collectErrors(
   triageFailure: QueryFailure | null,
   runs: ReviewerRun[],
@@ -932,12 +950,7 @@ export async function runReview(input: RunInput): Promise<RunResult> {
           errors: [
             // Config and gather run first, so their errors come first.
             ...loaded.warnings.map((message) => ({ stage: "config", message })),
-            ...(gathered.historyError
-              ? [{ stage: "gather", message: `history: ${gathered.historyError}` }]
-              : []),
-            ...(gathered.fileHistoryError
-              ? [{ stage: "gather", message: `file history: ${gathered.fileHistoryError}` }]
-              : []),
+            ...gatherErrors(gathered),
             ...collectErrors(triageFailure, runs, verifications, merged.merges),
             ...(failed.value ? [failed.value] : []),
           ],
