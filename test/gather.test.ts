@@ -432,16 +432,27 @@ describe("gather on the fixture repo (A2)", () => {
       expect(result.fileHistoryError).toBeNull();
     });
 
-    it("holds no other file in the facts of one file", () => {
-      for (const [path, facts] of Object.entries(result.fileHistory ?? {})) {
-        for (const other of Object.keys(result.fileHistory ?? {})) {
-          if (other !== path) expect(facts.text).not.toContain(`-- ${other}`);
+    it("holds no other changed file in the facts of one file", () => {
+      // The fixture has one file with facts and more changed files. Check
+      // that both are there, so the loops below always run.
+      const facts = Object.entries(result.fileHistory ?? {});
+      const changed = result.changedFiles.map((f) => f.path);
+      expect(facts.length).toBeGreaterThanOrEqual(1);
+      expect(changed.length).toBeGreaterThanOrEqual(2);
+      for (const [path, entry] of facts) {
+        expect(entry.text).toContain(`-- ${path}`);
+        for (const other of changed) {
+          if (other !== path) expect(entry.text).not.toContain(`-- ${other}`);
         }
       }
     });
 
     it("gives no entry for a file that the merge base does not have", () => {
-      expect(Object.keys(result.fileHistory ?? {}).some((p) => p.endsWith("ci.yml"))).toBe(false);
+      // The added file is a changed file, and another file has facts, so
+      // the check below is not empty.
+      expect(result.changedFiles.map((f) => f.path)).toContain(".github/workflows/ci.yml");
+      expect(Object.keys(result.fileHistory ?? {})).toContain("src/stats.ts");
+      expect(Object.keys(result.fileHistory ?? {})).not.toContain(".github/workflows/ci.yml");
     });
 
     it("gives the facts when the history block is off", async () => {
@@ -698,6 +709,20 @@ describe("gatherHistory", () => {
     expect(big?.text.endsWith(";")).toBe(true);
     expect(out["small.ts"]?.truncated).toBe(false);
     expect(out["small.ts"]?.text).toMatch(/\(Hist\s+2026-02-03\s+1\) one$/m);
+  });
+
+  it("holds the blame and log of its own file only in the facts of each file", async () => {
+    const out = await gatherFileHistory(repo, sha, [
+      { key: "big.ts", path: "big.ts", ranges: [{ start: 1, end: 2 }] },
+      { key: "small.ts", path: "small.ts", ranges: [{ start: 1, end: 2 }] },
+    ]);
+    expect(Object.keys(out).sort()).toEqual(["big.ts", "small.ts"]);
+    expect(out["big.ts"]?.text).toContain("-- big.ts");
+    expect(out["big.ts"]?.text).not.toContain("small.ts");
+    expect(out["big.ts"]?.text).not.toMatch(/\) one$/m);
+    expect(out["small.ts"]?.text).toContain("-- small.ts");
+    expect(out["small.ts"]?.text).not.toContain("big.ts");
+    expect(out["small.ts"]?.text).not.toContain("const line0");
   });
 
   it("keys the facts by the head path of a renamed file", async () => {
