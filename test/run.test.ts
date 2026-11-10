@@ -1635,10 +1635,13 @@ describe("the history block and the history reviewer config", () => {
   it("records a failure of the git facts as a gather error, and completes the run (D6 R6)", async () => {
     const stub = gitStub(true);
     const record = await withGitStub(stub, () => review(disabled, "facts-fail"));
-    expect(record.cost.errors).toContainEqual({
-      stage: "gather",
-      message: expect.stringMatching(/^file history: git blame .* failed: STUB-BLAME-FAILED$/),
-    });
+    // The history block is off, so the one failure names the git facts only.
+    expect(record.cost.errors.filter((e) => e.stage === "gather")).toEqual([
+      {
+        stage: "gather",
+        message: expect.stringMatching(/^file history: git blame .* failed: STUB-BLAME-FAILED$/),
+      },
+    ]);
     expect(record.posted.verdict).not.toBe("incomplete");
   });
 
@@ -1678,10 +1681,15 @@ describe("the history block and the history reviewer config", () => {
     expect(stub.blameCalls()).toBeGreaterThan(0);
     expect(record.identity.history).toEqual({ built: false, truncated: false });
     expect(record.identity.selected_reviewers.map((r) => r.name)).toContain("diff-bugs");
-    expect(record.cost.errors).toContainEqual({
-      stage: "gather",
-      message: expect.stringMatching(/^history: git blame .* failed: STUB-BLAME-FAILED$/),
-    });
+    // One git failure gives one gather error, which names both outputs.
+    expect(record.cost.errors.filter((e) => e.stage === "gather")).toEqual([
+      {
+        stage: "gather",
+        message: expect.stringMatching(
+          /^history and file history: git blame .* failed: STUB-BLAME-FAILED$/,
+        ),
+      },
+    ]);
     // The failure does not change the verdict.
     const clean = await review(enabled, "history-fails-control");
     expect(record.posted.verdict).toEqual(clean.posted.verdict);
