@@ -1,0 +1,1364 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 39,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Verifier inputs and rubric (D6)",
+      "draft": true,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/39"
+    },
+    "run_kind": "later",
+    "prior": {
+      "head": "bfb3b045a0e164e44fd3b98a90a07c316c906351",
+      "source": "record",
+      "record": "/home/runner/work/_temp/pr-review-records/pr-39/2026-11-10T021927.872Z-bfb3b04.json",
+      "open": [
+        "ad13e52c1f9fcfbc"
+      ],
+      "dismissed": [],
+      "fetch_failed": false
+    },
+    "base": "ca5fbe9e14d339dcd8df4bd04bdd6abac4f7cfc7",
+    "head": "615c89baad152eff290f2871ed94dcae7b4cabb3",
+    "started_at": "2026-11-10T02:28:56.651Z",
+    "tool_version": "0.4.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Verifier inputs and rubric (D6)\n\nImplements D6 of TICKETS.md: the verifier scores one question (is the claim true of the code), takes the six labels of the severity policy, gives an `unsure` result for a claim the repository cannot settle or a call that stops on its budget or turn limit, and gets the description block with the PR labels, the blame and log of the finding's file from gather, and a window of a long head file. Closes #18, #19 and #24.\n\n## Eval gate\n\nOne repeat, `--no-extras`, the ten pinned cases (ref db6ad8e), run locally on 2026-11-09. All ten cases completed, the discourse case included.\n\n```\nSummary over 1 repeats\nmetric             mean                                     min      max\nraw recall         0.592                                    0.592    0.592\nrecall             0.433                                    0.433    0.433\nprecision          0.342                                    0.342    0.342\nadj precision      -                                        -        -\nfindings per case  3.800                                    3.800    3.800\ncost per PR        $4.4113                                  $4.4113  $4.4113\njudge cost per PR  $0.0190                                  $0.0190  $0.0190\ndrops              reviewer 12, verify 22, merge 30, cap 2\n\nJudge: 15 calls, 0 unknown, 0 extras unknown, $0.1895\nGate: passed (recall drop -0.146, precision drop 0.294)\nCases ref: db6ad8e20c8c9f784a1b97b27c9eac2e3f0c93bd\n```\n\n| metric | baseline | this branch |\n|---|---|---|\n| recall | 0.287 | 0.433 |\n| strict precision | 0.636 | 0.342 |\n| adjudicated precision (labeler) | - | 0.921 |\n| cost per PR | $4.25 | $4.41 |\n| cases completed | 9 of 10 | 10 of 10 |\n\nStrict precision fell because the golden sets are incomplete, not because the verifier posts noise. The 25 posted findings that matched no golden went through the D5 labeling round (Opus 5.5 scorer, GPT-6.1 Sol judge, three runs each, $8.53): 22 got a posting label (7 blocking, 13 suggestion, 2 nit) and 3 did not (2 don't post, 1 unsure). So 35 of 38 posted findings are real under the policy. The 22 are candidates for the cases repo and sit in the crew record. The repo's own gate (margins) passed.\n\n```\ncase                                 findings  labeled  queued  failed runs  first-pass acceptance  run agreement  scorer cost\nmartian-calcom-8330                  5         5        0       0            1.000                  1.000          $1.3552\nmartian-discourse-graphite-1         4         4        0       0            0.500                  1.000          $1.3149\nmartian-sentry-93824                 5         5        0       0            0.467                  0.600          $2.4384\nmartian-sentry-greptile-1            7         6        1       0            0.810                  0.571          $2.0733\nreviewbench-flatten-js-244           2         2        0       0            0.500                  1.000          $0.7447\nreviewbench-statswales-frontend-626  2         0        2       0            0.667                  0.500          $0.5993\ntotal                                25        22       3       0            0.693                  0.760          $8.5257\n```\n\nOver the 92 verifications of the run the verifier gave don't post 15 times and not real 4 times; no unsure result and no limit stop occurred. A first attempt of the eval died in a usage limit and is not counted.\n\n## Spec\n\n# Spec: D6, Verifier inputs and rubric\n\n## Goal\n\nThe verifier scores one thing: whether a claim is true of the code. It gets the inputs it needs to check a claim: the description block, the git facts of the finding's file, and a window of the head file. A claim that the repository cannot settle, and a verifier call that stops on its budget, give an `unsure` result. That result never posts and never fails the review.\n\n## Facts\n\n- `verifyFinding` asks the role \"verifier\", then the role \"verifier-escalation\" when the score is in the middle band or the finding has `needs_context` (`src/verify/index.ts:194`).\n- `decide` passes a result when it is in scope, `claim_holds` is true, the score is at or above the threshold, and a quote matches the head file (`src/verify/index.ts:240`).\n- A failed first call gives `final: null` and `passed: false` (`src/verify/index.ts:252`). A failed escalation call gives the same (`src/verify/index.ts:270-273`).\n- `verificationCounts` counts every `QueryFailure` on a first or escalated call as a failed verifier call (`src/verdict.ts:85`). `decideVerdict` gives \"incomplete\" when `verifierFailures` is above 0 (`src/verdict.ts:18`, `src/verdict.ts:34`).\n- The eval turns an incomplete verdict into a failed repeat (`src/eval/run.ts:246-249`). One $1 budget stop failed the discourse case whole this way (`TICKETS.md:56`).\n- The SDK client maps `error_max_budget_usd` and `error_max_turns` to the failure kind \"limit\" (`src/sdk/client.ts:65`).\n- The verifier role is Sonnet at high effort, 25 turns, $0.50. The escalation role is Opus at high effort, 25 turns, $1. Both have the \"read-only\" tools: Read, Grep and Glob (`src/config/models.ts:67-82`).\n- Bash is granted only when the request sets `bash: true` (`src/sdk/options.ts:98`). The verifier never sets it.\n- `VerifierResult` holds `in_scope`, `claim_holds`, `introduced_by_pr`, `quotes`, `rationale`, `score` and `severity`. The severity is \"blocking\", \"suggestion\" or \"nit\" (`src/schemas/verifier.ts:7-14`).\n- A verification entry in the record holds `finding`, `first`, `escalated?`, `final`, `passed` and `rejected?` (`src/schemas/record.ts:163-169`). The coverage block of the posted record holds `findings_dropped_by_failed_verifier` (`src/verdict.ts:68`).\n- The rubric in `prompts/verifier.md` has four questions (`prompts/verifier.md:34-37`). Question 3 is \"Would a careful reviewer on this team post this finding?\" The score bands mix truth, scope and worth (`prompts/verifier.md:46-50`).\n- The `user_message` of the verifier prompt has the blocks finding, file, description and diff (`prompts/verifier.md:4-13`). Its text says the description comes \"from the messages of its commits\" (`prompts/verifier.md:13`).\n- With a PR, the description is the sanitized PR title and body from `prDescription` (`src/run.ts:514-522`, `src/github/metadata.ts:61-69`). Without a PR, it is the sanitized commit messages. Labels are not in it. Labels go only to the tier input (`src/run.ts:492`).\n- The verifier gets the description (`src/run.ts:650`, `src/verify/index.ts:178-181`). The reviewers get the same description (`src/find/index.ts:208-211`).\n- `fileHistory` runs blame and log at the merge base for the old-side ranges of one file (`src/gather/history.ts:69`). `gatherHistory` joins all files into one capped block for the history reviewer only (`src/gather/history.ts:110`).\n- The diff of `base...head` is the diff against the merge base (`src/gather/index.ts:112-121`). The verifier already gets the section of its file.\n- Design section 3.4 says the verifier \"never sees the history block\" (`docs/design/high-level-design.md:112`). Section 3.5 says the same (`docs/design/high-level-design.md:123`).\n- `verifyReason` in explain names the reason a verification failed: a failed call, scope, claim, score or quote (`src/explain/index.ts:87`). The eval stage order is reviewer, verify, suppress, merge, cap, scope, post (`src/eval/report.ts:95`).\n- The severity policy has six labels (`docs/design/severity-policy.md:13-41`). It says the verifier posts blocking, suggestion and nit, and records don't post, not real and unsure without posting them (`docs/design/severity-policy.md:43`). Don't post is defined at line 37 and unsure at line 41.\n- `INLINE_FILE_MAX_LINES` and `WINDOW_LINES` exist nowhere yet. The verifier inlines the whole numbered head file with no cap (`src/verify/index.ts:120-124`, `src/verify/index.ts:177`).\n- Related tests: `test/verify.test.ts` uses the fake SDK client of `src/sdk/fake.ts`. `test/gather.test.ts` uses a real temporary repo from `scripts/make-fixture.sh`. `test/run.test.ts:452` covers a refused escalation, the case closest to a budget stop. Also `test/verdict.test.ts`, `test/explain.test.ts`, `test/eval-metrics.test.ts` and `test/record.test.ts`.\n- The gates are `npm test` (vitest run), `npm run lint` (eslint and prettier check on `src` and `test`), `npm run typecheck` and `npm run build`. Node is 20.19 or later (`package.json:15-17`). Setup is `npm ci`.\n\n## Requirements\n\n**R1. One question.** Requirement: The verifier prompt asks whether the claim is true of the code as written, and whether the claim is in scope. The prompt does not ask whether a careful reviewer posts the finding. The score is the confidence, from 0 to 100, that the claim holds. The score bands describe confidence only. The severity of the verifier result follows `docs/design/severity-policy.md` and takes its six labels, spelled as `LABEL_SEVERITIES` in `src/schemas/label.ts` spells them (`dont_post`, `not_real`, `unsure` for the three that do not post). Only the verifier result takes the six labels. The reviewer finding, the merge output and the posted finding keep their three labels, so the shared `severitySchema()` of `src/schemas/finding.ts` does not widen. The prompt tells the verifier when to answer unsure and when to answer don't post, as the policy says. Acceptance: A vitest test reads `prompts/verifier.md` and asserts that the rubric holds no question on posting. A search of `prompts/verifier.md` for \"careful reviewer\" and for \"worth posting\" returns nothing. A schema test shows that the verifier result accepts each of the six labels and rejects any other. The project lead applies this checklist to the prompt text: the score bands speak of confidence that the claim holds and of nothing else; the text says when to answer unsure (the repository does not settle the claim: production data, a runtime or an external service is needed); the text says when to answer don't post (true but not worth the author's time, as the policy lists); the text says when to answer not real (the code contradicts the claim).\n\n**R2. Posting rule.** Requirement: A finding posts when its final result has `claim_holds` true, is in scope, has a score at or above the threshold, has a quote that matches the head file, and has a severity of blocking, suggestion or nit. A final severity of don't post, not real or unsure never posts. The escalation band stays. When the first and the escalated result both say `claim_holds` true, the finding posts although the escalated score is below the threshold. The scope and quote checks still apply in that case. Acceptance: Vitest tests with the fake SDK client show four cases. First, `claim_holds` true and a score at or above the threshold posts. Second, `claim_holds` false does not post. Third, a severity of don't post does not post, and the record shows it. Fourth, a first score in the band with `claim_holds` true, then an escalated `claim_holds` true with a score below the threshold, posts.\n\n**R3. Unsure result.** Requirement: The verifier result can state unsure, for a claim that the repository cannot settle. The model states it through the severity label `unsure` of R1. An unsure result never posts. The verification entry in the record marks unsure in one field that explain and the eval read without a recompute; that field also names the cause: the model said unsure, or a call stopped on its limit (R4). The explain row of an unsure verification names unsure as its reason. The eval drop counts and the coverage block of the record count unsure findings apart from rejected findings and apart from failed verifier calls. One rule decides the outcome of a final result, in this order: a result with the severity `unsure` is unsure, whatever its `claim_holds`, because the label is the model's explicit signal. Then a result whose `claim_holds` is false is rejected, whatever its severity. A result with `claim_holds` true and the severity `not real` contradicts itself: it is rejected, and the entry's `rejected` text names the contradiction. A result with `claim_holds` true and the severity `don't post` is not posted and is not unsure; the record shows the severity. Then the checks of R2 apply: scope, threshold, quote, and a severity of blocking, suggestion or nit. Acceptance: Vitest tests show six things. An unsure result does not post. The record entry marks unsure with its cause. A `claim_holds` true plus `not_real` result is rejected with a reason in the record. The `pr-review explain` row says unsure. The eval per-stage drop counts show an unsure count apart from the other verify drops. A run with one model-said unsure finding shows that finding in the coverage block, apart from `findings_dropped_by_failed_verifier`.\n\n**R4. Limit stop.** Requirement: A verifier call that ends with the failure kind \"limit\" (the SDK subtypes `error_max_budget_usd` and `error_max_turns`, `src/sdk/client.ts:65`) gives the finding the unsure result at once. On the first call, the finding does not escalate. On the escalation call, the finding ends unsure. The verification entry records the limit stop as the cause of unsure (R3), and the failure stays in `first` or `escalated`. The record names it a limit stop, not a budget stop, because a turn stop takes the same path. A limit stop is not a failed verifier call. So it alone does not make the verdict \"incomplete\", the run exits 0, and the eval counts the case. The coverage block names how many findings ended unsure on a limit stop. A failure of any other kind keeps today's behaviour. Acceptance: A vitest test runs the whole review through `run()` with the fake SDK client. One escalation returns the subtype `error_max_budget_usd`. The run exits 0. The verdict is not \"incomplete\". The record entry shows unsure with the limit stop as cause, and the coverage block counts one unsure on a limit stop. The eval scoring treats the record as a complete repeat. A second test shows a first call that returns `error_max_turns`: the finding is unsure, and no escalation call is made. A third test shows that a failure of another kind still gives \"incomplete\".\n\n**R5. Description block.** Requirement: The verifier and the reviewers get the same description block. With a PR, it holds the PR title, the labels and the body. Without a PR, it holds the commit messages. The text in `prompts/verifier.md` and in `prompts/reviewer-user.md` describes that block truthfully. This requirement takes over the first bullet of the D7 entry in `TICKETS.md` (line 66, the description block with title, labels and body). The project lead changes that D7 bullet at integration to say that D6 did it. The rest of D7 stays out of scope. Acceptance: Vitest tests show that, for a PR context with labels, the verifier user message and the reviewer user message each hold the title, every label and the body. For a run without a PR, both hold the commit messages. No prompt says the description comes from commit messages alone.\n\n**R6. Git facts from gather.** Requirement: Gather produces, for each changed file, the blame and log of the changed lines at the merge base, in a form the run can hand to the verifier for one file. The verifier user message gets a git facts block for the file of its finding. The block holds that blame and log and no other file. The diff of the file against the merge base is the diff block the message already holds (`base...head` is the diff from the merge base); the git facts block does not repeat it. The per-file block is cut at a line end to fit 16384 bytes, and the message says when it was cut. Gather reads git. The verifier runs no git and has no Bash: its request grants Read, Grep and Glob only. The block for the history reviewer does not change. Gather builds the per-file facts whenever the run verifies findings, also when the history reviewer is off. Acceptance: A vitest test shows that the verifier user message for a finding on file F holds the blame and log of F and of no other file, and holds the diff of F once. A test shows that a per-file block over 16384 bytes is cut at a line end and the message says so. A test on the request shows that its tools hold Read, Grep and Glob and no Bash. A gather test on the fixture repo shows the per-file facts. A test shows that the facts exist when the history reviewer is off. The history reviewer block has the same text as before the change.\n\n**R7. Inline window.** Requirement: Two exported constants exist under the names `INLINE_FILE_MAX_LINES` and `WINDOW_LINES`, with the values 600 and 150. The IC chooses the module. When the head file has more lines than `INLINE_FILE_MAX_LINES`, the user message inlines only the numbered lines from the start line minus `WINDOW_LINES` to the end line plus `WINDOW_LINES`, clamped to the file. The message also states which lines of how many are shown, and that Read gives the rest. A file at or below `INLINE_FILE_MAX_LINES` inlines whole. Read stays in the tools. The quote check runs against the whole head file. Acceptance: Vitest tests import the two constants and build their inputs from them. For a file of `INLINE_FILE_MAX_LINES + 400` lines and a finding on the middle line, the message holds the numbered lines of the window and the header line, and holds no line outside the window. A file of `INLINE_FILE_MAX_LINES` lines inlines whole. A quote from outside the window still matches. When the window is used, the request's tools hold Read.\n\n**R8. Record, explain and eval stay consistent.** Requirement: The `RunRecord` schema validates a record with the new fields. Explain and the eval table show unsure apart. The cost columns of the eval table stay. Acceptance: `npm test` exits 0. `test/record.test.ts` round-trips a record that holds an unsure verification. A test shows the unsure count in the eval table.\n\n**R9. Design text.** Requirement: Sections 3.4 and 3.5 of `docs/design/high-level-design.md` state the one-question rubric, the unsure result, the budget-stop rule, the git facts block of the verifier, and the window. The section \"How the pipeline uses the labels\" in `docs/design/severity-policy.md` states the unsure count. The design text matches the code in the same PR. Acceptance: A search of `docs/design/high-level-design.md` for \"never sees the history block\" returns nothing. The project lead applies this checklist: section 3.4 says the verifier gets the git facts of the finding's file; section 3.5 states the one-question rubric, the unsure result, the limit-stop rule and the window; the section \"How the pipeline uses the labels\" of `docs/design/severity-policy.md` (line 116) says the record and the eval count unsure apart.\n\n**R10. Eval gate.** Requirement: The project lead runs the eval once at integration, on the pinned case set (`eval/cases.json`, fetched by `scripts/fetch-cases.sh`), with `--repeat 1 --no-extras`, against `eval/baseline.json`. This is not a work package. With `--no-extras` the adjudicated precision is null (`src/eval/metrics.ts:79-80`), so the gate reads the `precision` field of the eval table: the pooled strict precision, matches only, the same metric that `eval/baseline.json` holds as `precision`. The PR ships only when that precision is at or above 0.636. The PR body holds the eval table and the cost. Acceptance: The PR body shows the eval table with a `precision` of 0.636 or more, and the run cost.\n\n## Global constraints\n\nRules of `CLAUDE.md`, word for word:\n\n1. **TypeScript, as ESM.** Write TypeScript for Node 20 or later. Use `import` and `export`. Never use `require`. Why: one module system keeps the build and the `bin` entry simple.\n2. **Test with vitest, and test behaviour.** Every change has a vitest test. A unit test needs no network and no credentials. Apply five checks to each test: it names one behaviour; it asserts only what a user or caller can observe, such as a return value, output, an exit code, a record, a file, or a request that leaves the process; a rename of an internal would not break it; breaking the behaviour would make it fai",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": true,
+      "truncated": true
+    },
+    "history": {
+      "built": true,
+      "truncated": true
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": ".claude-plugin/marketplace.json",
+        "hunks": 1
+      },
+      {
+        "path": ".claude-plugin/plugin.json",
+        "hunks": 1
+      },
+      {
+        "path": "README.md",
+        "hunks": 4
+      },
+      {
+        "path": "TICKETS.md",
+        "hunks": 1
+      },
+      {
+        "path": "docs/design/high-level-design.md",
+        "hunks": 1
+      },
+      {
+        "path": "docs/design/severity-policy.md",
+        "hunks": 1
+      },
+      {
+        "path": "package.json",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/reviewer-user.md",
+        "hunks": 2
+      },
+      {
+        "path": "prompts/verifier.md",
+        "hunks": 2
+      },
+      {
+        "path": "src/eval/report.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/explain/index.ts",
+        "hunks": 4
+      },
+      {
+        "path": "src/gather/history.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/gather/index.ts",
+        "hunks": 7
+      },
+      {
+        "path": "src/github/metadata.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/github/review-body.ts",
+        "hunks": 2
+      },
+      {
+        "path": "src/merge/index.ts",
+        "hunks": 4
+      },
+      {
+        "path": "src/run.ts",
+        "hunks": 7
+      },
+      {
+        "path": "src/schemas/record.ts",
+        "hunks": 5
+      },
+      {
+        "path": "src/schemas/verifier.ts",
+        "hunks": 3
+      },
+      {
+        "path": "src/verdict.ts",
+        "hunks": 5
+      },
+      {
+        "path": "src/verify/index.ts",
+        "hunks": 12
+      },
+      {
+        "path": "test/eval-metrics.test.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/explain.test.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/gather.test.ts",
+        "hunks": 5
+      },
+      {
+        "path": "test/github-metadata.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/github-review-body.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/merge.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/output.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/prompt-sources.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/record.test.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/run.test.ts",
+        "hunks": 4
+      },
+      {
+        "path": "test/schemas.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/verdict.test.ts",
+        "hunks": 10
+      },
+      {
+        "path": "test/verify.test.ts",
+        "hunks": 7
+      }
+    ],
+    "excluded_files": [
+      {
+        "path": "package-lock.json",
+        "reason": "generated"
+      },
+      {
+        "path": "test/__snapshots__/output.test.ts.snap",
+        "reason": "generated"
+      }
+    ],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "Changes verifier decision logic, schemas, gather, run pipeline, record format, and prompts, which affect which findings post and the verdict.",
+      "confidence": "high",
+      "categories": [
+        "bug",
+        "test",
+        "docs",
+        "convention",
+        "performance"
+      ],
+      "hotspots": [
+        "src/verify/index.ts: settle(), decide(), agreed-override, limitStop, pre_existing branch",
+        "src/verdict.ts: verificationCounts (limit filtering, not_real exclusion from rejected)",
+        "src/merge/index.ts: postedSeverity throwing on non-posted severity",
+        "src/run.ts: fileHistory gather flag, preExisting filter, counts passed to coverage",
+        "src/gather/index.ts and src/gather/history.ts: shared history parts, error handling, caps",
+        "src/schemas/verifier.ts and src/schemas/record.ts: widened severity enum, new optional fields",
+        "src/explain/index.ts: unsure stage and verifyReason ordering",
+        "src/github/metadata.ts: labels in the PR description",
+        "prompts/verifier.md: rubric and six-label severity definitions"
+      ],
+      "file_notes": [
+        {
+          "file": "src/verify/index.ts",
+          "note": "New outcome rule (unsure/not_real/dont_post), escalation agreement override, window of long head files, git facts block"
+        },
+        {
+          "file": "src/verdict.ts",
+          "note": "Unsure counts; limit failures no longer count as failed calls; new coverage fields"
+        },
+        {
+          "file": "src/merge/index.ts",
+          "note": "postedSeverity throws for non-posting severities"
+        },
+        {
+          "file": "src/run.ts",
+          "note": "Passes fileHistory to verifier, records file-history errors, unsure counts in coverage"
+        },
+        {
+          "file": "src/gather/index.ts",
+          "note": "Builds per-file git facts alongside history block"
+        },
+        {
+          "file": "src/gather/history.ts",
+          "note": "Refactor into historyParts/joinHistory plus new per-file cap of 16384 bytes"
+        },
+        {
+          "file": "src/schemas/verifier.ts",
+          "note": "Verifier severity widened to six labels; new isPostedSeverity guard"
+        },
+        {
+          "file": "src/schemas/record.ts",
+          "note": "Optional unsure and coverage count fields"
+        },
+        {
+          "file": "src/explain/index.ts",
+          "note": "Unsure stage and severity-not-posting reasons"
+        },
+        {
+          "file": "src/eval/report.ts",
+          "note": "Adds unsure stage to the drop order"
+        },
+        {
+          "file": "src/github/metadata.ts",
+          "note": "Labels line added to the PR description"
+        },
+        {
+          "file": "src/github/review-body.ts",
+          "note": "Coverage shows unsure counts"
+        },
+        {
+          "file": "prompts/verifier.md",
+          "note": "Rewritten rubric, new git facts and window placeholders"
+        },
+        {
+          "file": "prompts/reviewer-user.md",
+          "note": "Description wording only"
+        },
+        {
+          "file": ".claude-plugin/plugin.json",
+          "note": "Version bump"
+        },
+        {
+          "file": ".claude-plugin/marketplace.json",
+          "note": "Version bump"
+        },
+        {
+          "file": "package.json",
+          "note": "Version bump"
+        },
+        {
+          "file": "TICKETS.md",
+          "note": "Status notes"
+        },
+        {
+          "file": "README.md",
+          "note": "Docs for labels and unsure coverage"
+        },
+        {
+          "file": "docs/design/high-level-design.md",
+          "note": "Design doc for the new verifier rule"
+        },
+        {
+          "file": "docs/design/severity-policy.md",
+          "note": "Doc for unsure records"
+        }
+      ],
+      "summary": "The change reworks the verifier. It now returns six severity labels, including unsure, not_real and dont_post, and a new outcome rule decides whether a finding posts. Limit stops give unsure instead of a failed call. When the first and escalated results agree the claim holds, the finding posts even if the escalated score is below the threshold. The verifier also gets per-file git blame and log facts and a window of long head files. PR labels go into the description. Unsure counts are added to the record, coverage, explain and eval, and the version goes to 0.5.0."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: Changes verifier decision logic, schemas, gather, run pipeline, record format, and prompts, which affect which findings post and the verdict.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 3100,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11738,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011848,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 273,
+              "cacheReadInputTokens": 5136,
+              "cacheCreationInputTokens": 11243,
+              "webSearchRequests": 0,
+              "costUSD": 0.0964392,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 43,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.097624
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "package.json",
+            "start_line": 3,
+            "end_line": 3,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The change bumps the release version to 0.5.0, but the description does not mention a release.",
+            "evidence": "\"version\": \"0.5.0\",",
+            "suggested_fix": "Add a line to the description that says the change releases 0.5.0.",
+            "explanation": "After the merge, release.yml tags and publishes a release, and the description does not tell readers this will happen.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7866,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11736,
+              "outputTokens": 24,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011856000000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 6,
+              "outputTokens": 722,
+              "cacheReadInputTokens": 38475,
+              "cacheCreationInputTokens": 13018,
+              "webSearchRequests": 0,
+              "costUSD": 0.126303,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 284,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.12748859999999998
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7200,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11742,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011852000000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 562,
+              "cacheReadInputTokens": 21325,
+              "cacheCreationInputTokens": 12676,
+              "webSearchRequests": 0,
+              "costUSD": 0.116929,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 370,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1181142
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6027,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11752,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011862,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 470,
+              "cacheReadInputTokens": 21335,
+              "cacheCreationInputTokens": 11891,
+              "webSearchRequests": 0,
+              "costUSD": 0.108811,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 235,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1099972
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 2887,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11748,
+              "outputTokens": 24,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011868000000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 226,
+              "cacheReadInputTokens": 21345,
+              "cacheCreationInputTokens": 11487,
+              "webSearchRequests": 0,
+              "costUSD": 0.10070100000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.10188780000000001
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1789,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 42703,
+              "outputTokens": 24,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0042823,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 77,
+              "cacheReadInputTokens": 5161,
+              "cacheCreationInputTokens": 42208,
+              "webSearchRequests": 0,
+              "costUSD": 0.3402442,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.3445265
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6416,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11744,
+              "outputTokens": 204,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0012764,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 182,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 484,
+              "cacheReadInputTokens": 21523,
+              "cacheCreationInputTokens": 11715,
+              "webSearchRequests": 0,
+              "costUSD": 0.1077206,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 324,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.108997
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6938,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11746,
+              "outputTokens": 24,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011866000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 444,
+              "cacheReadInputTokens": 21525,
+              "cacheCreationInputTokens": 11526,
+              "webSearchRequests": 0,
+              "costUSD": 0.105409,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 274,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.10659560000000001
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5541,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11756,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011866000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 486,
+              "cacheReadInputTokens": 5808,
+              "cacheCreationInputTokens": 11261,
+              "webSearchRequests": 0,
+              "costUSD": 0.1009776,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 139,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1021642
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "package.json",
+          "start_line": 3,
+          "end_line": 3,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The change bumps the release version to 0.5.0, but the description does not mention a release.",
+          "evidence": "\"version\": \"0.5.0\",",
+          "suggested_fix": "Add a line to the description that says the change releases 0.5.0.",
+          "explanation": "After the merge, release.yml tags and publishes a release, and the description does not tell readers this will happen.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"version\": \"0.5.0\",",
+            "To release, bump `version` in `package.json` and in the two `.claude-plugin/` manifests in the pull request; after the merge, `release.yml` tags `v<version>` and creates the release."
+          ],
+          "rationale": "The description doesn't mention the release, but CI's version-bump check requires every PR to bump the version, so the bump is routine and the merge-time release is documented project policy. Flagging it is low-value noise.",
+          "score": 12,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"version\": \"0.5.0\",",
+            "To release, bump `version` in `package.json` and in the two `.claude-plugin/` manifests in the pull request; after the merge, `release.yml` tags `v<version>` and creates the release."
+          ],
+          "rationale": "The description doesn't mention the release, but CI's version-bump check requires every PR to bump the version, so the bump is routine and the merge-time release is documented project policy. Flagging it is low-value noise.",
+          "score": 12,
+          "severity": "nit"
+        },
+        "passed": false
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5835934787,
+      "review_url": "https://github.com/jerridan/pr-review/pull/39#pullrequestreview-5835934787",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 129588770234
+      },
+      "cleanup_comment_id": null,
+      "resolved": [
+        {
+          "thread_id": "PRRT_kwDOVHw73s61iDA9",
+          "fingerprint": "ad13e52c1f9fcfbc"
+        }
+      ],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 12791,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 54246,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0054356000000000005,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1430,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 53759,
+            "webSearchRequests": 0,
+            "costUSD": 0.2294662,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.23490180000000002
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 3100,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11738,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011848,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 273,
+            "cacheReadInputTokens": 5136,
+            "cacheCreationInputTokens": 11243,
+            "webSearchRequests": 0,
+            "costUSD": 0.0964392,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 43,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.097624
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "model": "claude-opus-5-5",
+        "duration_ms": 2887,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11748,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011868000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 226,
+            "cacheReadInputTokens": 21345,
+            "cacheCreationInputTokens": 11487,
+            "webSearchRequests": 0,
+            "costUSD": 0.10070100000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.10188780000000001
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "model": "claude-opus-5-5",
+        "duration_ms": 1789,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 42703,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0042823,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 77,
+            "cacheReadInputTokens": 5161,
+            "cacheCreationInputTokens": 42208,
+            "webSearchRequests": 0,
+            "costUSD": 0.3402442,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.3445265
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6027,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11752,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011862,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 470,
+            "cacheReadInputTokens": 21335,
+            "cacheCreationInputTokens": 11891,
+            "webSearchRequests": 0,
+            "costUSD": 0.108811,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 235,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1099972
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7200,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11742,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011852000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 562,
+            "cacheReadInputTokens": 21325,
+            "cacheCreationInputTokens": 12676,
+            "webSearchRequests": 0,
+            "costUSD": 0.116929,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 370,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1181142
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7866,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11736,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011856000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 722,
+            "cacheReadInputTokens": 38475,
+            "cacheCreationInputTokens": 13018,
+            "webSearchRequests": 0,
+            "costUSD": 0.126303,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 284,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.12748859999999998
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6416,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11744,
+            "outputTokens": 204,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012764,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 182,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 484,
+            "cacheReadInputTokens": 21523,
+            "cacheCreationInputTokens": 11715,
+            "webSearchRequests": 0,
+            "costUSD": 0.1077206,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 324,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.108997
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5541,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11756,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011866000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 486,
+            "cacheReadInputTokens": 5808,
+            "cacheCreationInputTokens": 11261,
+            "webSearchRequests": 0,
+            "costUSD": 0.1009776,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 139,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1021642
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6938,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11746,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011866000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 444,
+            "cacheReadInputTokens": 21525,
+            "cacheCreationInputTokens": 11526,
+            "webSearchRequests": 0,
+            "costUSD": 0.105409,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 274,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.10659560000000001
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6125,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9347,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009452,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 779,
+            "cacheReadInputTokens": 16638,
+            "cacheCreationInputTokens": 10917,
+            "webSearchRequests": 0,
+            "costUSD": 0.0531298,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 113,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.054075
+      }
+    ],
+    "total_cost_usd": 1.5063719,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 34,
+      "gather": 444,
+      "scope": 10,
+      "triage": 13795,
+      "find_verify": 15576,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
