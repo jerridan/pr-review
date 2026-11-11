@@ -69,6 +69,7 @@ Goal: give the finders the briefing and the reading procedure that find the seri
 - Done 2026-11-11: the reviewer user message holds a `changed_files` block before the diff and tells the reviewer to read each changed file in full before it reports. A deleted file has its own line. The triage brief and the diff stay.
 - Done 2026-11-11: diff-bugs, history and tests each have a reading plan in numbered steps: the changed files in full, then the callers and callees, then the tests that cover the changed behaviour. The history plan matches the blame lines of prior fixes against the diff.
 - Each finding names the file and the line it rests on. This rule exists; keep it.
+- Done 2026-11-11: the read-in-full step lives in the reading plans of diff-bugs, history, tests and security, not in the shared user message. In the eval above, conventions, docs-and-comments and description-drift cost $7.37 against $3.28 before D7, for findings that are rarely serious. Security gained a reading plan. This change has no eval run of its own yet.
 - Done 2026-11-11: the eval at one repeat on the pinned cases (`e6ddf81`) gave recall 0.431 (baseline 0.396), precision 0.818 (baseline 0.722), adjudicated precision 0.939, raw recall 0.616 and cost per PR $6.03 (baseline $4.65, 30% more). All ten cases completed. Four ReviewBench cases still posted at most one finding, and ensnode 1938 posted none: every reviewer pass returned an empty list.
 - Run the injection measurement of D4c with this change, because the PR body now reaches every reviewer and the verifier.
 

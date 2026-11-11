@@ -86,7 +86,7 @@ Each reviewer declares triggers in frontmatter: path globs, languages, categorie
 
 ### 3.4 Find (parallel reviewer agents)
 
-Each reviewer gets: the triage brief, the description block, the list of changed files, the diff, the repo rules, read-only tools over the checkout, and a per-reviewer token budget. The history reviewer also gets the history block. The user message tells each reviewer to read each changed file in full before it reports. A deleted file has its own line in the list, because the head checkout has no file to read. The diff shows which lines changed. It is not the only context. Each returns structured findings:
+Each reviewer gets: the triage brief, the description block, the list of changed files, the diff, the repo rules, read-only tools over the checkout, and a per-reviewer token budget. The history reviewer also gets the history block. A deleted file has its own line in the list, because the head checkout has no file to read. The diff shows which lines changed. It is not the only context. Each returns structured findings:
 
 ```
 file, start_line, end_line, category, severity, claim,
@@ -95,7 +95,7 @@ evidence (code the reviewer read, quoted), suggested_fix, confidence
 
 Reviewer prompts follow the 5.5 prompting guidance (see `docs/research/claude-5-5-models.md`): one evidence source per reviewer, and an instruction to report every issue in scope with a confidence and an estimated severity, because 5.x models over-filter when told to be conservative. All filtering happens in verify and merge. Scope is the only exclusion: not lint or formatting, and nothing on code the PR did not add, change or aggravate. No finding without quoted evidence, which the orchestrator checks is a substring of the diff or file. A one-line explanation per finding, never visible reasoning. Diff first, instructions last. PR text and diff in tagged untrusted blocks. A line that forbids launching subagents.
 
-diff-bugs, history and tests each have a reading plan in numbered steps. Each plan starts with the changed files in full. diff-bugs then reads the callers and callees of the changed code, then the tests that cover it. history matches the blame lines of prior fixes against the diff. tests lists each changed behaviour and finds the tests that cover it, also through the callers. The steps are concrete actions, not exhortations: the 5.5 guidance says a line such as "be thorough" adds nothing.
+diff-bugs, history, tests and security each have a reading plan in numbered steps. Each plan starts with the changed files in full. These four reviewers find the serious defects of issue 20, so only they pay to read whole files. conventions, docs-and-comments and description-drift work from the diff and read files only when they need context. diff-bugs then reads the callers and callees of the changed code, then the tests that cover it. history matches the blame lines of prior fixes against the diff. tests lists each changed behaviour and finds the tests that cover it, also through the callers. security follows each outside input to its uses and reads the checks that guard each changed handler. The steps are concrete actions, not exhortations: the 5.5 guidance says a line such as "be thorough" adds nothing.
 
 Each reviewer is one SDK `query()` with its own model, effort and output schema. Default is Opus 5.5 at low effort; see section 5. Findings come back as structured output validated against a schema. The orchestrator is code, so no LLM retypes a finding on the way to the record.
 

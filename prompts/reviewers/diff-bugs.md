@@ -23,7 +23,7 @@ Look for logic errors, off-by-one errors, wrong conditions, missed edge cases (e
 
 Do these steps in order before you report.
 
-1. Read each changed file in full in the head checkout. The user message lists the changed files.
+1. Read each changed file in full in the head checkout. Read a long file in parts until you reach its last line. The user message lists the changed files. A deleted file is not in the head checkout. Read its removed lines in the diff.
 2. List each function, method, type and constant that the diff adds or changes.
 3. For each item in the list, find its callers with Grep. Read each call site and the code around it. Find the values that the caller passes in and the result that the caller expects back.
 4. For each item in the list, find the code that it calls. Read the definition of each callee in this repo. Find what the callee accepts, what it returns and what it throws.

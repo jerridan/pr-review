@@ -676,7 +676,7 @@ describe("the reviewer user message (R2)", () => {
     expect(sent.get("diff-bugs")).not.toContain("HISTORY-blame-and-log");
   });
 
-  it("lists each changed file before the diff, and tells every reviewer to read each in full before it reports (D7)", async () => {
+  it("lists each changed file before the diff, with a deleted file on its own line (D7)", async () => {
     const gathered: GatherResult = {
       ...GATHERED,
       changedFiles: [
@@ -698,8 +698,6 @@ describe("the reviewer user message (R2)", () => {
       expect(files?.index ?? Infinity, name).toBeLessThan(
         list.find((b) => b.label === "diff")?.index ?? -1,
       );
-      const tail = message.slice(message.lastIndexOf("</diff_"));
-      expect(tail, name).toMatch(/read each file in the changed_files block in full/);
     }
   });
 
