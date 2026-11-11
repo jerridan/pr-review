@@ -91,6 +91,8 @@ export type ReviewerTexts = {
   briefText: string;
   hotspotLine: string;
   emptyListText: string;
+  changedFileLine: string;
+  deletedFileLine: string;
   noDescriptionText: string;
   noHistoryText: string;
 };
@@ -116,6 +118,8 @@ export function reviewerTexts(prompt: PromptFile): ReviewerTexts {
     briefText: field(prompt, "brief_text"),
     hotspotLine: field(prompt, "hotspot_line"),
     emptyListText: field(prompt, "empty_list_text"),
+    changedFileLine: field(prompt, "changed_file_line"),
+    deletedFileLine: field(prompt, "deleted_file_line"),
     noDescriptionText: field(prompt, "no_description_text"),
     noHistoryText: field(prompt, "no_history_text"),
   };
@@ -192,9 +196,22 @@ function describeBrief(texts: ReviewerTexts, brief: TriageBrief | null): string 
   return render(texts.briefText, { summary: brief.summary, hotspots });
 }
 
+// One line per changed file, in the order of gather. A deleted file gets
+// its own line, because the head checkout has no file to read.
+function describeFiles(texts: ReviewerTexts, gathered: GatherResult): string {
+  const deleted = new Set(gathered.deletedFiles ?? []);
+  if (gathered.changedFiles.length === 0) return texts.emptyListText;
+  return gathered.changedFiles
+    .map((f) =>
+      render(deleted.has(f.path) ? texts.deletedFileLine : texts.changedFileLine, { path: f.path }),
+    )
+    .join("\n");
+}
+
 /**
  * Build the reviewer user message: the brief, the description, the
- * history when "withHistory" is true, then the diff, then the instructions.
+ * history when "withHistory" is true, the changed files, then the diff,
+ * then the instructions.
  */
 export function buildReviewerMessage(
   texts: ReviewerTexts,
@@ -209,6 +226,8 @@ export function buildReviewerMessage(
       "description",
       gathered.description.trim() === "" ? texts.noDescriptionText : gathered.description,
     ).block,
+    // File paths come from the change, so they are untrusted too.
+    files: wrapUntrusted("changed_files", describeFiles(texts, gathered)).block,
     diff: wrapUntrusted("diff", gathered.diff).block,
   };
   if (!withHistory) return render(texts.template, blocks);

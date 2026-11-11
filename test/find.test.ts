@@ -14,7 +14,7 @@ import {
 } from "../src/find/evidence.js";
 import { buildReviewerSystemPrompt, customReviewerBody, runReviewers } from "../src/find/index.js";
 import type { GatherResult } from "../src/gather/index.js";
-import { loadPrompt } from "../src/prompts/load.js";
+import { loadPrompt, render } from "../src/prompts/load.js";
 import type { ReviewerDefinition } from "../src/reviewers/loader.js";
 import type { Finding } from "../src/schemas/finding.js";
 import { FindingsOutputSchema } from "../src/schemas/finding.js";
@@ -670,9 +670,37 @@ describe("the reviewer user message (R2)", () => {
     expect(blockList(sent.get("diff-bugs") ?? "").map((b) => b.label)).toEqual([
       "triage_brief",
       "description",
+      "changed_files",
       "diff",
     ]);
     expect(sent.get("diff-bugs")).not.toContain("HISTORY-blame-and-log");
+  });
+
+  it("lists each changed file before the diff, and tells every reviewer to read each in full before it reports (D7)", async () => {
+    const gathered: GatherResult = {
+      ...GATHERED,
+      changedFiles: [
+        { path: "src/stats.ts", hunks: 1 },
+        { path: "src/old.ts", hunks: 1 },
+      ],
+      deletedFiles: ["src/old.ts"],
+    };
+    const sent = await messages(gathered, ["diff-bugs", "history", "tests"]);
+    for (const [name, message] of sent) {
+      const list = blockList(message);
+      const files = list.find((b) => b.label === "changed_files");
+      expect(files?.text, name).toBe(
+        [
+          render(userField("changed_file_line"), { path: "src/stats.ts" }),
+          render(userField("deleted_file_line"), { path: "src/old.ts" }),
+        ].join("\n"),
+      );
+      expect(files?.index ?? Infinity, name).toBeLessThan(
+        list.find((b) => b.label === "diff")?.index ?? -1,
+      );
+      const tail = message.slice(message.lastIndexOf("</diff_"));
+      expect(tail, name).toMatch(/read each file in the changed_files block in full/);
+    }
   });
 
   it("uses the prompt-file texts for an empty description and for no history", async () => {

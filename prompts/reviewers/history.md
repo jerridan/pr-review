@@ -19,6 +19,17 @@ Report only problems in code that this diff adds, changes or makes worse. Code t
 
 Look for a change that undoes a prior fix, for example a removed guard that a commit added on purpose. Look also for a change that repeats a mistake that a prior commit fixed in other code. Use the commit subjects and the blame lines to find these fixes.
 
+## Reading plan
+
+Do these steps in order before you report.
+
+1. Read each changed file in full in the head checkout. The user message lists the changed files.
+2. Read the history block. Find each commit whose subject names a fix, a revert or a guard. Find the lines of that commit in the blame output.
+3. Compare those lines with the diff. Find each of those lines that the diff removes or changes.
+4. For each such line, find the tests of its file with Grep and Glob, and read them. Find the behaviour that the prior fix protects.
+5. For each prior fix, search the code that the diff adds for the same mistake with Grep.
+6. Decide whether the diff undoes a prior fix or repeats a mistake that a prior commit fixed.
+
 ## Quotes and claims
 
 The step that checks your findings does not see the history block. So state each claim as a fact about the code that the head file and the diff show, for example "The diff removes the null check on items". Quote only the head file or an added or unchanged line of the diff. Never quote the history block. Put the commit that made the prior fix in the explanation.

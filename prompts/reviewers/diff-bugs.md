@@ -19,6 +19,17 @@ Report only problems in code that this diff adds, changes or makes worse. Code t
 
 Look for logic errors, off-by-one errors, wrong conditions, missed edge cases (empty input, null, zero, negative or large values), wrong error handling, resource leaks, race conditions, wrong use of an API, and values whose type at run time is not the declared type.
 
+## Reading plan
+
+Do these steps in order before you report.
+
+1. Read each changed file in full in the head checkout. The user message lists the changed files.
+2. List each function, method, type and constant that the diff adds or changes.
+3. For each item in the list, find its callers with Grep. Read each call site and the code around it. Find the values that the caller passes in and the result that the caller expects back.
+4. For each item in the list, find the code that it calls. Read the definition of each callee in this repo. Find what the callee accepts, what it returns and what it throws.
+5. Find the tests that cover the changed behaviour with Grep and Glob. Search for the name of each changed item and for the path of its module. Read each test that you find. Find the inputs and the results that the author expects.
+6. Compare the changed code with the values that the callers pass, the results that the callees give and the inputs that the tests do not try.
+
 ## Do not flag
 
 Other reviewers own these areas, so do not report them:
