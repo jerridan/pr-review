@@ -1,0 +1,1435 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 41,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Reviewer briefing and reading plans (D7)",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/41"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "3a31fb09cccc2ee001db9466f8b85f22e9966f1b",
+    "head": "25cf4bf4506a8e99dba6c0e632e7f07fafbd35b9",
+    "started_at": "2026-11-11T20:17:34.209Z",
+    "tool_version": "0.5.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Reviewer briefing and reading plans (D7)\n\n## Summary\n\nThis PR gives the reviewers the briefing and the reading procedure of D7. It closes #20 and #25. D6 already put the PR title, labels and body in the description block.\n\n- The reviewer user message holds a `changed_files` block before the diff. The message tells each reviewer to read each changed file in full before it reports. A deleted file has its own line, because the head checkout has no file to read.\n- Gather records the changed files that the change deletes.\n- diff-bugs, history and tests each have a reading plan in numbered steps: the changed files in full, then the callers and callees, then the tests that cover the changed behaviour. The history plan matches the blame lines of prior fixes against the diff.\n- The design (section 3.4) and TICKETS.md record the change.\n\n## Eval\n\nOne repeat on the pinned cases (`e6ddf81`) against the 0.5.0 baseline. The gate passed.\n\n| Metric | Baseline 0.5.0 | This PR |\n|---|---|---|\n| Recall | 0.396 | 0.431 |\n| Precision | 0.722 | 0.818 |\n| Adjudicated precision | n/a | 0.939 |\n| Raw recall | n/a | 0.616 |\n| Cost per PR | $4.65 | $6.03 |\n\n| Case | Raw recall | Recall | Precision | Posted | Cost |\n|---|---|---|---|---|---|\n| martian-calcom-8330 | 0.714 | 0.571 | 0.667 | 6 | $11.23 |\n| martian-discourse-graphite-1 | 1.000 | 0.625 | 0.833 | 6 | $14.29 |\n| martian-sentry-93824 | 0.889 | 0.778 | 1.000 | 7 | $7.90 |\n| martian-sentry-greptile-1 | 0.889 | 0.667 | 0.750 | 8 | $11.65 |\n| reviewbench-axios-10836 | 1.000 | 0.500 | 1.000 | 1 | $1.40 |\n| reviewbench-claire-de-binare-1550 | 0.000 | 0.000 | - | 0 | $3.44 |\n| reviewbench-disaster-ninja-fe-1166 | 1.000 | 0.667 | 0.667 | 3 | $3.70 |\n| reviewbench-ensnode-1938 | 0.000 | 0.000 | - | 0 | $0.74 |\n| reviewbench-flatten-js-244 | 0.333 | 0.167 | 1.000 | 1 | $2.99 |\n| reviewbench-statswales-frontend-626 | 0.333 | 0.333 | 1.000 | 1 | $2.91 |\n\nCost per PR rose by 30%. One repeat gives no spread, so the gains in recall and precision can be noise. The baseline has no raw recall to compare with.\n\n## Test plan\n\n- [x] `npm test`, `npm run lint`, `npm run typecheck` and `npm run build` pass.\n- [x] The eval runs at one repeat on the pinned cases and the gate passes.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZfeb8Fxs7Pynw8RhjV\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": "TICKETS.md",
+        "hunks": 1
+      },
+      {
+        "path": "docs/design/high-level-design.md",
+        "hunks": 2
+      },
+      {
+        "path": "prompts/reviewer-user.md",
+        "hunks": 2
+      },
+      {
+        "path": "prompts/reviewers/diff-bugs.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/reviewers/history.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/reviewers/tests.md",
+        "hunks": 1
+      },
+      {
+        "path": "src/find/index.ts",
+        "hunks": 4
+      },
+      {
+        "path": "src/gather/index.ts",
+        "hunks": 3
+      },
+      {
+        "path": "test/find.test.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/gather.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/reviewers.test.ts",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "Changes the reviewer user message construction, the GatherResult interface, and the prompts that drive every reviewer, so logic and public interfaces change.",
+      "confidence": "high",
+      "categories": [
+        "bug",
+        "test",
+        "docs",
+        "other"
+      ],
+      "hotspots": [
+        "src/gather/index.ts: deletedFiles computed from entries with status D filtered by kept; renames or other statuses",
+        "src/find/index.ts: describeFiles and buildReviewerMessage (files block, untrusted wrapping, deletedFiles optional)",
+        "prompts/reviewer-user.md: template placeholders {{files}} in both templates and new fields changed_file_line/deleted_file_line",
+        "test/find.test.ts: new changed_files test relies on block order and tail text",
+        "prompts/reviewers/*.md reading plans"
+      ],
+      "file_notes": [
+        {
+          "file": "src/gather/index.ts",
+          "note": "new optional deletedFiles field on GatherResult, set in gather from git entries with status D"
+        },
+        {
+          "file": "src/find/index.ts",
+          "note": "new describeFiles, two new prompt text fields, files block added to reviewer message"
+        },
+        {
+          "file": "prompts/reviewer-user.md",
+          "note": "templates gain {{files}} block and read-in-full instruction; the render must have all placeholders supplied"
+        },
+        {
+          "file": "prompts/reviewers/diff-bugs.md",
+          "note": "adds reading plan section"
+        },
+        {
+          "file": "prompts/reviewers/history.md",
+          "note": "adds reading plan section"
+        },
+        {
+          "file": "prompts/reviewers/tests.md",
+          "note": "adds reading plan section"
+        },
+        {
+          "file": "test/find.test.ts",
+          "note": "new test for changed_files block and instruction; block order updated"
+        },
+        {
+          "file": "test/gather.test.ts",
+          "note": "new git-repo test for deleted files"
+        },
+        {
+          "file": "test/reviewers.test.ts",
+          "note": "new test for reading plan structure"
+        },
+        {
+          "file": "TICKETS.md",
+          "note": "status and eval results notes"
+        },
+        {
+          "file": "docs/design/high-level-design.md",
+          "note": "doc update describing the new message contents and reading plans"
+        }
+      ],
+      "summary": "The change adds a changed_files block to the reviewer user message, with deleted files marked, and tells reviewers to read each changed file in full before reporting. It adds a deletedFiles field to gather's result and numbered reading plans to the diff-bugs, history and tests reviewer prompts. Tests, design docs and the ticket log are updated to match."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: Changes the reviewer user message construction, the GatherResult interface, and the prompts that drive every reviewer, so logic and public interfaces change.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 2147,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11801,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011901000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 141,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 13383,
+              "webSearchRequests": 0,
+              "costUSD": 0.11050380000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 87,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.11169390000000001
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4285,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11785,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011885,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 409,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 13325,
+              "webSearchRequests": 0,
+              "costUSD": 0.1153998,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 85,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.11658829999999999
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6677,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11803,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011903,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 500,
+              "cacheReadInputTokens": 19406,
+              "cacheCreationInputTokens": 13664,
+              "webSearchRequests": 0,
+              "costUSD": 0.12320919999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 345,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1243995
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4344,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11797,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011897000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 321,
+              "cacheReadInputTokens": 19400,
+              "cacheCreationInputTokens": 13577,
+              "webSearchRequests": 0,
+              "costUSD": 0.11893200000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 166,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1201217
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 3407,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11791,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011891,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 289,
+              "cacheReadInputTokens": 19401,
+              "cacheCreationInputTokens": 13578,
+              "webSearchRequests": 0,
+              "costUSD": 0.11830020000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 125,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1194893
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 3837,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 20601,
+              "outputTokens": 25,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0020726,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 329,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 22208,
+              "webSearchRequests": 0,
+              "costUSD": 0.1848638,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 111,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1869364
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1891,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11807,
+              "outputTokens": 24,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011927,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 131,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 13390,
+              "webSearchRequests": 0,
+              "costUSD": 0.11035980000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 77,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.11155250000000001
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1564,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11791,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011901,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 126,
+              "cacheReadInputTokens": 5137,
+              "cacheCreationInputTokens": 11296,
+              "webSearchRequests": 0,
+              "costUSD": 0.0939234,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 72,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0951135
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/find/index.ts",
+            "start_line": 203,
+            "end_line": 203,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "No test covers the branch where the change has no changed files, which puts the empty-list text in the changed_files block.",
+            "evidence": "if (gathered.changedFiles.length === 0) return texts.emptyListText;",
+            "suggested_fix": "Add a find test with changedFiles: [] that checks that the changed_files block text equals empty_list_text.",
+            "explanation": "The empty-list branch is new behaviour, and no test fails if it breaks.",
+            "needs_context": false
+          },
+          {
+            "file": "test/reviewers.test.ts",
+            "start_line": 185,
+            "end_line": 197,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "The reading-plan test checks for prompt keywords and a step count, so it restates the prompt text instead of an observable behaviour.",
+            "evidence": "expect(plan(\"history\")).toMatch(/blame/i);",
+            "suggested_fix": "Keep only a check that each prompt has a Reading plan section, or rely on the eval.",
+            "explanation": "A reword of the prompt breaks this test even when the plan keeps its meaning, and the test cannot show that reviewers follow the plan.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5954,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11789,
+              "outputTokens": 24,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011909000000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 657,
+              "cacheReadInputTokens": 20161,
+              "cacheCreationInputTokens": 14349,
+              "webSearchRequests": 0,
+              "costUSD": 0.1319802,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 75,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1331711
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "src/find/index.ts",
+          "start_line": 203,
+          "end_line": 203,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "No test covers the branch where the change has no changed files, which puts the empty-list text in the changed_files block.",
+          "evidence": "if (gathered.changedFiles.length === 0) return texts.emptyListText;",
+          "suggested_fix": "Add a find test with changedFiles: [] that checks that the changed_files block text equals empty_list_text.",
+          "explanation": "The empty-list branch is new behaviour, and no test fails if it breaks.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (gathered.changedFiles.length === 0) return texts.emptyListText;"
+          ],
+          "rationale": "The empty-list branch in describeFiles is new. No test passes `changedFiles: []` to the reviewer message: the only changed_files test uses two files, and the empty_list_text tests cover the brief's hotspots only. The branch is trivial and gather can produce an empty list, so the gap is minor.",
+          "score": 85,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (gathered.changedFiles.length === 0) return texts.emptyListText;",
+            "files: wrapUntrusted(\"changed_files\", describeFiles(texts, gathered)).block,",
+            "changedFiles: [\n        { path: \"src/stats.ts\", hunks: 1 },\n        { path: \"src/old.ts\", hunks: 1 },\n      ],"
+          ],
+          "rationale": "The PR adds the empty-list branch in describeFiles. No test passes an empty changedFiles list: the find test for the changed_files block uses two files, and the empty_list_text tests in prompt-sources only cover the brief's hotspots. The branch is trivial, and a change with no changed files may never reach the reviewers, so the gap matters little.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (gathered.changedFiles.length === 0) return texts.emptyListText;",
+            "files: wrapUntrusted(\"changed_files\", describeFiles(texts, gathered)).block,",
+            "changedFiles: [\n        { path: \"src/stats.ts\", hunks: 1 },\n        { path: \"src/old.ts\", hunks: 1 },\n      ],"
+          ],
+          "rationale": "The PR adds the empty-list branch in describeFiles. No test passes an empty changedFiles list: the find test for the changed_files block uses two files, and the empty_list_text tests in prompt-sources only cover the brief's hotspots. The branch is trivial, and a change with no changed files may never reach the reviewers, so the gap matters little.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "test/reviewers.test.ts",
+          "start_line": 185,
+          "end_line": 197,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "The reading-plan test checks for prompt keywords and a step count, so it restates the prompt text instead of an observable behaviour.",
+          "evidence": "expect(plan(\"history\")).toMatch(/blame/i);",
+          "suggested_fix": "Keep only a check that each prompt has a Reading plan section, or rely on the eval.",
+          "explanation": "A reword of the prompt breaks this test even when the plan keeps its meaning, and the test cannot show that reviewers follow the plan.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(plan(\"history\")).toMatch(/blame/i);",
+            "expect(steps[0], name).toMatch(/read each changed file in full/i);"
+          ],
+          "rationale": "The test does check prompt keywords and step counts, but the same file already pins prompt wording this way in many tests, and a prompt test cannot check observable reviewer behaviour anyway. The finding is a preference, not a defect.",
+          "score": 60,
+          "severity": "dont_post"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(steps.length, name).toBeGreaterThanOrEqual(4);",
+            "expect(plan(\"history\")).toMatch(/blame/i);",
+            "expect(doNotFlag(\"conventions\")).toMatch(/logic bug/i);"
+          ],
+          "rationale": "The claim is correct: the new test matches keywords and counts the steps in the prompt text. But the same file already tests every built-in prompt this way (for example its Do not flag and evidence-source keywords), and the prompts are the thing this change delivers. The test can break when a prompt is reworded, but it gives no wrong result, so the finding is not worth the author's time.",
+          "score": 85,
+          "severity": "dont_post"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(steps.length, name).toBeGreaterThanOrEqual(4);",
+            "expect(plan(\"history\")).toMatch(/blame/i);",
+            "expect(doNotFlag(\"conventions\")).toMatch(/logic bug/i);"
+          ],
+          "rationale": "The claim is correct: the new test matches keywords and counts the steps in the prompt text. But the same file already tests every built-in prompt this way (for example its Do not flag and evidence-source keywords), and the prompts are the thing this change delivers. The test can break when a prompt is reworded, but it gives no wrong result, so the finding is not worth the author's time.",
+          "score": 85,
+          "severity": "dont_post"
+        },
+        "passed": false
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [
+      {
+        "file": "src/find/index.ts",
+        "start_line": 203,
+        "end_line": 203,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "No test covers the branch where the change has no changed files, which puts the empty-list text in the changed_files block.",
+        "evidence": "if (gathered.changedFiles.length === 0) return texts.emptyListText;",
+        "suggested_fix": "Add a find test with changedFiles: [] that checks that the changed_files block text equals empty_list_text.",
+        "explanation": "The empty-list branch is new behaviour, and no test fails if it breaks.",
+        "needs_context": false,
+        "fingerprint": "f0938a9d89ef2dc2",
+        "severity": "nit",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (gathered.changedFiles.length === 0) return texts.emptyListText;",
+            "files: wrapUntrusted(\"changed_files\", describeFiles(texts, gathered)).block,",
+            "changedFiles: [\n        { path: \"src/stats.ts\", hunks: 1 },\n        { path: \"src/old.ts\", hunks: 1 },\n      ],"
+          ],
+          "rationale": "The PR adds the empty-list branch in describeFiles. No test passes an empty changedFiles list: the find test for the changed_files block uses two files, and the empty_list_text tests in prompt-sources only cover the brief's hotspots. The branch is trivial, and a change with no changed files may never reach the reviewers, so the gap matters little.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "span_text": "if (gathered.changedFiles.length === 0) return texts.emptyListText;"
+      }
+    ],
+    "github": {
+      "review_id": 5864886925,
+      "review_url": "https://github.com/jerridan/pr-review/pull/41#pullrequestreview-5864886925",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [
+        {
+          "fingerprint": "f0938a9d89ef2dc2",
+          "comment_id": 4542841251
+        }
+      ],
+      "in_body": [],
+      "check_run": {
+        "id": 130781863504
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 7314,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10406,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0010526,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 962,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 9919,
+            "webSearchRequests": 0,
+            "costUSD": 0.0494262,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.050478800000000004
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 2147,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11801,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011901000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 141,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 13383,
+            "webSearchRequests": 0,
+            "costUSD": 0.11050380000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 87,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.11169390000000001
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "model": "claude-opus-5-5",
+        "duration_ms": 3407,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11791,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011891,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 289,
+            "cacheReadInputTokens": 19401,
+            "cacheCreationInputTokens": 13578,
+            "webSearchRequests": 0,
+            "costUSD": 0.11830020000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 125,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1194893
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 4344,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11797,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011897000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 321,
+            "cacheReadInputTokens": 19400,
+            "cacheCreationInputTokens": 13577,
+            "webSearchRequests": 0,
+            "costUSD": 0.11893200000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 166,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1201217
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "model": "claude-opus-5-5",
+        "duration_ms": 4285,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11785,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011885,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 409,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 13325,
+            "webSearchRequests": 0,
+            "costUSD": 0.1153998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 85,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.11658829999999999
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 1891,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11807,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011927,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 131,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 13390,
+            "webSearchRequests": 0,
+            "costUSD": 0.11035980000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 77,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.11155250000000001
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6677,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11803,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011903,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 500,
+            "cacheReadInputTokens": 19406,
+            "cacheCreationInputTokens": 13664,
+            "webSearchRequests": 0,
+            "costUSD": 0.12320919999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 345,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1243995
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "model": "claude-opus-5-5",
+        "duration_ms": 3837,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 20601,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0020726,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 329,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 22208,
+            "webSearchRequests": 0,
+            "costUSD": 0.1848638,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 111,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1869364
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 1564,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11791,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011901,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 126,
+            "cacheReadInputTokens": 5137,
+            "cacheCreationInputTokens": 11296,
+            "webSearchRequests": 0,
+            "costUSD": 0.0939234,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 72,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0951135
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5954,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11789,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011909000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 657,
+            "cacheReadInputTokens": 20161,
+            "cacheCreationInputTokens": 14349,
+            "webSearchRequests": 0,
+            "costUSD": 0.1319802,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 75,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1331711
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 4245,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 14874,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0015004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 402,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 14387,
+            "webSearchRequests": 0,
+            "costUSD": 0.0620087,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 80,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0635091
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5137,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 14882,
+            "outputTokens": 346,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016612,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 323,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 515,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 14387,
+            "webSearchRequests": 0,
+            "costUSD": 0.1262774,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 114,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1279386
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 13446,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 12042,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012147000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 1078,
+            "cacheReadInputTokens": 58043,
+            "cacheCreationInputTokens": 15984,
+            "webSearchRequests": 0,
+            "costUSD": 0.08053629999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 204,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.08175099999999999
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 12250,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 12042,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012147000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 1142,
+            "cacheReadInputTokens": 57040,
+            "cacheCreationInputTokens": 15880,
+            "webSearchRequests": 0,
+            "costUSD": 0.16132,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 141,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1625347
+      }
+    ],
+    "total_cost_usd": 1.6052784,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 36,
+      "gather": 176,
+      "triage": 8502,
+      "find_verify": 39324,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
