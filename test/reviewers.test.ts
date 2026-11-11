@@ -182,6 +182,20 @@ describe("built-in reviewers (A4, R1)", () => {
     expect(body).toMatch(/head file or .*diff/i);
   });
 
+  it("gives diff-bugs, history and tests a numbered reading plan that starts with the changed files in full (D7)", () => {
+    for (const name of ["diff-bugs", "history", "tests"]) {
+      const plan = section(builtin(name).systemPrompt, "Reading plan");
+      const steps = plan.split("\n").filter((line) => /^\d+\. /.test(line));
+      expect(steps.length, name).toBeGreaterThanOrEqual(4);
+      expect(steps[0], name).toMatch(/read each changed file in full/i);
+    }
+    const plan = (name: string) => section(builtin(name).systemPrompt, "Reading plan");
+    expect(plan("diff-bugs")).toMatch(/callers/i);
+    expect(plan("diff-bugs")).toMatch(/tests that cover/i);
+    expect(plan("tests")).toMatch(/callers/i);
+    expect(plan("history")).toMatch(/blame/i);
+  });
+
   it("tells the description-drift reviewer what to report and where to quote from", () => {
     const body = builtin("description-drift").systemPrompt;
     expect(body).toMatch(/does not keep/i);

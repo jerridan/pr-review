@@ -18,6 +18,12 @@ export interface GatherResult {
   base: string;
   head: string;
   changedFiles: { path: string; hunks: number }[];
+  /**
+   * The paths in changedFiles that the change deletes, so the head commit
+   * has no file there. The field is optional so a test literal of a
+   * GatherResult may omit it. Gather always sets it.
+   */
+  deletedFiles?: string[];
   excluded: { path: string; reason: "rename-only" | "generated" }[];
   sensitive: string[];
   diff: string;
@@ -109,6 +115,9 @@ export async function gather(
   // path. An added file has no old side.
   const sections = diffSections(result.diff);
   const kept = new Set(result.changedFiles.map((f) => f.path));
+  const deletedFiles = entries
+    .filter((e) => kept.has(e.path) && e.status === "D")
+    .map((e) => e.path);
   const hunks = entries
     .filter((e) => kept.has(e.path) && e.status !== "A")
     .map((e) => ({
@@ -132,6 +141,7 @@ export async function gather(
     base: baseSha,
     head: headSha,
     ...result,
+    deletedFiles,
     mergeBase,
     description: description.text,
     descriptionMeta: { sanitized: description.sanitized, truncated: description.truncated },

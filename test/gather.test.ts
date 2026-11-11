@@ -765,3 +765,40 @@ describe("prDiff (R7)", () => {
     expect(atHead).not.toContain("The base branch moved on");
   }, 30_000);
 });
+
+describe("gather on a change that deletes a file (D7)", () => {
+  const GIT_ENV = {
+    ...process.env,
+    GIT_CONFIG_NOSYSTEM: "1",
+    GIT_CONFIG_GLOBAL: "/dev/null",
+    GIT_AUTHOR_NAME: "Del",
+    GIT_AUTHOR_EMAIL: "del@example.invalid",
+    GIT_COMMITTER_NAME: "Del",
+    GIT_COMMITTER_EMAIL: "del@example.invalid",
+  };
+  let repo = "";
+
+  afterAll(() => {
+    if (repo) rmSync(repo, { recursive: true, force: true });
+  });
+
+  it("names the deleted file as deleted, and not the changed file", async () => {
+    repo = mkdtempSync(join(tmpdir(), "pr-review-deleted-"));
+    const git = (...args: string[]) => run("git", ["-C", repo, ...args], { env: GIT_ENV });
+    await git("init", "--quiet", "--initial-branch=main");
+    writeFileSync(join(repo, "keep.ts"), "export const a = 1;\n");
+    writeFileSync(join(repo, "gone.ts"), "export const b = 2;\n");
+    await git("add", "-A");
+    await git("commit", "--quiet", "--no-gpg-sign", "-m", "Base");
+    const base = (await git("rev-parse", "HEAD")).stdout.trim();
+    writeFileSync(join(repo, "keep.ts"), "export const a = 3;\n");
+    rmSync(join(repo, "gone.ts"));
+    await git("add", "-A");
+    await git("commit", "--quiet", "--no-gpg-sign", "-m", "Head");
+    const head = (await git("rev-parse", "HEAD")).stdout.trim();
+
+    const out = await gather(repo, base, head, { ...DEFAULT_GLOBS, history: false });
+    expect(out.changedFiles.map((f) => f.path).sort()).toEqual(["gone.ts", "keep.ts"]);
+    expect(out.deletedFiles).toEqual(["gone.ts"]);
+  }, 30_000);
+});

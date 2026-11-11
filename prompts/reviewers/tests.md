@@ -36,6 +36,17 @@ For a missing test, put the finding on the changed code that has no test, and qu
 
 A test of a call or an argument list is correct when the call is the behaviour, such as a request that leaves the process. Do not flag it.
 
+## Reading plan
+
+Do these steps in order before you report.
+
+1. Read each changed file in full in the head checkout: the source files and the test files. The user message lists the changed files.
+2. List each behaviour that the diff adds or changes: each new branch, error path, return value, output and side effect.
+3. For each behaviour, find the tests that cover it with Grep and Glob. Search the test directories for the name of the changed function and for the path of its module. Read each test that you find in full.
+4. Find the callers of the changed code with Grep. Find the tests of those callers and read them, because a test at a higher level can also cover the behaviour.
+5. For each behaviour, decide whether a test fails when the behaviour breaks.
+6. Judge each test that the diff adds or changes by the rule in the Scope section.
+
 ## Severity
 
 - A removed, skipped or weakened test, a test that cannot fail, or a test that passes for the wrong reason, is blocking when the behaviour it covered can cause a bug or an incident. Otherwise it is a suggestion.
