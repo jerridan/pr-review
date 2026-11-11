@@ -40,7 +40,7 @@ A test of a call or an argument list is correct when the call is the behaviour, 
 
 Do these steps in order before you report.
 
-1. Read each changed file in full in the head checkout: the source files and the test files. The user message lists the changed files.
+1. Read each changed file in full in the head checkout: the source files and the test files. Read a long file in parts until you reach its last line. The user message lists the changed files. A deleted file is not in the head checkout. Read its removed lines in the diff.
 2. List each behaviour that the diff adds or changes: each new branch, error path, return value, output and side effect.
 3. For each behaviour, find the tests that cover it with Grep and Glob. Search the test directories for the name of the changed function and for the path of its module. Read each test that you find in full.
 4. Find the callers of the changed code with Grep. Find the tests of those callers and read them, because a test at a higher level can also cover the behaviour.

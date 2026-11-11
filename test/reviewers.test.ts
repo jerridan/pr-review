@@ -17,6 +17,7 @@ import {
   reviewerTools,
   type ReviewerDefinition,
 } from "../src/reviewers/loader.js";
+import { loadPrompt } from "../src/prompts/load.js";
 import { selectReviewers, skipSelected } from "../src/reviewers/select.js";
 import { UNTRUSTED_SYSTEM_LINE } from "../src/untrusted.js";
 
@@ -182,8 +183,8 @@ describe("built-in reviewers (A4, R1)", () => {
     expect(body).toMatch(/head file or .*diff/i);
   });
 
-  it("gives diff-bugs, history and tests a numbered reading plan that starts with the changed files in full (D7)", () => {
-    for (const name of ["diff-bugs", "history", "tests"]) {
+  it("gives diff-bugs, history, tests and security a numbered reading plan that starts with the changed files in full (D7)", () => {
+    for (const name of ["diff-bugs", "history", "tests", "security"]) {
       const plan = section(builtin(name).systemPrompt, "Reading plan");
       const steps = plan.split("\n").filter((line) => /^\d+\. /.test(line));
       expect(steps.length, name).toBeGreaterThanOrEqual(4);
@@ -194,6 +195,20 @@ describe("built-in reviewers (A4, R1)", () => {
     expect(plan("diff-bugs")).toMatch(/tests that cover/i);
     expect(plan("tests")).toMatch(/callers/i);
     expect(plan("history")).toMatch(/blame/i);
+  });
+
+  it("tells only diff-bugs, history, tests and security to read each changed file in full (D7)", () => {
+    const readers = new Set(["diff-bugs", "history", "tests", "security"]);
+    const all = loadBuiltinReviewers().map((d) => d.frontmatter.name);
+    expect(all).toEqual(expect.arrayContaining([...readers]));
+    for (const name of all) {
+      const told = /read each changed file in full/i.test(builtin(name).systemPrompt);
+      expect(told, name).toBe(readers.has(name));
+    }
+    const user = loadPrompt("reviewer-user.md");
+    for (const text of [user.body, String(user.frontmatter.history_user_message)]) {
+      expect(text).not.toMatch(/in full/i);
+    }
   });
 
   it("tells the description-drift reviewer what to report and where to quote from", () => {

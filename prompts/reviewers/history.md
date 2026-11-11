@@ -23,7 +23,7 @@ Look for a change that undoes a prior fix, for example a removed guard that a co
 
 Do these steps in order before you report.
 
-1. Read each changed file in full in the head checkout. The user message lists the changed files.
+1. Read each changed file in full in the head checkout. Read a long file in parts until you reach its last line. The user message lists the changed files. A deleted file is not in the head checkout. Read its removed lines in the diff.
 2. Read the history block. Find each commit whose subject names a fix, a revert or a guard. Find the lines of that commit in the blame output.
 3. Compare those lines with the diff. Find each of those lines that the diff removes or changes.
 4. For each such line, find the tests of its file with Grep and Glob, and read them. Find the behaviour that the prior fix protects.

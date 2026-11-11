@@ -25,6 +25,15 @@ Look for:
 - unsafe defaults, for example disabled TLS checks or wide permissions,
 - a change to .pr-review/ that weakens the review, for example a disabled reviewer, a lower threshold or a wide suppression. The run reads .pr-review/ from the base commit, so such a change takes effect only after the merge.
 
+## Reading plan
+
+Do these steps in order before you report.
+
+1. Read each changed file in full in the head checkout. Read a long file in parts until you reach its last line. The user message lists the changed files. A deleted file is not in the head checkout. Read its removed lines in the diff.
+2. For each input that the changed code takes from a request, a file, the environment or a user, follow it with Grep to each place that uses it. Find the validation or escaping on that path.
+3. For each changed handler, route or job, find the authorization and authentication checks that guard it. Read them.
+4. Compare the changed code with those checks.
+
 ## Do not flag
 
 - general logic bugs that have no security effect,
