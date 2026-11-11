@@ -1,9 +1,12 @@
 {
-  "recall": 0.28703703703703703,
-  "precision": 0.6363636363636364,
-  "margin": { "recall": 0.1, "precision": 0.35 },
-  "cases_ref": "db6ad8e20c8c9f784a1b97b27c9eac2e3f0c93bd",
+  "recall": 0.39603174603174607,
+  "precision": 0.7222222222222222,
+  "margin": {
+    "recall": 0.1,
+    "precision": 0.35
+  },
+  "cases_ref": "e6ddf81d9034a7f872db9fa37bb16a7335e1fe63",
   "repeat": 1,
-  "written_at": "2026-11-08T19:55:00.000Z",
-  "tool_version": "0.3.1"
+  "written_at": "2026-11-11T05:08:42.304Z",
+  "tool_version": "0.5.0"
 }
