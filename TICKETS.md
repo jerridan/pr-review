@@ -66,8 +66,8 @@ Goal: make the verifier score whether a claim is true, and give it the inputs it
 Goal: give the finders the briefing and the reading procedure that find the serious items. Closes issues 20 and 25. Depends on D5 for the measurement.
 
 - Done 2026-11-09 in D6: the description block holds the PR title, labels and body when the run has a PR, else the commit messages, and every reviewer and the verifier get it.
-- The reviewer user message lists the changed files and tells the reviewer to read each one in full before it reports. Keep the triage hotspots. Keep the diff available, but not as the only context.
-- Give diff-bugs, history and tests a reading plan in concrete steps: the changed files in full, then the callers and callees of the changed code, then the tests that cover the changed behaviour. Write steps, not exhortations. The 5.5 guidance says a line such as "be thorough" costs tokens and adds nothing.
+- Done 2026-11-11: the reviewer user message holds a `changed_files` block before the diff and tells the reviewer to read each changed file in full before it reports. A deleted file has its own line. The triage brief and the diff stay.
+- Done 2026-11-11: diff-bugs, history and tests each have a reading plan in numbered steps: the changed files in full, then the callers and callees, then the tests that cover the changed behaviour. The history plan matches the blame lines of prior fixes against the diff.
 - Each finding names the file and the line it rests on. This rule exists; keep it.
 - Run the injection measurement of D4c with this change, because the PR body now reaches every reviewer and the verifier.
 
