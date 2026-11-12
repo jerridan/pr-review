@@ -563,7 +563,7 @@ The JSON output holds `reviewers_skipped`, `reviewers_without_bash` and `sensiti
 The pool builds the golden findings of a case from your own repo. Run `pr-review pool` first. It finds the defects and writes `golden.json` with the placeholder severity `unsure`. Then run `pr-review label --write-golden`. It sets the severity of each golden finding.
 
 ```bash
-pr-review pool <case-dir>... --out <dir> [--record <path>]... [--reviews <n>] [--write-golden]
+pr-review pool <case-dir>... --out <dir> [--record <path>]... [--reviews <n>] [--write-golden] [--dismissed]
 pr-review label --cases <cases-dir> --only <case> --write-golden
 ```
 
@@ -576,6 +576,7 @@ The pool makes real model calls. It needs a Claude login, and the Codex CLI on y
 | `--record <path>` | A run record of the PR of the case. Give the flag again for each record. The `identity.pr` of the record must equal the number at the end of the case name, as in `walle-14`. The repo of the record (its `identity.github.slug`, else its `identity.repo` when that is `owner/repo`) must equal the `owner/repo` in the pull request URL in `origin` of `case.json`. The pool checks every finding of each record before the first model call. Use `--record` with one case per command. | none |
 | `--reviews <n>` | The blind reviews of each model family. A positive integer. | 2 |
 | `--write-golden` | Write `golden.json` in each case directory. This replaces an existing `golden.json`. | off |
+| `--dismissed` | Also write goldens for the findings that the verifier dismissed in the `--record` files. See "Dismissed findings" below. | off |
 
 For each case, the pool clones the case at its head and does six steps:
 
@@ -593,11 +594,29 @@ Each case gets four files in `<out>/<case>/`:
 | `pool.json` | The anonymous items. |
 | `pool-key.json` | The members and the sources of each item. |
 | `reviews.json` | For each blind review: its source, `ok`, the number of findings or the failure text, and the cost in USD of a Claude review. No adjudicator sees this file. |
-| `adjudications.json` | For each item: the score, the reason and the span of each family, or `failed`; `kept`; and `outcome`: `golden`, `joined`, `no_span`, `not_kept` or `failed`. |
+| `adjudications.json` | For each item: the score, the reason and the span of each family, or `failed`; `kept`; and `outcome`: `golden`, `joined`, `no_span`, `not_kept`, `failed` or `dismissed_golden`. |
 
 Stdout gets one line per case: the items, the kept items, the failed items, the goldens, the `no_span` items, the cost in USD of the Claude calls, and the findings of each blind review, for example `reviews claude 0+0, gpt 0+1`. A failed review shows as `failed`. One prompt gets at most 64 KiB of the diff, 16 KiB of the PR body, 1 KiB of the title, 8 KiB of the file list, and 4 KiB of the claim and 8 KiB of the evidence of an item. The limits count UTF-8 bytes. A cut text from the prompt file tells the model about each cut. The failure text of a GPT call ends with the last 500 characters of the Codex stderr, because Codex writes the cause of a failure last. With `--write-golden`, each golden has the file, the golden span, the category, the claim, `severity: "unsure"` and a `note` with both scores. A case with no kept item gets `{"findings": []}`, a clean case. Without `--write-golden`, `golden.json` does not change. With `--write-golden`, `golden.json` also does not change when a blind review or an adjudication call of the case failed, or when the case failed. The pool says so on stderr, and the exit code is not 0. The pool writes `adjudications.json` before the second grouping, so a failed second grouping leaves it on disk.
 
 The command exits 0 when every call succeeded. It exits 1 when a case failed or a call failed after its retry. It exits 2 on a usage error, also for a record of another PR or another repo, and for a record finding that is not valid. Each call gets one retry. At most four calls run at once.
+
+### Dismissed findings
+
+A run record shows the findings that the verifier dismissed. Such a finding is an entry of `stages.verifications[]` with `passed: false` and a `final.severity` of `dont_post` or `not_real`. A dismissed finding is a source of goldens: if both model families find its claim false, the golden set learns a finding that the review must not post. Add `--dismissed` to the pool command to use them. Without the flag, the pool does not change.
+
+With `--dismissed`, the pool does these steps for each `--record`:
+
+1. **Head rule.** A dismissed finding counts only when `identity.head` of its record equals the `head` of the case. A finding from another head can rest on code that the case head does not hold, so its score says nothing about the claim at the case head. The pool lists a record with another head on stdout.
+2. **Mark.** The pool marks each pool member that matches a counted dismissed finding. A member matches when it is a finding of `stages.reviewers[].findings` of the same record, with equal `file`, `start_line`, `end_line`, `category`, `claim` and `evidence`. The mark is `"dismissed": "<label>"` on the member in `pool-key.json`. `pool.json` and every adjudication request stay the same, so no model sees the verifier's label or reason. A counted dismissed finding with no matching member is `unmatched`. It writes no golden and does not fail the run.
+3. **Outcome.** The pool decides by the two scores of the item that holds a marked member:
+   - Both scores are 75 or more: the item is kept, as in step 5. It writes a pool golden. Its `note` also names the record file and the label of the verifier. The claim is true of the PR. The labeler then decides between `dont_post` and a posted label. A posted label means that the verifier dismissed a finding that is worth posting.
+   - Both scores are below 50, and no call failed: the outcome is `dismissed_golden`. Both families find the claim false at the head, or not a defect of this PR. The expected label is `not_real`. The golden has `severity: "unsure"`. Its `note` names the record file, the label of the verifier and both scores.
+   - Any other result writes no golden: a failed call, a score from 50 to 74 in either family, or one score below 50 and the other 75 or more. The families do not agree that the claim is true or that it is false.
+4. **Span.** A `dismissed_golden` item takes its span from the adjudication at the case head, by the rule of a kept item. With no valid span, the outcome is `no_span` and the pool writes no golden. A `dismissed_golden` item does not enter the join of kept items, because its claim is false and the claim of a kept item is true. Two `dismissed_golden` items stay two goldens.
+
+The threshold 50 comes from the adjudication prompt: a score below 50 means that the claim is false at the head, or that it rests on lines the PR does not change or expose.
+
+Stdout gets one more line for each case: the counted dismissed findings, the `unmatched` ones, the kept ones, the `dismissed_golden` items and the items with no golden. It then names each unmatched finding and each item with no golden. A case with no counted dismissed finding, or with none that gives a golden, stays in the set. Its pool goldens are valid.
 
 ### Adjudicate one finding
 
