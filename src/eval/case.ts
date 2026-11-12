@@ -103,7 +103,7 @@ export const GoldenSchema = z.strictObject({ findings: z.array(GoldenFindingSche
 const CASE_FILES = ["repo.bundle", "diff.patch", "golden.json"] as const;
 
 /** The files that the pool needs, apart from case.json. The pool writes golden.json. */
-const POOL_CASE_FILES = ["repo.bundle", "diff.patch"] as const;
+const POOL_CASE_FILES = ["case.json", "repo.bundle", "diff.patch"] as const;
 
 async function exists(path: string): Promise<boolean> {
   try {
@@ -181,9 +181,6 @@ async function loadCase(dir: string, name: string): Promise<Case> {
 export async function loadPoolCase(dir: string): Promise<Case> {
   const full = resolve(dir);
   const name = basename(full);
-  if (!(await exists(join(full, "case.json")))) {
-    throw new CaseError(name, `case ${name}: case.json is missing`);
-  }
   const meta = await loadMeta(full, name, POOL_CASE_FILES);
   return { dir: full, ...meta, golden: [] };
 }

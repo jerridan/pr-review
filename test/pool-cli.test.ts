@@ -581,8 +581,13 @@ function editMeta(s: Setup, change: (meta: Record<string, unknown>) => void): vo
 }
 
 // Write the fixture record with a change, and give its path.
-function editedRecord(s: Setup, change: (record: Record<string, any>) => void): string {
-  const record = readJson<Record<string, any>>(RECORD_FIXTURE);
+type RecordShape = {
+  identity: { repo: string; github?: { slug: string } };
+  stages: { reviewers: { findings: Partial<Item>[] }[] };
+};
+
+function editedRecord(s: Setup, change: (record: RecordShape) => void): string {
+  const record = readJson<RecordShape>(RECORD_FIXTURE);
   change(record);
   const path = join(s.out, "..", "edited.json");
   writeFileSync(path, JSON.stringify(record));
@@ -643,7 +648,7 @@ describe("pr-review pool, the record check", () => {
   it("exits 2 before any call when a record finding is not valid", async () => {
     const s = setup({});
     const path = editedRecord(s, (r) => {
-      delete r.stages.reviewers[0].findings[0].claim;
+      delete r.stages.reviewers[0]?.findings[0]?.claim;
     });
     const code = await cli(s.client, "pool", s.caseDir, "--out", s.out, "--record", path);
     expect(code).toBe(2);
@@ -813,7 +818,9 @@ describe("pr-review pool, the size of a codex prompt", () => {
 
   it("holds an adjudication prompt under the limit in bytes for a multi-byte finding", async () => {
     const s = setup({
-      claudeReviews: [[item("MARK-K1", 11, 11, { claim: `MARK-K1 ${euro(60_000)}`, evidence: euro(60_000) })]],
+      claudeReviews: [
+        [item("MARK-K1", 11, 11, { claim: `MARK-K1 ${euro(60_000)}`, evidence: euro(60_000) })],
+      ],
       gptReviews: [[]],
       claude: { "MARK-K1": KEPT },
     });

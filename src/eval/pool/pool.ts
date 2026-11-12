@@ -50,6 +50,8 @@ export type PoolCaseResult = {
   reviewErrors: string[];
   /** The blind reviews, Claude first, each family in order. */
   reviews: ReviewRun[];
+  /** Why --write-golden left golden.json unchanged, or null. */
+  goldenSkipped: string | null;
 };
 
 /** One pool item: an id, the fields of its representative, and its members. */
@@ -155,11 +157,35 @@ function overlaps(a: PoolItem, sa: GoldenSpan, b: PoolItem, sb: GoldenSpan): boo
   );
 }
 
+type Spanned = { r: ItemAdjudication & { span: GoldenSpan }; item: PoolItem };
+
+// The connected components of the span-overlap graph: items of one file
+// whose golden spans overlap, directly or through other items.
+function components(items: readonly Spanned[]): Spanned[][] {
+  const parent = items.map((_, n) => n);
+  const root = (n: number): number => {
+    let r = n;
+    while (parent[r] !== r) r = parent[r] as number;
+    return r;
+  };
+  for (let i = 0; i < items.length; i++) {
+    for (let j = i + 1; j < items.length; j++) {
+      const x = items[i] as Spanned;
+      const y = items[j] as Spanned;
+      if (overlaps(x.item, x.r.span, y.item, y.r.span)) parent[root(i)] = root(j);
+    }
+  }
+  const groups = new Map<number, Spanned[]>();
+  items.forEach((x, n) => groups.set(root(n), [...(groups.get(root(n)) ?? []), x]));
+  return [...groups.values()];
+}
+
 /**
- * Join the kept items with a span. The items whose spans overlap another
- * kept item in the same file go through the grouping call once more. Each
- * group keeps the member with the highest lower score. Set the outcome of
- * each item.
+ * Join the kept items with a span. The items of one component of the
+ * span-overlap graph go through the grouping call once more, one call for
+ * each component of two or more items. A group never holds items of two
+ * components. Each group keeps the member with the highest lower score.
+ * Set the outcome of each joined item.
  */
 async function joinKept(
   name: string,
@@ -169,38 +195,38 @@ async function joinKept(
 ): Promise<void> {
   const withSpan = results
     .map((r, n) => ({ r, item: items[n] as PoolItem }))
-    .filter(
-      (x): x is { r: ItemAdjudication & { span: GoldenSpan }; item: PoolItem } =>
-        x.r.span !== undefined,
-    );
-  const overlapping = withSpan.filter((x) =>
-    withSpan.some((y) => y !== x && overlaps(x.item, x.r.span, y.item, y.r.span)),
+    .filter((x): x is Spanned => x.r.span !== undefined);
+  const multi = components(withSpan).filter((c) => c.length >= 2);
+  const answers = await Promise.all(
+    multi.map((c) =>
+      groupFindings(
+        c.map((x) => ({
+          ...x.item.finding,
+          start_line: x.r.span.start_line,
+          end_line: x.r.span.end_line,
+        })),
+        ctx,
+      ),
+    ),
   );
-  for (const x of withSpan) x.r.outcome = "golden";
-  if (overlapping.length < 2) return;
-  const grouped = await groupFindings(
-    overlapping.map((x) => ({
-      ...x.item.finding,
-      start_line: x.r.span.start_line,
-      end_line: x.r.span.end_line,
-    })),
-    ctx,
-  );
-  if (!grouped.ok) {
-    throw new PoolCaseError(
-      name,
-      `the grouping of the overlapping kept items failed: ${grouped.error}`,
-    );
-  }
-  for (const g of grouped.groups) {
-    const members = g.members.map((i) => overlapping[i] as (typeof overlapping)[number]);
-    const best = members.reduce((a, b) => (lowerScore(b.r) > lowerScore(a.r) ? b : a));
-    for (const m of members) {
-      if (m === best) continue;
-      m.r.outcome = "joined";
-      m.r.joined_into = best.item.id;
+  answers.forEach((grouped, n) => {
+    if (!grouped.ok) {
+      throw new PoolCaseError(
+        name,
+        `the grouping of the overlapping kept items failed: ${grouped.error}`,
+      );
     }
-  }
+    const component = multi[n] as Spanned[];
+    for (const g of grouped.groups) {
+      const members = g.members.map((i) => component[i] as Spanned);
+      const best = members.reduce((a, b) => (lowerScore(b.r) > lowerScore(a.r) ? b : a));
+      for (const m of members) {
+        if (m === best) continue;
+        m.r.outcome = "joined";
+        m.r.joined_into = best.item.id;
+      }
+    }
+  });
 }
 
 function golden(item: PoolItem, r: ItemAdjudication & { span: GoldenSpan }): GoldenFinding {
@@ -276,10 +302,16 @@ async function poolInCheckout(
     if (a.kept) {
       const span = goldenSpan(item.finding.file, a, ctx.checkout);
       if (span === null) entry.outcome = "no_span";
-      else entry.span = span;
+      else {
+        entry.span = span;
+        entry.outcome = "golden";
+      }
     }
     return entry;
   });
+
+  // Write the adjudications before the join, so a failed join loses none.
+  await writeFile(join(dir, "adjudications.json"), json({ items: results }));
 
   // Step 6: join the kept items.
   await joinKept(c.name, items, results, ctx);
@@ -289,7 +321,16 @@ async function poolInCheckout(
       ? [golden(items[n] as PoolItem, { ...r, span: r.span })]
       : [],
   );
-  if (opts.writeGolden) await writeFile(join(c.dir, "golden.json"), json({ findings: goldens }));
+  const failedReviews = runs.filter((r) => !r.ok).length;
+  const failedItems = results.filter((r) => r.outcome === "failed").length;
+  let goldenSkipped: string | null = null;
+  if (opts.writeGolden) {
+    if (failedReviews > 0 || failedItems > 0) {
+      goldenSkipped = `${failedReviews} blind reviews and ${failedItems} adjudications failed`;
+    } else {
+      await writeFile(join(c.dir, "golden.json"), json({ findings: goldens }));
+    }
+  }
 
   return {
     name: c.name,
@@ -301,6 +342,7 @@ async function poolInCheckout(
     costUsd: ctx.cost.usd,
     reviewErrors: runs.flatMap((r) => (r.ok ? [] : [`${r.source}: ${r.error}`])),
     reviews: runs,
+    goldenSkipped,
   };
 }
 

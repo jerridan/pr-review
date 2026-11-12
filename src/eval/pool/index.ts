@@ -18,11 +18,13 @@ import { adjudicateFinding } from "./adjudicate.js";
 import { poolCase, summaryLine, PoolCaseError } from "./pool.js";
 import {
   casePrNumber,
+  caseRepo,
   findFingerprint,
   inputFinding,
   PoolInputError,
   readJsonFile,
   readRecord,
+  reviewerFindings,
   type PoolRecord,
 } from "./records.js";
 import { sixFields, type PoolFinding } from "./schemas.js";
@@ -77,9 +79,18 @@ async function poolInputs(
     for (const dir of opts.caseDirs) cases.push(await loadPoolCase(dir));
     const records: PoolRecord[] = [];
     for (const path of opts.records) records.push(await readRecord(path));
+    // Check every record finding now, so a bad one costs no model call.
+    for (const r of records) reviewerFindings(r);
     for (const c of cases) {
       const pr = casePrNumber(c.name);
+      const repo = caseRepo(c.origin);
       for (const r of records) {
+        if (repo === null) {
+          return `case ${c.name} has no pull request URL in its origin, so it takes no --record`;
+        }
+        if (r.repo === null || r.repo.toLowerCase() !== repo.toLowerCase()) {
+          return `the record ${r.path} is of the repo ${r.repo ?? "none"}, not of the repo ${repo} of case ${c.name}`;
+        }
         if (pr === null) {
           return `case ${c.name} has no PR number at the end of its name, so it takes no --record`;
         }
@@ -122,6 +133,9 @@ export async function runPool(opts: PoolOptions, deps: ProgramDeps): Promise<num
         say("pool", `case ${c.name}: a review failed: ${error}`);
       if (result.failed > 0)
         say("pool", `case ${c.name}: ${result.failed} items had a failed call.`);
+      if (result.goldenSkipped !== null) {
+        say("pool", `case ${c.name}: golden.json is unchanged, because ${result.goldenSkipped}.`);
+      }
       if (result.reviewErrors.length > 0 || result.failed > 0) code = EXIT_FAILURE;
     } catch (err) {
       if (!(
@@ -131,6 +145,9 @@ export async function runPool(opts: PoolOptions, deps: ProgramDeps): Promise<num
       ))
         throw err;
       say("pool", err.message);
+      if (opts.writeGolden) {
+        say("pool", `case ${c.name}: golden.json is unchanged, because the case failed.`);
+      }
       code = EXIT_FAILURE;
     }
   }
