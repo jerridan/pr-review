@@ -1,0 +1,2047 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 46,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Resume a stopped eval run, and plan one D4b baseline",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/46"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "b126f028a7c272daa4d983b6101155f7435d10fa",
+    "head": "bbc5dd44b242be9c085fc995638a6a1fabfc48c8",
+    "started_at": "2026-11-12T19:17:44.507Z",
+    "tool_version": "0.6.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Resume a stopped eval run, and plan one D4b baseline\n\nMake the eval resumable, and plan one D4b baseline at the end.\n\nA baseline at two repeats does not fit in one five-hour plan window, the eval and the CI reviewer use the same plan login, and a stopped eval run lost every result. This PR fixes the last point and changes the D4b plan.\n\n## What changes\n\n- Each finished repeat writes `<out>/<case>/<repeat>/result.json`: the `RepeatMetrics`, the case name and head, the repeat number, the tool version and the options that change a result (tier, judge model, extras, raw judge). A temp file and a rename write it, so a kill leaves no half file.\n- `pr-review eval --resume` reads those files before the first model call. A repeat with a good result is reused: no clone and no model call. A failed, missing or unreadable result, or one for another case head, clears that repeat's output and runs it again. A result of another tool version or with other options stops the command with exit 2, so one report never mixes two configurations. Reused results go through the report, the gate and `--write-baseline` like fresh ones. Stderr says how many repeats were reused.\n- README: a \"Resume a run\" section and the `--resume` flag.\n- TICKETS.md, D4b: no revision moves the pin or writes a baseline. One final baseline PR moves the pin one time and writes the baseline at two repeats, with `--resume`.\n- Version 0.7.0 for the new flag.\n\n## Verification\n\n- New tests in `test/eval-cli.test.ts`: a run that fails on the third case, then `--resume` on the same `--out`, makes model calls only for that case, and the aggregate equals that of one uninterrupted run; a reused repeat makes no call; a failed result runs again; another tool version gives exit 2; without `--resume` every repeat runs.\n- `npm test` (1297 tests), `npm run lint`, `npm run typecheck`, `npm run build` and `scripts/check-version-bump.sh` pass.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZeygoPpDMXvhR2hBF1\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": ".claude-plugin/marketplace.json",
+        "hunks": 1
+      },
+      {
+        "path": ".claude-plugin/plugin.json",
+        "hunks": 1
+      },
+      {
+        "path": "README.md",
+        "hunks": 1
+      },
+      {
+        "path": "TICKETS.md",
+        "hunks": 1
+      },
+      {
+        "path": "package.json",
+        "hunks": 1
+      },
+      {
+        "path": "src/cli.ts",
+        "hunks": 3
+      },
+      {
+        "path": "src/eval/run.ts",
+        "hunks": 6
+      },
+      {
+        "path": "test/eval-cli.test.ts",
+        "hunks": 3
+      }
+    ],
+    "excluded_files": [
+      {
+        "path": "package-lock.json",
+        "reason": "generated"
+      }
+    ],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "Adds a new --resume feature to the eval runner with new logic for result persistence, reuse validation, error handling and exit codes, plus a version bump.",
+      "confidence": "high",
+      "categories": [
+        "bug",
+        "test",
+        "docs",
+        "other"
+      ],
+      "hotspots": [
+        "src/eval/run.ts: reusableResults (version/options mismatch check, JSON.stringify option comparison, skip conditions)",
+        "src/eval/run.ts: runEval loop (reuse, rm of old repeat dir before rerun, writeResult after runRepeat)",
+        "src/eval/run.ts: readResult shape validation (metrics.repeat vs value.repeat, partial checks)",
+        "src/eval/run.ts: writeResult atomic temp+rename, and write failure only warning",
+        "src/eval/run.ts: same-judge early return leaves no result; reused results skip same-judge check",
+        "src/cli.ts: --resume option wiring"
+      ],
+      "file_notes": [
+        {
+          "file": "src/eval/run.ts",
+          "note": "New resume logic: result.json writing/reading, reuse map, ResumeError mapped to EXIT_USAGE, stderr reuse count."
+        },
+        {
+          "file": "src/cli.ts",
+          "note": "Adds --resume flag and passes it into EvalOptions."
+        },
+        {
+          "file": "test/eval-cli.test.ts",
+          "note": "Excludes result.json from record scans; adds resume tests (partial rerun, complete, version mismatch, option mismatch, no-resume)."
+        },
+        {
+          "file": "README.md",
+          "note": "Documents --resume and the result.json format."
+        },
+        {
+          "file": "TICKETS.md",
+          "note": "Planning text change only, about baseline and pin timing."
+        },
+        {
+          "file": "package.json",
+          "note": "Version bump to 0.7.0; the resume check compares tool_version, so this matters."
+        },
+        {
+          "file": ".claude-plugin/plugin.json",
+          "note": "Version bump to 0.7.0."
+        },
+        {
+          "file": ".claude-plugin/marketplace.json",
+          "note": "Version bump to 0.7.0."
+        }
+      ],
+      "summary": "Adds a --resume option to `pr-review eval`. Each finished repeat now writes an atomic result.json with its metrics, case head, tool version and result-affecting options. With --resume, non-failed matching results are reused with no model call. A tool version or option mismatch exits 2, and a stale or failed repeat has its output cleared and is rerun. The change includes tests, docs, ticket text and a version bump to 0.7.0."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: Adds a new --resume feature to the eval runner with new logic for result persistence, reuse validation, error handling and exit codes, plus a version bump.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 3231,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11567,
+              "outputTokens": 19,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011661999999999998,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 265,
+              "cacheReadInputTokens": 5136,
+              "cacheCreationInputTokens": 11071,
+              "webSearchRequests": 0,
+              "costUSD": 0.0949032,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 43,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0960694
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/run.ts",
+            "start_line": 493,
+            "end_line": 499,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The description says each finished repeat writes result.json, but a write failure only prints a warning and the run continues, so a later --resume runs that repeat again.",
+            "evidence": "`warning: case ${c.name}, repeat ${repeat}: cannot write result.json: ${messageOf(err)}`,",
+            "suggested_fix": "In the README, say that a failed write of result.json gives a warning and that --resume then runs the repeat again.",
+            "explanation": "The description and README do not say that a failed write of result.json is only a warning.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5237,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11565,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011665000000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 476,
+              "cacheReadInputTokens": 5094,
+              "cacheCreationInputTokens": 11069,
+              "webSearchRequests": 0,
+              "costUSD": 0.0990988,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 193,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1002653
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/run.ts",
+            "start_line": 259,
+            "end_line": 271,
+            "category": "bug",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "The version and option checks run before the failed, case and head checks, so a failed or stale result that would be rerun anyway still stops the whole resume with exit 2.",
+            "evidence": "if (found.tool_version !== toolVersion()) {",
+            "suggested_fix": "Skip failed results and results with another head or case before the version and option checks.",
+            "explanation": "A result that will not be reused cannot mix configurations, so it should not block the run.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 11343,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11569,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011669,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 6,
+              "outputTokens": 996,
+              "cacheReadInputTokens": 38885,
+              "cacheCreationInputTokens": 13733,
+              "webSearchRequests": 0,
+              "costUSD": 0.13758499999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 482,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.13875189999999998
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/run.ts",
+            "start_line": 236,
+            "end_line": 237,
+            "category": "bug",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "readResult does not check that `repeat` is a number or that it matches the repeat slot, so a malformed file with both repeats missing, or a file with the wrong repeat, is still reused.",
+            "evidence": "value.metrics.repeat !== value.repeat",
+            "suggested_fix": "Check `typeof value.repeat === \"number\"`. In reusableResults, also check `found.repeat === repeat`.",
+            "explanation": "If both fields are undefined, the check passes. A file with a repeat number other than its directory then feeds metrics for the wrong repeat into the report.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7287,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11575,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011675000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 654,
+              "cacheReadInputTokens": 5363,
+              "cacheCreationInputTokens": 11079,
+              "webSearchRequests": 0,
+              "costUSD": 0.1027926,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 354,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1039601
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5583,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11575,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011675000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 522,
+              "cacheReadInputTokens": 5046,
+              "cacheCreationInputTokens": 11079,
+              "webSearchRequests": 0,
+              "costUSD": 0.1000892,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 205,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1012567
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4181,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 19897,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0019997,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 333,
+              "cacheReadInputTokens": 5438,
+              "cacheCreationInputTokens": 19401,
+              "webSearchRequests": 0,
+              "costUSD": 0.16296360000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 95,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1649633
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1685,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11559,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011659,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 102,
+              "cacheReadInputTokens": 5330,
+              "cacheCreationInputTokens": 11063,
+              "webSearchRequests": 0,
+              "costUSD": 0.091618,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 48,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0927839
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4647,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11565,
+              "outputTokens": 19,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011660000000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 379,
+              "cacheReadInputTokens": 5330,
+              "cacheCreationInputTokens": 11069,
+              "webSearchRequests": 0,
+              "costUSD": 0.097206,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 58,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.098372
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/run.ts",
+            "start_line": 273,
+            "end_line": 273,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "No test covers the case where a result is not reused because its case head sha differs.",
+            "evidence": "if (found.metrics.failed || found.head !== c.head || found.case !== c.name) continue;",
+            "suggested_fix": "Add a test that edits head in result.json, then runs with --resume and asserts that the repeat runs again (a triage call is made).",
+            "explanation": "If the head check breaks, a stale result from an older case revision would be reused in the baseline without warning, and no test would fail.",
+            "needs_context": false
+          },
+          {
+            "file": "src/eval/run.ts",
+            "start_line": 483,
+            "end_line": 484,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "No test checks that a rerun repeat's old output is cleared, so the repeat dir ends up with exactly one record.",
+            "evidence": "await rm(join(out, c.name, String(repeat)), { recursive: true, force: true });",
+            "suggested_fix": "In the resume test, assert that recordsUnder(join(out,'c-planted','1')) has length 1 after the resume.",
+            "explanation": "If the rm breaks, the repeat dir would hold the old failed record next to the new one, and no test would fail.",
+            "needs_context": false
+          },
+          {
+            "file": "src/eval/run.ts",
+            "start_line": 493,
+            "end_line": 499,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "No test covers the path where result.json cannot be written and the eval only warns.",
+            "evidence": "`warning: case ${c.name}, repeat ${repeat}: cannot write result.json: ${messageOf(err)}`,",
+            "suggested_fix": "Add a test that makes the result path unwritable, then asserts exit 0 and the warning on stderr.",
+            "explanation": "No test checks that a failed write lets the run continue with a warning instead of aborting.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 15808,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11563,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011663,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 6,
+              "outputTokens": 1795,
+              "cacheReadInputTokens": 41080,
+              "cacheCreationInputTokens": 12614,
+              "webSearchRequests": 0,
+              "costUSD": 0.14505200000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 118,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1462183
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "src/eval/run.ts",
+          "start_line": 493,
+          "end_line": 499,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The description says each finished repeat writes result.json, but a write failure only prints a warning and the run continues, so a later --resume runs that repeat again.",
+          "evidence": "`warning: case ${c.name}, repeat ${repeat}: cannot write result.json: ${messageOf(err)}`,",
+          "suggested_fix": "In the README, say that a failed write of result.json gives a warning and that --resume then runs the repeat again.",
+          "explanation": "The description and README do not say that a failed write of result.json is only a warning.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "`warning: case ${c.name}, repeat ${repeat}: cannot write result.json: ${messageOf(err)}`,",
+            "When a repeat ends, the eval writes `<out>/<case>/<repeat>/result.json`."
+          ],
+          "rationale": "The code does catch a write failure and only warns, and the README doesn't mention this, so a later --resume would rerun that repeat. This is a rare failure, and the warning already tells the user, so documenting it is not worth the author's time.",
+          "score": 80,
+          "severity": "dont_post"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "      try {\n        await writeResult(ctx, c, outcome.metrics);\n      } catch (err) {\n        say(\n          `warning: case ${c.name}, repeat ${repeat}: cannot write result.json: ${messageOf(err)}`,\n        );\n      }",
+            "      if (found === null) continue;",
+            "When a repeat ends, the eval writes `<out>/<case>/<repeat>/result.json`."
+          ],
+          "rationale": "The claim is correct: a failed write of result.json only prints a warning, and on --resume a missing file means the repeat runs again, which the README does not mention. Still, the failure is rare, the warning shows when it happens, and running the repeat again is a safe result, so this docs gap is not worth the author's time.",
+          "score": 90,
+          "severity": "dont_post"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "      try {\n        await writeResult(ctx, c, outcome.metrics);\n      } catch (err) {\n        say(\n          `warning: case ${c.name}, repeat ${repeat}: cannot write result.json: ${messageOf(err)}`,\n        );\n      }",
+            "      if (found === null) continue;",
+            "When a repeat ends, the eval writes `<out>/<case>/<repeat>/result.json`."
+          ],
+          "rationale": "The claim is correct: a failed write of result.json only prints a warning, and on --resume a missing file means the repeat runs again, which the README does not mention. Still, the failure is rare, the warning shows when it happens, and running the repeat again is a safe result, so this docs gap is not worth the author's time.",
+          "score": 90,
+          "severity": "dont_post"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "src/eval/run.ts",
+          "start_line": 236,
+          "end_line": 237,
+          "category": "bug",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "readResult does not check that `repeat` is a number or that it matches the repeat slot, so a malformed file with both repeats missing, or a file with the wrong repeat, is still reused.",
+          "evidence": "value.metrics.repeat !== value.repeat",
+          "suggested_fix": "Check `typeof value.repeat === \"number\"`. In reusableResults, also check `found.repeat === repeat`.",
+          "explanation": "If both fields are undefined, the check passes. A file with a repeat number other than its directory then feeds metrics for the wrong repeat into the report.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "value.metrics.repeat !== value.repeat",
+            "if (found.metrics.failed || found.head !== c.head || found.case !== c.name) continue;",
+            "reuse.set(`${c.name}/${repeat}`, found.metrics);"
+          ],
+          "rationale": "The code matches the claim. readResult never checks that `repeat` is a number, so two undefined values pass the comparison. reusableResults never compares `found.repeat` with the loop's `repeat`. The tool writes these files itself under the right slot, so a bad file needs a hand edit or a copy, and the risk is small.",
+          "score": 80,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "value.metrics.repeat !== value.repeat",
+            "if (found.metrics.failed || found.head !== c.head || found.case !== c.name) continue;",
+            "reuse.set(`${c.name}/${repeat}`, found.metrics);"
+          ],
+          "rationale": "The claim holds. readResult only checks that metrics.repeat equals value.repeat, so a file where both are undefined passes. reusableResults checks case and head but never checks `found.repeat === repeat`, so it can reuse a file whose repeat does not match its directory. This only happens with a hand-edited or moved file, because writeResult always writes a matching repeat, so it is an edge case and the fix is cheap.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "value.metrics.repeat !== value.repeat",
+            "if (found.metrics.failed || found.head !== c.head || found.case !== c.name) continue;",
+            "reuse.set(`${c.name}/${repeat}`, found.metrics);"
+          ],
+          "rationale": "The claim holds. readResult only checks that metrics.repeat equals value.repeat, so a file where both are undefined passes. reusableResults checks case and head but never checks `found.repeat === repeat`, so it can reuse a file whose repeat does not match its directory. This only happens with a hand-edited or moved file, because writeResult always writes a matching repeat, so it is an edge case and the fix is cheap.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "src/eval/run.ts",
+          "start_line": 259,
+          "end_line": 271,
+          "category": "bug",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "The version and option checks run before the failed, case and head checks, so a failed or stale result that would be rerun anyway still stops the whole resume with exit 2.",
+          "evidence": "if (found.tool_version !== toolVersion()) {",
+          "suggested_fix": "Skip failed results and results with another head or case before the version and option checks.",
+          "explanation": "A result that will not be reused cannot mix configurations, so it should not block the run.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (found.tool_version !== toolVersion()) {",
+            "if (found.metrics.failed || found.head !== c.head || found.case !== c.name) continue;"
+          ],
+          "rationale": "The code checks tool version and options (which throw ResumeError, giving exit 2) before it skips failed or other-head results, so a result that would be rerun can still stop the resume. The effect is narrow, because the description says a different version or different options should stop the run and the user can use another --out.",
+          "score": 80,
+          "severity": "suggestion"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (found.tool_version !== toolVersion()) {",
+            "if (JSON.stringify(found.options) !== JSON.stringify(now)) {",
+            "if (found.metrics.failed || found.head !== c.head || found.case !== c.name) continue;"
+          ],
+          "rationale": "The finding is correct. In reusableResults, the tool version and options checks throw a ResumeError before the code reaches the failed/head/case `continue`. So a result that would only be rerun and never reused still stops --resume with exit 2. The impact is limited: the error message is clear, and the user can rerun without --resume or with another --out.",
+          "score": 92,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (found.tool_version !== toolVersion()) {",
+            "if (JSON.stringify(found.options) !== JSON.stringify(now)) {",
+            "if (found.metrics.failed || found.head !== c.head || found.case !== c.name) continue;"
+          ],
+          "rationale": "The finding is correct. In reusableResults, the tool version and options checks throw a ResumeError before the code reaches the failed/head/case `continue`. So a result that would only be rerun and never reused still stops --resume with exit 2. The impact is limited: the error message is clear, and the user can rerun without --resume or with another --out.",
+          "score": 92,
+          "severity": "suggestion"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "src/eval/run.ts",
+          "start_line": 273,
+          "end_line": 273,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "No test covers the case where a result is not reused because its case head sha differs.",
+          "evidence": "if (found.metrics.failed || found.head !== c.head || found.case !== c.name) continue;",
+          "suggested_fix": "Add a test that edits head in result.json, then runs with --resume and asserts that the repeat runs again (a triage call is made).",
+          "explanation": "If the head check breaks, a stale result from an older case revision would be reused in the baseline without warning, and no test would fail.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (found.metrics.failed || found.head !== c.head || found.case !== c.name) continue;",
+            "exits 2 when the result file has another tool version",
+            "runs only the failed case again, and gives the aggregate of an uninterrupted run"
+          ],
+          "rationale": "The `--resume` tests in test/eval-cli.test.ts cover a failed result, a tool version change, an options change and no `--resume`. None edits `head` in result.json, so removing the `found.head !== c.head` check would break no test.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (found.metrics.failed || found.head !== c.head || found.case !== c.name) continue;",
+            "exits 2 when the result file has another tool version",
+            "runs only the failed case again, and gives the aggregate of an uninterrupted run"
+          ],
+          "rationale": "The `--resume` tests in test/eval-cli.test.ts cover a failed result, a tool version change, an options change and no `--resume`. None edits `head` in result.json, so removing the `found.head !== c.head` check would break no test.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "src/eval/run.ts",
+          "start_line": 483,
+          "end_line": 484,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "No test checks that a rerun repeat's old output is cleared, so the repeat dir ends up with exactly one record.",
+          "evidence": "await rm(join(out, c.name, String(repeat)), { recursive: true, force: true });",
+          "suggested_fix": "In the resume test, assert that recordsUnder(join(out,'c-planted','1')) has length 1 after the resume.",
+          "explanation": "If the rm breaks, the repeat dir would hold the old failed record next to the new one, and no test would fail.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "await rm(join(out, c.name, String(repeat)), { recursive: true, force: true });",
+            "expect(triageCalls(fake)).toBe(1);",
+            "expect(second.report?.failed_repeats).toEqual([]);"
+          ],
+          "rationale": "The new rm of a rerun repeat's directory is added by this PR. The resume tests check call counts, failed_repeats, the aggregate and stderr, but none counts the records in the repeat directory (recordsUnder is not used in that suite). Removing the rm would leave every test passing.",
+          "score": 85,
+          "severity": "suggestion"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "await rm(join(out, c.name, String(repeat)), { recursive: true, force: true });",
+            "// The old output of this repeat stays out of the way of the new record.",
+            "expect(triageCalls(fake)).toBe(1);",
+            "expect(second.report?.aggregate).toEqual(whole.report?.aggregate);"
+          ],
+          "rationale": "The new --resume tests check call counts, the aggregate and stderr, but none of them looks at the files in the rerun repeat's directory. If the new rm of the old output stopped working, no test would fail. This is a real coverage gap in code that this PR adds. The fix is a one-line assertion, so it is a minor point.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "await rm(join(out, c.name, String(repeat)), { recursive: true, force: true });",
+            "// The old output of this repeat stays out of the way of the new record.",
+            "expect(triageCalls(fake)).toBe(1);",
+            "expect(second.report?.aggregate).toEqual(whole.report?.aggregate);"
+          ],
+          "rationale": "The new --resume tests check call counts, the aggregate and stderr, but none of them looks at the files in the rerun repeat's directory. If the new rm of the old output stopped working, no test would fail. This is a real coverage gap in code that this PR adds. The fix is a one-line assertion, so it is a minor point.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "src/eval/run.ts",
+          "start_line": 493,
+          "end_line": 499,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "No test covers the path where result.json cannot be written and the eval only warns.",
+          "evidence": "`warning: case ${c.name}, repeat ${repeat}: cannot write result.json: ${messageOf(err)}`,",
+          "suggested_fix": "Add a test that makes the result path unwritable, then asserts exit 0 and the warning on stderr.",
+          "explanation": "No test checks that a failed write lets the run continue with a warning instead of aborting.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "`warning: case ${c.name}, repeat ${repeat}: cannot write result.json: ${messageOf(err)}`,"
+          ],
+          "rationale": "The warning string appears only in src/eval/run.ts, and no test mentions it. The tests that mention result.json only read or plant the file. The warn-and-continue branch is new in this PR and untested, but it is a small defensive path.",
+          "score": 85,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "`warning: case ${c.name}, repeat ${repeat}: cannot write result.json: ${messageOf(err)}`,",
+            "const file = join(out, \"a-planted\", \"1\", \"result.json\");"
+          ],
+          "rationale": "The claim holds: no test in test/ checks the \"cannot write result.json\" warning or a failed write of result.json. But this is a simple try/catch on a rare error path, so the missing test is not worth the author's time.",
+          "score": 88,
+          "severity": "dont_post"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "`warning: case ${c.name}, repeat ${repeat}: cannot write result.json: ${messageOf(err)}`,",
+            "const file = join(out, \"a-planted\", \"1\", \"result.json\");"
+          ],
+          "rationale": "The claim holds: no test in test/ checks the \"cannot write result.json\" warning or a failed write of result.json. But this is a simple try/catch on a rare error path, so the missing test is not worth the author's time.",
+          "score": 88,
+          "severity": "dont_post"
+        },
+        "passed": false
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [
+      {
+        "file": "src/eval/run.ts",
+        "start_line": 259,
+        "end_line": 271,
+        "category": "bug",
+        "severity_estimate": "suggestion",
+        "confidence": "low",
+        "claim": "The version and option checks run before the failed, case and head checks, so a failed or stale result that would be rerun anyway still stops the whole resume with exit 2.",
+        "evidence": "if (found.tool_version !== toolVersion()) {",
+        "suggested_fix": "Skip failed results and results with another head or case before the version and option checks.",
+        "explanation": "A result that will not be reused cannot mix configurations, so it should not block the run.",
+        "needs_context": false,
+        "fingerprint": "2429ebfb9af7125e",
+        "severity": "suggestion",
+        "score": 92,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (found.tool_version !== toolVersion()) {",
+            "if (JSON.stringify(found.options) !== JSON.stringify(now)) {",
+            "if (found.metrics.failed || found.head !== c.head || found.case !== c.name) continue;"
+          ],
+          "rationale": "The finding is correct. In reusableResults, the tool version and options checks throw a ResumeError before the code reaches the failed/head/case `continue`. So a result that would only be rerun and never reused still stops --resume with exit 2. The impact is limited: the error message is clear, and the user can rerun without --resume or with another --out.",
+          "score": 92,
+          "severity": "suggestion"
+        },
+        "span_text": "const found = await readResult(path); if (found === null) continue; if (found.tool_version !== toolVersion()) { throw new ResumeError( `${path}: the result is from tool version ${found.tool_version}, but this is ${toolVersion()}. ` + \"Run without --resume, or use another --out.\", ); } if (JSON.stringify(found.options) !== JSON.stringify(now)) { throw new ResumeError( `${path}: the result has other options (${JSON.stringify(found.options)}) than this run ` + `(${JSON.stringify(now)}). Give the same options, or use another --out.`, );"
+      },
+      {
+        "file": "src/eval/run.ts",
+        "start_line": 236,
+        "end_line": 237,
+        "category": "bug",
+        "severity_estimate": "nit",
+        "confidence": "low",
+        "claim": "readResult does not check that `repeat` is a number or that it matches the repeat slot, so a malformed file with both repeats missing, or a file with the wrong repeat, is still reused.",
+        "evidence": "value.metrics.repeat !== value.repeat",
+        "suggested_fix": "Check `typeof value.repeat === \"number\"`. In reusableResults, also check `found.repeat === repeat`.",
+        "explanation": "If both fields are undefined, the check passes. A file with a repeat number other than its directory then feeds metrics for the wrong repeat into the report.",
+        "needs_context": false,
+        "fingerprint": "73b0384fe0484d96",
+        "severity": "suggestion",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "value.metrics.repeat !== value.repeat",
+            "if (found.metrics.failed || found.head !== c.head || found.case !== c.name) continue;",
+            "reuse.set(`${c.name}/${repeat}`, found.metrics);"
+          ],
+          "rationale": "The claim holds. readResult only checks that metrics.repeat equals value.repeat, so a file where both are undefined passes. reusableResults checks case and head but never checks `found.repeat === repeat`, so it can reuse a file whose repeat does not match its directory. This only happens with a hand-edited or moved file, because writeResult always writes a matching repeat, so it is an edge case and the fix is cheap.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "span_text": "value.metrics.repeat !== value.repeat ) {"
+      },
+      {
+        "file": "src/eval/run.ts",
+        "start_line": 273,
+        "end_line": 273,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "No test covers the case where a result is not reused because its case head sha differs.",
+        "evidence": "if (found.metrics.failed || found.head !== c.head || found.case !== c.name) continue;",
+        "suggested_fix": "Add a test that edits head in result.json, then runs with --resume and asserts that the repeat runs again (a triage call is made).",
+        "explanation": "If the head check breaks, a stale result from an older case revision would be reused in the baseline without warning, and no test would fail.",
+        "needs_context": false,
+        "fingerprint": "9ece76b799f1675e",
+        "severity": "suggestion",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (found.metrics.failed || found.head !== c.head || found.case !== c.name) continue;",
+            "exits 2 when the result file has another tool version",
+            "runs only the failed case again, and gives the aggregate of an uninterrupted run"
+          ],
+          "rationale": "The `--resume` tests in test/eval-cli.test.ts cover a failed result, a tool version change, an options change and no `--resume`. None edits `head` in result.json, so removing the `found.head !== c.head` check would break no test.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "span_text": "if (found.metrics.failed || found.head !== c.head || found.case !== c.name) continue;"
+      },
+      {
+        "file": "src/eval/run.ts",
+        "start_line": 483,
+        "end_line": 484,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "No test checks that a rerun repeat's old output is cleared, so the repeat dir ends up with exactly one record.",
+        "evidence": "await rm(join(out, c.name, String(repeat)), { recursive: true, force: true });",
+        "suggested_fix": "In the resume test, assert that recordsUnder(join(out,'c-planted','1')) has length 1 after the resume.",
+        "explanation": "If the rm breaks, the repeat dir would hold the old failed record next to the new one, and no test would fail.",
+        "needs_context": false,
+        "fingerprint": "33c458ea37a40e2f",
+        "severity": "nit",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "await rm(join(out, c.name, String(repeat)), { recursive: true, force: true });",
+            "// The old output of this repeat stays out of the way of the new record.",
+            "expect(triageCalls(fake)).toBe(1);",
+            "expect(second.report?.aggregate).toEqual(whole.report?.aggregate);"
+          ],
+          "rationale": "The new --resume tests check call counts, the aggregate and stderr, but none of them looks at the files in the rerun repeat's directory. If the new rm of the old output stopped working, no test would fail. This is a real coverage gap in code that this PR adds. The fix is a one-line assertion, so it is a minor point.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "span_text": "if (opts.resume) await rm(join(out, c.name, String(repeat)), { recursive: true, force: true });"
+      }
+    ],
+    "github": {
+      "review_id": 5880619621,
+      "review_url": "https://github.com/jerridan/pr-review/pull/46#pullrequestreview-5880619621",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [
+        {
+          "fingerprint": "2429ebfb9af7125e",
+          "comment_id": 4555198150
+        },
+        {
+          "fingerprint": "73b0384fe0484d96",
+          "comment_id": 4555198167
+        },
+        {
+          "fingerprint": "9ece76b799f1675e",
+          "comment_id": 4555198177
+        },
+        {
+          "fingerprint": "33c458ea37a40e2f",
+          "comment_id": 4555198189
+        }
+      ],
+      "in_body": [],
+      "check_run": {
+        "id": 131429380736
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 7589,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10286,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0010406,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 937,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 9798,
+            "webSearchRequests": 0,
+            "costUSD": 0.0486922,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0497328
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 3231,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11567,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011661999999999998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 265,
+            "cacheReadInputTokens": 5136,
+            "cacheCreationInputTokens": 11071,
+            "webSearchRequests": 0,
+            "costUSD": 0.0949032,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 43,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0960694
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5237,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11565,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011665000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 476,
+            "cacheReadInputTokens": 5094,
+            "cacheCreationInputTokens": 11069,
+            "webSearchRequests": 0,
+            "costUSD": 0.0990988,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 193,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1002653
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5583,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11575,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011675000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 522,
+            "cacheReadInputTokens": 5046,
+            "cacheCreationInputTokens": 11079,
+            "webSearchRequests": 0,
+            "costUSD": 0.1000892,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 205,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1012567
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7287,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11575,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011675000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 654,
+            "cacheReadInputTokens": 5363,
+            "cacheCreationInputTokens": 11079,
+            "webSearchRequests": 0,
+            "costUSD": 0.1027926,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 354,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1039601
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 1685,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11559,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011659,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 102,
+            "cacheReadInputTokens": 5330,
+            "cacheCreationInputTokens": 11063,
+            "webSearchRequests": 0,
+            "costUSD": 0.091618,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 48,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0927839
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "model": "claude-opus-5-5",
+        "duration_ms": 4181,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 19897,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0019997,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 333,
+            "cacheReadInputTokens": 5438,
+            "cacheCreationInputTokens": 19401,
+            "webSearchRequests": 0,
+            "costUSD": 0.16296360000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 95,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1649633
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 4647,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11565,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011660000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 379,
+            "cacheReadInputTokens": 5330,
+            "cacheCreationInputTokens": 11069,
+            "webSearchRequests": 0,
+            "costUSD": 0.097206,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 58,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.098372
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 11343,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11569,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011669,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 996,
+            "cacheReadInputTokens": 38885,
+            "cacheCreationInputTokens": 13733,
+            "webSearchRequests": 0,
+            "costUSD": 0.13758499999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 482,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.13875189999999998
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6909,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 17378,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0017468000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 630,
+            "cacheReadInputTokens": 25624,
+            "cacheCreationInputTokens": 17712,
+            "webSearchRequests": 0,
+            "costUSD": 0.0797184,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 136,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0814652
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 7260,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 17407,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0017522,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 767,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 16919,
+            "webSearchRequests": 0,
+            "costUSD": 0.0757867,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 388,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0775389
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 9134,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 17352,
+            "outputTokens": 488,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0019792,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 471,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 883,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 16864,
+            "webSearchRequests": 0,
+            "costUSD": 0.07672670000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 543,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.07870590000000001
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7223,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 17376,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0017481,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 704,
+            "cacheReadInputTokens": 25614,
+            "cacheCreationInputTokens": 17225,
+            "webSearchRequests": 0,
+            "costUSD": 0.1570188,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 167,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1587669
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "model": "claude-opus-5-5",
+        "duration_ms": 15808,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11563,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011663,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 1795,
+            "cacheReadInputTokens": 41080,
+            "cacheCreationInputTokens": 12614,
+            "webSearchRequests": 0,
+            "costUSD": 0.14505200000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 118,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1462183
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7731,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 17371,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0017466,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 776,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 16875,
+            "webSearchRequests": 0,
+            "costUSD": 0.15140140000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 364,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.153148
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 7030,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 17352,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0017442,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 624,
+            "cacheReadInputTokens": 25598,
+            "cacheCreationInputTokens": 17264,
+            "webSearchRequests": 0,
+            "costUSD": 0.0778638,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 162,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.079608
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 10640,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 17352,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0017447,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1025,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 16856,
+            "webSearchRequests": 0,
+            "costUSD": 0.1562294,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 637,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.15797409999999998
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 9417,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 17379,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0017473999999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 879,
+            "cacheReadInputTokens": 47433,
+            "cacheCreationInputTokens": 19519,
+            "webSearchRequests": 0,
+            "costUSD": 0.0916213,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 234,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0933687
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 12923,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 17349,
+            "outputTokens": 670,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0020699000000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 649,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 769,
+            "cacheReadInputTokens": 47708,
+            "cacheCreationInputTokens": 19827,
+            "webSearchRequests": 0,
+            "costUSD": 0.09178080000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 143,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.09385070000000001
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7142,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 17348,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0017442999999999998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 591,
+            "cacheReadInputTokens": 25586,
+            "cacheCreationInputTokens": 17119,
+            "webSearchRequests": 0,
+            "costUSD": 0.1539052,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 149,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1556495
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 11237,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 17369,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0017484,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 1128,
+            "cacheReadInputTokens": 71167,
+            "cacheCreationInputTokens": 20356,
+            "webSearchRequests": 0,
+            "costUSD": 0.19967339999999997,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 212,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.20142179999999998
+      }
+    ],
+    "total_cost_usd": 2.4238714,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 34,
+      "gather": 121,
+      "triage": 8585,
+      "find_verify": 46761,
+      "merge": 6
+    },
+    "errors": []
+  }
+}
