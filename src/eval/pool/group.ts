@@ -1,9 +1,10 @@
 // Group the findings of the pool. Identical findings join in code. Then one
 // Claude call groups the findings that state the same defect at the same
 // place.
+import { z } from "zod";
 import { claudeCall, type PoolContext } from "./calls.js";
 import { groupMessage } from "./prompts.js";
-import { GroupOutputSchema, type GroupOutput, type PoolFinding } from "./schemas.js";
+import { GroupOutputSchema, sixFields, type GroupOutput, type PoolFinding } from "./schemas.js";
 
 /** A finding with its source label. */
 export type Sourced = { source: string; finding: PoolFinding };
@@ -71,6 +72,10 @@ function toGroups(out: GroupOutput, names: readonly string[]): Group[] | string 
   return groups;
 }
 
+const KeptGroupsSchema = z.array(
+  z.object({ members: z.array(z.number()), representative: z.number() }),
+);
+
 /**
  * Group "findings" with one Claude call. Fewer than two findings need no
  * call. An answer that names an unknown id, puts a finding in two groups,
@@ -84,6 +89,10 @@ export async function groupFindings(
   if (findings.length < 2) {
     return { ok: true, groups: names.map((_, i) => ({ members: [i], representative: i })) };
   }
+  // A kept answer is for the same findings in the same order.
+  const key = JSON.stringify(findings.map(sixFields));
+  const old = ctx.memo?.get("group", key, KeptGroupsSchema);
+  if (old !== undefined) return { ok: true, groups: old };
   let groups: Group[] = [];
   const result = await claudeCall(
     "pool-grouper",
@@ -97,7 +106,9 @@ export async function groupFindings(
       return null;
     },
   );
-  return result.ok ? { ok: true, groups } : { ok: false, error: result.error };
+  if (!result.ok) return { ok: false, error: result.error };
+  ctx.memo?.set("group", key, groups);
+  return { ok: true, groups };
 }
 
 /** Group the clusters with the grouping call. Each group of clusters becomes one cluster. */

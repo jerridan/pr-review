@@ -6,6 +6,7 @@ import type { SdkClient } from "../../sdk/client.js";
 import type { RunOptions } from "../../sdk/options.js";
 import type { Semaphore } from "../../semaphore.js";
 import { runCodex } from "../codex.js";
+import type { CallMemo } from "./memo.js";
 import { codexPrompt, type Message } from "./prompts.js";
 
 /** What every call of one case shares. */
@@ -17,6 +18,8 @@ export type PoolContext = {
   semaphore: Semaphore;
   /** The sum of the cost of the Claude calls, in USD. */
   cost: { usd: number };
+  /** The kept results of the calls of the case. The adjudicate command has none. */
+  memo?: CallMemo;
 };
 
 export type CallResult<T> = { ok: true; value: T } | { ok: false; error: string };
