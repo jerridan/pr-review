@@ -6,12 +6,22 @@ import { UNTRUSTED_SYSTEM_LINE } from "../src/untrusted.js";
 
 describe("the pool prompt files", () => {
   it.each([
-    ["pool-review.md", "pool-reviewer", ["{{title}}", "{{body}}", "{{changed_files}}", "{{diff}}"]],
-    ["pool-group.md", "pool-grouper", ["{{items}}"]],
-    ["pool-adjudicate.md", "adjudicator", ["{{finding}}", "{{diff}}"]],
-  ])("%s has the frontmatter keys role, kind and user_message", (file, role, tokens) => {
+    [
+      "pool-review.md",
+      "pool-reviewer",
+      ["{{title}}", "{{body}}", "{{changed_files}}", "{{diff}}"],
+      ["cut_text", "kind", "role", "user_message"],
+    ],
+    ["pool-group.md", "pool-grouper", ["{{items}}"], ["kind", "role", "user_message"]],
+    [
+      "pool-adjudicate.md",
+      "adjudicator",
+      ["{{finding}}", "{{diff}}"],
+      ["cut_text", "kind", "role", "user_message"],
+    ],
+  ])("%s has its frontmatter keys", (file, role, tokens, keys) => {
     const p = loadPrompt(file);
-    expect(Object.keys(p.frontmatter).sort()).toEqual(["kind", "role", "user_message"]);
+    expect(Object.keys(p.frontmatter).sort()).toEqual(keys);
     expect(p.frontmatter.role).toBe(role);
     expect(p.frontmatter.kind).toBe("system");
     for (const token of tokens) expect(p.frontmatter.user_message).toContain(token);
