@@ -701,6 +701,12 @@ describe("the reviewer user message (R2)", () => {
     }
   });
 
+  it("puts the prompt-file empty-list text in the changed_files block when no file changed (D7)", async () => {
+    const sent = await messages({ ...GATHERED, changedFiles: [], deletedFiles: [] }, ["diff-bugs"]);
+    const files = blockList(sent.get("diff-bugs") ?? "").find((b) => b.label === "changed_files");
+    expect(files?.text).toBe(userField("empty_list_text").trim());
+  });
+
   it("uses the prompt-file texts for an empty description and for no history", async () => {
     const sent = await messages({ ...GATHERED, description: "", history: null }, [
       "diff-bugs",
