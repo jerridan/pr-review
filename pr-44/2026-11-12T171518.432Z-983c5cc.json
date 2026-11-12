@@ -1,0 +1,1983 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 44,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Add eval cases by bug injection (D4b R4)",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/44"
+    },
+    "run_kind": "later",
+    "prior": {
+      "head": "b49cedd74c12c888c25d2e6c0abde1b7e50a954e",
+      "source": "record",
+      "record": "/home/runner/work/_temp/pr-review-records/pr-44/2026-11-12T164014.834Z-b49cedd.json",
+      "open": [
+        "ab58706d4ddb02e8",
+        "b7958b73c41f398a",
+        "c288a60fb1de73d2"
+      ],
+      "dismissed": [],
+      "fetch_failed": false
+    },
+    "base": "b126f028a7c272daa4d983b6101155f7435d10fa",
+    "head": "983c5cc2ca9615c317e72904b9b85115298478a5",
+    "started_at": "2026-11-12T17:15:18.432Z",
+    "tool_version": "0.6.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Add eval cases by bug injection (D4b R4)\n\nD4b revision R4: eval cases by bug injection.\n\n**Without the pin move and the baseline.** The merge order of the D4b revisions is R1, R4, R2, R3. R1 is not merged yet. When R1 merges, this PR rebases on it, moves the pin in `eval/cases.json` to the merged cases commit, writes `eval/baseline.json` at two repeats, and re-derives the margins by the README rule.\n\n## What changes\n\n- `scripts/inject-case.sh <repo> <base> <head> <patch> <message-file> <name>` makes one injection case. It builds one commit on the merge base of a merged host PR. The commit holds the head tree of the PR with one bug patch applied, and the PR title and body as its message. Then it calls `make-case.sh`, sets the source to `injection`, and keeps the patch as `injection.patch`. So the history, the blame and the PR text of the case do not show the bug. The commit copies the author, the committer and the dates of the host head, so the same inputs give the same sha and the log shows no sign of the injection. The script does not change the host repo, ignores the user's `apply.whitespace` setting, and refuses a message file whose second line is not empty.\n- `test/eval-scripts.test.ts`: tests for the script on synthetic repos, a shallow one included.\n- `README.md`: a paragraph on the script, and an `injection.patch` row in the case file table.\n- `TICKETS.md`: the R4 progress line.\n\n## Cases repo\n\nBranch `d4b-r4-injection` of the cases repo adds four cases, one golden each:\n\n| Case | Language | Host PR size | Kind of bug | Label |\n|------|----------|--------------|-------------|-------|\n| `injection-websites-130` | TypeScript | ~110 lines | a field key copied from the wrong section | blocking |\n| `injection-websites-120` | TypeScript | ~670 lines | a validation check removed from a predicate | suggestion |\n| `injection-walle-21` | Python | ~160 lines | the wrong timeout setting on a loop | suggestion |\n| `injection-walle-6` | Python | ~1200 lines | an idempotency id minted on each retry | blocking |\n\nThe D5 labeling loop chose each label, and the three runs agree for each finding. The cases README gains a section on how to add an injection case. With these cases, the set holds 14 cases and 86 goldens (55 posted).\n\n## Verification\n\n- `npm test` (1307 tests), `npm run lint`, `npm run typecheck`, `npm run build` pass.\n- The case loader reads all 14 cases with no error. Each bundle holds exactly one commit from base to head.\n- `scripts/check-six-labels.mjs` in the cases repo passes.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZeygoPpDMXvhR2hBF1\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": "README.md",
+        "hunks": 3
+      },
+      {
+        "path": "TICKETS.md",
+        "hunks": 1
+      },
+      {
+        "path": "scripts/inject-case.sh",
+        "hunks": 1
+      },
+      {
+        "path": "test/eval-scripts.test.ts",
+        "hunks": 3
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "Adds a new executable shell script with non-trivial git plumbing logic (temp repo with alternates, shallow handling, deterministic commit creation) plus tests and docs.",
+      "confidence": "high",
+      "categories": [
+        "bug",
+        "test",
+        "docs"
+      ],
+      "hotspots": [
+        "scripts/inject-case.sh: temp bare repo with alternates and shallow copy",
+        "scripts/inject-case.sh: git apply --cached and failure cleanup (no case left)",
+        "scripts/inject-case.sh: IFS='|' read of git log identity (names containing '|', process substitution under pipefail)",
+        "scripts/inject-case.sh: GIT_DIR/GIT_INDEX_FILE export/unset and trap cleanup",
+        "scripts/inject-case.sh: make-case.sh invocation against temp repo and mv into cwd",
+        "test/eval-scripts.test.ts: runScript env param change and new inject-case tests"
+      ],
+      "file_notes": [
+        {
+          "file": "scripts/inject-case.sh",
+          "note": "new script; builds a squashed commit with the head tree plus bug patch, then calls make-case.sh and sets source=injection"
+        },
+        {
+          "file": "test/eval-scripts.test.ts",
+          "note": "new inject-case test suite; runScript gains an optional env parameter"
+        },
+        {
+          "file": "README.md",
+          "note": "documents injection.patch and the inject-case.sh workflow"
+        },
+        {
+          "file": "TICKETS.md",
+          "note": "progress note only"
+        }
+      ],
+      "summary": "Adds scripts/inject-case.sh, which makes an eval case by bug injection. It squashes a host PR head tree with a bug patch into one commit on the base, using the head's identity and dates, then runs make-case.sh and marks the case source as injection. It also adds tests, README documentation and a TICKETS progress note."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: Adds a new executable shell script with non-trivial git plumbing logic (temp repo with alternates, shallow handling, deterministic commit creation) plus tests and docs.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 2101,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11815,
+              "outputTokens": 16,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011895000000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 100,
+              "cacheReadInputTokens": 5136,
+              "cacheCreationInputTokens": 11319,
+              "webSearchRequests": 0,
+              "costUSD": 0.0935872,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 46,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.09477669999999999
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "README.md",
+            "start_line": 662,
+            "end_line": 662,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "medium",
+            "claim": "The description says TICKETS.md gains the R4 progress line, but the change does not touch TICKETS.md.",
+            "evidence": "To make a case by bug injection, run this command in the cases directory:",
+            "suggested_fix": "Add the R4 progress line to TICKETS.md, or remove the claim from the description.",
+            "explanation": "The changed files list holds only README.md, scripts/inject-case.sh and test/eval-scripts.test.ts, so the promised TICKETS.md progress line is missing.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4713,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11811,
+              "outputTokens": 19,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011906,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 408,
+              "cacheReadInputTokens": 5094,
+              "cacheCreationInputTokens": 11315,
+              "webSearchRequests": 0,
+              "costUSD": 0.0997068,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 134,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1008974
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "scripts/inject-case.sh",
+            "start_line": 108,
+            "end_line": 108,
+            "category": "bug",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "If the author or committer name of the head commit contains '|', the identity fields are split wrongly.",
+            "evidence": "IFS='|' read -r an ae ad cn ce cd < <(git log -1 --format='%an|%ae|%aI|%cn|%ce|%cI' \"$head\")",
+            "suggested_fix": "Separate the fields with a byte that git does not allow in names, for example %x00 or %x1f, or read each field with its own `git log --format` call.",
+            "explanation": "A '|' in a name moves every later field one place, so the email and date values go into the wrong variables. The commit then gets the wrong identity, or `commit-tree` fails on a date that is not valid.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 8981,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11827,
+              "outputTokens": 25,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011952,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 782,
+              "cacheReadInputTokens": 5363,
+              "cacheCreationInputTokens": 11331,
+              "webSearchRequests": 0,
+              "costUSD": 0.10736860000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 377,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1085638
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "scripts/inject-case.sh",
+            "start_line": 107,
+            "end_line": 107,
+            "category": "bug",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "Splitting the identity on '|' gives wrong fields when a name or email of the head commit holds a '|' character.",
+            "evidence": "IFS='|' read -r an ae ad cn ce cd < <(git log -1 --format='%an|%ae|%aI|%cn|%ce|%cI' \"$head\")",
+            "suggested_fix": "Read each field with its own git log call, or use a NUL separator (%x00) and read with read -d ''.",
+            "explanation": "If an author name holds '|', the email and date fields shift, so the commit gets a wrong identity and date, or commit-tree fails on a date that is not valid.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5928,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11829,
+              "outputTokens": 25,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011953999999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 506,
+              "cacheReadInputTokens": 5363,
+              "cacheCreationInputTokens": 11333,
+              "webSearchRequests": 0,
+              "costUSD": 0.1018646,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 183,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.10306
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 3547,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11833,
+              "outputTokens": 25,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011958,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 252,
+              "cacheReadInputTokens": 5046,
+              "cacheCreationInputTokens": 11337,
+              "webSearchRequests": 0,
+              "costUSD": 0.0967532,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 155,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.097949
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 2332,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 15432,
+              "outputTokens": 25,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0015557,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 139,
+              "cacheReadInputTokens": 5438,
+              "cacheCreationInputTokens": 14936,
+              "webSearchRequests": 0,
+              "costUSD": 0.12336359999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 18,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.12491929999999998
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1993,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11829,
+              "outputTokens": 25,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011953999999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 92,
+              "cacheReadInputTokens": 5330,
+              "cacheCreationInputTokens": 11333,
+              "webSearchRequests": 0,
+              "costUSD": 0.093578,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 38,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0947734
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1910,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11819,
+              "outputTokens": 25,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011944,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 84,
+              "cacheReadInputTokens": 5330,
+              "cacheCreationInputTokens": 11323,
+              "webSearchRequests": 0,
+              "costUSD": 0.093338,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0945324
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "scripts/inject-case.sh",
+            "start_line": 66,
+            "end_line": 69,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "No test covers the error path where <repo> is not a git repo.",
+            "evidence": "if ! git -C \"$repo\" rev-parse --git-dir > /dev/null 2>&1; then",
+            "suggested_fix": "Add a test that passes a plain directory as <repo> and asserts a non-zero exit and no case directory.",
+            "explanation": "This new error path has no test, so a regression would go unnoticed.",
+            "needs_context": false
+          },
+          {
+            "file": "scripts/inject-case.sh",
+            "start_line": 53,
+            "end_line": 58,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "Only the missing message file is tested. No test covers a missing patch file or a <base> that is not a commit.",
+            "evidence": "for f in \"$patch\" \"$message\"; do",
+            "suggested_fix": "Add two tests: one with a missing patch path and one with base 'no-such-commit'. Each test asserts a non-zero exit and an empty output directory.",
+            "explanation": "The branches for a missing patch and an unresolvable base have no test.",
+            "needs_context": false
+          },
+          {
+            "file": "test/eval-scripts.test.ts",
+            "start_line": 383,
+            "end_line": 388,
+            "category": "test",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The short-arguments test asserts only a non-zero exit, but the script promises the usage message and exit 2.",
+            "evidence": "const result = await runScript(INJECT_CASE, [h.repo, h.base, h.head], out);\n    expect(result.code).not.toBe(0);",
+            "suggested_fix": "Assert code 2 and that stderr contains 'usage'.",
+            "explanation": "A loose assertion still passes if a later failure produces the non-zero exit, so it cannot prove that the usage check works.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 9639,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11823,
+              "outputTokens": 23,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011938,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 1012,
+              "cacheReadInputTokens": 6105,
+              "cacheCreationInputTokens": 11327,
+              "webSearchRequests": 0,
+              "costUSD": 0.112085,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 248,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1132788
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "README.md",
+          "start_line": 662,
+          "end_line": 662,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "medium",
+          "claim": "The description says TICKETS.md gains the R4 progress line, but the change does not touch TICKETS.md.",
+          "evidence": "To make a case by bug injection, run this command in the cases directory:",
+          "suggested_fix": "Add the R4 progress line to TICKETS.md, or remove the claim from the description.",
+          "explanation": "The changed files list holds only README.md, scripts/inject-case.sh and test/eval-scripts.test.ts, so the promised TICKETS.md progress line is missing.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": false,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "To make a case by bug injection, run this command in the cases directory:",
+            "R4 in progress, 2026-11-12"
+          ],
+          "rationale": "The head checkout's TICKETS.md already holds an R4 progress line dated 2026-11-12, so the claim that TICKETS.md lacks it is contradicted. The finding's changed-files list is not shown to be complete, and its quoted line in README.md is unrelated to the claim.",
+          "score": 5,
+          "severity": "not_real"
+        },
+        "final": {
+          "in_scope": false,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "To make a case by bug injection, run this command in the cases directory:",
+            "R4 in progress, 2026-11-12"
+          ],
+          "rationale": "The head checkout's TICKETS.md already holds an R4 progress line dated 2026-11-12, so the claim that TICKETS.md lacks it is contradicted. The finding's changed-files list is not shown to be complete, and its quoted line in README.md is unrelated to the claim.",
+          "score": 5,
+          "severity": "not_real"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "scripts/inject-case.sh",
+          "start_line": 107,
+          "end_line": 107,
+          "category": "bug",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "Splitting the identity on '|' gives wrong fields when a name or email of the head commit holds a '|' character.",
+          "evidence": "IFS='|' read -r an ae ad cn ce cd < <(git log -1 --format='%an|%ae|%aI|%cn|%ce|%cI' \"$head\")",
+          "suggested_fix": "Read each field with its own git log call, or use a NUL separator (%x00) and read with read -d ''.",
+          "explanation": "If an author name holds '|', the email and date fields shift, so the commit gets a wrong identity and date, or commit-tree fails on a date that is not valid.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "IFS='|' read -r an ae ad cn ce cd < <(git log -1 --format='%an|%ae|%aI|%cn|%ce|%cI' \"$head\")"
+          ],
+          "rationale": "Git permits '|' in author and committer names, so the '|'-delimited read shifts the fields. The last variable then collects the extra text, and commit-tree would fail on an invalid date or the commit would get a wrong identity. This needs a rare name, and the failure is mostly loud.",
+          "score": 85,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "IFS='|' read -r an ae ad cn ce cd < <(git log -1 --format='%an|%ae|%aI|%cn|%ce|%cI' \"$head\")",
+            "GIT_AUTHOR_NAME=\"$an\" GIT_AUTHOR_EMAIL=\"$ae\" GIT_AUTHOR_DATE=\"$ad\" \\"
+          ],
+          "rationale": "Git allows '|' in a name or email. When one appears, the split on '|' moves every later field by one place, so the author and committer get the wrong email and date, or commit-tree fails on a bad date. Such names are rare, and a failure would usually be visible, so this is an unusual-path issue with a cheap fix (a NUL separator).",
+          "score": 92,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "IFS='|' read -r an ae ad cn ce cd < <(git log -1 --format='%an|%ae|%aI|%cn|%ce|%cI' \"$head\")",
+            "GIT_AUTHOR_NAME=\"$an\" GIT_AUTHOR_EMAIL=\"$ae\" GIT_AUTHOR_DATE=\"$ad\" \\"
+          ],
+          "rationale": "Git allows '|' in a name or email. When one appears, the split on '|' moves every later field by one place, so the author and committer get the wrong email and date, or commit-tree fails on a bad date. Such names are rare, and a failure would usually be visible, so this is an unusual-path issue with a cheap fix (a NUL separator).",
+          "score": 92,
+          "severity": "suggestion"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "scripts/inject-case.sh",
+          "start_line": 108,
+          "end_line": 108,
+          "category": "bug",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "If the author or committer name of the head commit contains '|', the identity fields are split wrongly.",
+          "evidence": "IFS='|' read -r an ae ad cn ce cd < <(git log -1 --format='%an|%ae|%aI|%cn|%ce|%cI' \"$head\")",
+          "suggested_fix": "Separate the fields with a byte that git does not allow in names, for example %x00 or %x1f, or read each field with its own `git log --format` call.",
+          "explanation": "A '|' in a name moves every later field one place, so the email and date values go into the wrong variables. The commit then gets the wrong identity, or `commit-tree` fails on a date that is not valid.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "IFS='|' read -r an ae ad cn ce cd < <(git log -1 --format='%an|%ae|%aI|%cn|%ce|%cI' \"$head\")"
+          ],
+          "rationale": "The fields are joined with '|' and split on '|'. Git allows '|' in author and committer names, so such a name shifts every later field. The shifted values become the wrong email or an invalid date, and `commit-tree` or the identity goes wrong. The case is rare, and a bad date makes the script fail loudly instead of silently.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "IFS='|' read -r an ae ad cn ce cd < <(git log -1 --format='%an|%ae|%aI|%cn|%ce|%cI' \"$head\")"
+          ],
+          "rationale": "The fields are joined with '|' and split on '|'. Git allows '|' in author and committer names, so such a name shifts every later field. The shifted values become the wrong email or an invalid date, and `commit-tree` or the identity goes wrong. The case is rare, and a bad date makes the script fail loudly instead of silently.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "scripts/inject-case.sh",
+          "start_line": 66,
+          "end_line": 69,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "No test covers the error path where <repo> is not a git repo.",
+          "evidence": "if ! git -C \"$repo\" rev-parse --git-dir > /dev/null 2>&1; then",
+          "suggested_fix": "Add a test that passes a plain directory as <repo> and asserts a non-zero exit and no case directory.",
+          "explanation": "This new error path has no test, so a regression would go unnoticed.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if ! git -C \"$repo\" rev-parse --git-dir > /dev/null 2>&1; then",
+            "echo \"inject-case: $repo is not a git repo\" >&2"
+          ],
+          "rationale": "No test in the inject-case suite passes a non-git directory as <repo>, so the claim is true. The gap is minor: without the check the script would still fail later in resolve with a \"not a commit\" error.",
+          "score": 85,
+          "severity": "dont_post"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if ! git -C \"$repo\" rev-parse --git-dir > /dev/null 2>&1; then",
+            "echo \"inject-case: $repo is not a git repo\" >&2",
+            "it(\"exits non-zero and writes no directory when head is not a commit\", async () => {"
+          ],
+          "rationale": "The inject-case.sh tests in test/eval-scripts.test.ts cover a missing message file, a bad patch, a bad head, an existing name and a bad second line. None of them passes a directory that is not a git repo. So the claim holds. The missing test is for a simple guard that is easy to see in the code, and if the guard broke, the later rev-parse/resolve step would still fail. So it is not worth posting.",
+          "score": 88,
+          "severity": "dont_post"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if ! git -C \"$repo\" rev-parse --git-dir > /dev/null 2>&1; then",
+            "echo \"inject-case: $repo is not a git repo\" >&2",
+            "it(\"exits non-zero and writes no directory when head is not a commit\", async () => {"
+          ],
+          "rationale": "The inject-case.sh tests in test/eval-scripts.test.ts cover a missing message file, a bad patch, a bad head, an existing name and a bad second line. None of them passes a directory that is not a git repo. So the claim holds. The missing test is for a simple guard that is easy to see in the code, and if the guard broke, the later rev-parse/resolve step would still fail. So it is not worth posting.",
+          "score": 88,
+          "severity": "dont_post"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "scripts/inject-case.sh",
+          "start_line": 53,
+          "end_line": 58,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "Only the missing message file is tested. No test covers a missing patch file or a <base> that is not a commit.",
+          "evidence": "for f in \"$patch\" \"$message\"; do",
+          "suggested_fix": "Add two tests: one with a missing patch path and one with base 'no-such-commit'. Each test asserts a non-zero exit and an empty output directory.",
+          "explanation": "The branches for a missing patch and an unresolvable base have no test.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "for f in \"$patch\" \"$message\"; do",
+            "base=\"$(resolve \"$base_arg\")\"",
+            "head=\"$(resolve \"$head_arg\")\""
+          ],
+          "rationale": "No test covers a missing patch file or a bad base. The same loop and the same resolve() function are already tested through the message-file and head-not-a-commit tests, so the gap is minor.",
+          "score": 80,
+          "severity": "dont_post"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "for f in \"$patch\" \"$message\"; do",
+            "base=\"$(resolve \"$base_arg\")\"",
+            "head=\"$(resolve \"$head_arg\")\"",
+            "it(\"exits non-zero and writes no directory when head is not a commit\", async () => {",
+            "it(\"exits non-zero and writes no directory when the message file is missing\", async () => {"
+          ],
+          "rationale": "The finding is right that no test covers a missing patch file or a bad base. But the missing patch goes through the same loop as the missing message file, which is tested. A bad base goes through the same resolve() function as a bad head, which is also tested. So the gap is cosmetic.",
+          "score": 72,
+          "severity": "dont_post"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "for f in \"$patch\" \"$message\"; do",
+            "base=\"$(resolve \"$base_arg\")\"",
+            "head=\"$(resolve \"$head_arg\")\"",
+            "it(\"exits non-zero and writes no directory when head is not a commit\", async () => {",
+            "it(\"exits non-zero and writes no directory when the message file is missing\", async () => {"
+          ],
+          "rationale": "The finding is right that no test covers a missing patch file or a bad base. But the missing patch goes through the same loop as the missing message file, which is tested. A bad base goes through the same resolve() function as a bad head, which is also tested. So the gap is cosmetic.",
+          "score": 72,
+          "severity": "dont_post"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "test/eval-scripts.test.ts",
+          "start_line": 383,
+          "end_line": 388,
+          "category": "test",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The short-arguments test asserts only a non-zero exit, but the script promises the usage message and exit 2.",
+          "evidence": "const result = await runScript(INJECT_CASE, [h.repo, h.base, h.head], out);\n    expect(result.code).not.toBe(0);",
+          "suggested_fix": "Assert code 2 and that stderr contains 'usage'.",
+          "explanation": "A loose assertion still passes if a later failure produces the non-zero exit, so it cannot prove that the usage check works.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const result = await runScript(INJECT_CASE, [h.repo, h.base, h.head], out);\n    expect(result.code).not.toBe(0);",
+            "if [ \"$#\" -ne 6 ]; then\n  echo \"usage: $0 <repo> <base> <head> <patch> <message-file> <name>\" >&2\n  exit 2"
+          ],
+          "rationale": "The script exits 2 with a usage message on wrong argument count, but the test only asserts a non-zero exit, so it would also pass if the usage check were removed and a later failure produced a non-zero exit. The weakness is minor.",
+          "score": 85,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(result.code).not.toBe(0);",
+            "echo \"usage: $0 <repo> <base> <head> <patch> <message-file> <name>\" >&2",
+            "exit 2",
+            "set -euo pipefail"
+          ],
+          "rationale": "The script sends a usage message to stderr and exits 2 when it gets the wrong number of arguments, but the new test only checks for a non-zero exit. Under `set -u`, removing the usage check would still fail on `$4` with exit 1, so the test cannot tell whether the check works. This is a minor test weakness and cheap to fix.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(result.code).not.toBe(0);",
+            "echo \"usage: $0 <repo> <base> <head> <patch> <message-file> <name>\" >&2",
+            "exit 2",
+            "set -euo pipefail"
+          ],
+          "rationale": "The script sends a usage message to stderr and exits 2 when it gets the wrong number of arguments, but the new test only checks for a non-zero exit. Under `set -u`, removing the usage check would still fail on `$4` with exit 1, so the test cannot tell whether the check works. This is a minor test weakness and cheap to fix.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "passed": true
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5878870737,
+      "review_url": "https://github.com/jerridan/pr-review/pull/44#pullrequestreview-5878870737",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 131355342386
+      },
+      "cleanup_comment_id": null,
+      "resolved": [
+        {
+          "thread_id": "PRRT_kwDOVHw73s62uS3P",
+          "fingerprint": "ab58706d4ddb02e8"
+        }
+      ],
+      "errors": []
+    },
+    "below_floor": [
+      {
+        "file": "scripts/inject-case.sh",
+        "start_line": 107,
+        "end_line": 107,
+        "category": "bug",
+        "severity_estimate": "suggestion",
+        "confidence": "low",
+        "claim": "Splitting the identity on '|' gives wrong fields when a name or email of the head commit holds a '|' character.",
+        "evidence": "IFS='|' read -r an ae ad cn ce cd < <(git log -1 --format='%an|%ae|%aI|%cn|%ce|%cI' \"$head\")",
+        "suggested_fix": "Read each field with its own git log call, or use a NUL separator (%x00) and read with read -d ''.",
+        "explanation": "If an author name holds '|', the email and date fields shift, so the commit gets a wrong identity and date, or commit-tree fails on a date that is not valid.",
+        "needs_context": false,
+        "fingerprint": "7166ea84705f76c4",
+        "severity": "suggestion",
+        "score": 92,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "IFS='|' read -r an ae ad cn ce cd < <(git log -1 --format='%an|%ae|%aI|%cn|%ce|%cI' \"$head\")",
+            "GIT_AUTHOR_NAME=\"$an\" GIT_AUTHOR_EMAIL=\"$ae\" GIT_AUTHOR_DATE=\"$ad\" \\"
+          ],
+          "rationale": "Git allows '|' in a name or email. When one appears, the split on '|' moves every later field by one place, so the author and committer get the wrong email and date, or commit-tree fails on a bad date. Such names are rare, and a failure would usually be visible, so this is an unusual-path issue with a cheap fix (a NUL separator).",
+          "score": 92,
+          "severity": "suggestion"
+        },
+        "span_text": "IFS='|' read -r an ae ad cn ce cd < <(git log -1 --format='%an|%ae|%aI|%cn|%ce|%cI' \"$head\")"
+      },
+      {
+        "file": "scripts/inject-case.sh",
+        "start_line": 108,
+        "end_line": 108,
+        "category": "bug",
+        "severity_estimate": "suggestion",
+        "confidence": "low",
+        "claim": "If the author or committer name of the head commit contains '|', the identity fields are split wrongly.",
+        "evidence": "IFS='|' read -r an ae ad cn ce cd < <(git log -1 --format='%an|%ae|%aI|%cn|%ce|%cI' \"$head\")",
+        "suggested_fix": "Separate the fields with a byte that git does not allow in names, for example %x00 or %x1f, or read each field with its own `git log --format` call.",
+        "explanation": "A '|' in a name moves every later field one place, so the email and date values go into the wrong variables. The commit then gets the wrong identity, or `commit-tree` fails on a date that is not valid.",
+        "needs_context": false,
+        "fingerprint": "5a2805e382d8dc9e",
+        "severity": "suggestion",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "IFS='|' read -r an ae ad cn ce cd < <(git log -1 --format='%an|%ae|%aI|%cn|%ce|%cI' \"$head\")"
+          ],
+          "rationale": "The fields are joined with '|' and split on '|'. Git allows '|' in author and committer names, so such a name shifts every later field. The shifted values become the wrong email or an invalid date, and `commit-tree` or the identity goes wrong. The case is rare, and a bad date makes the script fail loudly instead of silently.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "span_text": "new=\"$("
+      },
+      {
+        "file": "test/eval-scripts.test.ts",
+        "start_line": 383,
+        "end_line": 388,
+        "category": "test",
+        "severity_estimate": "nit",
+        "confidence": "low",
+        "claim": "The short-arguments test asserts only a non-zero exit, but the script promises the usage message and exit 2.",
+        "evidence": "const result = await runScript(INJECT_CASE, [h.repo, h.base, h.head], out);\n    expect(result.code).not.toBe(0);",
+        "suggested_fix": "Assert code 2 and that stderr contains 'usage'.",
+        "explanation": "A loose assertion still passes if a later failure produces the non-zero exit, so it cannot prove that the usage check works.",
+        "needs_context": false,
+        "fingerprint": "942d81a39a099618",
+        "severity": "nit",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(result.code).not.toBe(0);",
+            "echo \"usage: $0 <repo> <base> <head> <patch> <message-file> <name>\" >&2",
+            "exit 2",
+            "set -euo pipefail"
+          ],
+          "rationale": "The script sends a usage message to stderr and exits 2 when it gets the wrong number of arguments, but the new test only checks for a non-zero exit. Under `set -u`, removing the usage check would still fail on `$4` with exit 1, so the test cannot tell whether the check works. This is a minor test weakness and cheap to fix.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "span_text": "it(\"exits non-zero when the arguments are short\", async () => { const h = await makeHost(); const out = newDir(\"inject-out\"); const result = await runScript(INJECT_CASE, [h.repo, h.base, h.head], out); expect(result.code).not.toBe(0);"
+      }
+    ],
+    "not_reposted": [],
+    "carried": [
+      {
+        "file": "scripts/inject-case.sh",
+        "start_line": 42,
+        "end_line": 47,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "The name validation and the 'not a commit' error path have no tests.",
+        "evidence": "  \"\" | . | .. | */*)",
+        "suggested_fix": "Add tests for a name such as 'a/b' and for a bad base rev. Each test asserts a non-zero exit and that no directory is written.",
+        "explanation": "A broken check could let the script write outside the current directory, and no test would fail.",
+        "needs_context": false,
+        "fingerprint": "c288a60fb1de73d2",
+        "severity": "nit",
+        "score": 92,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"\" | . | .. | */*)",
+            "echo \"inject-case: $1 is not a commit in $repo\" >&2"
+          ],
+          "rationale": "The eight inject-case tests cover a patch that doesn't apply, an existing name, a missing message file and too few arguments. None passes an invalid name or a bad base or head rev.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "span_text": "case \"$name\" in \"\" | . | .. | */*) echo \"inject-case: the name \\\"$name\\\" is not a directory name\" >&2 exit 2 ;; esac"
+      },
+      {
+        "file": "scripts/inject-case.sh",
+        "start_line": 86,
+        "end_line": 88,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "No test covers the shallow-repo branch, which is the real use with fetch-pr.sh repos.",
+        "evidence": "  cp \"$common/shallow\" \"$tmp/shallow\"",
+        "suggested_fix": "Add a test that runs the script on a shallow clone of the host, whose boundary is base, and checks that it exits 0 with one commit.",
+        "explanation": "If the shallow file is not copied, the commit build or the bundle fails on a shallow host repo, and no test would show it.",
+        "needs_context": false,
+        "fingerprint": "b7958b73c41f398a",
+        "severity": "suggestion",
+        "score": 92,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if [ -f \"$common/shallow\" ]; then\n  cp \"$common/shallow\" \"$tmp/shallow\"\nfi",
+            "await git(repo, [\"init\", \"--quiet\", \"--initial-branch=main\"]);",
+            "async function makeHost(): Promise<Host> {"
+          ],
+          "rationale": "All eight inject-case.sh tests build their host with makeHost(), which is a full non-shallow `git init` repo. So nothing tests the branch that copies the `shallow` file. The fetch-pr.sh shallow test only runs make-case.sh. This is a real test gap on the main use path, which goes through repos from fetch-pr.sh. The author did check that path by hand on the four real cases.",
+          "score": 92,
+          "severity": "suggestion"
+        },
+        "span_text": "if [ -f \"$common/shallow\" ]; then cp \"$common/shallow\" \"$tmp/shallow\" fi"
+      }
+    ]
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 8833,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11365,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011485000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 728,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 10877,
+            "webSearchRequests": 0,
+            "costUSD": 0.0509182,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.052066699999999994
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 2101,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11815,
+            "outputTokens": 16,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011895000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 100,
+            "cacheReadInputTokens": 5136,
+            "cacheCreationInputTokens": 11319,
+            "webSearchRequests": 0,
+            "costUSD": 0.0935872,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 46,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.09477669999999999
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "model": "claude-opus-5-5",
+        "duration_ms": 3547,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11833,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011958,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 252,
+            "cacheReadInputTokens": 5046,
+            "cacheCreationInputTokens": 11337,
+            "webSearchRequests": 0,
+            "costUSD": 0.0967532,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 155,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.097949
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "model": "claude-opus-5-5",
+        "duration_ms": 4713,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11811,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011906,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 408,
+            "cacheReadInputTokens": 5094,
+            "cacheCreationInputTokens": 11315,
+            "webSearchRequests": 0,
+            "costUSD": 0.0997068,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 134,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1008974
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "model": "claude-opus-5-5",
+        "duration_ms": 2332,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 15432,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0015557,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 139,
+            "cacheReadInputTokens": 5438,
+            "cacheCreationInputTokens": 14936,
+            "webSearchRequests": 0,
+            "costUSD": 0.12336359999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 18,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.12491929999999998
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5928,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11829,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011953999999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 506,
+            "cacheReadInputTokens": 5363,
+            "cacheCreationInputTokens": 11333,
+            "webSearchRequests": 0,
+            "costUSD": 0.1018646,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 183,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.10306
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 1993,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11829,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011953999999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 92,
+            "cacheReadInputTokens": 5330,
+            "cacheCreationInputTokens": 11333,
+            "webSearchRequests": 0,
+            "costUSD": 0.093578,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 38,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0947734
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 1910,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11819,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011944,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 84,
+            "cacheReadInputTokens": 5330,
+            "cacheCreationInputTokens": 11323,
+            "webSearchRequests": 0,
+            "costUSD": 0.093338,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0945324
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 8981,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11827,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011952,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 782,
+            "cacheReadInputTokens": 5363,
+            "cacheCreationInputTokens": 11331,
+            "webSearchRequests": 0,
+            "costUSD": 0.10736860000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 377,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1085638
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "model": "claude-opus-5-5",
+        "duration_ms": 9639,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11823,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011938,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1012,
+            "cacheReadInputTokens": 6105,
+            "cacheCreationInputTokens": 11327,
+            "webSearchRequests": 0,
+            "costUSD": 0.112085,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 248,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1132788
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 7189,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7793,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007908,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 778,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 7305,
+            "webSearchRequests": 0,
+            "costUSD": 0.0374407,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 413,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0382315
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 10194,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7789,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007889,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 672,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 7301,
+            "webSearchRequests": 0,
+            "costUSD": 0.0363647,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 323,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0371536
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 17632,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 17046,
+            "outputTokens": 16,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0017125999999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 10,
+            "outputTokens": 1328,
+            "cacheReadInputTokens": 90172,
+            "cacheCreationInputTokens": 17895,
+            "webSearchRequests": 0,
+            "costUSD": 0.0938972,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 362,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0956098
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6703,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7799,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007924000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 680,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 7303,
+            "webSearchRequests": 0,
+            "costUSD": 0.0729054,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 242,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0736978
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 11288,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7738,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007848000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 893,
+            "cacheReadInputTokens": 27895,
+            "cacheCreationInputTokens": 9946,
+            "webSearchRequests": 0,
+            "costUSD": 0.051515500000000006,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 313,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.05230030000000001
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 11007,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 15201,
+            "outputTokens": 296,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016680999999999998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 274,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 849,
+            "cacheReadInputTokens": 23447,
+            "cacheCreationInputTokens": 15037,
+            "webSearchRequests": 0,
+            "costUSD": 0.0709907,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 306,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0726588
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 16512,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7724,
+            "outputTokens": 225,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0008849,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 203,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 1007,
+            "cacheReadInputTokens": 43774,
+            "cacheCreationInputTokens": 11783,
+            "webSearchRequests": 0,
+            "costUSD": 0.0615954,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 268,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.062480299999999996
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 8942,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7746,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007871000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 793,
+            "cacheReadInputTokens": 27937,
+            "cacheCreationInputTokens": 8724,
+            "webSearchRequests": 0,
+            "costUSD": 0.0912634,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 145,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.09205050000000001
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 8517,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 15211,
+            "outputTokens": 273,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016576,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 250,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 736,
+            "cacheReadInputTokens": 42772,
+            "cacheCreationInputTokens": 16047,
+            "webSearchRequests": 0,
+            "costUSD": 0.15167440000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 144,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.153332
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 9078,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7720,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007830000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 739,
+            "cacheReadInputTokens": 27848,
+            "cacheCreationInputTokens": 16448,
+            "webSearchRequests": 0,
+            "costUSD": 0.15195760000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 109,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1527406
+      }
+    ],
+    "total_cost_usd": 1.8150726999999998,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 36,
+      "gather": 76,
+      "scope": 4,
+      "triage": 9902,
+      "find_verify": 43281,
+      "merge": 8
+    },
+    "errors": []
+  }
+}
