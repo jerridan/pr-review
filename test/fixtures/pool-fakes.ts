@@ -219,6 +219,7 @@ export async function makeFixtureCase(work: string, name: string): Promise<Fixtu
     unknown
   >;
   meta.source = "pool";
+  meta.origin = "https://github.com/example/fixture/pull/7";
   meta.title = "Add an average helper";
   meta.body = "This PR adds the average function.";
   writeFileSync(join(template, "case.json"), JSON.stringify(meta, null, 2));

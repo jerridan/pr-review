@@ -406,7 +406,11 @@ describe("pr-review pool --write-golden", () => {
   type Golden = { findings: Record<string, unknown>[] };
 
   it("writes one golden per kept item with a span, with severity unsure and both scores", async () => {
-    const s = setup(MAIN);
+    // The plan of the main scenario, with no failed call.
+    const s = setup({
+      ...MAIN,
+      claude: { ...MAIN.claude, "MARK-F1": { score: 10, start_line: 12, end_line: 12 } },
+    });
     writeFileSync(join(s.caseDir, "golden.json"), GOLDEN_BEFORE);
     await cli(
       s.client,
@@ -566,4 +570,263 @@ describe("pr-review pool, the other paths", () => {
     const s = setup({});
     expect(await cli(s.client, "pool", s.caseDir)).toBe(2);
   });
+});
+
+// Change case.json of a set-up case.
+function editMeta(s: Setup, change: (meta: Record<string, unknown>) => void): void {
+  const path = join(s.caseDir, "case.json");
+  const meta = readJson<Record<string, unknown>>(path);
+  change(meta);
+  writeFileSync(path, JSON.stringify(meta));
+}
+
+// Write the fixture record with a change, and give its path.
+function editedRecord(s: Setup, change: (record: Record<string, any>) => void): string {
+  const record = readJson<Record<string, any>>(RECORD_FIXTURE);
+  change(record);
+  const path = join(s.out, "..", "edited.json");
+  writeFileSync(path, JSON.stringify(record));
+  return path;
+}
+
+const KEPT = { score: 80, start_line: 11, end_line: 11 };
+
+describe("pr-review pool --write-golden, after a failed call", () => {
+  it("leaves golden.json unchanged and says so when an adjudication call failed", async () => {
+    const s = setup({
+      claudeReviews: [[item("MARK-K1", 11)]],
+      gptReviews: [[]],
+      claude: { "MARK-K1": "fail" },
+      gpt: { "MARK-K1": KEPT },
+    });
+    writeFileSync(join(s.caseDir, "golden.json"), GOLDEN_BEFORE);
+    const code = await cli(
+      s.client,
+      "pool",
+      s.caseDir,
+      "--out",
+      s.out,
+      "--reviews",
+      "1",
+      "--write-golden",
+    );
+    expect(code).toBe(1);
+    expect(readFileSync(join(s.caseDir, "golden.json"), "utf8")).toBe(GOLDEN_BEFORE);
+    expect(s.io.stderr()).toMatch(/golden\.json[^\n]*unchanged/);
+  }, 60_000);
+
+  it("leaves golden.json unchanged and says so when a blind review failed", async () => {
+    const s = setup({
+      claudeReviews: [[item("MARK-K1", 11)]],
+      gptReviews: ["fail", "fail"],
+      claude: { "MARK-K1": KEPT },
+      gpt: { "MARK-K1": KEPT },
+    });
+    writeFileSync(join(s.caseDir, "golden.json"), GOLDEN_BEFORE);
+    const code = await cli(
+      s.client,
+      "pool",
+      s.caseDir,
+      "--out",
+      s.out,
+      "--reviews",
+      "1",
+      "--write-golden",
+    );
+    expect(code).toBe(1);
+    expect(readFileSync(join(s.caseDir, "golden.json"), "utf8")).toBe(GOLDEN_BEFORE);
+    expect(s.io.stderr()).toMatch(/golden\.json[^\n]*unchanged/);
+  }, 60_000);
+});
+
+describe("pr-review pool, the record check", () => {
+  it("exits 2 before any call when a record finding is not valid", async () => {
+    const s = setup({});
+    const path = editedRecord(s, (r) => {
+      delete r.stages.reviewers[0].findings[0].claim;
+    });
+    const code = await cli(s.client, "pool", s.caseDir, "--out", s.out, "--record", path);
+    expect(code).toBe(2);
+    expect(s.io.stderr()).toMatch(/not a valid finding/);
+    expect(s.client.calls).toHaveLength(0);
+    expect(codexCalls(s.codexDir)).toHaveLength(0);
+  }, 60_000);
+
+  it("exits 2 before any call for a record of another repo", async () => {
+    const s = setup({});
+    const path = editedRecord(s, (r) => {
+      r.identity.repo = "example/other";
+    });
+    const code = await cli(s.client, "pool", s.caseDir, "--out", s.out, "--record", path);
+    expect(code).toBe(2);
+    expect(s.io.stderr()).toMatch(/example\/other/);
+    expect(s.client.calls).toHaveLength(0);
+    expect(codexCalls(s.codexDir)).toHaveLength(0);
+  }, 60_000);
+
+  it("takes the repo of a record from its GitHub slug when identity.repo is a path", async () => {
+    const s = setup({});
+    const path = editedRecord(s, (r) => {
+      r.identity.repo = "/home/runner/work/fixture/fixture";
+      r.identity.github = { slug: "Example/Fixture" };
+    });
+    const code = await cli(
+      s.client,
+      "pool",
+      s.caseDir,
+      "--out",
+      s.out,
+      "--reviews",
+      "1",
+      "--record",
+      path,
+    );
+    expect(code).toBe(0);
+  }, 60_000);
+
+  it("exits 2 for a record when the origin of the case is not a pull request URL", async () => {
+    const s = setup({});
+    editMeta(s, (m) => {
+      m.origin = "";
+    });
+    const code = await cli(s.client, "pool", s.caseDir, "--out", s.out, "--record", RECORD_FIXTURE);
+    expect(code).toBe(2);
+    expect(s.io.stderr()).toMatch(/origin/);
+    expect(s.client.calls).toHaveLength(0);
+  }, 60_000);
+});
+
+describe("pr-review pool, the join of the kept items", () => {
+  it("keeps adjudications.json when the second grouping fails", async () => {
+    const s = setup({
+      claudeReviews: [[item("MARK-O1", 3, 5), item("MARK-O2", 4, 6)]],
+      gptReviews: [[]],
+      groupers: [byTag, failGrouping, failGrouping],
+      claude: {
+        "MARK-O1": { score: 80, start_line: 3, end_line: 5 },
+        "MARK-O2": { score: 90, start_line: 4, end_line: 6 },
+      },
+      gpt: {
+        "MARK-O1": { score: 80, start_line: 3, end_line: 5 },
+        "MARK-O2": { score: 85, start_line: 4, end_line: 6 },
+      },
+    });
+    writeFileSync(join(s.caseDir, "golden.json"), GOLDEN_BEFORE);
+    const code = await cli(
+      s.client,
+      "pool",
+      s.caseDir,
+      "--out",
+      s.out,
+      "--reviews",
+      "1",
+      "--write-golden",
+    );
+    expect(code).toBe(1);
+    expect(s.io.stderr()).toMatch(/group/i);
+    const adj = readJson<{ items: Adjudication[] }>(join(s.out, CASE, "adjudications.json"));
+    expect(adj.items.map((a) => a.kept)).toEqual([true, true]);
+    expect(readFileSync(join(s.caseDir, "golden.json"), "utf8")).toBe(GOLDEN_BEFORE);
+  }, 60_000);
+
+  it("groups the overlapping kept items of each component apart, and never across components", async () => {
+    // Two pairs in two files. The pairs do not overlap each other.
+    const inFormat = (marker: string, start: number, end: number) =>
+      item(marker, start, end, { file: "src/format.ts" });
+    const seen: string[][] = [];
+    const spy: Plan["groupers"] = [
+      byTag,
+      (items) => {
+        seen.push(items.map((i) => i.claim.slice(0, 7)).sort());
+        return allInOne(items);
+      },
+      (items) => {
+        seen.push(items.map((i) => i.claim.slice(0, 7)).sort());
+        return allInOne(items);
+      },
+    ];
+    const both = (start: number, end: number) => ({ score: 80, start_line: start, end_line: end });
+    const verdicts = {
+      "MARK-A1": both(3, 5),
+      "MARK-A2": both(4, 6),
+      "MARK-B1": both(2, 3),
+      "MARK-B2": both(3, 4),
+    };
+    const s = setup({
+      claudeReviews: [
+        [
+          item("MARK-A1", 3, 5),
+          item("MARK-A2", 4, 6),
+          inFormat("MARK-B1", 2, 3),
+          inFormat("MARK-B2", 3, 4),
+        ],
+      ],
+      gptReviews: [[]],
+      groupers: spy,
+      claude: verdicts,
+      gpt: verdicts,
+    });
+    const code = await cli(
+      s.client,
+      "pool",
+      s.caseDir,
+      "--out",
+      s.out,
+      "--reviews",
+      "1",
+      "--write-golden",
+    );
+    expect(code).toBe(0);
+    expect(seen.sort()).toEqual([
+      ["MARK-A1", "MARK-A2"],
+      ["MARK-B1", "MARK-B2"],
+    ]);
+    const golden = readJson<{ findings: { file: string }[] }>(join(s.caseDir, "golden.json"));
+    expect(golden.findings.map((f) => f.file).sort()).toEqual(["src/format.ts", "src/stats.ts"]);
+    expect(s.client.calls.filter((c) => c.role === "pool-grouper")).toHaveLength(3);
+  }, 60_000);
+});
+
+describe("pr-review pool, the size of a codex prompt", () => {
+  const LIMIT = 120_000;
+  const euro = (n: number) => "€".repeat(n);
+
+  it("holds a review prompt under the limit in bytes for a multi-byte diff, title and body", async () => {
+    const s = setup({ claudeReviews: [[]], gptReviews: [[]] });
+    // 60000 characters of 3 bytes each are under 65536 characters, and over 131072 bytes.
+    writeFileSync(
+      join(s.caseDir, "diff.patch"),
+      `${readFileSync(join(s.caseDir, "diff.patch"), "utf8")}\n+${euro(60_000)}\n`,
+    );
+    editMeta(s, (m) => {
+      m.title = euro(30_000);
+      m.body = euro(60_000);
+    });
+    const code = await cli(s.client, "pool", s.caseDir, "--out", s.out, "--reviews", "1");
+    expect(code).toBe(0);
+    const prompts = codexCalls(s.codexDir).map((c) => c.argv.at(-1) ?? "");
+    expect(prompts).toHaveLength(1);
+    expect(Buffer.byteLength(prompts[0] ?? "")).toBeLessThan(LIMIT);
+    const cut = String(loadPrompt("pool-review.md").frontmatter.cut_text).split("{{limit}}")[0];
+    expect(prompts[0]).toContain(cut);
+  }, 60_000);
+
+  it("holds an adjudication prompt under the limit in bytes for a multi-byte finding", async () => {
+    const s = setup({
+      claudeReviews: [[item("MARK-K1", 11, 11, { claim: `MARK-K1 ${euro(60_000)}`, evidence: euro(60_000) })]],
+      gptReviews: [[]],
+      claude: { "MARK-K1": KEPT },
+    });
+    writeFileSync(
+      join(s.caseDir, "diff.patch"),
+      `${readFileSync(join(s.caseDir, "diff.patch"), "utf8")}\n+${euro(60_000)}\n`,
+    );
+    const code = await cli(s.client, "pool", s.caseDir, "--out", s.out, "--reviews", "1");
+    expect(code).toBe(0);
+    const prompts = codexCalls(s.codexDir)
+      .filter((c) => c.kind === "adjudicate")
+      .map((c) => c.argv.at(-1) ?? "");
+    expect(prompts).toHaveLength(1);
+    expect(Buffer.byteLength(prompts[0] ?? "")).toBeLessThan(LIMIT);
+  }, 60_000);
 });
