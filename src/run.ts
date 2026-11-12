@@ -213,8 +213,9 @@ function givenDescription(given: { title: string; body: string }): Sanitized {
   };
 }
 
-// Give the run role of a query. The judge is a role of the eval, so a
-// judge query in a run is a bug.
+// Give the run role of a query. The judge, the pool reviewer, the pool
+// grouper and the adjudicator are roles of the eval, so such a query in a
+// run is a bug.
 function runRole(role: QueryRole): Role {
   if (isEvalRole(role)) throw new Error("A run makes no eval query.");
   return role;

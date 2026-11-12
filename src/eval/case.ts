@@ -1,5 +1,6 @@
 // Load and validate the cases of an eval. A case is one directory with
-// case.json, repo.bundle, diff.patch and golden.json.
+// case.json, repo.bundle, diff.patch and golden.json. The pool loader needs
+// no golden.json, because the pool writes it.
 import { access, readdir, readFile, realpath } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { z } from "zod";
