@@ -9,6 +9,12 @@ import { AdjudicationOutputSchema, type AdjudicationOutput, type PoolFinding } f
 /** The lowest score of each family that keeps a finding. */
 export const KEEP_SCORE = 75;
 
+/**
+ * A score below this value means that the claim is false at the head, or
+ * that it rests on lines the PR does not change or expose.
+ */
+export const DISMISS_BELOW = 50;
+
 /** The result of one family: its answer, or the error of a failed call. */
 export type FamilyResult = AdjudicationOutput | { failed: string };
 

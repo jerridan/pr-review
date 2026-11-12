@@ -20,6 +20,8 @@ export type PoolRecord = {
   /** The file name of the record, for the source label. */
   name: string;
   pr: number | null;
+  /** The identity.head of the record, or null. */
+  head: string | null;
   /** The owner/repo of the record: its slug, else its identity.repo when that has this form. */
   repo: string | null;
   value: unknown;
@@ -33,6 +35,7 @@ export type ReviewerFinding = { reviewer: string; finding: PoolFinding };
 const RecordHeadSchema = z.object({
   identity: z.object({
     pr: z.int().nullable().optional(),
+    head: z.string().optional(),
     repo: z.string().optional(),
     github: z.object({ slug: z.string() }).nullable().optional(),
   }),
@@ -80,6 +83,7 @@ export async function readRecord(path: string): Promise<PoolRecord> {
     path,
     name: basename(path),
     pr: head.data.identity.pr ?? null,
+    head: head.data.identity.head ?? null,
     repo: slug !== null && OWNER_REPO.test(slug) ? slug : null,
     value,
   };
@@ -108,6 +112,51 @@ export function reviewerFindings(record: PoolRecord): ReviewerFinding[] {
       finding: inputFinding(f, `stages.reviewers.${i}.findings.${j} of ${record.path}`),
     })),
   );
+}
+
+/** The labels with which the verifier dismisses a finding. */
+export const DISMISS_LABELS = ["dont_post", "not_real"] as const;
+export type DismissLabel = (typeof DISMISS_LABELS)[number];
+
+/** A finding that the verifier dismissed, with its label. */
+export type DismissedFinding = { finding: PoolFinding; label: DismissLabel };
+
+const VerificationsSchema = z.object({
+  stages: z.object({
+    verifications: z
+      .array(
+        z.object({
+          finding: z.unknown(),
+          passed: z.boolean(),
+          final: z.object({ severity: z.string() }).nullable().optional(),
+        }),
+      )
+      .optional(),
+  }),
+});
+
+/**
+ * Every finding in stages.verifications of a record with passed false and a
+ * final severity of dont_post or not_real. A record with no verifications
+ * gives none.
+ */
+export function dismissedFindings(record: PoolRecord): DismissedFinding[] {
+  const parsed = VerificationsSchema.safeParse(record.value);
+  if (!parsed.success) {
+    throw new PoolInputError(
+      `the record ${record.path} has no valid verifications: ${describeIssues(parsed.error)}`,
+    );
+  }
+  return (parsed.data.stages.verifications ?? []).flatMap((v, i) => {
+    const label = DISMISS_LABELS.find((l) => l === v.final?.severity);
+    if (v.passed || label === undefined) return [];
+    return [
+      {
+        finding: inputFinding(v.finding, `stages.verifications.${i}.finding of ${record.path}`),
+        label,
+      },
+    ];
+  });
 }
 
 /** The lists of a record that hold fingerprinted findings. */
