@@ -63,9 +63,14 @@ async function git(repo: string, args: string[]): Promise<string> {
 type Result = { code: number; stdout: string; stderr: string };
 
 /** Run a script in "cwd" and give its exit code and output. */
-async function runScript(script: string, args: string[], cwd: string): Promise<Result> {
+async function runScript(
+  script: string,
+  args: string[],
+  cwd: string,
+  env: NodeJS.ProcessEnv = ENV,
+): Promise<Result> {
   try {
-    const { stdout, stderr } = await run("bash", [script, ...args], { cwd, env: ENV });
+    const { stdout, stderr } = await run("bash", [script, ...args], { cwd, env });
     return { code: 0, stdout, stderr };
   } catch (err) {
     const e = err as { code?: number; stdout?: string; stderr?: string };
@@ -232,7 +237,7 @@ describe("scripts/make-case.sh (R2.10)", () => {
   }, 30_000);
 });
 
-describe("inject-case.sh", () => {
+describe("scripts/inject-case.sh", () => {
   const PATCH = [
     "diff --git a/a.txt b/a.txt",
     "--- a/a.txt",
@@ -364,18 +369,128 @@ describe("inject-case.sh", () => {
     expect(readdirSync(join(out, "inj"))).toEqual(["golden.json"]);
   }, 30_000);
 
-  it("exits non-zero when the message file is missing or the arguments are short", async () => {
+  it("exits non-zero and writes no directory when the message file is missing", async () => {
     const h = await makeHost();
     const out = newDir("inject-out");
-    const missing = await runScript(
+    const result = await runScript(
       INJECT_CASE,
       [h.repo, h.base, h.head, h.patch, join(out, "none.txt"), "inj"],
       out,
     );
-    expect(missing.code).not.toBe(0);
+    expect(result.code).not.toBe(0);
     expect(existsSync(join(out, "inj"))).toBe(false);
-    const short = await runScript(INJECT_CASE, [h.repo, h.base, h.head], out);
-    expect(short.code).not.toBe(0);
+  }, 30_000);
+
+  it("exits non-zero when the arguments are short", async () => {
+    const h = await makeHost();
+    const out = newDir("inject-out");
+    const result = await runScript(INJECT_CASE, [h.repo, h.base, h.head], out);
+    expect(result.code).not.toBe(0);
+  }, 30_000);
+
+  it("exits 2 and writes nothing when the name holds a slash", async () => {
+    const h = await makeHost();
+    const out = newDir("inject-out");
+    const result = await inject(h, out, "a/b");
+    expect(result.code).toBe(2);
+    expect(readdirSync(out)).toEqual([]);
+  }, 30_000);
+
+  it("exits non-zero and writes no directory when head is not a commit", async () => {
+    const h = await makeHost();
+    const out = newDir("inject-out");
+    const result = await inject({ ...h, head: "no-such-commit" }, out);
+    expect(result.code).not.toBe(0);
+    expect(readdirSync(out)).toEqual([]);
+  }, 30_000);
+
+  it("copies the author, the committer and the dates of head to the case head", async () => {
+    const h = await makeHost();
+    writeFileSync(join(h.repo, "d.txt"), "tail\n");
+    await git(h.repo, ["add", "-A"]);
+    await run(
+      "git",
+      ["-C", h.repo, "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "Head three"],
+      {
+        env: {
+          ...ENV,
+          GIT_AUTHOR_NAME: "Ann Author",
+          GIT_AUTHOR_EMAIL: "ann@example.invalid",
+          GIT_AUTHOR_DATE: "2023-03-04T05:06:07+02:00",
+          GIT_COMMITTER_NAME: "Cy Committer",
+          GIT_COMMITTER_EMAIL: "cy@example.invalid",
+          GIT_COMMITTER_DATE: "2023-03-05T06:07:08-05:00",
+        },
+      },
+    );
+    const head = await git(h.repo, ["rev-parse", "HEAD"]);
+    const out = newDir("inject-out");
+    const result = await inject({ ...h, head }, out);
+    expect(result.code, result.stderr).toBe(0);
+    const meta = JSON.parse(readFileSync(join(out, "inj", "case.json"), "utf8")) as {
+      head: string;
+    };
+    const clone = join(out, "clone");
+    await run("git", ["clone", "--quiet", join(out, "inj", "repo.bundle"), clone], { env: ENV });
+    const format = "%an|%ae|%aI|%cn|%ce|%cI";
+    expect(await git(clone, ["log", "-1", `--format=${format}`, meta.head])).toBe(
+      await git(h.repo, ["log", "-1", `--format=${format}`, head]),
+    );
+  }, 30_000);
+
+  it("exits non-zero and writes no directory when the second line of the message is not empty", async () => {
+    const h = await makeHost();
+    writeFileSync(h.message, "Host title\nHost body.\n");
+    const out = newDir("inject-out");
+    const result = await inject(h, out);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain("second line");
+    expect(readdirSync(out)).toEqual([]);
+  }, 30_000);
+
+  it("keeps trailing whitespace of the patch when apply.whitespace is error", async () => {
+    const h = await makeHost();
+    writeFileSync(h.patch, PATCH.replace("+BETA", "+BETA  "));
+    const out = newDir("inject-out");
+    const result = await runScript(
+      INJECT_CASE,
+      [h.repo, h.base, h.head, h.patch, h.message, "inj"],
+      out,
+      {
+        ...ENV,
+        GIT_CONFIG_COUNT: "1",
+        GIT_CONFIG_KEY_0: "apply.whitespace",
+        GIT_CONFIG_VALUE_0: "error",
+      },
+    );
+    expect(result.code, result.stderr).toBe(0);
+    const meta = JSON.parse(readFileSync(join(out, "inj", "case.json"), "utf8")) as {
+      head: string;
+    };
+    const clone = join(out, "clone");
+    await run("git", ["clone", "--quiet", join(out, "inj", "repo.bundle"), clone], { env: ENV });
+    expect(await git(clone, ["show", `${meta.head}:a.txt`])).toBe("alpha\nBETA  \ngamma");
+  }, 30_000);
+
+  it("makes a case with a shallow file from a shallow host repo", async () => {
+    const h = await makeHost();
+    const shallow = join(newDir("inject-shallow"), "repo");
+    await run("git", ["clone", "--quiet", "--depth", "2", `file://${h.repo}`, shallow], {
+      env: ENV,
+    });
+    const base = await git(shallow, ["rev-parse", "HEAD~1"]);
+    const out = newDir("inject-out");
+    const result = await inject({ ...h, repo: shallow, base }, out);
+    expect(result.code, result.stderr).toBe(0);
+    expect(readFileSync(join(out, "inj", "shallow"), "utf8").trim()).toBe(base);
+    const meta = JSON.parse(readFileSync(join(out, "inj", "case.json"), "utf8")) as {
+      head: string;
+    };
+    const clone = join(out, "clone");
+    await run("git", ["init", "--quiet", clone], { env: ENV });
+    writeFileSync(join(clone, ".git", "shallow"), `${base}\n`);
+    await git(clone, ["fetch", "--quiet", join(out, "inj", "repo.bundle"), meta.head]);
+    expect(await git(clone, ["rev-parse", "FETCH_HEAD^"])).toBe(base);
   }, 30_000);
 });
 
