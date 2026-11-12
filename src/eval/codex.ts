@@ -114,7 +114,8 @@ export async function runCodex<T>(
       return fail(`the out file is not JSON: ${messageOf(err)}`);
     }
     const parsed = schema.safeParse(value);
-    if (!parsed.success) return fail(`the out file fails the ${what} schema: ${parsed.error.message}`);
+    if (!parsed.success)
+      return fail(`the out file fails the ${what} schema: ${parsed.error.message}`);
     return { ok: true, output: parsed.data, stderr };
   } catch (err) {
     return fail(messageOf(err));
