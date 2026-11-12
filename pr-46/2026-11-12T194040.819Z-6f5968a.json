@@ -1,0 +1,1767 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 46,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Resume a stopped eval run, and plan one D4b baseline",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/46"
+    },
+    "run_kind": "later",
+    "prior": {
+      "head": "bbc5dd44b242be9c085fc995638a6a1fabfc48c8",
+      "source": "record",
+      "record": "/home/runner/work/_temp/pr-review-records/pr-46/2026-11-12T191744.507Z-bbc5dd4.json",
+      "open": [
+        "2429ebfb9af7125e",
+        "33c458ea37a40e2f",
+        "73b0384fe0484d96",
+        "9ece76b799f1675e"
+      ],
+      "dismissed": [],
+      "fetch_failed": false
+    },
+    "base": "2cc9f6343b9460d268003b49dd8e438f1bdfbe40",
+    "head": "6f5968ab5827affbe19c9c7215c995b9d5792879",
+    "started_at": "2026-11-12T19:40:40.819Z",
+    "tool_version": "0.7.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Resume a stopped eval run, and plan one D4b baseline\n\nMake the eval resumable, and plan one D4b baseline at the end.\n\nA baseline at two repeats does not fit in one five-hour plan window, the eval and the CI reviewer use the same plan login, and a stopped eval run lost every result. This PR fixes the last point and changes the D4b plan.\n\n## What changes\n\n- Each finished repeat writes `<out>/<case>/<repeat>/result.json`: the `RepeatMetrics`, the case name and head, the repeat number, the tool version and the options that change a result (tier, judge model, extras, raw judge). A temp file and a rename write it, so a kill leaves no half file.\n- `pr-review eval --resume` reads those files before the first model call. A repeat with a good result is reused: no clone and no model call. A failed, missing or malformed result, one for another case head, or one scored against another `golden.json` (a fingerprint in the file) runs again, and `--resume` clears its old output first. A result that would be reused but has another tool version or other options stops the command with exit 2, so one report never mixes two configurations. A run without `--resume` keeps the old records. Reused results go through the report, the gate and `--write-baseline` like fresh ones. Stderr says how many repeats were reused.\n- README: a \"Resume a run\" section and the `--resume` flag.\n- TICKETS.md, D4b: no revision moves the pin or writes a baseline. One final baseline PR moves the pin one time and writes the baseline at two repeats, with `--resume`.\n- Version 0.8.0 for the new flag (after 0.7.0 of PR #45).\n\n## Verification\n\n- New tests in `test/eval-cli.test.ts`: a run that fails on the third case, then `--resume` on the same `--out`, makes model calls only for that case, and the aggregate equals that of one uninterrupted run; a reused repeat makes no call; a failed result runs again; another tool version gives exit 2; without `--resume` every repeat runs.\n- `npm test` (1382 tests, on main after PR #45), `npm run lint`, `npm run typecheck`, `npm run build` and `scripts/check-version-bump.sh` pass.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZeygoPpDMXvhR2hBF1\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": ".claude-plugin/marketplace.json",
+        "hunks": 1
+      },
+      {
+        "path": ".claude-plugin/plugin.json",
+        "hunks": 1
+      },
+      {
+        "path": "README.md",
+        "hunks": 1
+      },
+      {
+        "path": "TICKETS.md",
+        "hunks": 1
+      },
+      {
+        "path": "package.json",
+        "hunks": 1
+      },
+      {
+        "path": "src/cli.ts",
+        "hunks": 3
+      },
+      {
+        "path": "src/eval/run.ts",
+        "hunks": 7
+      },
+      {
+        "path": "test/eval-cli.test.ts",
+        "hunks": 3
+      }
+    ],
+    "excluded_files": [
+      {
+        "path": "package-lock.json",
+        "reason": "generated"
+      }
+    ],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "Adds a new --resume feature to the eval CLI with new logic for result persistence, validation, reuse, deletion of old output, and exit-code behavior.",
+      "confidence": "high",
+      "categories": [
+        "bug",
+        "test",
+        "docs",
+        "other"
+      ],
+      "hotspots": [
+        "src/eval/run.ts: reusableResults (reuse/skip/throw conditions)",
+        "src/eval/run.ts: runEval loop (rm of repeat directory under --resume, writeResult placement, failed-write warning)",
+        "src/eval/run.ts: readResult / ResultFileSchema (zod validation, cast to ResultFile, loose metrics)",
+        "src/eval/run.ts: writeResult (temp file + rename) and goldenFingerprint",
+        "src/eval/run.ts: ResumeError handling returning EXIT_USAGE before model calls",
+        "test/eval-cli.test.ts: resume tests and result.json filtering"
+      ],
+      "file_notes": [
+        {
+          "file": "src/eval/run.ts",
+          "note": "New resume logic: result.json writing, validation, reuse map, directory cleanup, version/option mismatch exit 2."
+        },
+        {
+          "file": "src/cli.ts",
+          "note": "Adds --resume option and passes it to runEval."
+        },
+        {
+          "file": "test/eval-cli.test.ts",
+          "note": "New --resume test suite; existing helpers now ignore result.json."
+        },
+        {
+          "file": "README.md",
+          "note": "Documents --resume and the 'Resume a run' section; check it matches the code."
+        },
+        {
+          "file": "TICKETS.md",
+          "note": "Planning text change only."
+        },
+        {
+          "file": "package.json",
+          "note": "Version bump to 0.8.0. The tool version is stored in result files and compared on resume."
+        },
+        {
+          "file": ".claude-plugin/plugin.json",
+          "note": "Version bump."
+        },
+        {
+          "file": ".claude-plugin/marketplace.json",
+          "note": "Version bump."
+        }
+      ],
+      "summary": "Adds a `--resume` flag to `pr-review eval`. Each finished repeat now writes an atomic `result.json` with its metrics, the case head, a golden fingerprint, the tool version and the options. With `--resume`, a repeat is reused when its result matches. A repeat that failed, is invalid or is stale runs again, and its old output is cleared first. If a result would be reused but the tool version or options differ, the run exits 2. The change also adds tests, README docs, a TICKETS.md update and a version bump to 0.8.0."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: Adds a new --resume feature to the eval CLI with new logic for result persistence, validation, reuse, deletion of old output, and exit-code behavior.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/run.ts",
+            "start_line": 271,
+            "end_line": 271,
+            "category": "convention",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "readResult casts the zod output with `as unknown as ResultFile` and does not derive the type from the schema.",
+            "evidence": "return file as unknown as ResultFile;",
+            "suggested_fix": "Make the schema match ResultFile, for example with z.enum for tier, and use z.infer, or narrow the type without a double cast.",
+            "explanation": "The double cast skips the type check that the zod schema gives, so the schema and the hand-written ResultFile type can drift apart.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5141,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11410,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011515000000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 415,
+              "cacheReadInputTokens": 5136,
+              "cacheCreationInputTokens": 10915,
+              "webSearchRequests": 0,
+              "costUSD": 0.0966552,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 146,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0978067
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "TICKETS.md",
+            "start_line": 53,
+            "end_line": 53,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The description says the change updates TICKETS.md for D4b, but TICKETS.md is not in the changed files or the diff.",
+            "evidence": "No revision moves the pin or writes a baseline: the final baseline PR does both, one time, for all four.",
+            "suggested_fix": "Add the TICKETS.md edit to the change, or remove that point from the description.",
+            "explanation": "The described plan change to D4b is not part of this diff. The text may already be on the base, or the edit may be missing.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7160,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11420,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011525,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 6,
+              "outputTokens": 624,
+              "cacheReadInputTokens": 37732,
+              "cacheCreationInputTokens": 12045,
+              "webSearchRequests": 0,
+              "costUSD": 0.11641040000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 135,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.11756290000000001
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 8089,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11416,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011521000000000003,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 611,
+              "cacheReadInputTokens": 21647,
+              "cacheCreationInputTokens": 12155,
+              "webSearchRequests": 0,
+              "costUSD": 0.1138054,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 437,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.11495750000000002
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 8898,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11426,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011531000000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 6,
+              "outputTokens": 669,
+              "cacheReadInputTokens": 38541,
+              "cacheCreationInputTokens": 12721,
+              "webSearchRequests": 0,
+              "costUSD": 0.1228802,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 384,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.12403330000000001
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 3770,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11430,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011535,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 272,
+              "cacheReadInputTokens": 21027,
+              "cacheCreationInputTokens": 11797,
+              "webSearchRequests": 0,
+              "costUSD": 0.1040374,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 113,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1051909
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6117,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 21110,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0021215,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 359,
+              "cacheReadInputTokens": 31491,
+              "cacheCreationInputTokens": 21407,
+              "webSearchRequests": 0,
+              "costUSD": 0.18475020000000003,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 201,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.18687170000000003
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4973,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11422,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011527000000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 412,
+              "cacheReadInputTokens": 5330,
+              "cacheCreationInputTokens": 10927,
+              "webSearchRequests": 0,
+              "costUSD": 0.09673,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 66,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0978827
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4521,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11432,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011537000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 381,
+              "cacheReadInputTokens": 5330,
+              "cacheCreationInputTokens": 10937,
+              "webSearchRequests": 0,
+              "costUSD": 0.09619,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 72,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.09734369999999999
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "test/eval-cli.test.ts",
+            "start_line": 1635,
+            "end_line": 1645,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "The option-mismatch test covers only extras. No test covers a change of tier, judge model or raw judge, and the test does not check the stderr message.",
+            "evidence": "\"exits 2 when an option that changes the result differs\",",
+            "suggested_fix": "Parametrize the test over --raw-judge, --judge-model and --tier, and assert that stderr names the options.",
+            "explanation": "If sameOptions dropped the tier, judge_model or raw_judge comparison, results would be reused across configurations and no test would fail.",
+            "needs_context": false
+          },
+          {
+            "file": "src/eval/run.ts",
+            "start_line": 307,
+            "end_line": 307,
+            "category": "test",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "No test covers the case-name mismatch branch of the reuse check.",
+            "evidence": "if (found.case !== c.name || found.head !== c.head || found.golden !== golden) continue;",
+            "suggested_fix": "Add a tamper test that sets r.case to another name and expects a rerun.",
+            "explanation": "The tests cover head and golden mismatches. The case-name mismatch can be removed and no test fails.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 8631,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11432,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011532,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 866,
+              "cacheReadInputTokens": 23147,
+              "cacheCreationInputTokens": 11502,
+              "webSearchRequests": 0,
+              "costUSD": 0.1139814,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 215,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.11513459999999999
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "src/eval/run.ts",
+          "start_line": 271,
+          "end_line": 271,
+          "category": "convention",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "readResult casts the zod output with `as unknown as ResultFile` and does not derive the type from the schema.",
+          "evidence": "return file as unknown as ResultFile;",
+          "suggested_fix": "Make the schema match ResultFile, for example with z.enum for tier, and use z.infer, or narrow the type without a double cast.",
+          "explanation": "The double cast skips the type check that the zod schema gives, so the schema and the hand-written ResultFile type can drift apart.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "return file as unknown as ResultFile;",
+            "tier: z.string(),"
+          ],
+          "rationale": "The double cast is in the code, and the schema's `tier: z.string()` and `.loose()` metrics do differ from the hand-written `ResultFile` type, so the two can drift. No behavior is wrong: a bad tier fails the later options check, and the cast is the only one in `src`.",
+          "score": 85,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "return file as unknown as ResultFile;",
+            "tier: z.string(),",
+            "metrics: MetricsShape.loose(),",
+            "// The fields of the metrics that buildReport and renderTable read."
+          ],
+          "rationale": "The new readResult does return the parsed data through `as unknown as ResultFile`, so the compiler never checks the schema (`tier: z.string()`, a partial loose metrics shape) against the hand-written type. The partial metrics check is on purpose and nothing breaks on a normal path, so this is only a type-safety and drift risk.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "return file as unknown as ResultFile;",
+            "tier: z.string(),",
+            "metrics: MetricsShape.loose(),",
+            "// The fields of the metrics that buildReport and renderTable read."
+          ],
+          "rationale": "The new readResult does return the parsed data through `as unknown as ResultFile`, so the compiler never checks the schema (`tier: z.string()`, a partial loose metrics shape) against the hand-written type. The partial metrics check is on purpose and nothing breaks on a normal path, so this is only a type-safety and drift risk.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "TICKETS.md",
+          "start_line": 53,
+          "end_line": 53,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The description says the change updates TICKETS.md for D4b, but TICKETS.md is not in the changed files or the diff.",
+          "evidence": "No revision moves the pin or writes a baseline: the final baseline PR does both, one time, for all four.",
+          "suggested_fix": "Add the TICKETS.md edit to the change, or remove that point from the description.",
+          "explanation": "The described plan change to D4b is not part of this diff. The text may already be on the base, or the edit may be missing.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "No revision moves the pin or writes a baseline: the final baseline PR does both, one time, for all four."
+          ],
+          "rationale": "The head TICKETS.md has the new D4b text, which the base lacked. Base blame shows \\\"Each revision moves the pin, writes a baseline at two repeats...\\\", so the PR did edit TICKETS.md. The empty diff block is a tooling gap, not a missing edit.",
+          "score": 4,
+          "severity": "not_real"
+        },
+        "escalated": {
+          "in_scope": false,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "Proposed split (a recommendation; the agent that runs D4b can choose a different one): four revisions. Each revision can be one PR in this repo and one PR in the cases repo. No revision moves the pin or writes a baseline: the final baseline PR does both, one time, for all four. A baseline costs about $6 per case per repeat.",
+            "A revision adds its cases to the cases repo and does not move the pin or write a baseline. After the last revision, one final baseline PR moves the pin in `eval/cases.json` one time, writes the baseline with `--write-baseline` at two repeats and re-derives the margins by the rule in the README.",
+            "The final baseline run uses `--resume`, so a run that stops continues from the complete cases."
+          ],
+          "rationale": "At the merge base, blame shows lines 48 and 53 said \"Each revision moves the pin ... writes a baseline at two repeats\". In the head file those lines now say no revision moves the pin and one final baseline PR runs with `--resume`. So the change does edit TICKETS.md as the description says, and the empty diff block is a tooling artifact, not a missing edit.",
+          "score": 8,
+          "severity": "not_real"
+        },
+        "final": {
+          "in_scope": false,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "Proposed split (a recommendation; the agent that runs D4b can choose a different one): four revisions. Each revision can be one PR in this repo and one PR in the cases repo. No revision moves the pin or writes a baseline: the final baseline PR does both, one time, for all four. A baseline costs about $6 per case per repeat.",
+            "A revision adds its cases to the cases repo and does not move the pin or write a baseline. After the last revision, one final baseline PR moves the pin in `eval/cases.json` one time, writes the baseline with `--write-baseline` at two repeats and re-derives the margins by the rule in the README.",
+            "The final baseline run uses `--resume`, so a run that stops continues from the complete cases."
+          ],
+          "rationale": "At the merge base, blame shows lines 48 and 53 said \"Each revision moves the pin ... writes a baseline at two repeats\". In the head file those lines now say no revision moves the pin and one final baseline PR runs with `--resume`. So the change does edit TICKETS.md as the description says, and the empty diff block is a tooling artifact, not a missing edit.",
+          "score": 8,
+          "severity": "not_real"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "test/eval-cli.test.ts",
+          "start_line": 1635,
+          "end_line": 1645,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "The option-mismatch test covers only extras. No test covers a change of tier, judge model or raw judge, and the test does not check the stderr message.",
+          "evidence": "\"exits 2 when an option that changes the result differs\",",
+          "suggested_fix": "Parametrize the test over --raw-judge, --judge-model and --tier, and assert that stderr names the options.",
+          "explanation": "If sameOptions dropped the tier, judge_model or raw_judge comparison, results would be reused across configurations and no test would fail.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const second = await evalInto(out, fake, cases, \"--resume\", \"--no-extras\");",
+            "a.tier === b.tier &&\n  a.judge_model === b.judge_model &&\n  a.extras === b.extras &&\n  a.raw_judge === b.raw_judge;"
+          ],
+          "rationale": "sameOptions compares four fields, but the only option-mismatch test changes extras, and it does not check stderr. Dropping the tier, judge_model or raw_judge comparison would pass every test. The gap is real but affects only test coverage.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const second = await evalInto(out, fake, cases, \"--resume\", \"--no-extras\");",
+            "a.tier === b.tier &&\n  a.judge_model === b.judge_model &&\n  a.extras === b.extras &&\n  a.raw_judge === b.raw_judge;"
+          ],
+          "rationale": "sameOptions compares four fields, but the only option-mismatch test changes extras, and it does not check stderr. Dropping the tier, judge_model or raw_judge comparison would pass every test. The gap is real but affects only test coverage.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "src/eval/run.ts",
+          "start_line": 307,
+          "end_line": 307,
+          "category": "test",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "No test covers the case-name mismatch branch of the reuse check.",
+          "evidence": "if (found.case !== c.name || found.head !== c.head || found.golden !== golden) continue;",
+          "suggested_fix": "Add a tamper test that sets r.case to another name and expects a rerun.",
+          "explanation": "The tests cover head and golden mismatches. The case-name mismatch can be removed and no test fails.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (found.case !== c.name || found.head !== c.head || found.golden !== golden) continue;"
+          ],
+          "rationale": "The tests tamper with head and golden only, and nothing sets `r.case`, so the case-name condition is untested. The result path already encodes the case name, so the check is defensive and a gap in it is low-risk.",
+          "score": 80,
+          "severity": "dont_post"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (found.case !== c.name || found.head !== c.head || found.golden !== golden) continue;",
+            "tamper(out, (r) => (r.head = \"0\".repeat(40))),",
+            "\"runs a repeat again when golden.json changed after the result\","
+          ],
+          "rationale": "The resume tests tamper with head, golden, repeat, metrics and tool_version, but none changes `case`, and no test anywhere sets `r.case`. So nothing tests the case-name check, and removing it would not fail a test. The result path already comes from the case name, so a mismatch only happens in rare cases, such as a copied directory. A missing test for this is minor.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (found.case !== c.name || found.head !== c.head || found.golden !== golden) continue;",
+            "tamper(out, (r) => (r.head = \"0\".repeat(40))),",
+            "\"runs a repeat again when golden.json changed after the result\","
+          ],
+          "rationale": "The resume tests tamper with head, golden, repeat, metrics and tool_version, but none changes `case`, and no test anywhere sets `r.case`. So nothing tests the case-name check, and removing it would not fail a test. The result path already comes from the case name, so a mismatch only happens in rare cases, such as a copied directory. A missing test for this is minor.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "passed": true
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5880928852,
+      "review_url": "https://github.com/jerridan/pr-review/pull/46#pullrequestreview-5880928852",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 131442992991
+      },
+      "cleanup_comment_id": null,
+      "resolved": [
+        {
+          "thread_id": "PRRT_kwDOVHw73s62yeox",
+          "fingerprint": "2429ebfb9af7125e"
+        },
+        {
+          "thread_id": "PRRT_kwDOVHw73s62yeo6",
+          "fingerprint": "73b0384fe0484d96"
+        },
+        {
+          "thread_id": "PRRT_kwDOVHw73s62yepE",
+          "fingerprint": "9ece76b799f1675e"
+        }
+      ],
+      "errors": []
+    },
+    "below_floor": [
+      {
+        "file": "test/eval-cli.test.ts",
+        "start_line": 1635,
+        "end_line": 1645,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "The option-mismatch test covers only extras. No test covers a change of tier, judge model or raw judge, and the test does not check the stderr message.",
+        "evidence": "\"exits 2 when an option that changes the result differs\",",
+        "suggested_fix": "Parametrize the test over --raw-judge, --judge-model and --tier, and assert that stderr names the options.",
+        "explanation": "If sameOptions dropped the tier, judge_model or raw_judge comparison, results would be reused across configurations and no test would fail.",
+        "needs_context": false,
+        "fingerprint": "aee4d97ee91ed330",
+        "severity": "suggestion",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const second = await evalInto(out, fake, cases, \"--resume\", \"--no-extras\");",
+            "a.tier === b.tier &&\n  a.judge_model === b.judge_model &&\n  a.extras === b.extras &&\n  a.raw_judge === b.raw_judge;"
+          ],
+          "rationale": "sameOptions compares four fields, but the only option-mismatch test changes extras, and it does not check stderr. Dropping the tier, judge_model or raw_judge comparison would pass every test. The gap is real but affects only test coverage.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "span_text": "\"exits 2 when an option that changes the result differs\", async () => { const cases = twoCases(); const out = newDir(\"out\"); await evalInto(out, evalFake(), cases); const fake = evalFake(); const second = await evalInto(out, fake, cases, \"--resume\", \"--no-extras\"); expect(second.code).toBe(2); expect(fake.calls).toHaveLength(0); }, RUN_TIMEOUT,"
+      },
+      {
+        "file": "src/eval/run.ts",
+        "start_line": 271,
+        "end_line": 271,
+        "category": "convention",
+        "severity_estimate": "nit",
+        "confidence": "low",
+        "claim": "readResult casts the zod output with `as unknown as ResultFile` and does not derive the type from the schema.",
+        "evidence": "return file as unknown as ResultFile;",
+        "suggested_fix": "Make the schema match ResultFile, for example with z.enum for tier, and use z.infer, or narrow the type without a double cast.",
+        "explanation": "The double cast skips the type check that the zod schema gives, so the schema and the hand-written ResultFile type can drift apart.",
+        "needs_context": true,
+        "fingerprint": "cd0fd013517ba081",
+        "severity": "nit",
+        "score": 92,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "return file as unknown as ResultFile;",
+            "tier: z.string(),",
+            "metrics: MetricsShape.loose(),",
+            "// The fields of the metrics that buildReport and renderTable read."
+          ],
+          "rationale": "The new readResult does return the parsed data through `as unknown as ResultFile`, so the compiler never checks the schema (`tier: z.string()`, a partial loose metrics shape) against the hand-written type. The partial metrics check is on purpose and nothing breaks on a normal path, so this is only a type-safety and drift risk.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "span_text": "async function readResult(path: string, repeat: number): Promise<ResultFile | null> {"
+      },
+      {
+        "file": "src/eval/run.ts",
+        "start_line": 307,
+        "end_line": 307,
+        "category": "test",
+        "severity_estimate": "nit",
+        "confidence": "low",
+        "claim": "No test covers the case-name mismatch branch of the reuse check.",
+        "evidence": "if (found.case !== c.name || found.head !== c.head || found.golden !== golden) continue;",
+        "suggested_fix": "Add a tamper test that sets r.case to another name and expects a rerun.",
+        "explanation": "The tests cover head and golden mismatches. The case-name mismatch can be removed and no test fails.",
+        "needs_context": false,
+        "fingerprint": "e2d7c7033ff34ae8",
+        "severity": "nit",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (found.case !== c.name || found.head !== c.head || found.golden !== golden) continue;",
+            "tamper(out, (r) => (r.head = \"0\".repeat(40))),",
+            "\"runs a repeat again when golden.json changed after the result\","
+          ],
+          "rationale": "The resume tests tamper with head, golden, repeat, metrics and tool_version, but none changes `case`, and no test anywhere sets `r.case`. So nothing tests the case-name check, and removing it would not fail a test. The result path already comes from the case name, so a mismatch only happens in rare cases, such as a copied directory. A missing test for this is minor.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "span_text": "if (found.case !== c.name || found.head !== c.head || found.golden !== golden) continue;"
+      }
+    ],
+    "not_reposted": [],
+    "carried": [
+      {
+        "file": "src/eval/run.ts",
+        "start_line": 483,
+        "end_line": 484,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "No test checks that a rerun repeat's old output is cleared, so the repeat dir ends up with exactly one record.",
+        "evidence": "await rm(join(out, c.name, String(repeat)), { recursive: true, force: true });",
+        "suggested_fix": "In the resume test, assert that recordsUnder(join(out,'c-planted','1')) has length 1 after the resume.",
+        "explanation": "If the rm breaks, the repeat dir would hold the old failed record next to the new one, and no test would fail.",
+        "needs_context": false,
+        "fingerprint": "33c458ea37a40e2f",
+        "severity": "nit",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "await rm(join(out, c.name, String(repeat)), { recursive: true, force: true });",
+            "// The old output of this repeat stays out of the way of the new record.",
+            "expect(triageCalls(fake)).toBe(1);",
+            "expect(second.report?.aggregate).toEqual(whole.report?.aggregate);"
+          ],
+          "rationale": "The new --resume tests check call counts, the aggregate and stderr, but none of them looks at the files in the rerun repeat's directory. If the new rm of the old output stopped working, no test would fail. This is a real coverage gap in code that this PR adds. The fix is a one-line assertion, so it is a minor point.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "span_text": "if (opts.resume) await rm(join(out, c.name, String(repeat)), { recursive: true, force: true });"
+      }
+    ]
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6932,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 13572,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0013692000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 926,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 13085,
+            "webSearchRequests": 0,
+            "costUSD": 0.0617302,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0630994
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "model": "claude-opus-5-5",
+        "duration_ms": 3770,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11430,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011535,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 272,
+            "cacheReadInputTokens": 21027,
+            "cacheCreationInputTokens": 11797,
+            "webSearchRequests": 0,
+            "costUSD": 0.1040374,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 113,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1051909
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5141,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11410,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011515000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 415,
+            "cacheReadInputTokens": 5136,
+            "cacheCreationInputTokens": 10915,
+            "webSearchRequests": 0,
+            "costUSD": 0.0966552,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 146,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0978067
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7160,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11420,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011525,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 624,
+            "cacheReadInputTokens": 37732,
+            "cacheCreationInputTokens": 12045,
+            "webSearchRequests": 0,
+            "costUSD": 0.11641040000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 135,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.11756290000000001
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 8089,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11416,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011521000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 611,
+            "cacheReadInputTokens": 21647,
+            "cacheCreationInputTokens": 12155,
+            "webSearchRequests": 0,
+            "costUSD": 0.1138054,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 437,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.11495750000000002
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 8898,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11426,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011531000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 669,
+            "cacheReadInputTokens": 38541,
+            "cacheCreationInputTokens": 12721,
+            "webSearchRequests": 0,
+            "costUSD": 0.1228802,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 384,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.12403330000000001
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 4973,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11422,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011527000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 412,
+            "cacheReadInputTokens": 5330,
+            "cacheCreationInputTokens": 10927,
+            "webSearchRequests": 0,
+            "costUSD": 0.09673,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 66,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0978827
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6117,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 21110,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0021215,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 359,
+            "cacheReadInputTokens": 31491,
+            "cacheCreationInputTokens": 21407,
+            "webSearchRequests": 0,
+            "costUSD": 0.18475020000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 201,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.18687170000000003
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 4521,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11432,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011537000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 381,
+            "cacheReadInputTokens": 5330,
+            "cacheCreationInputTokens": 10937,
+            "webSearchRequests": 0,
+            "costUSD": 0.09619,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 72,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.09734369999999999
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 5635,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 13480,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0013605000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 641,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 12993,
+            "webSearchRequests": 0,
+            "costUSD": 0.0588227,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 317,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0601832
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "model": "claude-opus-5-5",
+        "duration_ms": 8631,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11432,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011532,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 866,
+            "cacheReadInputTokens": 23147,
+            "cacheCreationInputTokens": 11502,
+            "webSearchRequests": 0,
+            "costUSD": 0.1139814,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 215,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.11513459999999999
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 8827,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 13809,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0013914,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 657,
+            "cacheReadInputTokens": 22056,
+            "cacheCreationInputTokens": 13750,
+            "webSearchRequests": 0,
+            "costUSD": 0.0637836,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 225,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.065175
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5391,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 13803,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0013898,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 597,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 13308,
+            "webSearchRequests": 0,
+            "costUSD": 0.1192854,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 229,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1206752
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 8677,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 13494,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0013614000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 982,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 12999,
+            "webSearchRequests": 0,
+            "costUSD": 0.1245134,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 429,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1258748
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 9108,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11615,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.001174,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 922,
+            "cacheReadInputTokens": 35876,
+            "cacheCreationInputTokens": 12901,
+            "webSearchRequests": 0,
+            "costUSD": 0.06442360000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 137,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0655976
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 10952,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 13778,
+            "outputTokens": 328,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0015418000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 309,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 863,
+            "cacheReadInputTokens": 42100,
+            "cacheCreationInputTokens": 15928,
+            "webSearchRequests": 0,
+            "costUSD": 0.07656400000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 225,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0781058
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 11961,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-opus-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 955,
+            "cacheReadInputTokens": 61123,
+            "cacheCreationInputTokens": 16766,
+            "webSearchRequests": 0,
+            "costUSD": 0.1654846,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 183,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-haiku-5-5": {
+            "inputTokens": 13770,
+            "outputTokens": 603,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016784999999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 582,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1671631
+      }
+    ],
+    "total_cost_usd": 1.8026581000000002,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 50,
+      "gather": 175,
+      "scope": 8,
+      "triage": 7954,
+      "find_verify": 43273,
+      "merge": 9
+    },
+    "errors": []
+  }
+}
