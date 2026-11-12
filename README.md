@@ -658,6 +658,16 @@ scripts/fetch-pr.sh <url> <merge-base> <head> <dir>
 
 The script makes a shallow repo in `<dir>` that holds the merge base, the head and the commits between them. Then run `make-case.sh` with `<dir>` as the repo. It writes the `shallow` file into the case, and the bundle holds two snapshots of the tree. For a PR, the merge base is the `merge_base_commit` of the GitHub compare API for `<base-branch>...<head>`.
 
+To make a case by bug injection, run this command in the cases directory:
+
+```bash
+scripts/inject-case.sh <repo> <base> <head> <patch> <message-file> <name>
+```
+
+`<base>` and `<head>` are the merge base and the head of a merged PR. `<patch>` adds one bug to the tree of `<head>`. `<message-file>` holds the PR title on its first line and the PR body after it. The script builds one commit. Its parent is `<base>`, its tree is the tree of `<head>` with `<patch>` applied, and its message is `<message-file>`. It then calls `make-case.sh` with `<base>` and that commit. The case has the source `injection`, and `injection.patch` holds a copy of `<patch>` for a person to read.
+
+The case holds one squashed commit because the reviewer must not see the injection. The history, the blame and the PR text show no sign of the bug. The author and the date of the commit are fixed, so the same inputs give the same head sha. The script does not change `<repo>`. It stops and writes no case when the patch does not apply to `<head>`.
+
 ### The cases repo and the pin
 
 The case set lives in a separate private repo, `jerridan/pr-review-cases`. Its README tells how to add a case. `eval/cases.json` pins it:
