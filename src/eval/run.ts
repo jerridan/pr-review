@@ -2,9 +2,9 @@
 // sequence, score each record against the golden findings of its case,
 // and report the metrics. The gate compares the report with a baseline.
 import { existsSync, readFileSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { EXIT_FAILURE, EXIT_GATE, EXIT_OK, EXIT_USAGE, type ProgramDeps } from "../cli.js";
 import { JUDGE_DEFAULTS, ROLE_DEFAULTS, resolveModel } from "../config/models.js";
 import { loadRepoConfig } from "../config/repo-config.js";
@@ -50,6 +50,8 @@ export type EvalOptions = {
   extras: boolean;
   /** True for --raw-judge: the raw pass also asks the judge. */
   rawJudge: boolean;
+  /** True for --resume: reuse the finished repeats that the --out directory holds. */
+  resume: boolean;
 };
 
 function messageOf(err: unknown): string {
@@ -163,6 +165,117 @@ type EvalContext = {
   /** The ISO time when runEval started. */
   startedAt: string;
 };
+
+/** The options that change the result of a repeat. */
+type ResultOptions = {
+  tier: Tier;
+  judge_model: string;
+  extras: boolean;
+  raw_judge: boolean;
+};
+
+/**
+ * The file "<out>/<case>/<repeat>/result.json". It holds the metrics of a
+ * finished repeat and the facts that a later --resume run checks.
+ */
+type ResultFile = {
+  case: string;
+  head: string;
+  repeat: number;
+  tool_version: string;
+  options: ResultOptions;
+  metrics: RepeatMetrics;
+};
+
+class ResumeError extends Error {}
+
+const resultOptions = (ctx: EvalContext): ResultOptions => ({
+  tier: ctx.opts.tier,
+  judge_model: ctx.judgeModel,
+  extras: ctx.opts.extras,
+  raw_judge: ctx.opts.rawJudge,
+});
+
+const resultPath = (out: string, c: Case, repeat: number): string =>
+  join(out, c.name, String(repeat), "result.json");
+
+// Write the file in one step: a temp file, then a rename. A kill leaves no
+// half file.
+async function writeResult(ctx: EvalContext, c: Case, m: RepeatMetrics): Promise<void> {
+  const path = resultPath(ctx.out, c, m.repeat);
+  const file: ResultFile = {
+    case: c.name,
+    head: c.head,
+    repeat: m.repeat,
+    tool_version: toolVersion(),
+    options: resultOptions(ctx),
+    metrics: m,
+  };
+  await mkdir(dirname(path), { recursive: true });
+  const temp = `${path}.tmp-${process.pid}`;
+  await writeFile(temp, `${JSON.stringify(file, null, 2)}\n`);
+  await rename(temp, path);
+}
+
+// Read a result file. A missing file, a file that is not JSON, and a file of
+// another shape give null.
+async function readResult(path: string): Promise<ResultFile | null> {
+  try {
+    const value = JSON.parse(await readFile(path, "utf8")) as Partial<ResultFile> | null;
+    if (
+      value === null ||
+      typeof value !== "object" ||
+      typeof value.case !== "string" ||
+      typeof value.head !== "string" ||
+      typeof value.tool_version !== "string" ||
+      typeof value.options !== "object" ||
+      value.options === null ||
+      typeof value.metrics !== "object" ||
+      value.metrics === null ||
+      typeof value.metrics.failed !== "boolean" ||
+      value.metrics.repeat !== value.repeat
+    ) {
+      return null;
+    }
+    return value as ResultFile;
+  } catch {
+    return null;
+  }
+}
+
+// The results to reuse, by "<case>/<repeat>". A result that is failed, or
+// that has another case head, is not reused. A result of another tool
+// version or with other options throws: one report must not mix two
+// configurations.
+async function reusableResults(
+  ctx: EvalContext,
+  cases: Case[],
+): Promise<Map<string, RepeatMetrics>> {
+  const reuse = new Map<string, RepeatMetrics>();
+  const now = resultOptions(ctx);
+  for (const c of cases) {
+    for (let repeat = 1; repeat <= ctx.opts.repeat; repeat++) {
+      const path = resultPath(ctx.out, c, repeat);
+      const found = await readResult(path);
+      if (found === null) continue;
+      if (found.tool_version !== toolVersion()) {
+        throw new ResumeError(
+          `${path}: the result is from tool version ${found.tool_version}, but this is ${toolVersion()}. ` +
+            "Run without --resume, or use another --out.",
+        );
+      }
+      if (JSON.stringify(found.options) !== JSON.stringify(now)) {
+        throw new ResumeError(
+          `${path}: the result has other options (${JSON.stringify(found.options)}) than this run ` +
+            `(${JSON.stringify(now)}). Give the same options, or use another --out.`,
+        );
+      }
+      if (found.metrics.failed || found.head !== c.head || found.case !== c.name) continue;
+      reuse.set(`${c.name}/${repeat}`, found.metrics);
+    }
+  }
+  return reuse;
+}
 
 /** candidates.json has the format of golden.json. */
 type CandidatesFile = { findings: GoldenFinding[] };
@@ -345,11 +458,30 @@ export async function runEval(opts: EvalOptions, deps: ProgramDeps): Promise<num
     startedAt,
   };
 
+  let reuse = new Map<string, RepeatMetrics>();
+  if (opts.resume) {
+    try {
+      reuse = await reusableResults(ctx, cases);
+    } catch (err) {
+      if (!(err instanceof ResumeError)) throw err;
+      say(err.message);
+      return EXIT_USAGE;
+    }
+  }
+
   // The runs go in sequence: case by case, and repeat by repeat.
   const results: { name: string; repeats: RepeatMetrics[] }[] = [];
   for (const c of cases) {
     const repeats: RepeatMetrics[] = [];
     for (let repeat = 1; repeat <= opts.repeat; repeat++) {
+      const reused = reuse.get(`${c.name}/${repeat}`);
+      if (reused !== undefined) {
+        repeats.push(reused);
+        continue;
+      }
+      // The old output of this repeat stays out of the way of the new record.
+      if (opts.resume)
+        await rm(join(out, c.name, String(repeat)), { recursive: true, force: true });
       const outcome = await runRepeat(ctx, c, repeat);
       // The pre-flight catches a config that gives a reviewer the judge
       // model. This check stays as a safety net for a model that only the
@@ -357,6 +489,13 @@ export async function runEval(opts: EvalOptions, deps: ProgramDeps): Promise<num
       if (outcome.kind === "same-judge") {
         say(sameJudgeMessage(`case ${c.name}, repeat ${repeat}`, outcome.reviewers, judgeModel));
         return EXIT_USAGE;
+      }
+      try {
+        await writeResult(ctx, c, outcome.metrics);
+      } catch (err) {
+        say(
+          `warning: case ${c.name}, repeat ${repeat}: cannot write result.json: ${messageOf(err)}`,
+        );
       }
       repeats.push(outcome.metrics);
     }
@@ -397,6 +536,9 @@ export async function runEval(opts: EvalOptions, deps: ProgramDeps): Promise<num
     opts.format === "json" ? json : renderTable(report, base.gate?.cases_ref ?? null),
   );
 
+  if (opts.resume) {
+    say(`${reuse.size} ${reuse.size === 1 ? "repeat" : "repeats"} reused from ${out}`);
+  }
   for (const f of report.failed_repeats) {
     say(`case ${f.case}, repeat ${f.repeat} failed: ${f.error}`);
   }

@@ -684,8 +684,17 @@ The eval makes real SDK calls. It needs a Claude login and it costs money.
 | `--allow-same-judge` | Let the judge model equal a reviewer model. | off |
 | `--no-extras` | Do not ask the extras judge about the posted findings that match no golden finding. Adjudicated precision is then null, and the eval writes no `candidates.json`. | extras on |
 | `--raw-judge` | Also ask the judge about the ambiguous pairs of the raw candidates. Without it, raw recall counts exact matches and the judge answers that the posted pass already got. | off |
+| `--resume` | Reuse the finished repeats that the `--out` directory holds. See "Resume a run". | off |
 
 For each case in name order, the eval clones the case into a temporary directory and runs the review there, once for each repeat. The runs go one at a time. The run takes the `title` and the `body` of the case as the PR text. It makes no `gh` call. Each run writes a normal record in `<out>/<case>/<repeat>/`.
+
+### Resume a run
+
+When a repeat ends, the eval writes `<out>/<case>/<repeat>/result.json`. The file holds the metrics of the repeat, whether it failed or not. It also holds the case name, the case head sha, the repeat number, the tool version, and the options that change the result: the tier, the judge model, `--no-extras` and `--raw-judge`. The eval writes the file in one step, so a kill leaves no half file.
+
+A run that stops continues with `--resume` and the same `--out`. This holds also for a baseline run with `--write-baseline`. For each repeat, `--resume` reads the result file. It reuses a result that did not fail and that has the same case name and head sha. A reused repeat makes no model call and no clone. It runs again when the result failed, when the file is missing or not valid, or when the head sha differs. Before it runs again, the eval clears the old output of the repeat. The report, the aggregate, the exit code, `candidates.json` and the baseline treat a reused result like a new one. A stopped run that continues gives the same aggregate as one run that does not stop. The eval prints on stderr how many repeats it reused.
+
+When the tool version or an option differs from the result file, the eval exits 2 before any model call. This keeps one report from mixing two configurations. Give the same options, or use another `--out`. Without `--resume`, every repeat runs.
 
 ### Cases
 
