@@ -247,4 +247,17 @@ describe("pr-review pool --resume, a kept result that is not good", () => {
     expect(second.roles("adjudicator")).toHaveLength(3);
     expect(second.io.stdout()).toMatch(/resume 0 reused, 9 new/);
   }, 120_000);
+
+  it("ignores a calls.json written for another case head", async () => {
+    const p = prepare();
+    await run(p, false);
+    const path = join(p.out, CASE, "calls.json");
+    const calls = JSON.parse(readText(path)) as Record<string, unknown>;
+    writeFileSync(path, JSON.stringify({ ...calls, head: "f".repeat(40) }));
+    const second = await run(p, false, ["--resume"]);
+    expect(second.code).toBe(0);
+    expect(second.roles("pool-reviewer")).toHaveLength(1);
+    expect(second.roles("adjudicator")).toHaveLength(3);
+    expect(second.io.stdout()).toMatch(/resume 0 reused, 9 new/);
+  }, 120_000);
 });

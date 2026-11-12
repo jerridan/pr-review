@@ -335,7 +335,7 @@ The labeler sets the severity of the golden findings with its own models. The sc
 pr-review run   [--base <sha>] [--head <sha>] [--pr <n>] [--github-repo <owner/repo>] [--fresh] [--tier full|fast|skip] [--format github|json|table|md]
 pr-review eval  --cases <dir> [--repeat <n>] [--baseline <file>] [--write-baseline] [--out <dir>] [--format table|json] [--tier full|fast|skip] [--judge-model <id>] [--allow-api-key] [--allow-same-judge] [--no-extras] [--raw-judge]
 pr-review label --cases <dir> [--runs <n>] [--concurrency <n>] [--write-golden] [--only <case>] [--out <dir>] [--format table|json] [--allow-api-key]
-pr-review pool  <case-dir>... --out <dir> [--record <path>]... [--reviews <n>] [--write-golden] [--dismissed]
+pr-review pool  <case-dir>... --out <dir> [--record <path>]... [--reviews <n>] [--write-golden] [--dismissed] [--resume]
 pr-review adjudicate <case-dir> (--record <path> --fingerprint <fp> | --finding <path>) [--out <path>]
 pr-review list  (reviewers that would run, with the trigger that selected them)
 pr-review explain <record.json> [--format table|json]   (why each finding was kept or dropped)

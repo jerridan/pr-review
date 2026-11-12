@@ -2,7 +2,6 @@
 // the same prompt. Each answers if the claim is true at the case head and
 // belongs to the PR. The finding is kept when both scores reach the
 // threshold. "pr-review pool" and "pr-review adjudicate" both use it.
-import { sixFields } from "./schemas.js";
 import {
   claudeCall,
   claudeModelId,
@@ -13,7 +12,12 @@ import {
   type PoolContext,
 } from "./calls.js";
 import { adjudicateMessage, promptDigest } from "./prompts.js";
-import { AdjudicationOutputSchema, type AdjudicationOutput, type PoolFinding } from "./schemas.js";
+import {
+  AdjudicationOutputSchema,
+  sixFields,
+  type AdjudicationOutput,
+  type PoolFinding,
+} from "./schemas.js";
 
 /** The lowest score of each family that keeps a finding. */
 export const KEEP_SCORE = 75;
