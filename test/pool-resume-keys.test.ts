@@ -16,7 +16,9 @@ const CASE = "fixture-7";
 const prompts = vi.hoisted(() => ({ file: "", suffix: "" }));
 
 vi.mock("../src/prompts/load.js", async (original) => {
-  const real = await original<typeof import("../src/prompts/load.js")>();
+  const real = await original<
+    Record<string, unknown> & { loadPrompt: (p: string) => { body: string } }
+  >();
   return {
     ...real,
     loadPrompt: (path: string) => {
