@@ -1,13 +1,20 @@
 // Load and validate the cases of an eval. A case is one directory with
 // case.json, repo.bundle, diff.patch and golden.json.
 import { access, readdir, readFile, realpath } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { z } from "zod";
 import { runGit } from "../gather/worktree.js";
 import { CATEGORIES, type Category } from "../schemas/finding.js";
 import { LABEL_SEVERITIES, POSTED_SEVERITIES } from "../schemas/label.js";
 
-export type CaseSource = "fixture" | "pr" | "reviewbench" | "martian" | "injection" | "record";
+export type CaseSource =
+  | "fixture"
+  | "pr"
+  | "reviewbench"
+  | "martian"
+  | "injection"
+  | "record"
+  | "pool";
 
 /**
  * A golden finding carries one of the six labels of the severity policy.
@@ -56,7 +63,15 @@ export class CaseError extends Error {
   }
 }
 
-const CASE_SOURCES = ["fixture", "pr", "reviewbench", "martian", "injection", "record"] as const;
+const CASE_SOURCES = [
+  "fixture",
+  "pr",
+  "reviewbench",
+  "martian",
+  "injection",
+  "record",
+  "pool",
+] as const;
 
 // These schemas never go to the SDK, so they can hold range checks.
 // Strict objects make a misspelt field name fail.
@@ -92,6 +107,9 @@ export const GoldenSchema = z.strictObject({ findings: z.array(GoldenFindingSche
 
 /** The files that every case holds, apart from case.json. */
 const CASE_FILES = ["repo.bundle", "diff.patch", "golden.json"] as const;
+
+/** The files that the pool needs, apart from case.json. The pool writes golden.json. */
+const POOL_CASE_FILES = ["repo.bundle", "diff.patch"] as const;
 
 async function exists(path: string): Promise<boolean> {
   try {
@@ -134,8 +152,13 @@ async function readJson<T>(
   return parsed.data;
 }
 
-async function loadCase(dir: string, name: string): Promise<Case> {
-  for (const file of CASE_FILES) {
+// Check that "files" exist in the case, then read and check case.json.
+async function loadMeta(
+  dir: string,
+  name: string,
+  files: readonly string[],
+): Promise<z.infer<typeof CaseMetaSchema>> {
+  for (const file of files) {
     if (!(await exists(join(dir, file)))) {
       throw new CaseError(name, `case ${name}: ${file} is missing`);
     }
@@ -147,8 +170,28 @@ async function loadCase(dir: string, name: string): Promise<Case> {
       `case ${name}: case.json has the name "${meta.name}", which differs from the directory name`,
     );
   }
+  return meta;
+}
+
+async function loadCase(dir: string, name: string): Promise<Case> {
+  const meta = await loadMeta(dir, name, CASE_FILES);
   const golden = await readJson(name, dir, "golden.json", GoldenSchema);
   return { dir, ...meta, golden: golden.findings };
+}
+
+/**
+ * Load the case in "dir" for the pool. The case needs case.json,
+ * repo.bundle and diff.patch, and no golden.json. The pool does not read
+ * golden.json, so "golden" is empty. Throw a CaseError for an invalid case.
+ */
+export async function loadPoolCase(dir: string): Promise<Case> {
+  const full = resolve(dir);
+  const name = basename(full);
+  if (!(await exists(join(full, "case.json")))) {
+    throw new CaseError(name, `case ${name}: case.json is missing`);
+  }
+  const meta = await loadMeta(full, name, POOL_CASE_FILES);
+  return { dir: full, ...meta, golden: [] };
 }
 
 /**

@@ -6,6 +6,7 @@ import { withRepoGlobs } from "./config/globs.js";
 import {
   ROLE_DEFAULTS,
   ROLES,
+  isEvalRole,
   resolveModel,
   type Effort,
   type QueryRole,
@@ -186,7 +187,7 @@ const CLIENT_OVERRIDE_ROLES: ReadonlySet<Role> = new Set<Role>([
 // Add the repo config's model and effort for the role of the request.
 // An override that the request sets itself wins.
 function withRoleOverrides(req: QueryRequest, config: RepoConfig): QueryRequest {
-  if (req.role === "judge" || req.role === "labeler") return req;
+  if (isEvalRole(req.role)) return req;
   if (!CLIENT_OVERRIDE_ROLES.has(req.role) || !isConfigRole(req.role)) return req;
   const set = config.models[req.role];
   if (!set || (set.model === undefined && set.effort === undefined)) return req;
@@ -215,7 +216,7 @@ function givenDescription(given: { title: string; body: string }): Sanitized {
 // Give the run role of a query. The judge is a role of the eval, so a
 // judge query in a run is a bug.
 function runRole(role: QueryRole): Role {
-  if (role === "judge" || role === "labeler") throw new Error("A run makes no eval query.");
+  if (isEvalRole(role)) throw new Error("A run makes no eval query.");
   return role;
 }
 

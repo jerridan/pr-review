@@ -4,11 +4,15 @@
 export type Role = "triage" | "reviewer" | "verifier" | "verifier-escalation" | "merge" | "smoke";
 
 /**
- * The role of one query. "judge" and "labeler" are roles of the eval, not
- * of a run: they are not in ROLES, a run record has no entry for them, and
- * a repo config cannot set them.
+ * The roles of the eval, not of a run. "judge" scores the eval, "labeler"
+ * labels a golden, and the three "pool" roles build a pooled golden set.
+ * They are not in ROLES, a run record has no entry for them, and a repo
+ * config cannot set them.
  */
-export type QueryRole = Role | "judge" | "labeler";
+export type EvalRole = "judge" | "labeler" | "pool-reviewer" | "pool-grouper" | "adjudicator";
+
+/** The role of one query. */
+export type QueryRole = Role | EvalRole;
 
 export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
 
@@ -125,10 +129,57 @@ export const LABELER_DEFAULTS: RoleConfig = {
   tools: "none",
 };
 
+/**
+ * The blind reviewer of the pool. It reviews a case with no record and no
+ * golden. Its pin stays apart from the pipeline roles, so the pool does
+ * not change when they change.
+ */
+export const POOL_REVIEWER_DEFAULTS: RoleConfig = {
+  // The literal id is on purpose: the pin stays apart from the pipeline roles.
+  model: "claude-opus-5-5",
+  effort: "high",
+  maxTurns: 40,
+  maxBudgetUsd: 2,
+  timeoutMs: 900_000,
+  tools: "read-only",
+};
+
+/** The adjudicator of the pool: it scores one pool item at the case head. */
+export const ADJUDICATOR_DEFAULTS: RoleConfig = {
+  model: "claude-opus-5-5",
+  effort: "high",
+  maxTurns: 25,
+  maxBudgetUsd: 1,
+  timeoutMs: 600_000,
+  tools: "read-only",
+};
+
+/** The grouping of the pool: it joins the items that state the same defect. */
+export const POOL_GROUPER_DEFAULTS: RoleConfig = {
+  model: "claude-sonnet-5-5",
+  effort: "high",
+  maxTurns: 5,
+  maxBudgetUsd: 0.5,
+  timeoutMs: 300_000,
+  tools: "none",
+};
+
+const EVAL_DEFAULTS: Record<EvalRole, RoleConfig> = {
+  judge: JUDGE_DEFAULTS,
+  labeler: LABELER_DEFAULTS,
+  "pool-reviewer": POOL_REVIEWER_DEFAULTS,
+  "pool-grouper": POOL_GROUPER_DEFAULTS,
+  adjudicator: ADJUDICATOR_DEFAULTS,
+};
+
+/** Give true when "role" is a role of the eval, not of a run. */
+export function isEvalRole(role: QueryRole): role is EvalRole {
+  return Object.hasOwn(EVAL_DEFAULTS, role);
+}
+
 /** The defaults of the role of one query. */
 export function roleConfig(role: QueryRole): RoleConfig {
-  if (role === "judge") return JUDGE_DEFAULTS;
-  if (role === "labeler") return LABELER_DEFAULTS;
+  if (isEvalRole(role)) return EVAL_DEFAULTS[role];
   return ROLE_DEFAULTS[role];
 }
 
