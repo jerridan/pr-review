@@ -389,3 +389,31 @@ describe("pr-review pool --dismissed, a joined item", () => {
     expect(golden.findings[0]?.note).toContain("same-head.json");
   }, 60_000);
 });
+
+describe("pr-review pool --dismissed, an invalid record", () => {
+  it("exits 2 before any model call when a verification holds an invalid finding", async () => {
+    const { s, client } = setup({});
+    const path = recordFile(
+      join(s.root, "bad.json"),
+      s.head,
+      [],
+      [{ finding: D1, label: "not_real" }],
+    );
+    const record = readJson<{ stages: { verifications: { finding: { claim?: string } }[] } }>(path);
+    delete record.stages.verifications[0]?.finding.claim;
+    writeFileSync(path, JSON.stringify(record));
+    const code = await cli(
+      client,
+      "pool",
+      s.caseDir,
+      "--out",
+      s.out,
+      "--dismissed",
+      "--record",
+      path,
+    );
+    expect(code).toBe(2);
+    expect(client.calls).toHaveLength(0);
+    expect(codexCalls(s.codexDir)).toHaveLength(0);
+  }, 60_000);
+});
