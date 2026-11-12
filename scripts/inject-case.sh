@@ -6,7 +6,7 @@
 # <base> and <head> are two commits of <repo>, for example the merge base and
 # the head of a merged PR. <patch> is a bug patch that applies to the tree of
 # <head>. <message-file> holds the PR title on its first line and the PR body
-# after it.
+# after it. When a body follows, the second line must be empty.
 #
 # The script builds one new commit. Its parent is <base>. Its tree is the tree
 # of <head> with <patch> applied. Its message is <message-file>. Then it calls
@@ -20,11 +20,12 @@
 # The labeler then edits origin and language in case.json and writes
 # golden.json.
 #
-# The commit has a fixed author, a fixed committer and a fixed date. The same
-# inputs give the same head sha.
+# The commit has the author, the committer and the dates of <head>, so the log
+# shows no sign of the injection. The same inputs give the same head sha.
 #
 # The script does not change <repo>. It stops when <name> exists, when <patch>
-# or <message-file> is missing, or when <patch> does not apply to <head>. In
+# or <message-file> is missing, when the second line of <message-file> is not
+# empty, or when <patch> does not apply to <head>. In
 # each case it leaves no <name>.
 set -euo pipefail
 
@@ -55,6 +56,13 @@ for f in "$patch" "$message"; do
     exit 1
   fi
 done
+# make-case.sh joins the first paragraph into the title. So a body must start
+# after an empty line.
+second="$(sed -n '2p' "$message")"
+if [ -n "$second" ]; then
+  echo "inject-case: the second line of $message is not empty. Put an empty line after the title." >&2
+  exit 1
+fi
 if ! git -C "$repo" rev-parse --git-dir > /dev/null 2>&1; then
   echo "inject-case: $repo is not a git repo" >&2
   exit 1
@@ -90,16 +98,16 @@ fi
 export GIT_DIR="$tmp"
 export GIT_INDEX_FILE="$work/index"
 git read-tree "$head"
-if ! git apply --cached "$patch"; then
+if ! git apply --cached --whitespace=nowarn "$patch"; then
   echo "inject-case: $patch does not apply to $head_arg" >&2
   exit 1
 fi
 tree="$(git write-tree)"
+# Copy the identity and the dates of <head> to the new commit.
+IFS='|' read -r an ae ad cn ce cd < <(git log -1 --format='%an|%ae|%aI|%cn|%ce|%cI' "$head")
 new="$(
-  GIT_AUTHOR_NAME="pr-review inject-case" GIT_AUTHOR_EMAIL="inject-case@example.invalid" \
-    GIT_AUTHOR_DATE="2020-01-01T00:00:00 +0000" \
-    GIT_COMMITTER_NAME="pr-review inject-case" GIT_COMMITTER_EMAIL="inject-case@example.invalid" \
-    GIT_COMMITTER_DATE="2020-01-01T00:00:00 +0000" \
+  GIT_AUTHOR_NAME="$an" GIT_AUTHOR_EMAIL="$ae" GIT_AUTHOR_DATE="$ad" \
+    GIT_COMMITTER_NAME="$cn" GIT_COMMITTER_EMAIL="$ce" GIT_COMMITTER_DATE="$cd" \
     git -c commit.gpgsign=false commit-tree "$tree" -p "$base" -F "$message"
 )"
 unset GIT_DIR GIT_INDEX_FILE

@@ -630,7 +630,7 @@ For each case in name order, the eval clones the case into a temporary directory
 
 ### Cases
 
-A case is one directory with four files:
+A case is one directory with these files:
 
 | File | Content |
 |------|---------|
@@ -638,6 +638,7 @@ A case is one directory with four files:
 | `repo.bundle` | A git bundle that holds the base commit, the head commit and the history between them. |
 | `diff.patch` | The three-dot diff from the base to the head, for a person to read. The eval does not read it. |
 | `golden.json` | `findings`, each with `file`, `start_line`, `end_line`, `category`, `severity`, `claim` and an optional `note`. `severity` is one of the six labels of `docs/design/severity-policy.md`: `blocking`, `suggestion`, `nit`, `dont_post`, `not_real` or `unsure`. A golden with one of the first three is a posted golden. A golden with one of the last three is a not-real golden. |
+| `injection.patch` | Optional. Present only in an injection case: a copy of the bug patch, for a person to read. The eval does not read it. |
 | `shallow` | Optional. Present when the bundle comes from a shallow repo: the commits whose parents the bundle does not hold, one sha per line. The eval fetches the bundle into a repo with these shallow marks, because git refuses to clone such a bundle. |
 
 `source` is one of `fixture`, `pr`, `reviewbench`, `martian`, `injection` and `record`. A subdirectory without `case.json` is not a case. The eval checks every case before the first model call. A missing file, a field that is not valid, or a sha that the bundle does not hold makes the eval exit 2. The message names the case.
@@ -666,7 +667,7 @@ scripts/inject-case.sh <repo> <base> <head> <patch> <message-file> <name>
 
 `<base>` and `<head>` are the merge base and the head of a merged PR. `<patch>` adds one bug to the tree of `<head>`. `<message-file>` holds the PR title on its first line and the PR body after it. The script builds one commit. Its parent is `<base>`, its tree is the tree of `<head>` with `<patch>` applied, and its message is `<message-file>`. It then calls `make-case.sh` with `<base>` and that commit. The case has the source `injection`, and `injection.patch` holds a copy of `<patch>` for a person to read.
 
-The case holds one squashed commit because the reviewer must not see the injection. The history, the blame and the PR text show no sign of the bug. The author and the date of the commit are fixed, so the same inputs give the same head sha. The script does not change `<repo>`. It stops and writes no case when the patch does not apply to `<head>`.
+The case holds one squashed commit because the reviewer must not see the injection. The history, the blame and the PR text show no sign of the bug. The commit has the author, the committer and the dates of `<head>`, so the same inputs give the same head sha. The second line of `<message-file>` must be empty when a body follows the title. The script does not change `<repo>`. It stops and writes no case when the patch does not apply to `<head>`.
 
 ### The cases repo and the pin
 
