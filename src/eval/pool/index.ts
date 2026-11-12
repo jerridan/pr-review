@@ -15,10 +15,11 @@ import { createSemaphore } from "../../semaphore.js";
 import { CaseError, loadPoolCase, type Case } from "../case.js";
 import { cloneCase } from "../checkout.js";
 import { adjudicateFinding } from "./adjudicate.js";
-import { poolCase, summaryLine, PoolCaseError } from "./pool.js";
+import { dismissedLines, poolCase, summaryLine, PoolCaseError } from "./pool.js";
 import {
   casePrNumber,
   caseRepo,
+  dismissedFindings,
   findFingerprint,
   inputFinding,
   PoolInputError,
@@ -38,6 +39,7 @@ export type PoolOptions = {
   records: string[];
   reviews: number;
   writeGolden: boolean;
+  dismissed?: boolean;
 };
 
 export type AdjudicateOptions = {
@@ -81,6 +83,7 @@ async function poolInputs(
     for (const path of opts.records) records.push(await readRecord(path));
     // Check every record finding now, so a bad one costs no model call.
     for (const r of records) reviewerFindings(r);
+    if (opts.dismissed === true) for (const r of records) dismissedFindings(r);
     for (const c of cases) {
       const pr = casePrNumber(c.name);
       const repo = caseRepo(c.origin);
@@ -125,10 +128,16 @@ export async function runPool(opts: PoolOptions, deps: ProgramDeps): Promise<num
       const result = await poolCase(
         c,
         inputs.records,
-        { reviews: opts.reviews, writeGolden: opts.writeGolden, out: resolve(opts.out) },
+        {
+          reviews: opts.reviews,
+          writeGolden: opts.writeGolden,
+          out: resolve(opts.out),
+          dismissed: opts.dismissed === true,
+        },
         shared,
       );
       process.stdout.write(`${summaryLine(result)}\n`);
+      for (const line of dismissedLines(result)) process.stdout.write(`${line}\n`);
       for (const error of result.reviewErrors)
         say("pool", `case ${c.name}: a review failed: ${error}`);
       if (result.failed > 0)
@@ -263,10 +272,20 @@ export function registerPoolCommands(program: Command, deps: ProgramDeps): void 
     .option("--record <path>", "a run record of the PR of the case; repeat for more", collect, [])
     .option("--reviews <n>", "the blind reviews of each family, a positive integer", parseCount, 2)
     .option("--write-golden", "write golden.json in each case directory")
+    .option(
+      "--dismissed",
+      "write goldens for the findings that the verifier dismissed in the --record files",
+    )
     .action(
       async (
         caseDirs: string[],
-        options: { out: string; record: string[]; reviews: number; writeGolden?: boolean },
+        options: {
+          out: string;
+          record: string[];
+          reviews: number;
+          writeGolden?: boolean;
+          dismissed?: boolean;
+        },
       ) => {
         try {
           process.exitCode = await runPool(
@@ -276,6 +295,7 @@ export function registerPoolCommands(program: Command, deps: ProgramDeps): void 
               records: options.record,
               reviews: options.reviews,
               writeGolden: options.writeGolden === true,
+              dismissed: options.dismissed === true,
             },
             deps,
           );

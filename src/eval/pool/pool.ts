@@ -11,7 +11,13 @@ import type { RunOptions } from "../../sdk/options.js";
 import type { Semaphore } from "../../semaphore.js";
 import type { Case, GoldenFinding } from "../case.js";
 import { cloneCase } from "../checkout.js";
-import { adjudicateFinding, scoreOf, type Adjudication, type FamilyResult } from "./adjudicate.js";
+import {
+  adjudicateFinding,
+  DISMISS_BELOW,
+  scoreOf,
+  type Adjudication,
+  type FamilyResult,
+} from "./adjudicate.js";
 import type { PoolContext } from "./calls.js";
 import {
   groupClusters,
@@ -20,7 +26,12 @@ import {
   type Cluster,
   type Sourced,
 } from "./group.js";
-import { reviewerFindings, type PoolRecord } from "./records.js";
+import {
+  dismissedFindings,
+  reviewerFindings,
+  type DismissLabel,
+  type PoolRecord,
+} from "./records.js";
 import { blindReviews, type ReviewRun } from "./review.js";
 import { sixFields, type PoolFinding } from "./schemas.js";
 
@@ -35,7 +46,29 @@ export class PoolCaseError extends Error {
 /** What every case of one run shares. */
 export type PoolShared = { client: SdkClient; options: RunOptions; semaphore: Semaphore };
 
-export type PoolCaseOptions = { reviews: number; writeGolden: boolean; out: string };
+export type PoolCaseOptions = {
+  reviews: number;
+  writeGolden: boolean;
+  out: string;
+  /** Write goldens for the findings that the verifier dismissed. */
+  dismissed?: boolean;
+};
+
+/** The dismissed findings of one case, for the summary. */
+export type DismissedSummary = {
+  /** The dismissed findings of the records with the head of the case. */
+  counted: number;
+  /** The counted findings with no matching reviewer finding. */
+  unmatched: string[];
+  /** The marked items that write a pool golden (kept). */
+  kept: number;
+  /** The marked items that write a dismissed golden. */
+  dismissedGoldens: number;
+  /** The marked items that write no golden, with the reason. */
+  noGolden: string[];
+  /** The records that the head rule left out. */
+  otherHead: string[];
+};
 
 /** The counts of one case, for the summary line. */
 export type PoolCaseResult = {
@@ -52,6 +85,8 @@ export type PoolCaseResult = {
   reviews: ReviewRun[];
   /** Why --write-golden left golden.json unchanged, or null. */
   goldenSkipped: string | null;
+  /** The dismissed findings, or null without --dismissed. */
+  dismissed: DismissedSummary | null;
 };
 
 /** One pool item: an id, the fields of its representative, and its members. */
@@ -64,8 +99,10 @@ export type GoldenSpan = { start_line: number; end_line: number; from: "claude" 
  * What became of an item: "golden" when it writes a golden, "joined" when
  * a golden of an overlapping item stands for it, "no_span" when it is kept
  * with no valid span, "not_kept" for a low score, "failed" for a failed call.
+ * "dismissed_golden" is for a dismissed item that both families score below
+ * 50: it writes a golden whose claim is false.
  */
-export type Outcome = "golden" | "joined" | "no_span" | "not_kept" | "failed";
+export type Outcome = "golden" | "joined" | "no_span" | "not_kept" | "failed" | "dismissed_golden";
 
 export type ItemAdjudication = {
   id: string;
@@ -195,7 +232,7 @@ async function joinKept(
 ): Promise<void> {
   const withSpan = results
     .map((r, n) => ({ r, item: items[n] as PoolItem }))
-    .filter((x): x is Spanned => x.r.span !== undefined);
+    .filter((x): x is Spanned => x.r.outcome === "golden" && x.r.span !== undefined);
   const multi = components(withSpan).filter((c) => c.length >= 2);
   const answers = await Promise.all(
     multi.map((c) =>
@@ -229,7 +266,32 @@ async function joinKept(
   });
 }
 
-function golden(item: PoolItem, r: ItemAdjudication & { span: GoldenSpan }): GoldenFinding {
+/** A dismissal of a member: the record file and the label of the verifier. */
+type Mark = { record: string; label: DismissLabel };
+
+function describeMarks(marks: readonly Mark[]): string {
+  const seen = new Set<string>();
+  const parts: string[] = [];
+  for (const m of marks) {
+    const text = `${m.label} in the record ${m.record}`;
+    if (!seen.has(text)) parts.push(text);
+    seen.add(text);
+  }
+  return parts.join("; ");
+}
+
+function golden(
+  item: PoolItem,
+  r: ItemAdjudication & { span: GoldenSpan },
+  marks: readonly Mark[],
+): GoldenFinding {
+  const scores = `Claude score ${scoreOf(r.claude)}, GPT score ${scoreOf(r.gpt)}`;
+  let note = `Pool item ${item.id}: ${scores}.`;
+  if (marks.length > 0 && r.outcome === "dismissed_golden") {
+    note += ` The verifier dismissed it as ${describeMarks(marks)}. Both families score it below ${DISMISS_BELOW}, so the claim is false at the head, or it is not a defect of this PR.`;
+  } else if (marks.length > 0) {
+    note += ` The verifier dismissed it as ${describeMarks(marks)}.`;
+  }
   return {
     file: item.finding.file,
     start_line: r.span.start_line,
@@ -237,8 +299,66 @@ function golden(item: PoolItem, r: ItemAdjudication & { span: GoldenSpan }): Gol
     category: item.finding.category,
     severity: "unsure",
     claim: item.finding.claim,
-    note: `Pool item ${item.id}: Claude score ${scoreOf(r.claude)}, GPT score ${scoreOf(r.gpt)}.`,
+    note,
   };
+}
+
+// The key of a record member: its source and its six fields.
+function memberKey(m: Sourced): string {
+  return JSON.stringify([m.source, sixFields(m.finding)]);
+}
+
+type Dismissals = {
+  marks: Map<string, Mark[]>;
+  counted: number;
+  unmatched: string[];
+  otherHead: string[];
+};
+
+/**
+ * Find the dismissed findings that count: those of the records whose head
+ * is the head of the case. Mark the record members that match one on the
+ * six fields.
+ */
+function findDismissals(head: string, records: readonly PoolRecord[]): Dismissals {
+  const out: Dismissals = { marks: new Map(), counted: 0, unmatched: [], otherHead: [] };
+  for (const record of records) {
+    const dismissed = dismissedFindings(record);
+    if (record.head !== head) {
+      if (dismissed.length > 0) out.otherHead.push(record.name);
+      continue;
+    }
+    const members = reviewerFindings(record).map(({ reviewer, finding }): Sourced => ({
+      source: `record:${record.name}:${reviewer}`,
+      finding,
+    }));
+    for (const d of dismissed) {
+      out.counted += 1;
+      const want = JSON.stringify(sixFields(d.finding));
+      const hits = members.filter((m) => JSON.stringify(sixFields(m.finding)) === want);
+      for (const m of hits) {
+        const key = memberKey(m);
+        out.marks.set(key, [
+          ...(out.marks.get(key) ?? []),
+          { record: record.name, label: d.label },
+        ]);
+      }
+      if (hits.length === 0) {
+        const f = d.finding;
+        const claim = f.claim.length > 100 ? `${f.claim.slice(0, 100)}...` : f.claim;
+        out.unmatched.push(
+          `${record.name}: ${d.label} ${f.file}:${f.start_line}-${f.end_line} ${claim}`,
+        );
+      }
+    }
+  }
+  return out;
+}
+
+// True when both families answered and both score below the dismiss limit.
+function bothLow(a: Adjudication): boolean {
+  const scores = [scoreOf(a.claude), scoreOf(a.gpt)];
+  return scores.every((n) => n !== null && n < DISMISS_BELOW);
 }
 
 async function poolInCheckout(
@@ -277,12 +397,24 @@ async function poolInCheckout(
     join(dir, "pool.json"),
     json({ items: items.map((i) => ({ id: i.id, ...i.finding })) }),
   );
+  const dismissals = opts.dismissed === true ? findDismissals(c.head, records) : null;
+  const marksOf = (m: Sourced): Mark[] => dismissals?.marks.get(memberKey(m)) ?? [];
   const key = Object.fromEntries(
     items.map((i) => [
       i.id,
-      { members: i.members.map((m) => ({ source: m.source, ...sixFields(m.finding) })) },
+      {
+        members: i.members.map((m) => {
+          const labels = [...new Set(marksOf(m).map((x) => x.label))].sort();
+          return {
+            source: m.source,
+            ...sixFields(m.finding),
+            ...(labels.length > 0 ? { dismissed: labels.join(",") } : {}),
+          };
+        }),
+      },
     ]),
   );
+  const itemMarks = items.map((i) => i.members.flatMap(marksOf));
   await writeFile(join(dir, "pool-key.json"), json(key));
 
   // Step 5: adjudicate.
@@ -299,12 +431,13 @@ async function poolInCheckout(
       kept: a.kept,
       outcome: failed ? "failed" : "not_kept",
     };
-    if (a.kept) {
+    const dismissedItem = (itemMarks[n] as Mark[]).length > 0 && !failed && !a.kept && bothLow(a);
+    if (a.kept || dismissedItem) {
       const span = goldenSpan(item.finding.file, a, ctx.checkout);
       if (span === null) entry.outcome = "no_span";
       else {
         entry.span = span;
-        entry.outcome = "golden";
+        entry.outcome = a.kept ? "golden" : "dismissed_golden";
       }
     }
     return entry;
@@ -317,8 +450,8 @@ async function poolInCheckout(
   await joinKept(c.name, items, results, ctx);
   await writeFile(join(dir, "adjudications.json"), json({ items: results }));
   const goldens = results.flatMap((r, n) =>
-    r.outcome === "golden" && r.span !== undefined
-      ? [golden(items[n] as PoolItem, { ...r, span: r.span })]
+    (r.outcome === "golden" || r.outcome === "dismissed_golden") && r.span !== undefined
+      ? [golden(items[n] as PoolItem, { ...r, span: r.span }, itemMarks[n] as Mark[])]
       : [],
   );
   const failedReviews = runs.filter((r) => !r.ok).length;
@@ -332,6 +465,8 @@ async function poolInCheckout(
     }
   }
 
+  const dismissed: DismissedSummary | null =
+    dismissals === null ? null : summariseDismissed(dismissals, items, results, itemMarks);
   return {
     name: c.name,
     items: items.length,
@@ -343,7 +478,59 @@ async function poolInCheckout(
     reviewErrors: runs.flatMap((r) => (r.ok ? [] : [`${r.source}: ${r.error}`])),
     reviews: runs,
     goldenSkipped,
+    dismissed,
   };
+}
+
+function summariseDismissed(
+  d: Dismissals,
+  items: readonly PoolItem[],
+  results: readonly ItemAdjudication[],
+  itemMarks: readonly Mark[][],
+): DismissedSummary {
+  const summary: DismissedSummary = {
+    counted: d.counted,
+    unmatched: d.unmatched,
+    kept: 0,
+    dismissedGoldens: 0,
+    noGolden: [],
+    otherHead: d.otherHead,
+  };
+  results.forEach((r, n) => {
+    if ((itemMarks[n] as Mark[]).length === 0) return;
+    const id = (items[n] as PoolItem).id;
+    if (r.outcome === "golden" || r.outcome === "joined") summary.kept += 1;
+    else if (r.outcome === "dismissed_golden") summary.dismissedGoldens += 1;
+    else {
+      const why =
+        r.outcome === "failed"
+          ? "a model call failed"
+          : r.outcome === "no_span"
+            ? "no valid span"
+            : "the families do not agree";
+      summary.noGolden.push(
+        `${id}: ${why} (Claude ${scoreOf(r.claude) ?? "failed"}, GPT ${scoreOf(r.gpt) ?? "failed"})`,
+      );
+    }
+  });
+  return summary;
+}
+
+/** The summary lines of the dismissed findings of one case, or none. */
+export function dismissedLines(r: PoolCaseResult): string[] {
+  const d = r.dismissed;
+  if (d === null) return [];
+  const lines = [
+    `${r.name}: dismissed ${d.counted} counted, ${d.unmatched.length} unmatched, ${d.kept} kept, ${d.dismissedGoldens} dismissed_golden, ${d.noGolden.length} no golden`,
+  ];
+  for (const u of d.unmatched) lines.push(`${r.name}: unmatched dismissed finding in ${u}`);
+  for (const n of d.noGolden) lines.push(`${r.name}: no golden for dismissed item ${n}`);
+  for (const o of d.otherHead) {
+    lines.push(
+      `${r.name}: the record ${o} has another head, so its dismissed findings do not count`,
+    );
+  }
+  return lines;
 }
 
 /**
