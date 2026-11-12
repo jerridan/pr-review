@@ -21,7 +21,7 @@ import {
   type Sourced,
 } from "./group.js";
 import { reviewerFindings, type PoolRecord } from "./records.js";
-import { blindReviews } from "./review.js";
+import { blindReviews, type ReviewRun } from "./review.js";
 import { sixFields, type PoolFinding } from "./schemas.js";
 
 /** A case that the pool could not finish. */
@@ -48,6 +48,8 @@ export type PoolCaseResult = {
   costUsd: number;
   /** The errors of the blind reviews that failed. */
   reviewErrors: string[];
+  /** The blind reviews, Claude first, each family in order. */
+  reviews: ReviewRun[];
 };
 
 /** One pool item: an id, the fields of its representative, and its members. */
@@ -72,6 +74,23 @@ export type ItemAdjudication = {
   span?: GoldenSpan;
   joined_into?: string;
 };
+
+/** One entry of reviews.json: the findings of a review, or its failure. */
+export type ReviewEntry = {
+  source: string;
+  ok: boolean;
+  findings?: number;
+  failed?: string;
+  cost_usd?: number;
+};
+
+function reviewEntry(r: ReviewRun): ReviewEntry {
+  const entry: ReviewEntry = r.ok
+    ? { source: r.source, ok: true, findings: r.findings.length }
+    : { source: r.source, ok: false, failed: r.error };
+  if (r.costUsd !== undefined) entry.cost_usd = Math.round(r.costUsd * 1e6) / 1e6;
+  return entry;
+}
 
 function json(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;
@@ -210,6 +229,11 @@ async function poolInCheckout(
     opts.reviews,
     ctx,
   );
+  // reviews.json shows what each blind review gave. The pool and the
+  // adjudication calls never read it.
+  const dir = join(opts.out, c.name);
+  await mkdir(dir, { recursive: true });
+  await writeFile(join(dir, "reviews.json"), json({ reviews: runs.map(reviewEntry) }));
   const sourced: Sourced[] = runs.flatMap((r) =>
     r.ok ? r.findings.map((finding) => ({ source: r.source, finding })) : [],
   );
@@ -223,8 +247,6 @@ async function poolInCheckout(
   const grouped = await groupClusters(joinIdentical(sourced), ctx);
   if (!grouped.ok) throw new PoolCaseError(c.name, `the grouping call failed: ${grouped.error}`);
   const items = anonymise(grouped.clusters);
-  const dir = join(opts.out, c.name);
-  await mkdir(dir, { recursive: true });
   await writeFile(
     join(dir, "pool.json"),
     json({ items: items.map((i) => ({ id: i.id, ...i.finding })) }),
@@ -278,6 +300,7 @@ async function poolInCheckout(
     noSpan: results.filter((r) => r.outcome === "no_span").length,
     costUsd: ctx.cost.usd,
     reviewErrors: runs.flatMap((r) => (r.ok ? [] : [`${r.source}: ${r.error}`])),
+    reviews: runs,
   };
 }
 
@@ -301,7 +324,16 @@ export async function poolCase(
   }
 }
 
+// The findings of each review of one family, joined with "+", or "failed".
+function familyCounts(runs: readonly ReviewRun[], prefix: string): string {
+  return runs
+    .filter((r) => r.source.startsWith(prefix))
+    .map((r) => (r.ok ? String(r.findings.length) : "failed"))
+    .join("+");
+}
+
 /** The summary line of one case. */
 export function summaryLine(r: PoolCaseResult): string {
-  return `${r.name}: ${r.items} items, ${r.kept} kept, ${r.failed} failed, ${r.goldens} goldens, ${r.noSpan} no_span, cost $${r.costUsd.toFixed(2)}`;
+  const reviews = `reviews claude ${familyCounts(r.reviews, "claude-")}, gpt ${familyCounts(r.reviews, "gpt-")}`;
+  return `${r.name}: ${r.items} items, ${r.kept} kept, ${r.failed} failed, ${r.goldens} goldens, ${r.noSpan} no_span, cost $${r.costUsd.toFixed(2)}; ${reviews}`;
 }

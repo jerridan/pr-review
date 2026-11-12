@@ -586,15 +586,16 @@ For each case, the pool clones the case at its head and does six steps:
 5. **Adjudicate.** A Claude model and a GPT model each score every item from 0 to 100. The score tells if the claim is true at the case head and if the defect belongs to this PR. An item is kept when both scores are 75 or more. A failed call keeps the item out and marks it `failed`.
 6. **Join.** The golden span of a kept item is the Claude span when it is inside the file at the case head, else the GPT span. A kept item with neither is `no_span` and writes no golden. Kept items in one file whose spans overlap go through the grouping call again. Each group writes one golden: the member with the highest lower score.
 
-Each case gets three files in `<out>/<case>/`:
+Each case gets four files in `<out>/<case>/`:
 
 | File | Content |
 |------|---------|
 | `pool.json` | The anonymous items. |
 | `pool-key.json` | The members and the sources of each item. |
+| `reviews.json` | For each blind review: its source, `ok`, the number of findings or the failure text, and the cost in USD of a Claude review. No adjudicator sees this file. |
 | `adjudications.json` | For each item: the score, the reason and the span of each family, or `failed`; `kept`; and `outcome`: `golden`, `joined`, `no_span`, `not_kept` or `failed`. |
 
-Stdout gets one line per case: the items, the kept items, the failed items, the goldens, the `no_span` items and the cost in USD of the Claude calls. With `--write-golden`, each golden has the file, the golden span, the category, the claim, `severity: "unsure"` and a `note` with both scores. A case with no kept item gets `{"findings": []}`, a clean case. Without `--write-golden`, `golden.json` does not change.
+Stdout gets one line per case: the items, the kept items, the failed items, the goldens, the `no_span` items, the cost in USD of the Claude calls, and the findings of each blind review, for example `reviews claude 0+0, gpt 0+1`. A failed review shows as `failed`. The failure text of a GPT call ends with the last 500 characters of the Codex stderr, because Codex writes the cause of a failure last. With `--write-golden`, each golden has the file, the golden span, the category, the claim, `severity: "unsure"` and a `note` with both scores. A case with no kept item gets `{"findings": []}`, a clean case. Without `--write-golden`, `golden.json` does not change.
 
 The command exits 0 when every call succeeded. It exits 1 when a case failed or a call failed after its retry. It exits 2 on a usage error, also for a record of another PR. Each call gets one retry. At most four calls run at once.
 
