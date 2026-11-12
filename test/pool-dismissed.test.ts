@@ -5,6 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import {
+  allInOne,
+  byTag,
   captureOutput,
   cli,
   codexCalls,
@@ -144,6 +146,7 @@ type KeyOut = Record<string, { members: Record<string, unknown>[] }>;
 // D3: Claude 50, GPT 49.                 D4: both 80 (kept, dismissed as dont_post).
 // D5: dismissed, no reviewer finding.    K1: kept, overlaps D1, not dismissed.
 // B1: blind review, both 49.             D7: dismissed in a record of another head, both 49.
+// D8: Claude 49, GPT 80.
 const D1 = item("MARK-D1", 3, 4);
 const D2 = item("MARK-D2", 9);
 const D3 = item("MARK-D3", 10);
@@ -152,6 +155,7 @@ const D5 = item("MARK-D5", 6);
 const K1 = item("MARK-K1", 4, 5);
 const B1 = item("MARK-B1", 11);
 const D7 = item("MARK-D7", 12);
+const D8 = item("MARK-D8", 7);
 
 const PLAN: Plan = {
   claudeReviews: [[B1]],
@@ -164,6 +168,7 @@ const PLAN: Plan = {
     "MARK-K1": at(90, 4, 5),
     "MARK-B1": at(49, 11),
     "MARK-D7": at(49, 12),
+    "MARK-D8": at(49, 7),
   },
   gpt: {
     "MARK-D1": at(49, 3, 4),
@@ -173,6 +178,7 @@ const PLAN: Plan = {
     "MARK-K1": at(90, 4, 5),
     "MARK-B1": at(49, 11),
     "MARK-D7": at(49, 12),
+    "MARK-D8": at(80, 7),
   },
 };
 
@@ -181,13 +187,14 @@ function records(s: Setup): string[] {
     recordFile(
       join(s.root, "same-head.json"),
       s.head,
-      [D1, D2, D3, D4, K1],
+      [D1, D2, D3, D4, D8, K1],
       [
         { finding: D1, label: "not_real" },
         { finding: D2, label: "not_real" },
         { finding: D3, label: "dont_post" },
         { finding: D4, label: "dont_post" },
         { finding: D5, label: "not_real" },
+        { finding: D8, label: "not_real" },
       ],
       [{ finding: K1, label: "dont_post", passed: true }],
     ),
@@ -268,9 +275,22 @@ describe("pr-review pool --dismissed", () => {
   it("names a dismissed finding with no reviewer finding as unmatched in the summary", () => {
     const out = r.io.stdout();
     expect(out).toMatch(
-      /fixture-7: dismissed 5 counted, 1 unmatched, 1 kept, 1 dismissed_golden, 2 no golden/,
+      /fixture-7: dismissed 6 counted, 1 unmatched, 1 kept, 1 dismissed_golden, 3 no golden/,
     );
     expect(out).toMatch(/unmatched[^\n]*MARK-D5/);
+  });
+
+  it("gives the reason of an item with no golden: a score from 50 to 74, or no agreement", () => {
+    const out = r.io.stdout();
+    expect(out).toMatch(
+      /no golden for dismissed item p\d+: a score from 50 to 74 \(Claude 49, GPT 50\)/,
+    );
+    expect(out).toMatch(
+      /no golden for dismissed item p\d+: a score from 50 to 74 \(Claude 50, GPT 49\)/,
+    );
+    expect(out).toMatch(
+      /no golden for dismissed item p\d+: the families do not agree \(Claude 49, GPT 80\)/,
+    );
   });
 
   it("keeps a dismissed golden apart from the kept item that overlaps it", () => {
@@ -294,6 +314,7 @@ describe("pr-review pool --dismissed", () => {
       ["MARK-D2", "not_real"],
       ["MARK-D3", "dont_post"],
       ["MARK-D4", "dont_post"],
+      ["MARK-D8", "not_real"],
     ]);
     const pool = readFileSync(join(r.s.out, CASE, "pool.json"), "utf8");
     expect(pool).not.toContain("dismissed");
@@ -328,4 +349,43 @@ describe("pr-review pool without --dismissed", () => {
       .filter((m) => m.dismissed !== undefined);
     expect(marked).toEqual([]);
   }, 120_000);
+});
+
+describe("pr-review pool --dismissed, a joined item", () => {
+  it("names the label of a dismissed item that the join folds into another item", async () => {
+    const J1 = item("MARK-J1", 5, 6);
+    const J2 = item("MARK-J2", 6, 7);
+    const plan: Plan = {
+      claudeReviews: [[]],
+      gptReviews: [[]],
+      groupers: [byTag, allInOne],
+      claude: { "MARK-J1": at(80, 5, 6), "MARK-J2": at(90, 6, 7) },
+      gpt: { "MARK-J1": at(80, 5, 6), "MARK-J2": at(90, 6, 7) },
+    };
+    const { s, client } = setup(plan);
+    const record = recordFile(
+      join(s.root, "same-head.json"),
+      s.head,
+      [J1, J2],
+      [{ finding: J1, label: "dont_post" }],
+    );
+    const code = await cli(
+      client,
+      "pool",
+      s.caseDir,
+      "--out",
+      s.out,
+      "--reviews",
+      "1",
+      "--write-golden",
+      "--dismissed",
+      "--record",
+      record,
+    );
+    expect(code).toBe(0);
+    const golden = readJson<Golden>(join(s.caseDir, "golden.json"));
+    expect(golden.findings.map((f) => markerOf(f.claim))).toEqual(["MARK-J2"]);
+    expect(golden.findings[0]?.note).toContain("dont_post");
+    expect(golden.findings[0]?.note).toContain("same-head.json");
+  }, 60_000);
 });

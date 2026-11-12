@@ -182,3 +182,69 @@ describe("pr-review pool --resume", () => {
     expect(second.roles("pool-reviewer")).toHaveLength(0);
   }, 120_000);
 });
+
+type Calls = {
+  group: Record<string, unknown>;
+  adjudication: Record<string, { score: number }>;
+};
+
+function editCalls(p: Prepared, change: (calls: Calls) => void): void {
+  const path = join(p.out, CASE, "calls.json");
+  const calls = JSON.parse(readText(path)) as Calls;
+  change(calls);
+  writeFileSync(path, JSON.stringify(calls));
+}
+
+describe("pr-review pool --resume, a kept result that is not good", () => {
+  it("counts a kept adjudication with a score out of range as a new call", async () => {
+    const p = prepare();
+    await run(p, false);
+    editCalls(p, (calls) => {
+      const key = Object.keys(calls.adjudication).find((k) => k.includes("claude"));
+      const kept = calls.adjudication[key ?? ""];
+      if (kept) kept.score = 150;
+    });
+    const second = await run(p, false, ["--resume"]);
+    expect(second.code).toBe(0);
+    expect(second.roles("adjudicator")).toHaveLength(1);
+    expect(second.io.stdout()).toMatch(/fixture-7: resume 8 reused, 1 new/);
+  }, 120_000);
+
+  it("makes the grouping call again for a kept answer that puts a finding in two groups", async () => {
+    const p = prepare();
+    await run(p, false);
+    editCalls(p, (calls) => {
+      const key = Object.keys(calls.group)[0] ?? "";
+      calls.group[key] = [
+        { members: [0, 1], representative: 0 },
+        { members: [1, 2], representative: 1 },
+      ];
+    });
+    const second = await run(p, false, ["--resume"]);
+    expect(second.code).toBe(0);
+    expect(second.roles("pool-grouper")).toHaveLength(1);
+    expect(second.io.stdout()).toMatch(/fixture-7: resume 8 reused, 1 new/);
+  }, 120_000);
+
+  it("makes the grouping call again for a kept answer with an index out of range", async () => {
+    const p = prepare();
+    await run(p, false);
+    editCalls(p, (calls) => {
+      const key = Object.keys(calls.group)[0] ?? "";
+      calls.group[key] = [{ members: [0, 1, 2, 9], representative: 0 }];
+    });
+    const second = await run(p, false, ["--resume"]);
+    expect(second.roles("pool-grouper")).toHaveLength(1);
+  }, 120_000);
+
+  it("warns on stderr, and makes every call, when calls.json is not JSON", async () => {
+    const p = prepare();
+    await run(p, false);
+    writeFileSync(join(p.out, CASE, "calls.json"), "{not json");
+    const second = await run(p, false, ["--resume"]);
+    expect(second.code).toBe(0);
+    expect(second.io.stderr()).toMatch(/calls\.json/);
+    expect(second.roles("adjudicator")).toHaveLength(3);
+    expect(second.io.stdout()).toMatch(/resume 0 reused, 9 new/);
+  }, 120_000);
+});
