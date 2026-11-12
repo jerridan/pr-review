@@ -15,6 +15,8 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import {
   captureOutput,
   cli,
+  CODEX_BANNER,
+  CODEX_ERROR,
   codexCalls,
   fakeClient,
   installCodex,
@@ -244,6 +246,22 @@ describe("pr-review adjudicate --finding", () => {
     expect(result.claude).toHaveProperty("failed");
     expect(result.claude).not.toHaveProperty("score");
     expect(result.kept).toBe(false);
+  }, 60_000);
+
+  it("gives the end of the codex stderr in a failed GPT call, in the output and on stderr", async () => {
+    const s = setup({
+      claude: { "MARK-P1": { score: 99, start_line: 11, end_line: 11 } },
+      gpt: { "MARK-P1": "fail" },
+    });
+    const path = join(s.root, "finding.json");
+    writeFileSync(path, JSON.stringify(P1_FINDING));
+    const code = await cli(s.client, "adjudicate", s.caseDir, "--finding", path);
+    expect(code).toBe(1);
+    const result = JSON.parse(s.io.stdout()) as { gpt: { failed: string } };
+    expect(result.gpt.failed).toContain("codex exited with code 1");
+    expect(result.gpt.failed).toContain(CODEX_ERROR);
+    expect(result.gpt.failed).not.toContain(CODEX_BANNER);
+    expect(s.io.stderr()).toContain(CODEX_ERROR);
   }, 60_000);
 
   it("exits 2 when the finding file lacks a field", async () => {

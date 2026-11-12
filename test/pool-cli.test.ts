@@ -18,6 +18,8 @@ import {
   byTag,
   captureOutput,
   cli,
+  CODEX_BANNER,
+  CODEX_ERROR,
   codexCalls,
   failGrouping,
   fakeClient,
@@ -314,6 +316,19 @@ describe("pr-review pool, the main scenario", () => {
     );
   });
 
+  it("writes reviews.json with the findings of each blind review and the Claude cost", () => {
+    expect(readJson(join(s.out, CASE, "reviews.json"))).toEqual({
+      reviews: [
+        { source: "claude-review-1", ok: true, findings: 6, cost_usd: 0.01 },
+        { source: "gpt-review-1", ok: true, findings: 4 },
+      ],
+    });
+  });
+
+  it("gives the findings of each blind review in the summary line", () => {
+    expect(s.io.stdout()).toMatch(/fixture-7: .*reviews claude 6, gpt 4\n/);
+  });
+
   it("leaves an existing golden.json unchanged without --write-golden", () => {
     expect(readFileSync(join(s.caseDir, "golden.json"), "utf8")).toBe(GOLDEN_BEFORE);
   });
@@ -488,9 +503,55 @@ describe("pr-review pool, the other paths", () => {
     const s = setup({});
     const code = await cli(s.client, "pool", s.caseDir, "--out", s.out);
     expect(code).toBe(0);
+    expect(s.io.stdout()).toMatch(/fixture-7: 0 items, .*reviews claude 0\+0, gpt 0\+0\n/);
+    const reviews = readJson<{ reviews: { source: string; findings: number }[] }>(
+      join(s.out, CASE, "reviews.json"),
+    );
+    expect(reviews.reviews.map((r) => [r.source, r.findings])).toEqual([
+      ["claude-review-1", 0],
+      ["claude-review-2", 0],
+      ["gpt-review-1", 0],
+      ["gpt-review-2", 0],
+    ]);
     expect(s.client.calls.filter((c) => c.role === "pool-reviewer")).toHaveLength(2);
     expect(codexCalls(s.codexDir).filter((c) => c.kind === "review")).toHaveLength(2);
     expect(readJson(join(s.out, CASE, "pool.json"))).toEqual({ items: [] });
+  }, 60_000);
+
+  it("gives the end of the codex stderr in a failed GPT review, on disk and on stderr", async () => {
+    const s = setup({ claudeReviews: [[item("MARK-K1", 11)]], gptReviews: ["fail", "fail"] });
+    const code = await cli(s.client, "pool", s.caseDir, "--out", s.out, "--reviews", "1");
+    expect(code).toBe(1);
+    const line = s.io
+      .stderr()
+      .split("\n")
+      .find((l) => l.includes("a review failed: gpt-review-1"));
+    expect(line).toContain("codex exited with code 1");
+    expect(line).toContain(CODEX_ERROR);
+    expect(line).not.toContain(CODEX_BANNER);
+    const reviews = readJson<{ reviews: Record<string, unknown>[] }>(
+      join(s.out, CASE, "reviews.json"),
+    );
+    const gpt = reviews.reviews.find((r) => r.source === "gpt-review-1");
+    expect(gpt).toMatchObject({ ok: false });
+    expect(String(gpt?.failed)).toContain(CODEX_ERROR);
+    expect(s.io.stdout()).toMatch(/reviews claude 1, gpt failed\n/);
+  }, 60_000);
+
+  it("gives the end of the codex stderr in a failed GPT adjudication", async () => {
+    const s = setup({
+      claudeReviews: [[item("MARK-K1", 11)]],
+      claude: { "MARK-K1": { score: 80, start_line: 11, end_line: 11 } },
+      gpt: { "MARK-K1": "fail" },
+    });
+    const code = await cli(s.client, "pool", s.caseDir, "--out", s.out, "--reviews", "1");
+    expect(code).toBe(1);
+    const adj = readJson<{ items: Adjudication[] }>(join(s.out, CASE, "adjudications.json"));
+    const failed = (adj.items[0]?.gpt as { failed: string }).failed;
+    expect(failed).toContain("codex exited with code 1");
+    expect(failed).toContain(CODEX_ERROR);
+    expect(failed).not.toContain(CODEX_BANNER);
+    expect(failed.length).toBeLessThan(700);
   }, 60_000);
 
   it("pools a case directory that has no golden.json", async () => {
