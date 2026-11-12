@@ -383,7 +383,11 @@ function recordsUnder(out: string): { path: string; record: RunRecord }[] {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const full = join(dir, entry.name);
       if (entry.isDirectory()) walk(full);
-      else if (entry.name.endsWith(".json") && entry.name !== "report.json") {
+      else if (
+        entry.name.endsWith(".json") &&
+        entry.name !== "report.json" &&
+        entry.name !== "result.json"
+      ) {
         found.push({ path: full, record: JSON.parse(readFileSync(full, "utf8")) as RunRecord });
       }
     }
@@ -1529,3 +1533,126 @@ function twoCasesInto(root: string): void {
     root,
   );
 }
+
+describe("pr-review eval --resume", () => {
+  function threeCases(): string {
+    return casesDir([
+      { name: "a-planted", golden: [PLANTED()] },
+      { name: "b-unmatched", golden: [UNMATCHED] },
+      { name: "c-planted", golden: [PLANTED()] },
+    ]);
+  }
+
+  async function evalInto(out: string, fake: Fake, cases: string, ...extra: string[]) {
+    stdout = "";
+    stderr = "";
+    process.exitCode = undefined;
+    const code = await exitCodeOf(
+      createProgram({ client: fake }).parseAsync([
+        "node",
+        "pr-review",
+        "eval",
+        "--cases",
+        cases,
+        "--out",
+        out,
+        "--format",
+        "json",
+        "--repeat",
+        "1",
+        ...extra,
+      ]),
+    );
+    const report = code === 2 ? null : (JSON.parse(stdout) as Report);
+    return { code, report };
+  }
+
+  const triageCalls = (fake: Fake) => fake.calls.filter((c) => c.role === "triage").length;
+
+  it(
+    "runs only the failed case again, and gives the aggregate of an uninterrupted run",
+    async () => {
+      const cases = threeCases();
+      const whole = await evalInto(newDir("out"), evalFake(), cases);
+      expect(whole.code, stderr).toBe(0);
+
+      const out = newDir("out");
+      const first = await evalInto(
+        out,
+        evalFake({ reviewerFailure: { message: "stop", runs: [3] } }),
+        cases,
+      );
+      expect(first.code).toBe(1);
+
+      const fake = evalFake();
+      const second = await evalInto(out, fake, cases, "--resume");
+      expect(second.code, stderr).toBe(0);
+      expect(triageCalls(fake)).toBe(1);
+      expect(second.report?.failed_repeats).toEqual([]);
+      expect(second.report?.aggregate).toEqual(whole.report?.aggregate);
+      expect(stderr).toContain("2 repeats reused");
+    },
+    RUN_TIMEOUT,
+  );
+
+  it(
+    "makes no call for a repeat that is complete",
+    async () => {
+      const cases = threeCases();
+      const out = newDir("out");
+      const first = await evalInto(out, evalFake(), cases);
+      const fake = evalFake();
+      const second = await evalInto(out, fake, cases, "--resume");
+      expect(second.code, stderr).toBe(0);
+      expect(fake.calls).toHaveLength(0);
+      expect(second.report?.aggregate).toEqual(first.report?.aggregate);
+    },
+    RUN_TIMEOUT,
+  );
+
+  it(
+    "exits 2 when the result file has another tool version",
+    async () => {
+      const cases = twoCases();
+      const out = newDir("out");
+      await evalInto(out, evalFake(), cases);
+      const file = join(out, "a-planted", "1", "result.json");
+      const result = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
+      result.tool_version = "0.0.0-other";
+      writeFileSync(file, JSON.stringify(result));
+      const fake = evalFake();
+      const second = await evalInto(out, fake, cases, "--resume");
+      expect(second.code).toBe(2);
+      expect(fake.calls).toHaveLength(0);
+      expect(stderr).toContain("version");
+    },
+    RUN_TIMEOUT,
+  );
+
+  it(
+    "exits 2 when an option that changes the result differs",
+    async () => {
+      const cases = twoCases();
+      const out = newDir("out");
+      await evalInto(out, evalFake(), cases);
+      const fake = evalFake();
+      const second = await evalInto(out, fake, cases, "--resume", "--no-extras");
+      expect(second.code).toBe(2);
+      expect(fake.calls).toHaveLength(0);
+    },
+    RUN_TIMEOUT,
+  );
+
+  it(
+    "runs every repeat again without --resume",
+    async () => {
+      const cases = twoCases();
+      const out = newDir("out");
+      await evalInto(out, evalFake(), cases);
+      const fake = evalFake();
+      await evalInto(out, fake, cases);
+      expect(triageCalls(fake)).toBe(2);
+    },
+    RUN_TIMEOUT,
+  );
+});
