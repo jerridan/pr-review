@@ -48,6 +48,13 @@ Goal: grow the case set in small revisions, about five cases each. Depends on D5
 - Make each case with `scripts/make-case.sh` and add it to the cases repo as its README says. Each revision moves the pin in `eval/cases.json`, writes a new baseline with `--write-baseline` at two repeats and re-derives the margins by the rule in the README, in one PR.
 - Done 2026-11-11: the 25 posted findings of the D6 gate run that matched no golden went through the labeling loop and joined the set as goldens (22 posted, 3 not real; cases repo PR #5). The set holds 82 goldens, 51 posted. The pin moved to e6ddf81 and the baseline at 0.5.0 reads recall 0.396, precision 0.722, cost per PR $4.65 at one repeat. The margins stay at 0.1 and 0.35: one repeat gives no spread.
 
+Proposed split (a recommendation; the agent that runs D4b can choose a different one): four revisions. Each revision can be one PR in this repo and one branch in the cases repo. Each revision moves the pin, writes a baseline at two repeats and re-derives the margins. A baseline costs about $6 per case per repeat.
+
+- R1, benchmark cases: about five cases from Martian and ReviewBench. The labeler and `scripts/make-case.sh` are sufficient, so R1 needs no new tooling. R1 is a good first revision: it gives the first baseline at two repeats.
+- R2, own-repo cases: cases from jerridan/websites, jerridan/walle and jerridan/pr-review with pooled goldens. R2 needs the pool tooling: two blind reviews per family, the anonymised pool, and the adjudication by both families.
+- R3, dismissed findings: the dismissed findings of the records become not-real or don't-post goldens. R3 depends on R2, because the R2 pool adjudicates each finding.
+- R4, injection cases: a few cases by bug injection into jerridan/websites and jerridan/walle, with the source `injection`. R4 does not depend on R2 or R3. D4c and D7 need the injection measurement.
+
 ## D6: Verifier inputs and rubric
 
 Goal: make the verifier score whether a claim is true, and give it the inputs it needs to check one. Closes issues 18, 19 and 24. Depends on D5 for the measurement and for the policy.
