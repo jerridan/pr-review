@@ -69,7 +69,7 @@ Goal: give the finders the briefing and the reading procedure that find the seri
 - Done 2026-11-11: the reviewer user message holds a `changed_files` block before the diff and tells the reviewer to read each changed file in full before it reports. A deleted file has its own line. The triage brief and the diff stay.
 - Done 2026-11-11: diff-bugs, history and tests each have a reading plan in numbered steps: the changed files in full, then the callers and callees, then the tests that cover the changed behaviour. The history plan matches the blame lines of prior fixes against the diff.
 - Each finding names the file and the line it rests on. This rule exists; keep it.
-- Done 2026-11-11: the read-in-full step lives in the reading plans of diff-bugs, history, tests and security, not in the shared user message. In the eval above, conventions, docs-and-comments and description-drift cost $7.37 against $3.28 before D7, for findings that are rarely serious. Security gained a reading plan. This change has no eval run of its own yet.
+- Done 2026-11-11: the read-in-full step lives in the reading plans of diff-bugs, history, tests and security, not in the shared user message. In the eval above, conventions, docs-and-comments and description-drift cost $7.37 against $3.28 before D7, for findings that are rarely serious. Security gained a reading plan. The eval of this change at one repeat gave recall 0.438, precision 0.714, adjudicated precision 0.786, raw recall 0.568 and cost per PR $5.00 (baseline 0.5.0: $4.65). The three reviewers cost $3.32. The precision drop comes mostly from sentry-greptile, where four posted findings state one defect on the same line and the merge did not join them; six extras judge queries also gave no answer. That merge miss is a follow-up, not part of D7.
 - Done 2026-11-11: the eval at one repeat on the pinned cases (`e6ddf81`) gave recall 0.431 (baseline 0.396), precision 0.818 (baseline 0.722), adjudicated precision 0.939, raw recall 0.616 and cost per PR $6.03 (baseline $4.65, 30% more). All ten cases completed. Four ReviewBench cases still posted at most one finding, and ensnode 1938 posted none: every reviewer pass returned an empty list.
 - Run the injection measurement of D4c with this change, because the PR body now reaches every reviewer and the verifier.
 
@@ -101,6 +101,8 @@ Goal: run the first experiments on the eval and write the results to `docs/resea
 - A prompt injection in a PR body against the sanitizer and the untrusted wrapper, after D7.
 
 ## Smaller follow-ups found during D1 and D2
+
+- The merge step let four findings of one defect post apart on sentry-greptile (paginator.py line 838, the D7 eval of 2026-11-11). Find why the semantic merge did not join them.
 
 - The verifier prompt and the merge prompt have not been tuned on real findings. Review them against the first ten records.
 - `pr-review smoke` uses Sonnet 5.5; consider Haiku 5.5 to make the check cheaper.
