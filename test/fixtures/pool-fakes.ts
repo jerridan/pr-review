@@ -33,9 +33,12 @@ export type Grouper = (
   items: (Item & { id: string })[],
 ) => { groups: { members: string[]; representative: string }[] } | "fail";
 
+/** The findings of one review call, or a failed call. A retry takes the next entry. */
+export type ReviewAnswer = Item[] | "fail";
+
 export type Plan = {
-  claudeReviews?: Item[][];
-  gptReviews?: Item[][];
+  claudeReviews?: ReviewAnswer[];
+  gptReviews?: ReviewAnswer[];
   groupers?: Grouper[];
   claude?: Record<string, Verdict>;
   gpt?: Record<string, Verdict>;
@@ -103,7 +106,7 @@ export function fakeClient(plan: Plan) {
     if (req.role === "pool-reviewer") {
       const findings = plan.claudeReviews?.[review] ?? [];
       review += 1;
-      return { ok: true, output: { findings }, raw: META };
+      return findings === "fail" ? FAILED : { ok: true, output: { findings }, raw: META };
     }
     if (req.role === "pool-grouper") {
       const grouper = plan.groupers?.[group] ?? byTag;
@@ -118,9 +121,15 @@ export function fakeClient(plan: Plan) {
   });
 }
 
+/** The error that the fake codex writes last to stderr when a call fails. */
+export const CODEX_ERROR = "ERROR: You've hit your usage limit. Try again at 4:33 PM.";
+/** The start of the long banner that the fake codex writes first to stderr. */
+export const CODEX_BANNER = "CODEX-BANNER-START";
+
 // The fake codex: a shell shim first on PATH that runs a node script. The
 // script logs its argv and the kind of call (from the output schema), and
-// writes the planned answer to the out file.
+// writes the planned answer to the out file. A failed call writes a long
+// banner and then an error to stderr, and exits 1, as the real codex does.
 const SHIM_SCRIPT = `import { appendFileSync, existsSync, openSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 const dir = process.env.FAKE_CODEX_DIR;
@@ -133,17 +142,23 @@ const kind = schema.properties && schema.properties.findings ? "review" : "adjud
 appendFileSync(join(dir, "log.jsonl"), JSON.stringify({ argv, kind, schemaExists }) + "\\n");
 const prompt = argv.at(-1) ?? "";
 const plan = JSON.parse(readFileSync(join(dir, "plan.json"), "utf8"));
+const fail = () => {
+  process.stderr.write(${JSON.stringify(CODEX_BANNER)} + "x".repeat(3000) + "\\n" + ${JSON.stringify(CODEX_ERROR)} + "\\n");
+  process.exit(1);
+};
 let answer;
 if (kind === "review") {
   let n = 0;
   for (;; n++) {
     try { openSync(join(dir, "review-" + n), "wx"); break; } catch {}
   }
-  answer = { findings: (plan.gptReviews ?? [])[n] ?? [] };
+  const findings = (plan.gptReviews ?? [])[n] ?? [];
+  if (findings === "fail") fail();
+  answer = { findings };
 } else {
   const marker = (prompt.match(/MARK-[A-Za-z0-9]+/) ?? ["default"])[0];
   const v = (plan.gpt ?? {})[marker] ?? { score: 0, start_line: 1, end_line: 1 };
-  if (v === "fail") process.exit(1);
+  if (v === "fail") fail();
   answer = { ...v, reason: "fake reason" };
 }
 writeFileSync(out, JSON.stringify(answer));
