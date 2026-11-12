@@ -1,0 +1,1304 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 44,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Add eval cases by bug injection (D4b R4)",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/44"
+    },
+    "run_kind": "later",
+    "prior": {
+      "head": "ca0ff25f9dabbfb219c1989f53fb5979d941a9f0",
+      "source": "record",
+      "record": "/home/runner/work/_temp/pr-review-records/pr-44/2026-11-12T173016.886Z-ca0ff25.json",
+      "open": [
+        "b7958b73c41f398a",
+        "c288a60fb1de73d2"
+      ],
+      "dismissed": [],
+      "fetch_failed": false
+    },
+    "base": "b126f028a7c272daa4d983b6101155f7435d10fa",
+    "head": "a1b21737cbdb02d8752055cea2513e591e305c50",
+    "started_at": "2026-11-12T19:04:49.813Z",
+    "tool_version": "0.6.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Add eval cases by bug injection (D4b R4)\n\nD4b revision R4: eval cases by bug injection.\n\n**No pin move and no baseline.** A baseline at two repeats does not fit in one five-hour plan window, and a stopped eval run loses everything. So D4b writes one baseline for all four revisions at the end, and the pin moves one time, in that final baseline PR. `eval/cases.json` and `eval/baseline.json` are the same as on main.\n\n## What changes\n\n- `scripts/inject-case.sh <repo> <base> <head> <patch> <message-file> <name>` makes one injection case. It builds one commit on the merge base of a merged host PR. The commit holds the head tree of the PR with one bug patch applied, and the PR title and body as its message. Then it calls `make-case.sh`, sets the source to `injection`, and keeps the patch as `injection.patch`. So the history, the blame and the PR text of the case do not show the bug. The commit copies the author, the committer and the dates of the host head, so the same inputs give the same sha and the log shows no sign of the injection. The script does not change the host repo, ignores the user's `apply.whitespace` setting, and refuses a message file whose second line is not empty.\n- `test/eval-scripts.test.ts`: tests for the script on synthetic repos, a shallow one included.\n- `README.md`: a paragraph on the script, and an `injection.patch` row in the case file table.\n- `TICKETS.md`: the R4 line.\n\n## Cases repo\n\nCases repo PR #6 (merged, `a2ad8d5`) adds four cases, one golden each:\n\n| Case | Language | Host PR size | Kind of bug | Label |\n|------|----------|--------------|-------------|-------|\n| `injection-websites-130` | TypeScript | ~110 lines | a field key copied from the wrong section | blocking |\n| `injection-websites-120` | TypeScript | ~670 lines | a validation check removed from a predicate | suggestion |\n| `injection-walle-21` | Python | ~160 lines | the wrong timeout setting on a loop | suggestion |\n| `injection-walle-6` | Python | ~1200 lines | an idempotency id minted on each retry | blocking |\n\nThe D5 labeling loop chose each label, and the three runs agree for each finding. The cases README gains a section on how to add an injection case. With these cases, the set holds 14 cases and 86 goldens (55 posted).\n\n## Verification\n\n- `npm test` (1307 tests), `npm run lint`, `npm run typecheck`, `npm run build` pass.\n- The case loader reads all 14 cases with no error. Each bundle holds exactly one commit from base to head.\n- `scripts/check-six-labels.mjs` in the cases repo passes.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZeygoPpDMXvhR2hBF1\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": "README.md",
+        "hunks": 3
+      },
+      {
+        "path": "TICKETS.md",
+        "hunks": 1
+      },
+      {
+        "path": "scripts/inject-case.sh",
+        "hunks": 1
+      },
+      {
+        "path": "test/eval-scripts.test.ts",
+        "hunks": 3
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "Adds a new executable shell script with git plumbing logic (commit construction, temp repo with alternates, shallow handling, cleanup) plus tests for it.",
+      "confidence": "high",
+      "categories": [
+        "bug",
+        "test",
+        "docs"
+      ],
+      "hotspots": [
+        "scripts/inject-case.sh: temp bare repo with alternates and shallow copy",
+        "scripts/inject-case.sh: git apply --cached and exported GIT_DIR/GIT_INDEX_FILE handling",
+        "scripts/inject-case.sh: IFS read of identity/dates from git log (pipe delimiter, determinism)",
+        "scripts/inject-case.sh: cleanup on failure and mv of output dir",
+        "scripts/inject-case.sh: path absolutization and argument validation",
+        "test/eval-scripts.test.ts: runScript env param change and new inject-case tests"
+      ],
+      "file_notes": [
+        {
+          "file": "scripts/inject-case.sh",
+          "note": "new executable script; builds squashed commit with injected patch, calls make-case.sh, sets source=injection"
+        },
+        {
+          "file": "test/eval-scripts.test.ts",
+          "note": "new test suite for inject-case.sh; runScript gains optional env param"
+        },
+        {
+          "file": "README.md",
+          "note": "documents injection.patch file and inject-case.sh usage"
+        },
+        {
+          "file": "TICKETS.md",
+          "note": "progress note only"
+        }
+      ],
+      "summary": "Adds scripts/inject-case.sh, which builds an eval case by squashing a host PR head plus a bug patch into one commit on the base and then calling make-case.sh with source \"injection\". It also adds an extensive test suite and README and TICKETS documentation. runScript in the tests gains an optional env parameter."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: Adds a new executable shell script with git plumbing logic (commit construction, temp repo with alternates, shallow handling, cleanup) plus tests for it.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1924,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3624,
+              "outputTokens": 25,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0003749,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 76,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 8264,
+              "webSearchRequests": 0,
+              "costUSD": 0.06764,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0680149
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4041,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3624,
+              "outputTokens": 25,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0003749,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 185,
+              "cacheReadInputTokens": 8222,
+              "cacheCreationInputTokens": 8382,
+              "webSearchRequests": 0,
+              "costUSD": 0.0724164,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 71,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0727913
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 2218,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3632,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0003737,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 70,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 8499,
+              "webSearchRequests": 0,
+              "costUSD": 0.0694,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.06977370000000001
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1880,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3610,
+              "outputTokens": 24,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.000373,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 73,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 8477,
+              "webSearchRequests": 0,
+              "costUSD": 0.069284,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.069657
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "TICKETS.md",
+            "start_line": 48,
+            "end_line": 48,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The D4b spec still says each revision moves the pin and writes a baseline, but the new R4 entry says R4 does neither.",
+            "evidence": "Each revision moves the pin in `eval/cases.json`, writes a new baseline with `--write-baseline` at two repeats and re-derives the margins by the rule in the README, in one PR.",
+            "suggested_fix": "Change the spec to say that one final D4b PR moves the pin and writes the baseline for all revisions.",
+            "explanation": "The new R4 line defers the pin move and the baseline to a final PR, so this spec line and the 'Proposed split' line now contradict the actual plan.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5464,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3624,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0003734,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 469,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 8174,
+              "webSearchRequests": 0,
+              "costUSD": 0.07478,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 147,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0751534
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 2296,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 7235,
+              "outputTokens": 24,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0007355,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 107,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 9118,
+              "webSearchRequests": 0,
+              "costUSD": 0.0757038,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 53,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0764393
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 2086,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3620,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0003725,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 72,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 5395,
+              "webSearchRequests": 0,
+              "costUSD": 0.0452198,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.045592299999999995
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 2412,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3620,
+              "outputTokens": 25,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0003745,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 63,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 5403,
+              "webSearchRequests": 0,
+              "costUSD": 0.0451038,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0454783
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 3018,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3628,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0003733,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 215,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 6178,
+              "webSearchRequests": 0,
+              "costUSD": 0.054343800000000005,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 24,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.054717100000000005
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "TICKETS.md",
+          "start_line": 48,
+          "end_line": 48,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The D4b spec still says each revision moves the pin and writes a baseline, but the new R4 entry says R4 does neither.",
+          "evidence": "Each revision moves the pin in `eval/cases.json`, writes a new baseline with `--write-baseline` at two repeats and re-derives the margins by the rule in the README, in one PR.",
+          "suggested_fix": "Change the spec to say that one final D4b PR moves the pin and writes the baseline for all revisions.",
+          "explanation": "The new R4 line defers the pin move and the baseline to a final PR, so this spec line and the 'Proposed split' line now contradict the actual plan.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "Each revision moves the pin in `eval/cases.json`, writes a new baseline with `--write-baseline` at two repeats and re-derives the margins by the rule in the README, in one PR.",
+            "The pin move and the baseline come in the final D4b baseline PR.",
+            "Each revision moves the pin, writes a baseline at two repeats and re-derives the margins."
+          ],
+          "rationale": "The new R4 entry and the PR description say the pin move and baseline happen once in a final D4b PR, but the spec line 48 and the Proposed split line still say each revision does both, so the ticket contradicts itself. This is a small doc inconsistency with a cheap fix.",
+          "score": 85,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "Each revision moves the pin in `eval/cases.json`, writes a new baseline with `--write-baseline` at two repeats and re-derives the margins by the rule in the README, in one PR.",
+            "The pin move and the baseline come in the final D4b baseline PR.",
+            "Each revision moves the pin, writes a baseline at two repeats and re-derives the margins. A baseline costs about $6 per case per repeat."
+          ],
+          "rationale": "The finding is correct. The new R4 line moves the pin move and the baseline to one final D4b PR, but the spec bullet and the 'Proposed split' paragraph still say each revision moves the pin and writes a baseline. The change adds this contradiction to the plan that the next D4b agent will follow, and the fix is cheap.",
+          "score": 93,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "Each revision moves the pin in `eval/cases.json`, writes a new baseline with `--write-baseline` at two repeats and re-derives the margins by the rule in the README, in one PR.",
+            "The pin move and the baseline come in the final D4b baseline PR.",
+            "Each revision moves the pin, writes a baseline at two repeats and re-derives the margins. A baseline costs about $6 per case per repeat."
+          ],
+          "rationale": "The finding is correct. The new R4 line moves the pin move and the baseline to one final D4b PR, but the spec bullet and the 'Proposed split' paragraph still say each revision moves the pin and writes a baseline. The change adds this contradiction to the plan that the next D4b agent will follow, and the fix is cheap.",
+          "score": 93,
+          "severity": "suggestion"
+        },
+        "passed": true
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5880402154,
+      "review_url": "https://github.com/jerridan/pr-review/pull/44#pullrequestreview-5880402154",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 131421310542
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [
+      {
+        "file": "TICKETS.md",
+        "start_line": 48,
+        "end_line": 48,
+        "category": "docs",
+        "severity_estimate": "nit",
+        "confidence": "low",
+        "claim": "The D4b spec still says each revision moves the pin and writes a baseline, but the new R4 entry says R4 does neither.",
+        "evidence": "Each revision moves the pin in `eval/cases.json`, writes a new baseline with `--write-baseline` at two repeats and re-derives the margins by the rule in the README, in one PR.",
+        "suggested_fix": "Change the spec to say that one final D4b PR moves the pin and writes the baseline for all revisions.",
+        "explanation": "The new R4 line defers the pin move and the baseline to a final PR, so this spec line and the 'Proposed split' line now contradict the actual plan.",
+        "needs_context": false,
+        "fingerprint": "dd040af68e9e139a",
+        "severity": "suggestion",
+        "score": 93,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "Each revision moves the pin in `eval/cases.json`, writes a new baseline with `--write-baseline` at two repeats and re-derives the margins by the rule in the README, in one PR.",
+            "The pin move and the baseline come in the final D4b baseline PR.",
+            "Each revision moves the pin, writes a baseline at two repeats and re-derives the margins. A baseline costs about $6 per case per repeat."
+          ],
+          "rationale": "The finding is correct. The new R4 line moves the pin move and the baseline to one final D4b PR, but the spec bullet and the 'Proposed split' paragraph still say each revision moves the pin and writes a baseline. The change adds this contradiction to the plan that the next D4b agent will follow, and the fix is cheap.",
+          "score": 93,
+          "severity": "suggestion"
+        },
+        "span_text": "- Make each case with `scripts/make-case.sh` and add it to the cases repo as its README says. Each revision moves the pin in `eval/cases.json`, writes a new baseline with `--write-baseline` at two repeats and re-derives the margins by the rule in the README, in one PR."
+      }
+    ],
+    "not_reposted": [],
+    "carried": [
+      {
+        "file": "scripts/inject-case.sh",
+        "start_line": 42,
+        "end_line": 47,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "The name validation and the 'not a commit' error path have no tests.",
+        "evidence": "  \"\" | . | .. | */*)",
+        "suggested_fix": "Add tests for a name such as 'a/b' and for a bad base rev. Each test asserts a non-zero exit and that no directory is written.",
+        "explanation": "A broken check could let the script write outside the current directory, and no test would fail.",
+        "needs_context": false,
+        "fingerprint": "c288a60fb1de73d2",
+        "severity": "nit",
+        "score": 92,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"\" | . | .. | */*)",
+            "echo \"inject-case: $1 is not a commit in $repo\" >&2"
+          ],
+          "rationale": "The eight inject-case tests cover a patch that doesn't apply, an existing name, a missing message file and too few arguments. None passes an invalid name or a bad base or head rev.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "span_text": "case \"$name\" in \"\" | . | .. | */*) echo \"inject-case: the name \\\"$name\\\" is not a directory name\" >&2 exit 2 ;; esac"
+      },
+      {
+        "file": "scripts/inject-case.sh",
+        "start_line": 86,
+        "end_line": 88,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "No test covers the shallow-repo branch, which is the real use with fetch-pr.sh repos.",
+        "evidence": "  cp \"$common/shallow\" \"$tmp/shallow\"",
+        "suggested_fix": "Add a test that runs the script on a shallow clone of the host, whose boundary is base, and checks that it exits 0 with one commit.",
+        "explanation": "If the shallow file is not copied, the commit build or the bundle fails on a shallow host repo, and no test would show it.",
+        "needs_context": false,
+        "fingerprint": "b7958b73c41f398a",
+        "severity": "suggestion",
+        "score": 92,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if [ -f \"$common/shallow\" ]; then\n  cp \"$common/shallow\" \"$tmp/shallow\"\nfi",
+            "await git(repo, [\"init\", \"--quiet\", \"--initial-branch=main\"]);",
+            "async function makeHost(): Promise<Host> {"
+          ],
+          "rationale": "All eight inject-case.sh tests build their host with makeHost(), which is a full non-shallow `git init` repo. So nothing tests the branch that copies the `shallow` file. The fetch-pr.sh shallow test only runs make-case.sh. This is a real test gap on the main use path, which goes through repos from fetch-pr.sh. The author did check that path by hand on the four real cases.",
+          "score": 92,
+          "severity": "suggestion"
+        },
+        "span_text": "if [ -f \"$common/shallow\" ]; then cp \"$common/shallow\" \"$tmp/shallow\" fi"
+      }
+    ]
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 5696,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11369,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011484000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 696,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 12143,
+            "webSearchRequests": 0,
+            "costUSD": 0.055535999999999995,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.056684399999999996
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 1880,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3610,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.000373,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 73,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 8477,
+            "webSearchRequests": 0,
+            "costUSD": 0.069284,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.069657
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 1924,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3624,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0003749,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 76,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 8264,
+            "webSearchRequests": 0,
+            "costUSD": 0.06764,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0680149
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 2218,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3632,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0003737,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 70,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 8499,
+            "webSearchRequests": 0,
+            "costUSD": 0.0694,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.06977370000000001
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "model": "claude-opus-5-5",
+        "duration_ms": 4041,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3624,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0003749,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 185,
+            "cacheReadInputTokens": 8222,
+            "cacheCreationInputTokens": 8382,
+            "webSearchRequests": 0,
+            "costUSD": 0.0724164,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 71,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0727913
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 2086,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3620,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0003725,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 72,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 5395,
+            "webSearchRequests": 0,
+            "costUSD": 0.0452198,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.045592299999999995
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "model": "claude-opus-5-5",
+        "duration_ms": 2296,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7235,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007355,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 107,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 9118,
+            "webSearchRequests": 0,
+            "costUSD": 0.0757038,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 53,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0764393
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5464,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3624,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0003734,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 469,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 8174,
+            "webSearchRequests": 0,
+            "costUSD": 0.07478,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 147,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0751534
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 2412,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3620,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0003745,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 63,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 5403,
+            "webSearchRequests": 0,
+            "costUSD": 0.0451038,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0454783
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "model": "claude-opus-5-5",
+        "duration_ms": 3018,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3628,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0003733,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 215,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 6178,
+            "webSearchRequests": 0,
+            "costUSD": 0.054343800000000005,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 24,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.054717100000000005
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 8500,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 12849,
+            "outputTokens": 380,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0014749000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 355,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 803,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 16728,
+            "webSearchRequests": 0,
+            "costUSD": 0.074946,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 399,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0764209
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6902,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 12837,
+            "outputTokens": 30,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012987,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 759,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 16708,
+            "webSearchRequests": 0,
+            "costUSD": 0.148852,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 318,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.15015070000000003
+      }
+    ],
+    "total_cost_usd": 0.8608733,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 38,
+      "gather": 66,
+      "scope": 4,
+      "triage": 6476,
+      "find_verify": 23427,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
