@@ -1,0 +1,212 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 43,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Propose a split of D4b into four revisions",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/43"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "e0998edf40fbde6485d5cfe912721f2239b058e2",
+    "head": "f5ad094227356f649afb3f696cc562ff3c58e8d6",
+    "started_at": "2026-11-12T16:03:24.983Z",
+    "tool_version": "0.6.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Propose a split of D4b into four revisions\n\nD4b is too large for one PR. This change adds a proposed split to its entry in TICKETS.md: four revisions, R1 to R4.\n\n- R1: benchmark cases from Martian and ReviewBench. No new tooling.\n- R2: own-repo cases with pooled goldens. Adds the pool tooling.\n- R3: dismissed findings from records become goldens. Depends on R2.\n- R4: bug-injection cases. Independent of R2 and R3.\n\nThe split is a recommendation. The agent that runs D4b can choose a different one.\n\nOnly TICKETS.md changes, so the version does not change.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZfAh69BLY1HnoCvN6F\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [],
+    "changed_files": [
+      {
+        "path": "TICKETS.md",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "skip",
+      "reason": "The change adds planning text to TICKETS.md, a markdown file that no code reads.",
+      "confidence": "high",
+      "categories": [
+        "docs"
+      ],
+      "hotspots": [],
+      "file_notes": [
+        {
+          "file": "TICKETS.md",
+          "note": "Adds a proposed four-revision split (R1 to R4) to the D4b ticket. This is documentation only."
+        }
+      ],
+      "summary": "The change adds a \"Proposed split\" section to the D4b ticket in TICKETS.md. It splits the work into four revisions: benchmark cases, own-repo cases, dismissed findings and injection cases. It also lists the dependencies between them and a cost estimate. No code or configuration changes."
+    },
+    "tier": "skip",
+    "tier_reason": "Triage: The change adds planning text to TICKETS.md, a markdown file that no code reads.",
+    "selected_reviewers": [],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [],
+    "verifications": [],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "skipped",
+    "coverage": {
+      "reviewers_ran": [],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5877739131,
+      "review_url": "https://github.com/jerridan/pr-review/pull/43#pullrequestreview-5877739131",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 131308951979
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6884,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 2221,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0002331,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 369,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 1734,
+            "webSearchRequests": 0,
+            "costUSD": 0.0107562,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0109893
+      }
+    ],
+    "total_cost_usd": 0.0109893,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 38,
+      "gather": 40,
+      "triage": 7826,
+      "find_verify": 1,
+      "merge": 0
+    },
+    "errors": []
+  }
+}
