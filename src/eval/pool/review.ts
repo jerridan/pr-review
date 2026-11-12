@@ -3,8 +3,8 @@
 // No review sees a record, a golden, a PR comment or another review.
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { claudeCall, gptCall, type PoolContext } from "./calls.js";
-import { reviewMessage, type ReviewInput } from "./prompts.js";
+import { claudeCall, claudeModelId, GPT_MODEL_ID, gptCall, type PoolContext } from "./calls.js";
+import { promptDigest, reviewMessage, type ReviewInput } from "./prompts.js";
 import { PoolFindingSchema, ReviewOutputSchema, type PoolFinding } from "./schemas.js";
 
 /** One blind review. "costUsd" is the cost of a Claude review, with its retry. */
@@ -26,8 +26,12 @@ export async function blindReviews(
   const m = reviewMessage(input);
   // A kept review is for the same source and the same input. The request
   // text holds random tags, so the key hashes the input.
-  const digest = createHash("sha256").update(JSON.stringify(input)).digest("hex");
-  const keyOf = (source: string) => `${source}:${digest}`;
+  // The key also holds the model and the prompt, so a new pin or prompt makes a new call.
+  const digest = createHash("sha256")
+    .update(JSON.stringify([input, promptDigest("pool-review.md")]))
+    .digest("hex");
+  const keyOf = (source: string) =>
+    `${source}:${source.startsWith("claude-") ? claudeModelId("pool-reviewer") : GPT_MODEL_ID}:${digest}`;
   const kept = (source: string): ReviewRun | undefined => {
     const k = ctx.memo?.get("review", keyOf(source), KeptReviewSchema);
     return k === undefined ? undefined : { source, ok: true, ...k };

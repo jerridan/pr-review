@@ -1,11 +1,11 @@
 // One model call of the pool, on either family. A call that fails gets
 // one retry. A semaphore bounds the calls in flight.
 import type { z } from "zod";
-import type { EvalRole } from "../../config/models.js";
+import { resolveModel, roleConfig, type EvalRole } from "../../config/models.js";
 import type { SdkClient } from "../../sdk/client.js";
 import type { RunOptions } from "../../sdk/options.js";
 import type { Semaphore } from "../../semaphore.js";
-import { runCodex } from "../codex.js";
+import { CODEX_EFFORT, CODEX_MODEL, runCodex } from "../codex.js";
 import type { CallMemo } from "./memo.js";
 import { codexPrompt, type Message } from "./prompts.js";
 
@@ -26,6 +26,14 @@ export type CallResult<T> = { ok: true; value: T } | { ok: false; error: string 
 
 /** A check of a parsed result. It gives an error, or null when the result is good. */
 export type Check<T> = (value: T) => string | null;
+
+/** The model of a Claude role, for the key of a kept result. */
+export function claudeModelId(role: EvalRole): string {
+  return resolveModel(roleConfig(role).model);
+}
+
+/** The GPT model and effort, for the key of a kept result. */
+export const GPT_MODEL_ID = `${CODEX_MODEL}:${CODEX_EFFORT}`;
 
 /** The attempts of one call: the first and one retry. */
 export const ATTEMPTS = 2;

@@ -2,6 +2,7 @@
 // goes in tagged untrusted blocks. Each prompt file serves both families:
 // the SDK call gets the body as the system prompt, and the codex call gets
 // the body and the user message as one prompt.
+import { createHash } from "node:crypto";
 import { loadPrompt, render } from "../../prompts/load.js";
 import { wrapUntrusted } from "../../untrusted.js";
 import { sixFields, type PoolFinding } from "./schemas.js";
@@ -69,6 +70,15 @@ function cappedFinding(file: string, f: PoolFinding): PoolFinding {
     claim: cap(f.claim, POOL_CLAIM_LIMIT, cut),
     evidence: cap(f.evidence, POOL_EVIDENCE_LIMIT, cut),
   };
+}
+
+/** A short digest of a prompt file, for the key of a kept result. */
+export function promptDigest(file: string): string {
+  const p = prompt(file);
+  return createHash("sha256")
+    .update(JSON.stringify([p.system, p.template, p.cutText]))
+    .digest("hex")
+    .slice(0, 16);
 }
 
 /** The one prompt string of a codex call: the system text, then the user text. */

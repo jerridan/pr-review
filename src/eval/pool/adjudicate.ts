@@ -3,8 +3,16 @@
 // belongs to the PR. The finding is kept when both scores reach the
 // threshold. "pr-review pool" and "pr-review adjudicate" both use it.
 import { sixFields } from "./schemas.js";
-import { claudeCall, gptCall, type CallResult, type Check, type PoolContext } from "./calls.js";
-import { adjudicateMessage } from "./prompts.js";
+import {
+  claudeCall,
+  claudeModelId,
+  GPT_MODEL_ID,
+  gptCall,
+  type CallResult,
+  type Check,
+  type PoolContext,
+} from "./calls.js";
+import { adjudicateMessage, promptDigest } from "./prompts.js";
 import { AdjudicationOutputSchema, type AdjudicationOutput, type PoolFinding } from "./schemas.js";
 
 /** The lowest score of each family that keeps a finding. */
@@ -46,9 +54,10 @@ export async function adjudicateFinding(
     family: "claude" | "gpt",
     call: () => ReturnType<typeof gptCall<AdjudicationOutput>>,
   ): Promise<CallResult<AdjudicationOutput>> => {
-    const key = `${family}:${text}`;
-    const old = ctx.memo?.get("adjudication", key, AdjudicationOutputSchema);
-    if (old !== undefined && checkScore(old) === null) return { ok: true, value: old };
+    const model = family === "claude" ? claudeModelId("adjudicator") : GPT_MODEL_ID;
+    const key = `${family}:${model}:${promptDigest("pool-adjudicate.md")}:${text}`;
+    const old = ctx.memo?.get("adjudication", key, AdjudicationOutputSchema, checkScore);
+    if (old !== undefined) return { ok: true, value: old };
     const r = await call();
     if (r.ok) ctx.memo?.set("adjudication", key, r.value);
     return r;

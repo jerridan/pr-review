@@ -2,8 +2,8 @@
 // Claude call groups the findings that state the same defect at the same
 // place.
 import { z } from "zod";
-import { claudeCall, type PoolContext } from "./calls.js";
-import { groupMessage } from "./prompts.js";
+import { claudeCall, claudeModelId, type PoolContext } from "./calls.js";
+import { groupMessage, promptDigest } from "./prompts.js";
 import { GroupOutputSchema, sixFields, type GroupOutput, type PoolFinding } from "./schemas.js";
 
 /** A finding with its source label. */
@@ -90,8 +90,23 @@ export async function groupFindings(
     return { ok: true, groups: names.map((_, i) => ({ members: [i], representative: i })) };
   }
   // A kept answer is for the same findings in the same order.
-  const key = JSON.stringify(findings.map(sixFields));
-  const old = ctx.memo?.get("group", key, KeptGroupsSchema);
+  const key = JSON.stringify([
+    claudeModelId("pool-grouper"),
+    promptDigest("pool-group.md"),
+    findings.map(sixFields),
+  ]);
+  // A kept answer goes through the checks of a live answer.
+  const old = ctx.memo?.get("group", key, KeptGroupsSchema, (kept) => {
+    const named = (i: number) => names[i] ?? `i${i}`;
+    const answer = {
+      groups: kept.map((g) => ({
+        members: g.members.map(named),
+        representative: named(g.representative),
+      })),
+    };
+    const problem = toGroups(answer, names);
+    return typeof problem === "string" ? problem : null;
+  });
   if (old !== undefined) return { ok: true, groups: old };
   let groups: Group[] = [];
   const result = await claudeCall(
