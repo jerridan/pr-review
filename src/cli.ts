@@ -66,6 +66,7 @@ interface EvalCliOptions {
   /** Commander gives false for --no-extras, and true by default. */
   extras: boolean;
   rawJudge?: boolean;
+  resume?: boolean;
 }
 
 // Commander exits with 1 on a usage error. This makes it 2. Help and
@@ -312,6 +313,10 @@ export function createProgram(deps: ProgramDeps): Command {
       "--raw-judge",
       "also ask the judge about the ambiguous pairs of the raw candidates (default: exact matches only)",
     )
+    .option(
+      "--resume",
+      "reuse the finished repeats that the --out directory holds, and run the others",
+    )
     .action(async (options: EvalCliOptions, command: Command) => {
       if (options.writeBaseline === true && options.baseline === undefined) {
         command.error("error: --write-baseline needs --baseline", { exitCode: EXIT_USAGE });
@@ -331,6 +336,7 @@ export function createProgram(deps: ProgramDeps): Command {
             allowSameJudge: options.allowSameJudge === true,
             extras: options.extras,
             rawJudge: options.rawJudge === true,
+            resume: options.resume === true,
           },
           deps,
         );

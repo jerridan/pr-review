@@ -539,7 +539,9 @@ describe("pr-review eval: the runs (R3.2 to R3.7)", () => {
       expect(code, stderr).toBe(0);
       for (const name of ["a-planted", "b-unmatched"]) {
         for (const repeat of ["1", "2"]) {
-          const files = readdirSync(join(out, name, repeat)).filter((f) => f.endsWith(".json"));
+          const files = readdirSync(join(out, name, repeat)).filter(
+            (f) => f.endsWith(".json") && f !== "result.json",
+          );
           expect(files, `${name}/${repeat}`).toHaveLength(1);
         }
       }
