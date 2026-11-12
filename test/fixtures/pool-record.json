@@ -1,0 +1,113 @@
+{
+  "identity": {
+    "repo": "fixture",
+    "pr": 7,
+    "base": "0000000000000000000000000000000000000000",
+    "head": "1111111111111111111111111111111111111111"
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/stats.ts",
+            "start_line": 14,
+            "end_line": 14,
+            "category": "bug",
+            "severity_estimate": "blocking",
+            "confidence": "high",
+            "claim": "MARK-R1 The average divides by zero for an empty list.",
+            "evidence": "return total / values.length;",
+            "explanation": "RECORD-SECRET explanation of the reviewer.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": null
+      },
+      {
+        "name": "tests",
+        "pass": 2,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/stats.ts",
+            "start_line": 15,
+            "end_line": 15,
+            "category": "test",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "MARK-R2 No test covers the average function.",
+            "evidence": "}",
+            "explanation": "RECORD-SECRET second explanation.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": null
+      }
+    ],
+    "capped": [
+      {
+        "file": "src/stats.ts",
+        "start_line": 12,
+        "end_line": 12,
+        "category": "bug",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "MARK-C1 The sum can overflow for large values.",
+        "evidence": "total += values[i];",
+        "explanation": "RECORD-SECRET capped explanation.",
+        "needs_context": false,
+        "fingerprint": "fp-capped-5d1e",
+        "severity": "suggestion",
+        "score": 58,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": ["total += values[i];"],
+          "rationale": "VERIFIER-SECRET capped rationale.",
+          "score": 58,
+          "severity": "suggestion"
+        },
+        "span_text": "SPAN-SECRET total += values[i];"
+      }
+    ],
+    "pre_existing": []
+  },
+  "posted": {
+    "findings": [
+      {
+        "file": "src/stats.ts",
+        "start_line": 11,
+        "end_line": 11,
+        "category": "bug",
+        "severity_estimate": "blocking",
+        "confidence": "high",
+        "claim": "MARK-P1 The loop reads one element past the end of the list.",
+        "evidence": "for (let i = 0; i <= values.length; i++) {",
+        "explanation": "RECORD-SECRET posted explanation.",
+        "needs_context": false,
+        "fingerprint": "fp-7f3a9c",
+        "severity": "blocking",
+        "score": 63,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": ["for (let i = 0; i <= values.length; i++) {"],
+          "rationale": "VERIFIER-SECRET posted rationale.",
+          "score": 63,
+          "severity": "blocking"
+        },
+        "span_text": "SPAN-SECRET for (let i = 0; i <= values.length; i++) {"
+      }
+    ],
+    "below_floor": [],
+    "carried": []
+  }
+}
