@@ -202,7 +202,13 @@ export async function runAdjudicate(opts: AdjudicateOptions, deps: ProgramDeps):
     if (opts.out === undefined) process.stdout.write(text);
     else await writeFile(opts.out, text);
     const failed = "failed" in result.claude || "failed" in result.gpt;
-    if (failed) say("adjudicate", "a call failed after its retry.");
+    for (const [family, r] of [
+      ["claude", result.claude],
+      ["gpt", result.gpt],
+    ] as const) {
+      if ("failed" in r)
+        say("adjudicate", `the ${family} call failed after its retry: ${r.failed}`);
+    }
     return failed ? EXIT_FAILURE : EXIT_OK;
   } finally {
     await rm(tmp, { recursive: true, force: true });

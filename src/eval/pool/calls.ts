@@ -27,6 +27,24 @@ export type Check<T> = (value: T) => string | null;
 /** The attempts of one call: the first and one retry. */
 export const ATTEMPTS = 2;
 
+/** The most characters of codex stderr that the failure text of a GPT call holds. */
+export const STDERR_TAIL = 500;
+
+/**
+ * The failure text of a failed codex call: the error, then the end of
+ * stderr. Codex writes its banner and the prompt first and the cause of a
+ * failure last, so the end of stderr holds the cause. The text is one
+ * line, so the error line of the command is one line too.
+ */
+export function codexFailure(error: string, stderr: string): string {
+  const tail = stderr
+    .trim()
+    .slice(-STDERR_TAIL)
+    .replace(/\s*\n\s*/g, " | ")
+    .trim();
+  return tail === "" ? error : `${error}; codex stderr ends: ${tail}`;
+}
+
 function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
@@ -83,7 +101,9 @@ export function gptCall<T>(
   const once = (): Promise<CallResult<T>> =>
     ctx.semaphore(async () => {
       const outcome = await runCodex(codexPrompt(m), ctx.checkout, schema, what);
-      return outcome.ok ? { ok: true, value: outcome.output } : { ok: false, error: outcome.error };
+      return outcome.ok
+        ? { ok: true, value: outcome.output }
+        : { ok: false, error: codexFailure(outcome.error, outcome.stderr) };
     });
   return withRetry(once, check);
 }
