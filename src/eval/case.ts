@@ -8,13 +8,7 @@ import { CATEGORIES, type Category } from "../schemas/finding.js";
 import { LABEL_SEVERITIES, POSTED_SEVERITIES } from "../schemas/label.js";
 
 export type CaseSource =
-  | "fixture"
-  | "pr"
-  | "reviewbench"
-  | "martian"
-  | "injection"
-  | "record"
-  | "pool";
+  "fixture" | "pr" | "reviewbench" | "martian" | "injection" | "record" | "pool";
 
 /**
  * A golden finding carries one of the six labels of the severity policy.

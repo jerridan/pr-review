@@ -3,13 +3,7 @@
 import { JudgeResultSchema, type JudgeResult } from "../../schemas/label.js";
 import { runCodex, type CodexOutcome } from "../codex.js";
 
-export {
-  CODEX_EFFORT,
-  CODEX_MODEL,
-  CODEX_TIMEOUT_MS,
-  STDERR_LIMIT,
-  codexArgs,
-} from "../codex.js";
+export { CODEX_EFFORT, CODEX_MODEL, CODEX_TIMEOUT_MS, STDERR_LIMIT, codexArgs } from "../codex.js";
 
 export type CodexJudgeOutcome = CodexOutcome<JudgeResult>;
 
