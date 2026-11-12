@@ -615,7 +615,7 @@ The command runs step 5 of the pool on one finding.
 | `--finding <path>` | A JSON file with `file`, `start_line`, `end_line`, `category` and `claim`, and an optional `evidence`. Use it in place of `--record`. | none |
 | `--out <path>` | The output file. | stdout |
 
-The output is `{finding, claude, gpt, kept}`. `claude` and `gpt` are each `{score, reason, start_line, end_line}` or `{failed}`. The adjudicators get only the six fields of the finding, the diff and the checkout. They never get a fingerprint, a severity, a score, a verifier result, a reviewer name or a source. The command exits 0 when both calls succeeded, 1 when a call failed, and 2 on a usage error, also for an unknown fingerprint.
+The output is `{finding, claude, gpt, kept}`. `claude` and `gpt` are each `{score, reason, start_line, end_line}` or `{failed}`. The adjudicators get only the six fields of the finding, the diff and the checkout. They never get a fingerprint, a severity, a score, a verifier result, a reviewer name or a source. The command exits 0 when both calls succeeded, 1 when a call failed or the checkout failed, and 2 on a usage error, also for an unknown fingerprint.
 
 ## Label
 

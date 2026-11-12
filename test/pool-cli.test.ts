@@ -9,6 +9,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
+import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -269,20 +270,13 @@ describe("pr-review pool, the main scenario", () => {
     ]);
   });
 
-  it("does not order pool.json by source", () => {
-    const sourceOrder = [
-      "MARK-K1",
-      "MARK-F1",
-      "MARK-I1",
-      "MARK-G2",
-      "MARK-O1",
-      "MARK-S1",
-      "MARK-N1",
-      "MARK-O2",
-      "MARK-R1",
-      "MARK-R2",
-    ];
-    expect(pool.items.map((i) => markerOf(i.claim))).not.toEqual(sourceOrder);
+  it("orders pool.json by the hash of the item text, not by source", () => {
+    const hashes = pool.items.map((i) =>
+      createHash("sha256")
+        .update(JSON.stringify(Object.fromEntries(SIX.map((k) => [k, i[k as keyof Item]]))))
+        .digest("hex"),
+    );
+    expect(hashes).toEqual([...hashes].sort());
   });
 
   it("keeps an item scored 75 and 80, and not an item scored 74 and 90", () => {
@@ -497,7 +491,7 @@ describe("pr-review pool, the other paths", () => {
     const path = join(s.out, "..", "other.json");
     writeFileSync(path, JSON.stringify(record));
     const code = await cli(s.client, "pool", s.caseDir, "--out", s.out, "--record", path);
-    expect(code).not.toBe(0);
+    expect(code).toBe(2);
     expect(s.io.stderr()).toMatch(/8/);
     expect(s.client.calls).toHaveLength(0);
     expect(codexCalls(s.codexDir)).toHaveLength(0);
@@ -836,4 +830,37 @@ describe("pr-review pool, the size of a codex prompt", () => {
     expect(prompts).toHaveLength(1);
     expect(Buffer.byteLength(prompts[0] ?? "")).toBeLessThan(LIMIT);
   }, 60_000);
+});
+
+describe("pr-review pool, an invalid grouping answer", () => {
+  it.each([
+    ["an unknown id", () => ({ groups: [{ members: ["i9"], representative: "i9" }] })],
+    [
+      "a finding in two groups",
+      () => ({
+        groups: [
+          { members: ["i1", "i2"], representative: "i1" },
+          { members: ["i2"], representative: "i2" },
+        ],
+      }),
+    ],
+    [
+      "a representative outside its group",
+      () => ({ groups: [{ members: ["i1"], representative: "i2" }] }),
+    ],
+  ])(
+    "fails the case for %s",
+    async (_name, answer) => {
+      const s = setup({
+        claudeReviews: [[item("MARK-K1", 11)]],
+        gptReviews: [[item("MARK-N1", 10)]],
+        groupers: [answer, answer],
+      });
+      const code = await cli(s.client, "pool", s.caseDir, "--out", s.out, "--reviews", "1");
+      expect(code).toBe(1);
+      expect(s.io.stderr()).toMatch(/group/i);
+      expect(existsSync(join(s.out, CASE, "pool.json"))).toBe(false);
+    },
+    60_000,
+  );
 });

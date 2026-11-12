@@ -1,4 +1,4 @@
-// R4: a case with the source "pool". The eval loader loads it with its
+// A case with the source "pool" (the case source of the pool spec). The eval loader loads it with its
 // golden.json. The pool loader loads it also without golden.json.
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
