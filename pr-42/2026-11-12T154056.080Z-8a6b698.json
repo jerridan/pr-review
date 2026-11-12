@@ -1,0 +1,436 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 42,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Write eval baselines at two repeats",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/42"
+    },
+    "run_kind": "later",
+    "prior": {
+      "head": "bcc88301832f1543864dcb20e3aff49645ad2786",
+      "source": "record",
+      "record": "/home/runner/work/_temp/pr-review-records/pr-42/2026-11-12T153403.655Z-bcc8830.json",
+      "open": [
+        "92a5296129e44fd1"
+      ],
+      "dismissed": [],
+      "fetch_failed": false
+    },
+    "base": "e3578bd92b9f30b92d92ff939bf8f946b5481762",
+    "head": "8a6b69845ba6051bc459832d3b75136a54aaafee",
+    "started_at": "2026-11-12T15:40:56.080Z",
+    "tool_version": "0.6.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Write eval baselines at two repeats\n\n## Summary\n\nThis PR records two eval decisions in the docs. It changes no code.\n\n- A new baseline is written at two repeats, not three. Two repeats give the spread that the margin rule needs, at less cost.\n- A routine eval against the baseline stays at one repeat.\n- To cut noise, the case set grows before the repeat count does. More cases reduce the noise of one case and the noise between runs. More repeats reduce only the noise between runs. In the D7 evals, one case moved precision by 0.1 between two runs of nearly the same code.\n\nThe README baseline section, design section 8 and the D4b ticket now say this. The CI eval job keeps `--repeat 3`, because a change to it is a workflow change.\n\n## Test plan\n\n- [x] `npm test` passes.\n- [x] `scripts/check-version-bump.sh` says the change touches no shipped file.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZfeb8Fxs7Pynw8RhjV\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": "README.md",
+        "hunks": 1
+      },
+      {
+        "path": "TICKETS.md",
+        "hunks": 1
+      },
+      {
+        "path": "docs/design/high-level-design.md",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "fast",
+      "reason": "Docs-only change to README, TICKETS and design doc that updates the baseline-refresh procedure from three repeats to two; no code is touched.",
+      "confidence": "high",
+      "categories": [
+        "docs"
+      ],
+      "hotspots": [
+        "README.md: baseline refresh command (--repeat 2) and the new paragraph on repeats vs cases",
+        "docs/design/high-level-design.md: Metrics and Gate bullets, consistency of the repeat counts"
+      ],
+      "file_notes": [
+        {
+          "file": "README.md",
+          "note": "Baseline refresh command changed from --repeat 3 to --repeat 2; new paragraph on noise and cases vs repeats."
+        },
+        {
+          "file": "TICKETS.md",
+          "note": "Case-set revision step now says write the baseline at two repeats."
+        },
+        {
+          "file": "docs/design/high-level-design.md",
+          "note": "Removes the fixed 'run each case three times' wording; the Gate bullet now sets two repeats for a new baseline and gives the reason."
+        }
+      ],
+      "summary": "The change moves the documented baseline-refresh procedure from three repeats to two. It adds guidance to grow the case set before raising the repeat count. The README, the ticket text and the design doc are updated to match. No code or config changes."
+    },
+    "tier": "fast",
+    "tier_reason": "Triage: Docs-only change to README, TICKETS and design doc that updates the baseline-refresh procedure from three repeats to two; no code is touched.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= fast; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= fast; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 3240,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3662,
+              "outputTokens": 19,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0003757,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 222,
+              "cacheReadInputTokens": 13439,
+              "cacheCreationInputTokens": 4110,
+              "webSearchRequests": 0,
+              "costUSD": 0.0400238,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 83,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.040399500000000005
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1679,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 3662,
+              "outputTokens": 19,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0003757,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 74,
+              "cacheReadInputTokens": 5363,
+              "cacheCreationInputTokens": 3167,
+              "webSearchRequests": 0,
+              "costUSD": 0.0278966,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0282723
+        }
+      }
+    ],
+    "verifications": [],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "diff-bugs"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5877376327,
+      "review_url": "https://github.com/jerridan/pr-review/pull/42#pullrequestreview-5877376327",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 131294526672
+      },
+      "cleanup_comment_id": null,
+      "resolved": [
+        {
+          "thread_id": "PRRT_kwDOVHw73s62sZeb",
+          "fingerprint": "92a5296129e44fd1"
+        }
+      ],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 5017,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 4429,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0004529,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 544,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 3942,
+            "webSearchRequests": 0,
+            "costUSD": 0.0213382,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0217911
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 1679,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3662,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0003757,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 74,
+            "cacheReadInputTokens": 5363,
+            "cacheCreationInputTokens": 3167,
+            "webSearchRequests": 0,
+            "costUSD": 0.0278966,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0282723
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 3240,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3662,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0003757,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 222,
+            "cacheReadInputTokens": 13439,
+            "cacheCreationInputTokens": 4110,
+            "webSearchRequests": 0,
+            "costUSD": 0.0400238,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 83,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.040399500000000005
+      }
+    ],
+    "total_cost_usd": 0.09046290000000001,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 47,
+      "gather": 94,
+      "scope": 4,
+      "triage": 5848,
+      "find_verify": 4227,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
