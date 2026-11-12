@@ -725,11 +725,13 @@ For each repeat, the report gives the mean over the cases of raw recall, recall,
 
 With `--baseline <file>`, the eval compares the aggregate mean recall and mean precision with the file. The gate fails when the baseline value minus the mean is more than the margin. A drop equal to the margin passes. A null mean fails. The eval prints the two drops and the margin to stderr. The eval warns when the `cases_ref` of the baseline and the HEAD of the cases checkout are both known and differ. A change of the case set needs a new baseline.
 
-Refresh the baseline after a deliberate change, such as a new case set or a new prompt. Run the eval with the baseline flag and the write flag, then commit the file:
+Refresh the baseline after a deliberate change, such as a new case set or a new prompt. Run the eval with the baseline flag and the write flag at two repeats, then commit the file:
 
 ```bash
-pr-review eval --cases eval/cases --repeat 3 --baseline eval/baseline.json --write-baseline
+pr-review eval --cases eval/cases --repeat 2 --baseline eval/baseline.json --write-baseline
 ```
+
+Two repeats give the spread that the margin rule below needs, at less cost than three. A routine eval against the baseline runs at one repeat. To make the eval less noisy, add cases before you add repeats: more cases reduce both the noise of one case and the noise between runs, and more repeats reduce only the noise between runs.
 
 The write keeps the `margin` of the existing file, or uses 0.05 for each metric. It writes nothing when a repeat failed. An incomplete review is a failed repeat. No CI step writes the baseline.
 
