@@ -1,10 +1,12 @@
 // The eval command: validate the cases, review each case several times in
 // sequence, score each record against the golden findings of its case,
 // and report the metrics. The gate compares the report with a baseline.
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { z } from "zod";
 import { EXIT_FAILURE, EXIT_GATE, EXIT_OK, EXIT_USAGE, type ProgramDeps } from "../cli.js";
 import { JUDGE_DEFAULTS, ROLE_DEFAULTS, resolveModel } from "../config/models.js";
 import { loadRepoConfig } from "../config/repo-config.js";
@@ -164,6 +166,8 @@ type EvalContext = {
   judgeModel: string;
   /** The ISO time when runEval started. */
   startedAt: string;
+  /** The version of this tool, read one time per run. */
+  toolVersion: string;
 };
 
 /** The options that change the result of a repeat. */
@@ -174,6 +178,43 @@ type ResultOptions = {
   raw_judge: boolean;
 };
 
+// The fields of the metrics that buildReport and renderTable read.
+const number = z.number();
+const nullableNumber = z.number().nullable();
+const MetricsShape = z.object({
+  repeat: number,
+  failed: z.boolean(),
+  error: z.string().nullable(),
+  recall: nullableNumber,
+  precision: nullableNumber,
+  raw_recall: nullableNumber,
+  adjudicated_precision: nullableNumber,
+  posted: number,
+  matched: number,
+  cost_usd: nullableNumber,
+  judge_calls: number,
+  judge_unknown: number,
+  judge_cost_usd: number,
+  extras_accepted: number,
+  extras_unknown: number,
+  drops: z.record(z.string(), number),
+});
+
+const ResultFileSchema = z.object({
+  case: z.string(),
+  head: z.string(),
+  golden: z.string(),
+  repeat: number,
+  tool_version: z.string(),
+  options: z.object({
+    tier: z.string(),
+    judge_model: z.string(),
+    extras: z.boolean(),
+    raw_judge: z.boolean(),
+  }),
+  metrics: MetricsShape.loose(),
+});
+
 /**
  * The file "<out>/<case>/<repeat>/result.json". It holds the metrics of a
  * finished repeat and the facts that a later --resume run checks.
@@ -181,6 +222,8 @@ type ResultOptions = {
 type ResultFile = {
   case: string;
   head: string;
+  /** The fingerprint of the golden findings that scored the repeat. */
+  golden: string;
   repeat: number;
   tool_version: string;
   options: ResultOptions;
@@ -196,6 +239,10 @@ const resultOptions = (ctx: EvalContext): ResultOptions => ({
   raw_judge: ctx.opts.rawJudge,
 });
 
+// A hash of the golden findings. A change of golden.json changes it.
+const goldenFingerprint = (c: Case): string =>
+  createHash("sha256").update(JSON.stringify(c.golden)).digest("hex");
+
 const resultPath = (out: string, c: Case, repeat: number): string =>
   join(out, c.name, String(repeat), "result.json");
 
@@ -206,8 +253,9 @@ async function writeResult(ctx: EvalContext, c: Case, m: RepeatMetrics): Promise
   const file: ResultFile = {
     case: c.name,
     head: c.head,
+    golden: goldenFingerprint(c),
     repeat: m.repeat,
-    tool_version: toolVersion(),
+    tool_version: ctx.toolVersion,
     options: resultOptions(ctx),
     metrics: m,
   };
@@ -217,36 +265,32 @@ async function writeResult(ctx: EvalContext, c: Case, m: RepeatMetrics): Promise
   await rename(temp, path);
 }
 
-// Read a result file. A missing file, a file that is not JSON, and a file of
-// another shape give null.
-async function readResult(path: string): Promise<ResultFile | null> {
+// Read the result file of repeat slot "repeat". A missing file, a file that
+// is not JSON, a file of another shape, and a file for another repeat give
+// null.
+async function readResult(path: string, repeat: number): Promise<ResultFile | null> {
   try {
-    const value = JSON.parse(await readFile(path, "utf8")) as Partial<ResultFile> | null;
-    if (
-      value === null ||
-      typeof value !== "object" ||
-      typeof value.case !== "string" ||
-      typeof value.head !== "string" ||
-      typeof value.tool_version !== "string" ||
-      typeof value.options !== "object" ||
-      value.options === null ||
-      typeof value.metrics !== "object" ||
-      value.metrics === null ||
-      typeof value.metrics.failed !== "boolean" ||
-      value.metrics.repeat !== value.repeat
-    ) {
-      return null;
-    }
-    return value as ResultFile;
+    const parsed = ResultFileSchema.safeParse(JSON.parse(await readFile(path, "utf8")));
+    if (!parsed.success) return null;
+    const file = parsed.data;
+    if (file.repeat !== repeat || file.metrics.repeat !== repeat) return null;
+    return file as unknown as ResultFile;
   } catch {
     return null;
   }
 }
 
+const sameOptions = (a: ResultOptions, b: ResultOptions): boolean =>
+  a.tier === b.tier &&
+  a.judge_model === b.judge_model &&
+  a.extras === b.extras &&
+  a.raw_judge === b.raw_judge;
+
 // The results to reuse, by "<case>/<repeat>". A result that is failed, or
-// that has another case head, is not reused. A result of another tool
-// version or with other options throws: one report must not mix two
-// configurations.
+// that has another case, head or golden fingerprint, is not reused. It runs
+// again, so no version or option check applies to it. A result that would
+// be reused, but that has another tool version or other options, throws:
+// one report must not mix two configurations.
 async function reusableResults(
   ctx: EvalContext,
   cases: Case[],
@@ -254,23 +298,25 @@ async function reusableResults(
   const reuse = new Map<string, RepeatMetrics>();
   const now = resultOptions(ctx);
   for (const c of cases) {
+    const golden = goldenFingerprint(c);
     for (let repeat = 1; repeat <= ctx.opts.repeat; repeat++) {
       const path = resultPath(ctx.out, c, repeat);
-      const found = await readResult(path);
+      const found = await readResult(path, repeat);
       if (found === null) continue;
-      if (found.tool_version !== toolVersion()) {
+      if (found.metrics.failed) continue;
+      if (found.case !== c.name || found.head !== c.head || found.golden !== golden) continue;
+      if (found.tool_version !== ctx.toolVersion) {
         throw new ResumeError(
-          `${path}: the result is from tool version ${found.tool_version}, but this is ${toolVersion()}. ` +
+          `${path}: the result is from tool version ${found.tool_version}, but this is ${ctx.toolVersion}. ` +
             "Run without --resume, or use another --out.",
         );
       }
-      if (JSON.stringify(found.options) !== JSON.stringify(now)) {
+      if (!sameOptions(found.options, now)) {
         throw new ResumeError(
           `${path}: the result has other options (${JSON.stringify(found.options)}) than this run ` +
             `(${JSON.stringify(now)}). Give the same options, or use another --out.`,
         );
       }
-      if (found.metrics.failed || found.head !== c.head || found.case !== c.name) continue;
       reuse.set(`${c.name}/${repeat}`, found.metrics);
     }
   }
@@ -456,6 +502,7 @@ export async function runEval(opts: EvalOptions, deps: ProgramDeps): Promise<num
     options: { allowApiKey: opts.allowApiKey, env: process.env },
     judgeModel,
     startedAt,
+    toolVersion: toolVersion(),
   };
 
   let reuse = new Map<string, RepeatMetrics>();
@@ -480,8 +527,7 @@ export async function runEval(opts: EvalOptions, deps: ProgramDeps): Promise<num
         continue;
       }
       // The old output of this repeat stays out of the way of the new record.
-      if (opts.resume)
-        await rm(join(out, c.name, String(repeat)), { recursive: true, force: true });
+      await rm(join(out, c.name, String(repeat)), { recursive: true, force: true });
       const outcome = await runRepeat(ctx, c, repeat);
       // The pre-flight catches a config that gives a reviewer the judge
       // model. This check stays as a safety net for a model that only the
@@ -521,7 +567,7 @@ export async function runEval(opts: EvalOptions, deps: ProgramDeps): Promise<num
       try {
         await writeBaseline(opts.baseline, report, base.existing, {
           repeat: opts.repeat,
-          tool_version: toolVersion(),
+          tool_version: ctx.toolVersion,
         });
       } catch (err) {
         runError = messageOf(err);
