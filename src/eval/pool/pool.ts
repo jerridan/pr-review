@@ -32,6 +32,7 @@ import {
   type DismissLabel,
   type PoolRecord,
 } from "./records.js";
+import { CallMemo } from "./memo.js";
 import { blindReviews, type ReviewRun } from "./review.js";
 import { sixFields, type PoolFinding } from "./schemas.js";
 
@@ -52,6 +53,8 @@ export type PoolCaseOptions = {
   out: string;
   /** Write goldens for the findings that the verifier dismissed. */
   dismissed?: boolean;
+  /** Reuse the kept results of an earlier run in the output directory. */
+  resume?: boolean;
 };
 
 /** The dismissed findings of one case, for the summary. */
@@ -87,6 +90,8 @@ export type PoolCaseResult = {
   goldenSkipped: string | null;
   /** The dismissed findings, or null without --dismissed. */
   dismissed: DismissedSummary | null;
+  /** The calls that kept results served and the calls made, or null without --resume. */
+  resumed: { reused: number; made: number } | null;
 };
 
 /** One pool item: an id, the fields of its representative, and its members. */
@@ -365,9 +370,14 @@ async function poolInCheckout(
   c: Case,
   records: readonly PoolRecord[],
   opts: PoolCaseOptions,
-  ctx: PoolContext,
+  base: PoolContext,
 ): Promise<PoolCaseResult> {
   const diff = await readFile(join(c.dir, "diff.patch"), "utf8");
+  const dir = join(opts.out, c.name);
+  await mkdir(dir, { recursive: true });
+  // calls.json keeps each call that succeeded, so a later --resume run can reuse it.
+  const memo = new CallMemo(join(dir, "calls.json"), c.head, opts.resume === true);
+  const ctx: PoolContext = { ...base, memo };
 
   // Step 1: the blind reviews. Step 2: the record findings.
   const runs = await blindReviews(
@@ -377,8 +387,6 @@ async function poolInCheckout(
   );
   // reviews.json shows what each blind review gave. The pool and the
   // adjudication calls never read it.
-  const dir = join(opts.out, c.name);
-  await mkdir(dir, { recursive: true });
   await writeFile(join(dir, "reviews.json"), json({ reviews: runs.map(reviewEntry) }));
   const sourced: Sourced[] = runs.flatMap((r) =>
     r.ok ? r.findings.map((finding) => ({ source: r.source, finding })) : [],
@@ -479,6 +487,7 @@ async function poolInCheckout(
     reviews: runs,
     goldenSkipped,
     dismissed,
+    resumed: opts.resume === true ? memo.counts() : null,
   };
 }
 
@@ -514,6 +523,13 @@ function summariseDismissed(
     }
   });
   return summary;
+}
+
+/** The summary line of the calls of a resumed run, or none. */
+export function resumeLines(r: PoolCaseResult): string[] {
+  return r.resumed === null
+    ? []
+    : [`${r.name}: resume ${r.resumed.reused} reused, ${r.resumed.made} new`];
 }
 
 /** The summary lines of the dismissed findings of one case, or none. */

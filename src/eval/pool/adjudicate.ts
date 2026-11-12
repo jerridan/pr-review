@@ -2,7 +2,8 @@
 // the same prompt. Each answers if the claim is true at the case head and
 // belongs to the PR. The finding is kept when both scores reach the
 // threshold. "pr-review pool" and "pr-review adjudicate" both use it.
-import { claudeCall, gptCall, type Check, type PoolContext } from "./calls.js";
+import { sixFields } from "./schemas.js";
+import { claudeCall, gptCall, type CallResult, type Check, type PoolContext } from "./calls.js";
 import { adjudicateMessage } from "./prompts.js";
 import { AdjudicationOutputSchema, type AdjudicationOutput, type PoolFinding } from "./schemas.js";
 
@@ -39,9 +40,22 @@ export async function adjudicateFinding(
   ctx: PoolContext,
 ): Promise<Adjudication> {
   const m = adjudicateMessage(finding, diff);
+  // A kept result is for the same family and the same item text.
+  const text = JSON.stringify(sixFields(finding));
+  const run = async (
+    family: "claude" | "gpt",
+    call: () => ReturnType<typeof gptCall<AdjudicationOutput>>,
+  ): Promise<CallResult<AdjudicationOutput>> => {
+    const key = `${family}:${text}`;
+    const old = ctx.memo?.get("adjudication", key, AdjudicationOutputSchema);
+    if (old !== undefined && checkScore(old) === null) return { ok: true, value: old };
+    const r = await call();
+    if (r.ok) ctx.memo?.set("adjudication", key, r.value);
+    return r;
+  };
   const [claude, gpt] = await Promise.all([
-    claudeCall("adjudicator", m, AdjudicationOutputSchema, ctx, checkScore),
-    gptCall(m, AdjudicationOutputSchema, "adjudication", ctx, checkScore),
+    run("claude", () => claudeCall("adjudicator", m, AdjudicationOutputSchema, ctx, checkScore)),
+    run("gpt", () => gptCall(m, AdjudicationOutputSchema, "adjudication", ctx, checkScore)),
   ]);
   const result = (r: typeof claude): FamilyResult =>
     r.ok

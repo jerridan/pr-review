@@ -563,7 +563,7 @@ The JSON output holds `reviewers_skipped`, `reviewers_without_bash` and `sensiti
 The pool builds the golden findings of a case from your own repo. Run `pr-review pool` first. It finds the defects and writes `golden.json` with the placeholder severity `unsure`. Then run `pr-review label --write-golden`. It sets the severity of each golden finding.
 
 ```bash
-pr-review pool <case-dir>... --out <dir> [--record <path>]... [--reviews <n>] [--write-golden] [--dismissed]
+pr-review pool <case-dir>... --out <dir> [--record <path>]... [--reviews <n>] [--write-golden] [--dismissed] [--resume]
 pr-review label --cases <cases-dir> --only <case> --write-golden
 ```
 
@@ -576,6 +576,7 @@ The pool makes real model calls. It needs a Claude login, and the Codex CLI on y
 | `--record <path>` | A run record of the PR of the case. Give the flag again for each record. The `identity.pr` of the record must equal the number at the end of the case name, as in `walle-14`. The repo of the record (its `identity.github.slug`, else its `identity.repo` when that is `owner/repo`) must equal the `owner/repo` in the pull request URL in `origin` of `case.json`. The pool checks every finding of each record before the first model call. Use `--record` with one case per command. | none |
 | `--reviews <n>` | The blind reviews of each model family. A positive integer. | 2 |
 | `--write-golden` | Write `golden.json` in each case directory. This replaces an existing `golden.json`. | off |
+| `--resume` | Reuse the calls that succeeded in an earlier run with the same `--out`. See "Resume a stopped run" below. | off |
 | `--dismissed` | Also write goldens for the findings that the verifier dismissed in the `--record` files. See "Dismissed findings" below. | off |
 
 For each case, the pool clones the case at its head and does six steps:
@@ -587,18 +588,27 @@ For each case, the pool clones the case at its head and does six steps:
 5. **Adjudicate.** A Claude model and a GPT model each score every item from 0 to 100. The score tells if the claim is true at the case head and if the defect belongs to this PR. An item is kept when both scores are 75 or more. A failed call keeps the item out and marks it `failed`.
 6. **Join.** The golden span of a kept item is the Claude span when it is inside the file at the case head, else the GPT span. A kept item with neither is `no_span` and writes no golden. Kept items in one file whose spans overlap form a component, together with the items that overlap them in turn. Each component of two or more items goes through the grouping call again, one call for each component. A group never holds items of two components. Each group writes one golden: the member with the highest lower score.
 
-Each case gets four files in `<out>/<case>/`:
+Each case gets five files in `<out>/<case>/`:
 
 | File | Content |
 |------|---------|
 | `pool.json` | The anonymous items. |
 | `pool-key.json` | The members and the sources of each item. |
 | `reviews.json` | For each blind review: its source, `ok`, the number of findings or the failure text, and the cost in USD of a Claude review. No adjudicator sees this file. |
+| `calls.json` | Each model call that succeeded: the findings of each blind review, each grouping answer and each adjudication of each family. `--resume` reads it. |
 | `adjudications.json` | For each item: the score, the reason and the span of each family, or `failed`; `kept`; and `outcome`: `golden`, `joined`, `no_span`, `not_kept`, `failed` or `dismissed_golden`. |
 
 Stdout gets one line per case: the items, the kept items, the failed items, the goldens, the `no_span` items, the cost in USD of the Claude calls, and the findings of each blind review, for example `reviews claude 0+0, gpt 0+1`. A failed review shows as `failed`. One prompt gets at most 64 KiB of the diff, 16 KiB of the PR body, 1 KiB of the title, 8 KiB of the file list, and 4 KiB of the claim and 8 KiB of the evidence of an item. The limits count UTF-8 bytes. A cut text from the prompt file tells the model about each cut. The failure text of a GPT call ends with the last 500 characters of the Codex stderr, because Codex writes the cause of a failure last. With `--write-golden`, each golden has the file, the golden span, the category, the claim, `severity: "unsure"` and a `note` with both scores. A case with no kept item gets `{"findings": []}`, a clean case. Without `--write-golden`, `golden.json` does not change. With `--write-golden`, `golden.json` also does not change when a blind review or an adjudication call of the case failed, or when the case failed. The pool says so on stderr, and the exit code is not 0. The pool writes `adjudications.json` before the second grouping, so a failed second grouping leaves it on disk.
 
 The command exits 0 when every call succeeded. It exits 1 when a case failed or a call failed after its retry. It exits 2 on a usage error, also for a record of another PR or another repo, and for a record finding that is not valid. Each call gets one retry. At most four calls run at once.
+
+### Resume a stopped run
+
+A pool run can stop in the middle, for example when a model family hits its usage limit. Every call that succeeded is kept in `<out>/<case>/calls.json`. Run the same command again with `--resume` and the same `--out`. The run reuses each kept result and makes only the calls that are missing or failed. A failed call is never kept.
+
+A kept result serves a call only when the input is the same. The case head must be the same. A blind review needs the same source name (`claude-review-1`) and the same PR title, body, changed files and diff. A grouping call needs the same findings in the same order. An adjudication needs the same family and the same six fields of the item. A changed input makes a new call. A `calls.json` of another case head is ignored.
+
+The result files of a resumed run are the files that one run with no failure writes from the same call results. With `--resume`, stdout gets one more line for each case: `resume <n> reused, <m> new`. The cost on the summary line counts only the new Claude calls. A run without `--resume` makes every call and does not reuse `calls.json`, but it keeps the earlier results of the same head in the file. A run made before `calls.json` existed has no kept results: run it again with no `--resume` once.
 
 ### Dismissed findings
 

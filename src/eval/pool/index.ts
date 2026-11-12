@@ -15,7 +15,7 @@ import { createSemaphore } from "../../semaphore.js";
 import { CaseError, loadPoolCase, type Case } from "../case.js";
 import { cloneCase } from "../checkout.js";
 import { adjudicateFinding } from "./adjudicate.js";
-import { dismissedLines, poolCase, summaryLine, PoolCaseError } from "./pool.js";
+import { dismissedLines, poolCase, resumeLines, summaryLine, PoolCaseError } from "./pool.js";
 import {
   casePrNumber,
   caseRepo,
@@ -40,6 +40,7 @@ export type PoolOptions = {
   reviews: number;
   writeGolden: boolean;
   dismissed?: boolean;
+  resume?: boolean;
 };
 
 export type AdjudicateOptions = {
@@ -133,10 +134,12 @@ export async function runPool(opts: PoolOptions, deps: ProgramDeps): Promise<num
           writeGolden: opts.writeGolden,
           out: resolve(opts.out),
           dismissed: opts.dismissed === true,
+          resume: opts.resume === true,
         },
         shared,
       );
       process.stdout.write(`${summaryLine(result)}\n`);
+      for (const line of resumeLines(result)) process.stdout.write(`${line}\n`);
       for (const line of dismissedLines(result)) process.stdout.write(`${line}\n`);
       for (const error of result.reviewErrors)
         say("pool", `case ${c.name}: a review failed: ${error}`);
@@ -273,6 +276,10 @@ export function registerPoolCommands(program: Command, deps: ProgramDeps): void 
     .option("--reviews <n>", "the blind reviews of each family, a positive integer", parseCount, 2)
     .option("--write-golden", "write golden.json in each case directory")
     .option(
+      "--resume",
+      "reuse the calls that succeeded in an earlier run with the same --out (kept in calls.json)",
+    )
+    .option(
       "--dismissed",
       "write goldens for the findings that the verifier dismissed in the --record files",
     )
@@ -285,6 +292,7 @@ export function registerPoolCommands(program: Command, deps: ProgramDeps): void 
           reviews: number;
           writeGolden?: boolean;
           dismissed?: boolean;
+          resume?: boolean;
         },
       ) => {
         try {
@@ -296,6 +304,7 @@ export function registerPoolCommands(program: Command, deps: ProgramDeps): void 
               reviews: options.reviews,
               writeGolden: options.writeGolden === true,
               dismissed: options.dismissed === true,
+              resume: options.resume === true,
             },
             deps,
           );
