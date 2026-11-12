@@ -1,0 +1,2532 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 47,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Turn dismissed findings into goldens through the pool, and resume a pool run (D4b R3)",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/47"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "05daa9cf1536c23f886983fc1f28685345287ad2",
+    "head": "03b18d4720304fb84e2271c0e4a2e99b4bd607a4",
+    "started_at": "2026-11-12T22:12:02.339Z",
+    "tool_version": "0.8.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Turn dismissed findings into goldens through the pool, and resume a pool run (D4b R3)\n\nD4b revision R3: findings that the verifier dismissed become goldens through the pool.\n\n## What changes\n\n- `pr-review pool --dismissed`: a finding that the verifier dismissed (`dont_post` or `not_real` in `stages.verifications`) counts when its record saw the head of the case. The pool already adjudicates it, so no new adjudication path and no new model call exist.\n  - Both families keep it (75 or more): it stays a pool golden, and the note names the verifier's label. The labeler gives the label.\n  - Both families score it below 50: the outcome is `dismissed_golden`. It becomes a golden with the placeholder `unsure`, and the labeler labels it, normally `not_real`. It does not join a kept item.\n  - Any other result: no golden. The summary names each case.\n  - The verifier's label goes to `pool-key.json` only. No adjudication request holds it.\n- `pr-review pool --resume`: each call that succeeds goes to `<out>/<case>/calls.json`. A second run with `--resume` makes only the calls that are missing or failed. Why: a pool run today lost $12.74 of Claude calls when Codex reached its usage limit.\n- README, design doc and a TICKETS.md progress line.\n- No scoring change. The eval already counts a posted finding that matches a `dont_post` golden as a false positive (`test/eval-score.test.ts`, \"counts a judge match to a %s golden as a not-real match\").\n\n## The goldens follow in the cases repo\n\nThe records hold 19 dismissed findings, all in PRs 41, 44, 45 and 46 of this repo. No record holds a finding that a person dismissed. Seven are at the first recorded head. The four cases `pool-pr-review-41`, `-44`, `-45` and `-46` are made. Their goldens follow on cases repo branch `r3-dismissed-findings` after Codex returns. This PR does not wait for them.\n\nNo pin move and no baseline: the final D4b baseline PR does both for all four revisions. The version is not bumped, so that the sibling revisions do not conflict on it.\n\n## Tests\n\n`test/pool-dismissed.test.ts` and `test/pool-resume.test.ts` run the CLI with a fake SDK client and a fake `codex`. `npm test` (1396), lint, typecheck and build pass.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZe8a4pwY82rqWPJvix\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": "README.md",
+        "hunks": 3
+      },
+      {
+        "path": "TICKETS.md",
+        "hunks": 1
+      },
+      {
+        "path": "docs/design/high-level-design.md",
+        "hunks": 2
+      },
+      {
+        "path": "src/eval/pool/adjudicate.ts",
+        "hunks": 2
+      },
+      {
+        "path": "src/eval/pool/calls.ts",
+        "hunks": 2
+      },
+      {
+        "path": "src/eval/pool/group.ts",
+        "hunks": 4
+      },
+      {
+        "path": "src/eval/pool/index.ts",
+        "hunks": 6
+      },
+      {
+        "path": "src/eval/pool/memo.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/pool/pool.ts",
+        "hunks": 14
+      },
+      {
+        "path": "src/eval/pool/records.ts",
+        "hunks": 4
+      },
+      {
+        "path": "src/eval/pool/review.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/pool-dismissed.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/pool-resume.test.ts",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "Adds new logic for dismissed-finding goldens and a resume/memo cache across the pool pipeline, changing outcomes, golden writing, file output and CLI interface.",
+      "confidence": "high",
+      "categories": [
+        "bug",
+        "test",
+        "docs",
+        "other"
+      ],
+      "hotspots": [
+        "src/eval/pool/pool.ts: poolInCheckout dismissedItem/outcome logic, findDismissals, joinKept filter",
+        "src/eval/pool/memo.ts: CallMemo get/set, counts, head check, concurrent writes",
+        "src/eval/pool/review.ts: memo keys (hash of input), cost reuse, keep() on failure",
+        "src/eval/pool/adjudicate.ts: memo key and checkScore on reused values",
+        "src/eval/pool/group.ts: memo key and KeptGroupsSchema validation",
+        "src/eval/pool/records.ts: dismissedFindings parsing and strict validation",
+        "src/eval/pool/index.ts: option wiring and early validation"
+      ],
+      "file_notes": [
+        {
+          "file": "src/eval/pool/memo.ts",
+          "note": "new CallMemo: calls.json persistence keyed by head; synchronous writes from concurrent calls; counts reuse stats"
+        },
+        {
+          "file": "src/eval/pool/pool.ts",
+          "note": "dismissed marking, new dismissed_golden outcome, goldens notes, summary lines, memo creation, mkdir moved earlier"
+        },
+        {
+          "file": "src/eval/pool/review.ts",
+          "note": "blind reviews reuse kept results; failed runs not kept"
+        },
+        {
+          "file": "src/eval/pool/adjudicate.ts",
+          "note": "memoized adjudication per family; new DISMISS_BELOW constant"
+        },
+        {
+          "file": "src/eval/pool/group.ts",
+          "note": "memoized grouping answer"
+        },
+        {
+          "file": "src/eval/pool/records.ts",
+          "note": "adds head and dismissedFindings parser"
+        },
+        {
+          "file": "src/eval/pool/index.ts",
+          "note": "new --dismissed and --resume flags and output lines"
+        },
+        {
+          "file": "src/eval/pool/calls.ts",
+          "note": "optional memo on PoolContext"
+        },
+        {
+          "file": "test/pool-dismissed.test.ts",
+          "note": "new tests for dismissed flow"
+        },
+        {
+          "file": "test/pool-resume.test.ts",
+          "note": "new tests for resume"
+        },
+        {
+          "file": "README.md",
+          "note": "documents new flags and behavior"
+        },
+        {
+          "file": "docs/design/high-level-design.md",
+          "note": "design doc; the CLI synopsis omits --resume"
+        },
+        {
+          "file": "TICKETS.md",
+          "note": "status note"
+        }
+      ],
+      "summary": "Adds two features to `pr-review pool`. `--dismissed` turns verifier-dismissed findings into goldens, marking them in pool-key.json and adding a `dismissed_golden` outcome when both families score below 50. `--resume` keeps successful model calls in calls.json and reuses them when the inputs match. Docs and tests are included."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: Adds new logic for dismissed-finding goldens and a resume/memo cache across the pool pipeline, changing outcomes, golden writing, file output and CLI interface.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "docs/design/high-level-design.md",
+            "start_line": 338,
+            "end_line": 338,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "medium",
+            "claim": "The interface line in the design doc adds --dismissed but not the new --resume flag, which README lists.",
+            "evidence": "pr-review pool  <case-dir>... --out <dir> [--record <path>]... [--reviews <n>] [--write-golden] [--dismissed]",
+            "suggested_fix": "Append ` [--resume]` to the pool line.",
+            "explanation": "The design doc interface section lists every flag of each command, and README.md shows both new flags, so the two docs do not agree.",
+            "needs_context": false
+          },
+          {
+            "file": "src/eval/pool/adjudicate.ts",
+            "start_line": 5,
+            "end_line": 8,
+            "category": "convention",
+            "severity_estimate": "nit",
+            "confidence": "medium",
+            "claim": "The new import of sixFields adds a second import from ./schemas.js, but the file already imports from that module.",
+            "evidence": "import { sixFields } from \"./schemas.js\";",
+            "suggested_fix": "Add sixFields to the existing `./schemas.js` import.",
+            "explanation": "Other pool modules, such as group.ts in this same diff, merge the sixFields import into their one existing schemas.js import.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5891,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 31197,
+              "outputTokens": 23,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0031311999999999998,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 595,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 35839,
+              "webSearchRequests": 0,
+              "costUSD": 0.29862,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 113,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.3017512
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "docs/design/high-level-design.md",
+            "start_line": 338,
+            "end_line": 338,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "medium",
+            "claim": "The description says the design doc documents the new flags, but its interface line leaves out --resume.",
+            "evidence": "pr-review pool  <case-dir>... --out <dir> [--record <path>]... [--reviews <n>] [--write-golden] [--dismissed]",
+            "suggested_fix": "Append [--resume] to the interface line.",
+            "explanation": "The README and the CLI accept --resume, but the interface line in the design doc does not show it.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7551,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 31203,
+              "outputTokens": 23,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0031318,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 687,
+              "cacheReadInputTokens": 35803,
+              "cacheCreationInputTokens": 36219,
+              "webSearchRequests": 0,
+              "costUSD": 0.3106686,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 309,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.31380040000000003
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/pool/adjudicate.ts",
+            "start_line": 50,
+            "end_line": 51,
+            "category": "bug",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "A kept adjudication that the schema accepts but checkScore rejects is counted as reused, and then a new call is also made, so the resume counts are wrong.",
+            "evidence": "if (old !== undefined && checkScore(old) === null) return { ok: true, value: old };",
+            "suggested_fix": "Pass a schema that applies the score check (for example with a refine) to memo.get, so a rejected kept value counts as missing.",
+            "explanation": "CallMemo.get adds 1 to reused before checkScore runs, so a rejected kept value inflates the 'reused' count while a call is still made.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 12884,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 31195,
+              "outputTokens": 24,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0031315,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 1149,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 36064,
+              "webSearchRequests": 0,
+              "costUSD": 0.3115,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 647,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.3146315
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 14048,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 31191,
+              "outputTokens": 24,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0031311,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 1293,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 36060,
+              "webSearchRequests": 0,
+              "costUSD": 0.314348,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 741,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.3174791
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "docs/design/high-level-design.md",
+            "start_line": 338,
+            "end_line": 338,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "medium",
+            "claim": "The interface synopsis of `pr-review pool` adds `--dismissed` but leaves out the new `--resume` option.",
+            "evidence": "pr-review pool  <case-dir>... --out <dir> [--record <path>]... [--reviews <n>] [--write-golden] [--dismissed]",
+            "suggested_fix": "Append ` [--resume]` to the synopsis line.",
+            "explanation": "The CLI now registers `--resume`, and the README synopsis lists it, but the design synopsis does not.",
+            "needs_context": false
+          },
+          {
+            "file": "test/pool-dismissed.test.ts",
+            "start_line": 1,
+            "end_line": 1,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The header comment of the test file names revision R1, but this change is revision R3.",
+            "evidence": "// R1: \"pr-review pool --dismissed\" through the CLI entry, with a fake SDK",
+            "suggested_fix": "Change R1 to R3.",
+            "explanation": "The PR describes the dismissed path as D4b revision R3, so the comment names the wrong revision.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 8360,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 31195,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0031300000000000004,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 867,
+              "cacheReadInputTokens": 35747,
+              "cacheCreationInputTokens": 36200,
+              "webSearchRequests": 0,
+              "costUSD": 0.3141054,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 284,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.3172354
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/pool/group.ts",
+            "start_line": 92,
+            "end_line": 95,
+            "category": "bug",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "A grouping answer reused from calls.json does not get the validation that toGroups gives a fresh answer, so indices that are out of range or repeated can reach the join.",
+            "evidence": "  const old = ctx.memo?.get(\"group\", key, KeptGroupsSchema);\n  if (old !== undefined) return { ok: true, groups: old };",
+            "suggested_fix": "Check that each kept index is an integer below findings.length, that each index appears exactly once, and that the representative is one of the group's members. If any check fails, make the call again.",
+            "explanation": "KeptGroupsSchema checks only that members and the representative are numbers. A fresh answer must also pass the toGroups check (from commit 3d8ba83), which rejects an unknown id or a finding in two groups.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 10653,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 51079,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0051184,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 1013,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 52964,
+              "webSearchRequests": 0,
+              "costUSD": 0.4445918,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 206,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.4497102
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5720,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 31187,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0031292000000000004,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 525,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 32964,
+              "webSearchRequests": 0,
+              "costUSD": 0.2748318,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 48,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.277961
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4013,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 31189,
+              "outputTokens": 23,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0031304,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 321,
+              "cacheReadInputTokens": 5330,
+              "cacheCreationInputTokens": 30695,
+              "webSearchRequests": 0,
+              "costUSD": 0.253054,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 45,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.2561844
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/pool/memo.ts",
+            "start_line": 24,
+            "end_line": 24,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "No test checks that a calls.json from another case head is ignored on --resume.",
+            "evidence": "if (value.head !== head) return emptyStore();",
+            "suggested_fix": "Add a resume test that changes the case head between runs and asserts that every call is made again.",
+            "explanation": "If this check broke, a resumed run would silently reuse stale results for a new head and produce wrong goldens.",
+            "needs_context": false
+          },
+          {
+            "file": "src/eval/pool/records.ts",
+            "start_line": 145,
+            "end_line": 149,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "The new error path for a record with invalid verifications under --dismissed has no test of its exit code 2 before any model call.",
+            "evidence": "`the record ${record.path} has no valid verifications: ${describeIssues(parsed.error)}`,",
+            "suggested_fix": "Add a CLI test with a malformed verifications entry that asserts exit 2 and no client calls.",
+            "explanation": "The early validation is a promised behaviour (no model cost on a bad record), and nothing checks it.",
+            "needs_context": true
+          },
+          {
+            "file": "test/pool-dismissed.test.ts",
+            "start_line": 276,
+            "end_line": 280,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "The test asserts the number of grouper calls, which is an internal detail, instead of only the observable goldens and outcomes.",
+            "evidence": "expect(r.client.calls.filter((c) => c.role === \"pool-grouper\")).toHaveLength(1);",
+            "suggested_fix": "Assert outcome('MARK-K1') is 'golden' and outcome('MARK-D1') is 'dismissed_golden' instead of counting calls.",
+            "explanation": "A change to how grouping is batched would break this test even when D1 and K1 still stay two separate goldens.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 9734,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 31193,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0031303000000000004,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 1039,
+              "cacheReadInputTokens": 39863,
+              "cacheCreationInputTokens": 34261,
+              "webSearchRequests": 0,
+              "costUSD": 0.3028566,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 200,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.30598689999999995
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "docs/design/high-level-design.md",
+          "start_line": 338,
+          "end_line": 338,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "medium",
+          "claim": "The interface line in the design doc adds --dismissed but not the new --resume flag, which README lists.",
+          "evidence": "pr-review pool  <case-dir>... --out <dir> [--record <path>]... [--reviews <n>] [--write-golden] [--dismissed]",
+          "suggested_fix": "Append ` [--resume]` to the pool line.",
+          "explanation": "The design doc interface section lists every flag of each command, and README.md shows both new flags, so the two docs do not agree.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "pr-review pool  <case-dir>... --out <dir> [--record <path>]... [--reviews <n>] [--write-golden] [--dismissed]"
+          ],
+          "rationale": "The design doc's pool interface line adds `--dismissed` but omits `--resume`, which this PR adds. README.md line 566 lists both `[--dismissed] [--resume]`. The docs disagree, and the effect is minor.",
+          "score": 93,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "pr-review pool  <case-dir>... --out <dir> [--record <path>]... [--reviews <n>] [--write-golden] [--dismissed]"
+          ],
+          "rationale": "The design doc's pool interface line adds `--dismissed` but omits `--resume`, which this PR adds. README.md line 566 lists both `[--dismissed] [--resume]`. The docs disagree, and the effect is minor.",
+          "score": 93,
+          "severity": "nit"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "src/eval/pool/adjudicate.ts",
+          "start_line": 5,
+          "end_line": 8,
+          "category": "convention",
+          "severity_estimate": "nit",
+          "confidence": "medium",
+          "claim": "The new import of sixFields adds a second import from ./schemas.js, but the file already imports from that module.",
+          "evidence": "import { sixFields } from \"./schemas.js\";",
+          "suggested_fix": "Add sixFields to the existing `./schemas.js` import.",
+          "explanation": "Other pool modules, such as group.ts in this same diff, merge the sixFields import into their one existing schemas.js import.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "import { sixFields } from \"./schemas.js\";",
+            "import { AdjudicationOutputSchema, type AdjudicationOutput, type PoolFinding } from \"./schemas.js\";"
+          ],
+          "rationale": "The file now has two separate imports from ./schemas.js (lines 5 and 8), and the PR added the first. It is only cosmetic, and the description says lint passes.",
+          "score": 93,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "import { sixFields } from \"./schemas.js\";",
+            "import { AdjudicationOutputSchema, type AdjudicationOutput, type PoolFinding } from \"./schemas.js\";"
+          ],
+          "rationale": "The file now has two separate imports from ./schemas.js (lines 5 and 8), and the PR added the first. It is only cosmetic, and the description says lint passes.",
+          "score": 93,
+          "severity": "nit"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "docs/design/high-level-design.md",
+          "start_line": 338,
+          "end_line": 338,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "medium",
+          "claim": "The description says the design doc documents the new flags, but its interface line leaves out --resume.",
+          "evidence": "pr-review pool  <case-dir>... --out <dir> [--record <path>]... [--reviews <n>] [--write-golden] [--dismissed]",
+          "suggested_fix": "Append [--resume] to the interface line.",
+          "explanation": "The README and the CLI accept --resume, but the interface line in the design doc does not show it.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "pr-review pool  <case-dir>... --out <dir> [--record <path>]... [--reviews <n>] [--write-golden] [--dismissed]",
+            "pr-review pool <case-dir>... --out <dir> [--record <path>]... [--reviews <n>] [--write-golden] [--dismissed] [--resume]"
+          ],
+          "rationale": "The PR adds `--resume` to the pool CLI (src/eval/pool/index.ts) and the README interface line, but the design doc's interface line has `--dismissed` and no `--resume`. The design doc never mentions resume anywhere.",
+          "score": 93,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "pr-review pool  <case-dir>... --out <dir> [--record <path>]... [--reviews <n>] [--write-golden] [--dismissed]",
+            "pr-review pool <case-dir>... --out <dir> [--record <path>]... [--reviews <n>] [--write-golden] [--dismissed] [--resume]"
+          ],
+          "rationale": "The PR adds `--resume` to the pool CLI (src/eval/pool/index.ts) and the README interface line, but the design doc's interface line has `--dismissed` and no `--resume`. The design doc never mentions resume anywhere.",
+          "score": 93,
+          "severity": "nit"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "docs/design/high-level-design.md",
+          "start_line": 338,
+          "end_line": 338,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "medium",
+          "claim": "The interface synopsis of `pr-review pool` adds `--dismissed` but leaves out the new `--resume` option.",
+          "evidence": "pr-review pool  <case-dir>... --out <dir> [--record <path>]... [--reviews <n>] [--write-golden] [--dismissed]",
+          "suggested_fix": "Append ` [--resume]` to the synopsis line.",
+          "explanation": "The CLI now registers `--resume`, and the README synopsis lists it, but the design synopsis does not.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "pr-review pool  <case-dir>... --out <dir> [--record <path>]... [--reviews <n>] [--write-golden] [--dismissed]",
+            "\"--resume\",\n      \"reuse the calls that succeeded in an earlier run with the same --out (kept in calls.json)\","
+          ],
+          "rationale": "The pool command registers `--resume` in `src/eval/pool/index.ts`, and the README synopsis lists it. The design synopsis line was edited in this PR to add `--dismissed` but still omits `--resume`.",
+          "score": 95,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "pr-review pool  <case-dir>... --out <dir> [--record <path>]... [--reviews <n>] [--write-golden] [--dismissed]",
+            "\"--resume\",\n      \"reuse the calls that succeeded in an earlier run with the same --out (kept in calls.json)\","
+          ],
+          "rationale": "The pool command registers `--resume` in `src/eval/pool/index.ts`, and the README synopsis lists it. The design synopsis line was edited in this PR to add `--dismissed` but still omits `--resume`.",
+          "score": 95,
+          "severity": "nit"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "test/pool-dismissed.test.ts",
+          "start_line": 1,
+          "end_line": 1,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The header comment of the test file names revision R1, but this change is revision R3.",
+          "evidence": "// R1: \"pr-review pool --dismissed\" through the CLI entry, with a fake SDK",
+          "suggested_fix": "Change R1 to R3.",
+          "explanation": "The PR describes the dismissed path as D4b revision R3, so the comment names the wrong revision.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "// R1: \"pr-review pool --dismissed\" through the CLI entry, with a fake SDK"
+          ],
+          "rationale": "The new file's header says R1, which duplicates the header of pool-cli.test.ts. TICKETS.md defines R3 as the dismissed-findings revision. But the other headers (R2 adjudicate, R3 prompts, R5 resume) don't follow one clear scheme, so R3 may not be the right label either. It is only a comment.",
+          "score": 60,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "// R1: \"pr-review pool --dismissed\" through the CLI entry, with a fake SDK",
+            "// R5: \"pr-review pool --resume\" through the CLI entry, with a fake SDK",
+            "describe(\"pr-review eval: the end-to-end report (R10.1, R5.1, R5.4, R5.6)\", () => {"
+          ],
+          "rationale": "In this repo, the \"R\" numbers in test headers are requirement IDs, not revision numbers. The sibling test pool-resume.test.ts, from the same R3 change, is labelled R5, and eval tests cite IDs such as R10.1. \"R1\" therefore probably names the first requirement of this revision, so the comment is not wrong.",
+          "score": 12,
+          "severity": "not_real"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "// R1: \"pr-review pool --dismissed\" through the CLI entry, with a fake SDK",
+            "// R5: \"pr-review pool --resume\" through the CLI entry, with a fake SDK",
+            "describe(\"pr-review eval: the end-to-end report (R10.1, R5.1, R5.4, R5.6)\", () => {"
+          ],
+          "rationale": "In this repo, the \"R\" numbers in test headers are requirement IDs, not revision numbers. The sibling test pool-resume.test.ts, from the same R3 change, is labelled R5, and eval tests cite IDs such as R10.1. \"R1\" therefore probably names the first requirement of this revision, so the comment is not wrong.",
+          "score": 12,
+          "severity": "not_real"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "src/eval/pool/adjudicate.ts",
+          "start_line": 50,
+          "end_line": 51,
+          "category": "bug",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "A kept adjudication that the schema accepts but checkScore rejects is counted as reused, and then a new call is also made, so the resume counts are wrong.",
+          "evidence": "if (old !== undefined && checkScore(old) === null) return { ok: true, value: old };",
+          "suggested_fix": "Pass a schema that applies the score check (for example with a refine) to memo.get, so a rejected kept value counts as missing.",
+          "explanation": "CallMemo.get adds 1 to reused before checkScore runs, so a rejected kept value inflates the 'reused' count while a call is still made.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (old !== undefined && checkScore(old) === null) return { ok: true, value: old };",
+            "this.reused += 1;\n      return parsed.data;"
+          ],
+          "rationale": "memo.get increments `reused` before `checkScore` runs, so a kept value that fails checkScore is counted as reused and a call is also made. The mechanics are right. Values reach the memo only after a call passed checkScore, so the counts go wrong only for a hand-edited or corrupted calls.json.",
+          "score": 80,
+          "severity": "dont_post"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const old = ctx.memo?.get(\"adjudication\", key, AdjudicationOutputSchema);",
+            "if (old !== undefined && checkScore(old) === null) return { ok: true, value: old };",
+            "if (r.ok) ctx.memo?.set(\"adjudication\", key, r.value);",
+            "if (parsed?.success) {\n      this.reused += 1;\n      return parsed.data;\n    }",
+            "score: integer(),"
+          ],
+          "rationale": "CallMemo.get increments reused when the schema parse succeeds, which happens before checkScore. A rejected value then triggers a new call that is not counted as made. Values are stored only after a call passes checkScore, so this path needs a calls.json that was edited by hand or corrupted, and the only effect is a wrong count in the summary.",
+          "score": 88,
+          "severity": "dont_post"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const old = ctx.memo?.get(\"adjudication\", key, AdjudicationOutputSchema);",
+            "if (old !== undefined && checkScore(old) === null) return { ok: true, value: old };",
+            "if (r.ok) ctx.memo?.set(\"adjudication\", key, r.value);",
+            "if (parsed?.success) {\n      this.reused += 1;\n      return parsed.data;\n    }",
+            "score: integer(),"
+          ],
+          "rationale": "CallMemo.get increments reused when the schema parse succeeds, which happens before checkScore. A rejected value then triggers a new call that is not counted as made. Values are stored only after a call passes checkScore, so this path needs a calls.json that was edited by hand or corrupted, and the only effect is a wrong count in the summary.",
+          "score": 88,
+          "severity": "dont_post"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "src/eval/pool/group.ts",
+          "start_line": 92,
+          "end_line": 95,
+          "category": "bug",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "A grouping answer reused from calls.json does not get the validation that toGroups gives a fresh answer, so indices that are out of range or repeated can reach the join.",
+          "evidence": "  const old = ctx.memo?.get(\"group\", key, KeptGroupsSchema);\n  if (old !== undefined) return { ok: true, groups: old };",
+          "suggested_fix": "Check that each kept index is an integer below findings.length, that each index appears exactly once, and that the representative is one of the group's members. If any check fails, make the call again.",
+          "explanation": "KeptGroupsSchema checks only that members and the representative are numbers. A fresh answer must also pass the toGroups check (from commit 3d8ba83), which rejects an unknown id or a finding in two groups.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const KeptGroupsSchema = z.array(\n  z.object({ members: z.array(z.number()), representative: z.number() }),\n);",
+            "const old = ctx.memo?.get(\"group\", key, KeptGroupsSchema);\n  if (old !== undefined) return { ok: true, groups: old };",
+            "ctx.memo?.set(\"group\", key, groups);"
+          ],
+          "rationale": "The reuse path only checks that the values are numbers, so range, uniqueness and representative membership are not rechecked. The memo is only written after toGroups has validated the answer, and the key is the exact findings list. Bad indices could only come from a hand-edited or corrupted calls.json, so the practical risk is small.",
+          "score": 80,
+          "severity": "dont_post"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const KeptGroupsSchema = z.array(\n  z.object({ members: z.array(z.number()), representative: z.number() }),\n);",
+            "if (old !== undefined) return { ok: true, groups: old };",
+            "if (seen.has(i)) return `the grouping puts ${name} in two groups`;",
+            "A kept value that \"schema\" rejects counts as missing."
+          ],
+          "rationale": "The kept groups are checked only for shape. Nothing checks that indices are in range or unique, or that the representative is a member, so a damaged or hand-edited calls.json could crash groupClusters or duplicate members. The program writes only validated groups under a key made from the exact findings, so this can only happen on an unusual path.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const KeptGroupsSchema = z.array(\n  z.object({ members: z.array(z.number()), representative: z.number() }),\n);",
+            "if (old !== undefined) return { ok: true, groups: old };",
+            "if (seen.has(i)) return `the grouping puts ${name} in two groups`;",
+            "A kept value that \"schema\" rejects counts as missing."
+          ],
+          "rationale": "The kept groups are checked only for shape. Nothing checks that indices are in range or unique, or that the representative is a member, so a damaged or hand-edited calls.json could crash groupClusters or duplicate members. The program writes only validated groups under a key made from the exact findings, so this can only happen on an unusual path.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "src/eval/pool/memo.ts",
+          "start_line": 24,
+          "end_line": 24,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "No test checks that a calls.json from another case head is ignored on --resume.",
+          "evidence": "if (value.head !== head) return emptyStore();",
+          "suggested_fix": "Add a resume test that changes the case head between runs and asserts that every call is made again.",
+          "explanation": "If this check broke, a resumed run would silently reuse stale results for a new head and produce wrong goldens.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (value.head !== head) return emptyStore();"
+          ],
+          "rationale": "The head check exists in memo.ts, and test/pool-resume.test.ts has no test that changes the case head. Its tests cover only the resume, no-resume and changed-item-text cases. The gap is real but minor, because a case's head rarely changes between runs.",
+          "score": 85,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (value.head !== head) return emptyStore();",
+            "it(\"does not reuse a result for an item whose text changed\", async () => {",
+            "it(\"makes every call without --resume\", async () => {"
+          ],
+          "rationale": "The resume tests cover reuse, the run without --resume, and a changed finding text. None of them changes the case head, and no test uses CallMemo or calls.json directly, so nothing tests the other-head guard in the new memo.ts.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (value.head !== head) return emptyStore();",
+            "it(\"does not reuse a result for an item whose text changed\", async () => {",
+            "it(\"makes every call without --resume\", async () => {"
+          ],
+          "rationale": "The resume tests cover reuse, the run without --resume, and a changed finding text. None of them changes the case head, and no test uses CallMemo or calls.json directly, so nothing tests the other-head guard in the new memo.ts.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "src/eval/pool/records.ts",
+          "start_line": 145,
+          "end_line": 149,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "The new error path for a record with invalid verifications under --dismissed has no test of its exit code 2 before any model call.",
+          "evidence": "`the record ${record.path} has no valid verifications: ${describeIssues(parsed.error)}`,",
+          "suggested_fix": "Add a CLI test with a malformed verifications entry that asserts exit 2 and no client calls.",
+          "explanation": "The early validation is a promised behaviour (no model cost on a bad record), and nothing checks it.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "`the record ${record.path} has no valid verifications: ${describeIssues(parsed.error)}`,"
+          ],
+          "rationale": "The error message string appears only in records.ts, and the pool tests have no case with a malformed verifications entry or an exit-code assertion for it. The path is real but minor test coverage.",
+          "score": 80,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "`the record ${record.path} has no valid verifications: ${describeIssues(parsed.error)}`,",
+            "if (opts.dismissed === true) for (const r of records) dismissedFindings(r);"
+          ],
+          "rationale": "The PR adds this new error path, and `index.ts` runs it before any model call. No test in the repo uses a malformed verifications record or checks for the \"has no valid verifications\" message. The gap is real but small, because this is only an error path for bad input.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "`the record ${record.path} has no valid verifications: ${describeIssues(parsed.error)}`,",
+            "if (opts.dismissed === true) for (const r of records) dismissedFindings(r);"
+          ],
+          "rationale": "The PR adds this new error path, and `index.ts` runs it before any model call. No test in the repo uses a malformed verifications record or checks for the \"has no valid verifications\" message. The gap is real but small, because this is only an error path for bad input.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "test/pool-dismissed.test.ts",
+          "start_line": 276,
+          "end_line": 280,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "The test asserts the number of grouper calls, which is an internal detail, instead of only the observable goldens and outcomes.",
+          "evidence": "expect(r.client.calls.filter((c) => c.role === \"pool-grouper\")).toHaveLength(1);",
+          "suggested_fix": "Assert outcome('MARK-K1') is 'golden' and outcome('MARK-D1') is 'dismissed_golden' instead of counting calls.",
+          "explanation": "A change to how grouping is batched would break this test even when D1 and K1 still stay two separate goldens.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(r.client.calls.filter((c) => c.role === \"pool-grouper\")).toHaveLength(1);"
+          ],
+          "rationale": "The test does assert a grouper call count alongside the golden checks, so the claim is literally true. The count probably serves as a sanity check that grouping ran once over the overlapping items, and the golden assertions already cover the observable outcome, so this is low value.",
+          "score": 55,
+          "severity": "dont_post"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(r.client.calls.filter((c) => c.role === \"pool-grouper\")).toHaveLength(1);"
+          ],
+          "rationale": "The test does assert a grouper call count alongside the golden checks, so the claim is literally true. The count probably serves as a sanity check that grouping ran once over the overlapping items, and the golden assertions already cover the observable outcome, so this is low value.",
+          "score": 55,
+          "severity": "dont_post"
+        },
+        "passed": false
+      }
+    ],
+    "merges": [
+      {
+        "group": [
+          0,
+          2,
+          3
+        ],
+        "result": {
+          "merged": [
+            {
+              "member_index": 2,
+              "claim": "The `pr-review pool` interface line in the design doc lists `--dismissed` but omits the new `--resume` flag.",
+              "explanation": "The CLI registers `--resume` and the README synopsis lists it, but the design doc interface line does not, so the docs disagree.",
+              "suggested_fix": "Append ` [--resume]` to the pool interface line.",
+              "severity": "nit"
+            }
+          ]
+        }
+      }
+    ],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [
+      {
+        "file": "src/eval/pool/group.ts",
+        "start_line": 92,
+        "end_line": 95,
+        "category": "bug",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "A grouping answer reused from calls.json does not get the validation that toGroups gives a fresh answer, so indices that are out of range or repeated can reach the join.",
+        "evidence": "  const old = ctx.memo?.get(\"group\", key, KeptGroupsSchema);\n  if (old !== undefined) return { ok: true, groups: old };",
+        "suggested_fix": "Check that each kept index is an integer below findings.length, that each index appears exactly once, and that the representative is one of the group's members. If any check fails, make the call again.",
+        "explanation": "KeptGroupsSchema checks only that members and the representative are numbers. A fresh answer must also pass the toGroups check (from commit 3d8ba83), which rejects an unknown id or a finding in two groups.",
+        "needs_context": false,
+        "fingerprint": "41216045f5092dc6",
+        "severity": "suggestion",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const KeptGroupsSchema = z.array(\n  z.object({ members: z.array(z.number()), representative: z.number() }),\n);",
+            "if (old !== undefined) return { ok: true, groups: old };",
+            "if (seen.has(i)) return `the grouping puts ${name} in two groups`;",
+            "A kept value that \"schema\" rejects counts as missing."
+          ],
+          "rationale": "The kept groups are checked only for shape. Nothing checks that indices are in range or unique, or that the representative is a member, so a damaged or hand-edited calls.json could crash groupClusters or duplicate members. The program writes only validated groups under a key made from the exact findings, so this can only happen on an unusual path.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "span_text": "// A kept answer is for the same findings in the same order. const key = JSON.stringify(findings.map(sixFields)); const old = ctx.memo?.get(\"group\", key, KeptGroupsSchema); if (old !== undefined) return { ok: true, groups: old };"
+      },
+      {
+        "file": "src/eval/pool/memo.ts",
+        "start_line": 24,
+        "end_line": 24,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "No test checks that a calls.json from another case head is ignored on --resume.",
+        "evidence": "if (value.head !== head) return emptyStore();",
+        "suggested_fix": "Add a resume test that changes the case head between runs and asserts that every call is made again.",
+        "explanation": "If this check broke, a resumed run would silently reuse stale results for a new head and produce wrong goldens.",
+        "needs_context": false,
+        "fingerprint": "438fc71df4070f6c",
+        "severity": "suggestion",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (value.head !== head) return emptyStore();",
+            "it(\"does not reuse a result for an item whose text changed\", async () => {",
+            "it(\"makes every call without --resume\", async () => {"
+          ],
+          "rationale": "The resume tests cover reuse, the run without --resume, and a changed finding text. None of them changes the case head, and no test uses CallMemo or calls.json directly, so nothing tests the other-head guard in the new memo.ts.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "span_text": "if (value.head !== head) return emptyStore();"
+      },
+      {
+        "file": "docs/design/high-level-design.md",
+        "start_line": 338,
+        "end_line": 338,
+        "category": "docs",
+        "severity_estimate": "nit",
+        "confidence": "medium",
+        "claim": "The `pr-review pool` interface line in the design doc lists `--dismissed` but omits the new `--resume` flag.",
+        "evidence": "pr-review pool  <case-dir>... --out <dir> [--record <path>]... [--reviews <n>] [--write-golden] [--dismissed]",
+        "explanation": "The CLI registers `--resume` and the README synopsis lists it, but the design doc interface line does not, so the docs disagree.",
+        "needs_context": false,
+        "fingerprint": "5d2a61a3168c75ee",
+        "severity": "nit",
+        "score": 95,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "pr-review pool  <case-dir>... --out <dir> [--record <path>]... [--reviews <n>] [--write-golden] [--dismissed]",
+            "\"--resume\",\n      \"reuse the calls that succeeded in an earlier run with the same --out (kept in calls.json)\","
+          ],
+          "rationale": "The pool command registers `--resume` in `src/eval/pool/index.ts`, and the README synopsis lists it. The design synopsis line was edited in this PR to add `--dismissed` but still omits `--resume`.",
+          "score": 95,
+          "severity": "nit"
+        },
+        "span_text": "pr-review pool <case-dir>... --out <dir> [--record <path>]... [--reviews <n>] [--write-golden] [--dismissed]",
+        "suggested_fix": "Append ` [--resume]` to the pool interface line."
+      },
+      {
+        "file": "src/eval/pool/adjudicate.ts",
+        "start_line": 5,
+        "end_line": 8,
+        "category": "convention",
+        "severity_estimate": "nit",
+        "confidence": "medium",
+        "claim": "The new import of sixFields adds a second import from ./schemas.js, but the file already imports from that module.",
+        "evidence": "import { sixFields } from \"./schemas.js\";",
+        "suggested_fix": "Add sixFields to the existing `./schemas.js` import.",
+        "explanation": "Other pool modules, such as group.ts in this same diff, merge the sixFields import into their one existing schemas.js import.",
+        "needs_context": false,
+        "fingerprint": "bfd15ae8aad4642f",
+        "severity": "nit",
+        "score": 93,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "import { sixFields } from \"./schemas.js\";",
+            "import { AdjudicationOutputSchema, type AdjudicationOutput, type PoolFinding } from \"./schemas.js\";"
+          ],
+          "rationale": "The file now has two separate imports from ./schemas.js (lines 5 and 8), and the PR added the first. It is only cosmetic, and the description says lint passes.",
+          "score": 93,
+          "severity": "nit"
+        },
+        "span_text": "import { sixFields } from \"./schemas.js\"; import { claudeCall, gptCall, type CallResult, type Check, type PoolContext } from \"./calls.js\"; import { adjudicateMessage } from \"./prompts.js\"; import { AdjudicationOutputSchema, type AdjudicationOutput, type PoolFinding } from \"./schemas.js\";"
+      },
+      {
+        "file": "src/eval/pool/records.ts",
+        "start_line": 145,
+        "end_line": 149,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "The new error path for a record with invalid verifications under --dismissed has no test of its exit code 2 before any model call.",
+        "evidence": "`the record ${record.path} has no valid verifications: ${describeIssues(parsed.error)}`,",
+        "suggested_fix": "Add a CLI test with a malformed verifications entry that asserts exit 2 and no client calls.",
+        "explanation": "The early validation is a promised behaviour (no model cost on a bad record), and nothing checks it.",
+        "needs_context": true,
+        "fingerprint": "9668e90603061a78",
+        "severity": "nit",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "`the record ${record.path} has no valid verifications: ${describeIssues(parsed.error)}`,",
+            "if (opts.dismissed === true) for (const r of records) dismissedFindings(r);"
+          ],
+          "rationale": "The PR adds this new error path, and `index.ts` runs it before any model call. No test in the repo uses a malformed verifications record or checks for the \"has no valid verifications\" message. The gap is real but small, because this is only an error path for bad input.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "span_text": "if (!parsed.success) { throw new PoolInputError( `the record ${record.path} has no valid verifications: ${describeIssues(parsed.error)}`, ); }"
+      }
+    ],
+    "github": {
+      "review_id": 5882829618,
+      "review_url": "https://github.com/jerridan/pr-review/pull/47#pullrequestreview-5882829618",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [
+        {
+          "fingerprint": "41216045f5092dc6",
+          "comment_id": 4557022753
+        },
+        {
+          "fingerprint": "438fc71df4070f6c",
+          "comment_id": 4557022767
+        },
+        {
+          "fingerprint": "5d2a61a3168c75ee",
+          "comment_id": 4557022778
+        },
+        {
+          "fingerprint": "bfd15ae8aad4642f",
+          "comment_id": 4557022787
+        },
+        {
+          "fingerprint": "9668e90603061a78",
+          "comment_id": 4557022801
+        }
+      ],
+      "in_body": [],
+      "check_run": {
+        "id": 131530485965
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 7876,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 29779,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0029884000000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1110,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 30555,
+            "webSearchRequests": 0,
+            "costUSD": 0.133324,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1363124
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5891,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 31197,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0031311999999999998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 595,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 35839,
+            "webSearchRequests": 0,
+            "costUSD": 0.29862,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 113,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.3017512
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7551,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 31203,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0031318,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 687,
+            "cacheReadInputTokens": 35803,
+            "cacheCreationInputTokens": 36219,
+            "webSearchRequests": 0,
+            "costUSD": 0.3106686,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 309,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.31380040000000003
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "model": "claude-opus-5-5",
+        "duration_ms": 8360,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 31195,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0031300000000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 867,
+            "cacheReadInputTokens": 35747,
+            "cacheCreationInputTokens": 36200,
+            "webSearchRequests": 0,
+            "costUSD": 0.3141054,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 284,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.3172354
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 12884,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 31195,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0031315,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1149,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 36064,
+            "webSearchRequests": 0,
+            "costUSD": 0.3115,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 647,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.3146315
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 4013,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 31189,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0031304,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 321,
+            "cacheReadInputTokens": 5330,
+            "cacheCreationInputTokens": 30695,
+            "webSearchRequests": 0,
+            "costUSD": 0.253054,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 45,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.2561844
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5720,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 31187,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0031292000000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 525,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 32964,
+            "webSearchRequests": 0,
+            "costUSD": 0.2748318,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 48,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.277961
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 14048,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 31191,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0031311,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1293,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 36060,
+            "webSearchRequests": 0,
+            "costUSD": 0.314348,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 741,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.3174791
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "model": "claude-opus-5-5",
+        "duration_ms": 10653,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 51079,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0051184,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1013,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 52964,
+            "webSearchRequests": 0,
+            "costUSD": 0.4445918,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 206,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.4497102
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 4311,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 6304,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0006429000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 498,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 10185,
+            "webSearchRequests": 0,
+            "costUSD": 0.045724,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 181,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0463669
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6238,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 24300,
+            "outputTokens": 317,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0025884999999999997,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 298,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 483,
+            "cacheReadInputTokens": 28181,
+            "cacheCreationInputTokens": 28989,
+            "webSearchRequests": 0,
+            "costUSD": 0.1236121,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 10,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1262006
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "model": "claude-opus-5-5",
+        "duration_ms": 9734,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 31193,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0031303000000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 1039,
+            "cacheReadInputTokens": 39863,
+            "cacheCreationInputTokens": 34261,
+            "webSearchRequests": 0,
+            "costUSD": 0.3028566,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 200,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.30598689999999995
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 9917,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 24290,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.002439,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 844,
+            "cacheReadInputTokens": 57593,
+            "cacheCreationInputTokens": 29633,
+            "webSearchRequests": 0,
+            "costUSD": 0.1327433,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 182,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1351823
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 10116,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 6390,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0006495,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 874,
+            "cacheReadInputTokens": 37365,
+            "cacheCreationInputTokens": 8100,
+            "webSearchRequests": 0,
+            "costUSD": 0.0448925,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 151,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.045542000000000006
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 11440,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 13485,
+            "outputTokens": 307,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.001502,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 283,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 1195,
+            "cacheReadInputTokens": 39532,
+            "cacheCreationInputTokens": 14356,
+            "webSearchRequests": 0,
+            "costUSD": 0.0733392,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 559,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0748412
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 8715,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7171,
+            "outputTokens": 29,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007316,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 866,
+            "cacheReadInputTokens": 27577,
+            "cacheCreationInputTokens": 9127,
+            "webSearchRequests": 0,
+            "costUSD": 0.0479377,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 201,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0486693
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 16585,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 24305,
+            "outputTokens": 396,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0026285,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 373,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 14,
+            "outputTokens": 1373,
+            "cacheReadInputTokens": 182941,
+            "cacheCreationInputTokens": 27267,
+            "webSearchRequests": 0,
+            "costUSD": 0.14112009999999997,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 173,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.14374859999999998
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 4971,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 13556,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0013656000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 622,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 13070,
+            "webSearchRequests": 0,
+            "costUSD": 0.0589407,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 302,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0603063
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 14353,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5037,
+            "outputTokens": 299,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0006532,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 278,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 10,
+            "outputTokens": 1018,
+            "cacheReadInputTokens": 41920,
+            "cacheCreationInputTokens": 5980,
+            "webSearchRequests": 0,
+            "costUSD": 0.038312000000000006,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 132,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.038965200000000005
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 12113,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8395,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0008495,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 10,
+            "outputTokens": 1167,
+            "cacheReadInputTokens": 55415,
+            "cacheCreationInputTokens": 9020,
+            "webSearchRequests": 0,
+            "costUSD": 0.0533115,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 265,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.054161
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 11728,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 6380,
+            "outputTokens": 323,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007995000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 299,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 1072,
+            "cacheReadInputTokens": 38457,
+            "cacheCreationInputTokens": 14566,
+            "webSearchRequests": 0,
+            "costUSD": 0.1456914,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 200,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.14649089999999998
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 9773,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7187,
+            "outputTokens": 325,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0008812000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 304,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 958,
+            "cacheReadInputTokens": 26787,
+            "cacheCreationInputTokens": 8327,
+            "webSearchRequests": 0,
+            "costUSD": 0.0911574,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 337,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0920386
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 13840,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-opus-5-5": {
+            "inputTokens": 12,
+            "outputTokens": 1430,
+            "cacheReadInputTokens": 96526,
+            "cacheCreationInputTokens": 15329,
+            "webSearchRequests": 0,
+            "costUSD": 0.1705852,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 397,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-haiku-5-5": {
+            "inputTokens": 13495,
+            "outputTokens": 546,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016225,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 519,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1722077
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 11285,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5053,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005143000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 10,
+            "outputTokens": 1121,
+            "cacheReadInputTokens": 41872,
+            "cacheCreationInputTokens": 6548,
+            "webSearchRequests": 0,
+            "costUSD": 0.0832184,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 278,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0837327
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 10795,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8397,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0008507000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 10,
+            "outputTokens": 1003,
+            "cacheReadInputTokens": 62443,
+            "cacheCreationInputTokens": 11797,
+            "webSearchRequests": 0,
+            "costUSD": 0.1269646,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 188,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.12781530000000002
+      },
+      {
+        "role": "merge",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 3142,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 2008,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0002128,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 187,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 2584,
+            "webSearchRequests": 0,
+            "costUSD": 0.01221,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.012422800000000001
+      }
+    ],
+    "total_cost_usd": 4.3997439,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 39,
+      "gather": 180,
+      "triage": 8695,
+      "find_verify": 56013,
+      "merge": 3897
+    },
+    "errors": []
+  }
+}
