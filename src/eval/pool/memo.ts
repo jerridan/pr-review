@@ -3,7 +3,7 @@
 // resumed run reuses a kept result when the key of the call is the same. A
 // failed call is never kept. The file belongs to one case head: a file of
 // another head is dropped.
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import type { z } from "zod";
 
 /** The kinds of call that the file keeps. */
@@ -17,11 +17,18 @@ function emptyStore(): Store {
   return { review: {}, group: {}, adjudication: {} };
 }
 
-// Read the file. Give an empty store for a missing, damaged or other-head file.
+// Read the file. Give an empty store for a missing, damaged or other-head
+// file. Warn on stderr about a file that is not JSON.
 function readStore(path: string, head: string): Store {
+  let text: string;
   try {
-    const value = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
-    if (value.head !== head) return emptyStore();
+    text = readFileSync(path, "utf8");
+  } catch {
+    return emptyStore();
+  }
+  try {
+    const value = JSON.parse(text) as Record<string, unknown>;
+    if (value === null || typeof value !== "object" || value.head !== head) return emptyStore();
     const store = emptyStore();
     for (const kind of KINDS) {
       const part = value[kind];
@@ -31,6 +38,9 @@ function readStore(path: string, head: string): Store {
     }
     return store;
   } catch {
+    process.stderr.write(
+      `pr-review pool: ${path} is not JSON, so the run keeps no result from it.\n`,
+    );
     return emptyStore();
   }
 }
@@ -54,12 +64,18 @@ export class CallMemo {
 
   /**
    * The kept result for "key", or undefined when the call must be made. A
-   * kept value that "schema" rejects counts as missing.
+   * kept value that "schema" rejects, or that "check" answers with a
+   * problem, counts as missing.
    */
-  get<T>(kind: MemoKind, key: string, schema: z.ZodType<T>): T | undefined {
+  get<T>(
+    kind: MemoKind,
+    key: string,
+    schema: z.ZodType<T>,
+    check: (value: T) => string | null = () => null,
+  ): T | undefined {
     const kept = this.reuse ? this.store[kind][key] : undefined;
     const parsed = kept === undefined ? undefined : schema.safeParse(kept);
-    if (parsed?.success) {
+    if (parsed?.success && check(parsed.data) === null) {
       this.reused += 1;
       return parsed.data;
     }
@@ -70,7 +86,10 @@ export class CallMemo {
   /** Keep the result of a call that succeeded, and write the file. */
   set(kind: MemoKind, key: string, value: unknown): void {
     this.store[kind][key] = value;
-    writeFileSync(this.path, `${JSON.stringify({ head: this.head, ...this.store }, null, 2)}\n`);
+    // Write a temporary file, then rename it, so a stop in the write cannot damage calls.json.
+    const temp = `${this.path}.tmp`;
+    writeFileSync(temp, `${JSON.stringify({ head: this.head, ...this.store }, null, 2)}\n`);
+    renameSync(temp, this.path);
   }
 
   /** The number of calls that a kept result served, and the number of calls made. */
