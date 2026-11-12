@@ -526,8 +526,12 @@ export async function runEval(opts: EvalOptions, deps: ProgramDeps): Promise<num
         repeats.push(reused);
         continue;
       }
-      // The old output of this repeat stays out of the way of the new record.
-      await rm(join(out, c.name, String(repeat)), { recursive: true, force: true });
+      // With --resume, the old output of this repeat stays out of the way of
+      // the new record. Without it, the old records stay, as before.
+      // writeResult replaces the old result.json, and the golden fingerprint
+      // keeps a stale one from reuse.
+      if (opts.resume)
+        await rm(join(out, c.name, String(repeat)), { recursive: true, force: true });
       const outcome = await runRepeat(ctx, c, repeat);
       // The pre-flight catches a config that gives a reviewer the judge
       // model. This check stays as a safety net for a model that only the

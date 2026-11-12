@@ -1774,13 +1774,13 @@ describe("pr-review eval --resume", () => {
   );
 
   it(
-    "leaves one record in the directory of a repeat that ran again without --resume",
+    "keeps the old records of a repeat when a run without --resume uses the same --out",
     async () => {
       const cases = twoCases();
       const out = newDir("out");
       await evalInto(out, evalFake(), cases);
       await evalInto(out, evalFake(), cases);
-      expect(recordFiles(out)).toHaveLength(1);
+      expect(recordFiles(out)).toHaveLength(2);
     },
     RUN_TIMEOUT,
   );
