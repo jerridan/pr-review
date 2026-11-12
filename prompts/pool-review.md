@@ -1,6 +1,7 @@
 ---
 role: pool-reviewer
 kind: system
+cut_text: "[The text was cut here. The limit is {{limit}} bytes.]"
 user_message: |
   {{title}}
 

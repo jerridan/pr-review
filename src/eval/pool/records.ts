@@ -20,14 +20,22 @@ export type PoolRecord = {
   /** The file name of the record, for the source label. */
   name: string;
   pr: number | null;
+  /** The owner/repo of the record: its slug, else its identity.repo when that has this form. */
+  repo: string | null;
   value: unknown;
 };
+
+const OWNER_REPO = /^[^/\s]+\/[^/\s]+$/;
 
 /** A finding of a record, with the name of its reviewer. */
 export type ReviewerFinding = { reviewer: string; finding: PoolFinding };
 
 const RecordHeadSchema = z.object({
-  identity: z.object({ pr: z.int().nullable().optional() }),
+  identity: z.object({
+    pr: z.int().nullable().optional(),
+    repo: z.string().optional(),
+    github: z.object({ slug: z.string() }).nullable().optional(),
+  }),
 });
 
 const ReviewersSchema = z.object({
@@ -66,7 +74,15 @@ export async function readRecord(path: string): Promise<PoolRecord> {
   if (!head.success) {
     throw new PoolInputError(`the record ${path} is invalid: ${describeIssues(head.error)}`);
   }
-  return { path, name: basename(path), pr: head.data.identity.pr ?? null, value };
+  const { repo, github } = head.data.identity;
+  const slug = github?.slug ?? repo ?? null;
+  return {
+    path,
+    name: basename(path),
+    pr: head.data.identity.pr ?? null,
+    repo: slug !== null && OWNER_REPO.test(slug) ? slug : null,
+    value,
+  };
 }
 
 /** Check one finding of a record or a file. Throw a PoolInputError when it is invalid. */
@@ -118,6 +134,15 @@ export function findFingerprint(record: PoolRecord, fingerprint: string): PoolFi
     if (n >= 0) return inputFinding(items[n], `${part}.${list}.${n} of ${record.path}`);
   }
   return null;
+}
+
+/**
+ * The owner/repo of a case, from the pull request URL in its "origin", as in
+ * "https://github.com/owner/repo/pull/14". Null when "origin" has another form.
+ */
+export function caseRepo(origin: string): string | null {
+  const match = /^https?:\/\/github\.com\/([^/\s]+)\/([^/\s]+)\/pull\/\d+/.exec(origin);
+  return match ? `${match[1]}/${match[2]}` : null;
 }
 
 /** The PR number of a case: the trailing number of its name, as in "walle-14". */

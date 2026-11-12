@@ -1,6 +1,7 @@
 ---
 role: adjudicator
 kind: system
+cut_text: "[The text was cut here. The limit is {{limit}} bytes.]"
 user_message: |
   {{finding}}
 
