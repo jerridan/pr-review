@@ -1657,4 +1657,131 @@ describe("pr-review eval --resume", () => {
     },
     RUN_TIMEOUT,
   );
+
+  // Change one field of a result file, as a stale or damaged file would.
+  function tamper(out: string, change: (result: Record<string, unknown>) => void): void {
+    const file = join(out, "a-planted", "1", "result.json");
+    const result = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
+    change(result);
+    writeFileSync(file, JSON.stringify(result));
+  }
+
+  // Finish a run, change the first case, then resume. Only the first case
+  // must run again.
+  async function resumeAfter(change: (out: string, cases: string) => void) {
+    const cases = twoCases();
+    const out = newDir("out");
+    await evalInto(out, evalFake(), cases);
+    change(out, cases);
+    const fake = evalFake();
+    const second = await evalInto(out, fake, cases, "--resume");
+    return { out, fake, second };
+  }
+
+  const recordFiles = (out: string) =>
+    readdirSync(join(out, "a-planted", "1")).filter(
+      (f) => f.endsWith(".json") && f !== "result.json",
+    );
+
+  it(
+    "runs a repeat again when the case head differs from the result",
+    async () => {
+      const { fake, second } = await resumeAfter((out) =>
+        tamper(out, (r) => (r.head = "0".repeat(40))),
+      );
+      expect(second.code, stderr).toBe(0);
+      expect(triageCalls(fake)).toBe(1);
+    },
+    RUN_TIMEOUT,
+  );
+
+  it(
+    "runs a repeat again when golden.json changed after the result",
+    async () => {
+      const { fake, second } = await resumeAfter((_out, cases) =>
+        writeFileSync(
+          join(cases, "a-planted", "golden.json"),
+          JSON.stringify({ findings: [PLANTED(), UNMATCHED] }),
+        ),
+      );
+      expect(second.code, stderr).toBe(0);
+      expect(triageCalls(fake)).toBe(1);
+    },
+    RUN_TIMEOUT,
+  );
+
+  it(
+    "runs a repeat again when result.json is not JSON",
+    async () => {
+      const { fake, second } = await resumeAfter((out) =>
+        writeFileSync(join(out, "a-planted", "1", "result.json"), "{ not json"),
+      );
+      expect(second.code, stderr).toBe(0);
+      expect(triageCalls(fake)).toBe(1);
+    },
+    RUN_TIMEOUT,
+  );
+
+  it(
+    "runs a repeat again when the result is for another repeat number",
+    async () => {
+      const { fake, second } = await resumeAfter((out) =>
+        tamper(out, (r) => {
+          r.repeat = 2;
+          (r.metrics as Record<string, unknown>).repeat = 2;
+        }),
+      );
+      expect(second.code, stderr).toBe(0);
+      expect(triageCalls(fake)).toBe(1);
+    },
+    RUN_TIMEOUT,
+  );
+
+  it(
+    "runs a repeat again when the metrics of the result lack a field",
+    async () => {
+      const { fake, second } = await resumeAfter((out) =>
+        tamper(out, (r) => delete (r.metrics as Record<string, unknown>).drops),
+      );
+      expect(second.code, stderr).toBe(0);
+      expect(triageCalls(fake)).toBe(1);
+    },
+    RUN_TIMEOUT,
+  );
+
+  it(
+    "runs a failed result from another tool version again, without exit 2",
+    async () => {
+      const { fake, second } = await resumeAfter((out) =>
+        tamper(out, (r) => {
+          r.tool_version = "0.0.0-other";
+          (r.metrics as Record<string, unknown>).failed = true;
+        }),
+      );
+      expect(second.code, stderr).toBe(0);
+      expect(triageCalls(fake)).toBe(1);
+    },
+    RUN_TIMEOUT,
+  );
+
+  it(
+    "leaves one record in the directory of a repeat that ran again",
+    async () => {
+      const { out } = await resumeAfter((o) => tamper(o, (r) => (r.head = "0".repeat(40))));
+      expect(recordFiles(out)).toHaveLength(1);
+    },
+    RUN_TIMEOUT,
+  );
+
+  it(
+    "leaves one record in the directory of a repeat that ran again without --resume",
+    async () => {
+      const cases = twoCases();
+      const out = newDir("out");
+      await evalInto(out, evalFake(), cases);
+      await evalInto(out, evalFake(), cases);
+      expect(recordFiles(out)).toHaveLength(1);
+    },
+    RUN_TIMEOUT,
+  );
 });
