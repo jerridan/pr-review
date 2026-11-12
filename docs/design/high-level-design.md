@@ -186,7 +186,6 @@ The workflow uploads the record as an artifact and pushes it to a `pr-review-rec
 Uses:
 
 - The harness replays recorded inputs against a new version, so every real PR is a regression case.
-- Records where a human acted on or dismissed a finding become golden cases without labeling.
 - Per-reviewer precision over time drives suppression suggestions and shows which reviewer to cut.
 - `explain` reads a record to show why a finding was kept or dropped.
 - Later runs read two sources. GitHub gives the thread state and the posted fingerprints. The previous record gives the last reviewed head and the full finding of each open thread. When no record exists, the run takes the head from the newest review marker of the tool and resolves no thread.
@@ -324,6 +323,8 @@ Prompts follow Anthropic's current prompting guidance for the 5.5 family, summar
 - Online: track addressed rate by re-running the verifier on the next push, and reaction counts. Compare to offline before trusting offline alone.
 - With few cases: record every run from day one, local runs included, so the set grows on its own. Seed the first set three ways: ReviewBench and Martian cases for breadth, bug injection into merged PRs of the user's own repos for known-answer recall, and findings dismissed or acted on in real runs for precision. Synthetic cases overstate absolute scores, so use the harness for regression between two versions, not for an absolute number, until the real set reaches about 30 cases.
 
+A pooled golden set gives the goldens of a case from the user's own repos. `pr-review pool` builds it in six steps. First, blind reviews: two reviews by `claude-opus-5-5` and two by `gpt-6.1-sol` through the Codex CLI. Each sees the diff, the changed files, the PR title and body, and the checkout. No review sees a PR comment, a record, a golden or another review. Second, every reviewer finding of the PR's records joins the pool. Third, the grouping: identical findings join in code, then one `claude-sonnet-5-5` call groups the findings that state the same defect at the same place. Fourth, the anonymised pool: `pool.json` holds the six fields of each item, in hash order, with no source, model, severity or score. `pool-key.json` keeps the sources apart. Fifth, one Claude adjudication and one GPT adjudication score each item from 0 to 100: is the claim true at the case head, and does the defect belong to this PR? An item is kept only when both families score it 75 or more. A failed call keeps the item out. Sixth, each kept item writes one golden with the severity `unsure`, and kept items with overlapping spans go through the grouping once more, so one defect gives one golden. A case with no kept item is a clean case with an empty golden list. `pr-review label` then sets the severity of each golden. `pr-review adjudicate` runs the fifth step on one finding. The pool code lives in `src/eval/pool/`, and nothing in the run pipeline imports it.
+
 The labeler sets the severity of the golden findings with its own models. The scorer is `claude-opus-5-5` in the `labeler` role, and the judge is `gpt-6.1-sol` through the Codex CLI. These pins are apart from the pins of the pipeline roles. A change to a pipeline model does not change them, so the gold does not change when the pipeline's models change. The judge runs only in `src/eval/label/`, and nothing in the run pipeline imports it.
 
 ## 9. Interfaces
@@ -332,6 +333,8 @@ The labeler sets the severity of the golden findings with its own models. The sc
 pr-review run   [--base <sha>] [--head <sha>] [--pr <n>] [--github-repo <owner/repo>] [--fresh] [--tier full|fast|skip] [--format github|json|table|md]
 pr-review eval  --cases <dir> [--repeat <n>] [--baseline <file>] [--write-baseline] [--out <dir>] [--format table|json] [--tier full|fast|skip] [--judge-model <id>] [--allow-api-key] [--allow-same-judge] [--no-extras] [--raw-judge]
 pr-review label --cases <dir> [--runs <n>] [--concurrency <n>] [--write-golden] [--only <case>] [--out <dir>] [--format table|json] [--allow-api-key]
+pr-review pool  <case-dir>... --out <dir> [--record <path>]... [--reviews <n>] [--write-golden]
+pr-review adjudicate <case-dir> (--record <path> --fingerprint <fp> | --finding <path>) [--out <path>]
 pr-review list  (reviewers that would run, with the trigger that selected them)
 pr-review explain <record.json> [--format table|json]   (why each finding was kept or dropped)
 ```

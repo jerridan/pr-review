@@ -558,6 +558,64 @@ The GitHub review adds these keys:
 
 The JSON output holds `reviewers_skipped`, `reviewers_without_bash` and `sensitive_without_hunks` in its `coverage` object. The table output shows the same three lists on its `Coverage` line.
 
+## Pool
+
+The pool builds the golden findings of a case from your own repo. Run `pr-review pool` first. It finds the defects and writes `golden.json` with the placeholder severity `unsure`. Then run `pr-review label --write-golden`. It sets the severity of each golden finding.
+
+```bash
+pr-review pool <case-dir>... --out <dir> [--record <path>]... [--reviews <n>] [--write-golden]
+pr-review label --cases <cases-dir> --only <case> --write-golden
+```
+
+The pool makes real model calls. It needs a Claude login, and the Codex CLI on your `PATH` with its own login. The tool reads no credential of either.
+
+| Flag | Meaning | Default |
+|------|---------|---------|
+| `<case-dir>...` | One or more case directories. A case needs `case.json`, `repo.bundle` and `diff.patch`. It does not need `golden.json`. | required |
+| `--out <dir>` | The output directory. Each case gets `<out>/<case>/`. | required |
+| `--record <path>` | A run record of the PR of the case. Give the flag again for each record. The `identity.pr` of the record must equal the number at the end of the case name, as in `walle-14`. Each record applies to every case of the command. | none |
+| `--reviews <n>` | The blind reviews of each model family. A positive integer. | 2 |
+| `--write-golden` | Write `golden.json` in each case directory. This replaces an existing `golden.json`. | off |
+
+For each case, the pool clones the case at its head and does six steps:
+
+1. **Blind reviews.** `claude-opus-5-5` and `gpt-6.1-sol` (through `codex exec`) each review the case `--reviews` times. A review sees the diff, the list of changed files, the PR title and body from `case.json`, and the checkout through read-only tools. It sees no PR comment, no record, no golden and no other review.
+2. **Record findings.** Every finding in `stages.reviewers[].findings` of each `--record` goes into the pool, from every reviewer and every pass.
+3. **Group.** Findings with the same file, lines and claim join with no model call. Then one `claude-sonnet-5-5` call groups the findings that state the same defect at the same place. A group takes the fields of one member. A failed grouping call fails the case.
+4. **Anonymise.** `pool.json` holds the items with the ids `p01`, `p02` and up, and the fields `file`, `start_line`, `end_line`, `category`, `claim` and `evidence` only. The order comes from a hash of the item text, so it does not show the source. `pool-key.json` maps each id to its members and the source of each member: `claude-review-<n>`, `gpt-review-<n>` or `record:<file name>:<reviewer>`.
+5. **Adjudicate.** A Claude model and a GPT model each score every item from 0 to 100. The score tells if the claim is true at the case head and if the defect belongs to this PR. An item is kept when both scores are 75 or more. A failed call keeps the item out and marks it `failed`.
+6. **Join.** The golden span of a kept item is the Claude span when it is inside the file at the case head, else the GPT span. A kept item with neither is `no_span` and writes no golden. Kept items in one file whose spans overlap go through the grouping call again. Each group writes one golden: the member with the highest lower score.
+
+Each case gets three files in `<out>/<case>/`:
+
+| File | Content |
+|------|---------|
+| `pool.json` | The anonymous items. |
+| `pool-key.json` | The members and the sources of each item. |
+| `adjudications.json` | For each item: the score, the reason and the span of each family, or `failed`; `kept`; and `outcome`: `golden`, `joined`, `no_span`, `not_kept` or `failed`. |
+
+Stdout gets one line per case: the items, the kept items, the failed items, the goldens, the `no_span` items and the cost in USD of the Claude calls. With `--write-golden`, each golden has the file, the golden span, the category, the claim, `severity: "unsure"` and a `note` with both scores. A case with no kept item gets `{"findings": []}`, a clean case. Without `--write-golden`, `golden.json` does not change.
+
+The command exits 0 when every call succeeded. It exits 1 when a case failed or a call failed after its retry. It exits 2 on a usage error, also for a record of another PR. Each call gets one retry. At most four calls run at once.
+
+### Adjudicate one finding
+
+```bash
+pr-review adjudicate <case-dir> (--record <path> --fingerprint <fp> | --finding <path>) [--out <path>]
+```
+
+The command runs step 5 of the pool on one finding.
+
+| Flag | Meaning | Default |
+|------|---------|---------|
+| `<case-dir>` | The case directory. | required |
+| `--record <path>` | A run record. Use it with `--fingerprint`. | none |
+| `--fingerprint <fp>` | The fingerprint of the finding in the record. The command looks in `posted.findings`, `posted.below_floor`, `posted.carried`, `stages.capped` and `stages.pre_existing`. | none |
+| `--finding <path>` | A JSON file with `file`, `start_line`, `end_line`, `category` and `claim`, and an optional `evidence`. Use it in place of `--record`. | none |
+| `--out <path>` | The output file. | stdout |
+
+The output is `{finding, claude, gpt, kept}`. `claude` and `gpt` are each `{score, reason, start_line, end_line}` or `{failed}`. The adjudicators get only the six fields of the finding, the diff and the checkout. They never get a fingerprint, a severity, a score, a verifier result, a reviewer name or a source. The command exits 0 when both calls succeeded, 1 when a call failed, and 2 on a usage error, also for an unknown fingerprint.
+
 ## Label
 
 The labeler gives each golden finding of each case a severity and a category under `docs/design/severity-policy.md`. A scorer on Claude labels the finding. A judge from another model family accepts or rejects the label.
@@ -641,7 +699,7 @@ A case is one directory with these files:
 | `injection.patch` | Optional. Present only in an injection case: a copy of the bug patch, for a person to read. The eval does not read it. |
 | `shallow` | Optional. Present when the bundle comes from a shallow repo: the commits whose parents the bundle does not hold, one sha per line. The eval fetches the bundle into a repo with these shallow marks, because git refuses to clone such a bundle. |
 
-`source` is one of `fixture`, `pr`, `reviewbench`, `martian`, `injection` and `record`. A subdirectory without `case.json` is not a case. The eval checks every case before the first model call. A missing file, a field that is not valid, or a sha that the bundle does not hold makes the eval exit 2. The message names the case.
+`source` is one of `fixture`, `pr`, `reviewbench`, `martian`, `injection`, `record` and `pool`. A `pool` case is a case from your own repo with goldens from `pr-review pool`. A subdirectory without `case.json` is not a case. The eval checks every case before the first model call. A missing file, a field that is not valid, or a sha that the bundle does not hold makes the eval exit 2. The message names the case.
 
 To make a case from two commits, run this command in the cases directory:
 
