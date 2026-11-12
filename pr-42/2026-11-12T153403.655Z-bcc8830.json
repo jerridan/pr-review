@@ -1,0 +1,602 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 42,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Write eval baselines at two repeats",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/42"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "e3578bd92b9f30b92d92ff939bf8f946b5481762",
+    "head": "bcc88301832f1543864dcb20e3aff49645ad2786",
+    "started_at": "2026-11-12T15:34:03.655Z",
+    "tool_version": "0.6.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Write eval baselines at two repeats\n\n## Summary\n\nThis PR records two eval decisions in the docs. It changes no code.\n\n- A new baseline is written at two repeats, not three. Two repeats give the spread that the margin rule needs, at less cost.\n- A routine eval against the baseline stays at one repeat.\n- To cut noise, the case set grows before the repeat count does. More cases reduce the noise of one case and the noise between runs. More repeats reduce only the noise between runs. In the D7 evals, one case moved precision by 0.1 between two runs of nearly the same code.\n\nThe README baseline section, design section 8 and the D4b ticket now say this. The CI eval job keeps `--repeat 3`, because a change to it is a workflow change.\n\n## Test plan\n\n- [x] `npm test` passes.\n- [x] `scripts/check-version-bump.sh` says the change touches no shipped file.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZfeb8Fxs7Pynw8RhjV\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": "README.md",
+        "hunks": 1
+      },
+      {
+        "path": "TICKETS.md",
+        "hunks": 1
+      },
+      {
+        "path": "docs/design/high-level-design.md",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "fast",
+      "reason": "Docs-only change to three markdown files that changes the recommended baseline-refresh command from three repeats to two and adds guidance text; no code is touched.",
+      "confidence": "high",
+      "categories": [
+        "docs"
+      ],
+      "hotspots": [
+        "README.md: baseline refresh command (--repeat 2)",
+        "docs/design/high-level-design.md: Gate bullet vs the 'Run each case three times' line in Metrics"
+      ],
+      "file_notes": [
+        {
+          "file": "README.md",
+          "note": "Baseline refresh command changed from --repeat 3 to --repeat 2, plus a paragraph on why and on adding cases before repeats."
+        },
+        {
+          "file": "TICKETS.md",
+          "note": "D-ticket step now says to write the baseline at two repeats."
+        },
+        {
+          "file": "docs/design/high-level-design.md",
+          "note": "Gate bullet says a new baseline runs at two repeats and the set grows before the repeat count. This may conflict with the 'Run each case three times' sentence in the Metrics bullet just above."
+        }
+      ],
+      "summary": "The change updates the docs so that a new eval baseline is written at two repeats, not three. It gives the reason: two repeats give enough spread for the margin rule at a lower cost. It also advises adding cases before adding repeats to reduce noise. The README, the ticket text and the design doc all get the same wording."
+    },
+    "tier": "fast",
+    "tier_reason": "Triage: Docs-only change to three markdown files that changes the recommended baseline-refresh command from three repeats to two and adds guidance text; no code is touched.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= fast; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= fast; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "docs/design/high-level-design.md",
+            "start_line": 322,
+            "end_line": 323,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "medium",
+            "claim": "The new Gate text says a baseline runs at two repeats, but the Metrics bullet just above it still says to run each case three times.",
+            "evidence": "Run each case three times and report the spread.",
+            "suggested_fix": "Change the Metrics sentence to match: a new baseline runs each case two times and reports the spread, and a routine eval runs one time.",
+            "explanation": "The two bullets in design section 8 now give different repeat counts, so a reader cannot tell which count is correct.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4022,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 4674,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.00047740000000000006,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 372,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 9314,
+              "webSearchRequests": 0,
+              "costUSD": 0.08195999999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 99,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0824374
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1855,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 4662,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0004762000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 87,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 9529,
+              "webSearchRequests": 0,
+              "costUSD": 0.07798,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.07845619999999999
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "docs/design/high-level-design.md",
+          "start_line": 322,
+          "end_line": 323,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "medium",
+          "claim": "The new Gate text says a baseline runs at two repeats, but the Metrics bullet just above it still says to run each case three times.",
+          "evidence": "Run each case three times and report the spread.",
+          "suggested_fix": "Change the Metrics sentence to match: a new baseline runs each case two times and reports the spread, and a routine eval runs one time.",
+          "explanation": "The two bullets in design section 8 now give different repeat counts, so a reader cannot tell which count is correct.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "Run each case three times and report the spread.",
+            "A new baseline runs at two repeats, so the margins rest on a measured spread."
+          ],
+          "rationale": "The Metrics bullet still says to run each case three times, while the new Gate text says a new baseline runs at two repeats and a routine eval at one. The Metrics sentence can be read as the eval's default of `--repeat 3`, and the Gate already said one repeat before this PR, so the tension was partly there before. The PR adds the two-repeat figure without updating the Metrics bullet.",
+          "score": 70,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "Run each case three times and report the spread.",
+            "A new baseline runs at two repeats, so the margins rest on a measured spread.",
+            "a change that touches behaviour runs the eval locally at one repeat against `eval/baseline.json`"
+          ],
+          "rationale": "The Gate bullet, which this change edits, now says a new baseline uses two repeats and routine evals use one. The Metrics bullet just above it still says to run each case three times, so section 8 now gives two different repeat counts.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "Run each case three times and report the spread.",
+            "A new baseline runs at two repeats, so the margins rest on a measured spread.",
+            "a change that touches behaviour runs the eval locally at one repeat against `eval/baseline.json`"
+          ],
+          "rationale": "The Gate bullet, which this change edits, now says a new baseline uses two repeats and routine evals use one. The Metrics bullet just above it still says to run each case three times, so section 8 now gives two different repeat counts.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "passed": true
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "diff-bugs"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [
+      {
+        "file": "docs/design/high-level-design.md",
+        "start_line": 322,
+        "end_line": 323,
+        "category": "docs",
+        "severity_estimate": "nit",
+        "confidence": "medium",
+        "claim": "The new Gate text says a baseline runs at two repeats, but the Metrics bullet just above it still says to run each case three times.",
+        "evidence": "Run each case three times and report the spread.",
+        "suggested_fix": "Change the Metrics sentence to match: a new baseline runs each case two times and reports the spread, and a routine eval runs one time.",
+        "explanation": "The two bullets in design section 8 now give different repeat counts, so a reader cannot tell which count is correct.",
+        "needs_context": false,
+        "fingerprint": "92a5296129e44fd1",
+        "severity": "suggestion",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "Run each case three times and report the spread.",
+            "A new baseline runs at two repeats, so the margins rest on a measured spread.",
+            "a change that touches behaviour runs the eval locally at one repeat against `eval/baseline.json`"
+          ],
+          "rationale": "The Gate bullet, which this change edits, now says a new baseline uses two repeats and routine evals use one. The Metrics bullet just above it still says to run each case three times, so section 8 now gives two different repeat counts.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "span_text": "- Metrics: grounded recall on posted goldens only, and two precisions on posted findings. Strict precision counts the matches only. Adjudicated precision also counts the posted findings with no golden that the extras judge accepts as real defects under the severity policy. The accepted extras go to `candidates.json` for a person to review, and `golden.json` does not change. A posted finding that matches a not-real golden is a false positive. Raw recall scores the reviewer findings before the verifier, the merge and the cap, so the gap to recall shows what the pipeline dropped. Without `--raw-judge`, raw recall sends no judge query: it takes exact matches and the judge answers that the posted pass already got. The drop counts give the dropped findings by stage, from the rows of `pr-review explain`. Also findings per PR, and the cost per PR of the review run and of the judge. Run each case three times and report the spread. The eval pools the precision of a repeat over the cases: the matched posted findings divided by all posted findings. - Gate: a change that touches behaviour runs the eval locally at one repeat against `eval/baseline.json`, and the PR description carries the table. A new baseline runs at two repeats, so the margins rest on a measured spread. To cut noise, the set grows before the repeat count does: with ten cases, one case moved precision by 0.1 between two runs of nearly the same code. The eval job in CI runs on manual dispatch only. The gate fails when recall or precision drops past the margin of the baseline. One contributor works on the repo, so the eval does not run on every PR; a run over ten cases costs about $40 at one repeat."
+      }
+    ],
+    "github": {
+      "review_id": 5877253216,
+      "review_url": "https://github.com/jerridan/pr-review/pull/42#pullrequestreview-5877253216",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [
+        {
+          "fingerprint": "92a5296129e44fd1",
+          "comment_id": 4552556736
+        }
+      ],
+      "in_body": [],
+      "check_run": {
+        "id": 131290342470
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 5994,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 3924,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0004024000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 578,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 4698,
+            "webSearchRequests": 0,
+            "costUSD": 0.024576,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0249784
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 1855,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 4662,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0004762000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 87,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 9529,
+            "webSearchRequests": 0,
+            "costUSD": 0.07798,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.07845619999999999
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 4022,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 4674,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00047740000000000006,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 372,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 9314,
+            "webSearchRequests": 0,
+            "costUSD": 0.08195999999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 99,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0824374
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 10272,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 21681,
+            "outputTokens": 330,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0023331000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 310,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 874,
+            "cacheReadInputTokens": 25560,
+            "cacheCreationInputTokens": 26449,
+            "webSearchRequests": 0,
+            "costUSD": 0.1171,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 375,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1194331
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5123,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 21655,
+            "outputTokens": 248,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0022895000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 225,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 565,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 25526,
+            "webSearchRequests": 0,
+            "costUSD": 0.21551599999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 219,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.21780549999999999
+      }
+    ],
+    "total_cost_usd": 0.5231106,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 53,
+      "gather": 95,
+      "triage": 7006,
+      "find_verify": 21671,
+      "merge": 2
+    },
+    "errors": []
+  }
+}
