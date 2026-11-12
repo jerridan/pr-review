@@ -1,0 +1,1456 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 45,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Add the pool tooling and own-repo cases (D4b R2)",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/45"
+    },
+    "run_kind": "later",
+    "prior": {
+      "head": "7984df79f9e57be88073b6f16a7d3a64539281f8",
+      "source": "record",
+      "record": "/home/runner/work/_temp/pr-review-records/pr-45/2026-11-12T173656.758Z-7984df7.json",
+      "open": [
+        "53abf3e67915144f",
+        "58c3615c7d46a1c5",
+        "eba9f66f893ea33e"
+      ],
+      "dismissed": [],
+      "fetch_failed": false
+    },
+    "base": "c2f8fe04ea71dfcd7229fa8b1bf6581e3653a3cd",
+    "head": "cd714ac02faf8951b0b816fb4cbf199591f64552",
+    "started_at": "2026-11-12T19:35:38.639Z",
+    "tool_version": "0.6.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Add the pool tooling and own-repo cases (D4b R2)\n\nD4b revision R2: own-repo cases with pooled goldens. This PR adds the pool tooling. The six cases are built in the cases repo.\n\n**No pin move and no baseline in this PR.** One final baseline PR moves the pin in `eval/cases.json` and writes `eval/baseline.json` at two repeats for all four D4b revisions. Merge this PR after #44 (R4).\n\n## What changes\n\n- `pr-review pool <case-dir>... --out <dir> [--record <path>]... [--reviews <n>] [--write-golden]` builds the goldens of a case in six steps. (1) It runs two blind reviews by `claude-opus-5-5` and two by `gpt-6.1-sol` through the Codex CLI. No blind review sees a PR comment, a record or a golden. (2) It adds every reviewer finding of the PR's records. (3) It groups identical findings in code and the same defect by one `claude-sonnet-5-5` call. (4) It writes the anonymised `pool.json`, with `pool-key.json` apart. (5) It runs one Claude and one GPT adjudication per item and keeps an item only when both score 75 or more. (6) It joins kept items with overlapping spans and writes `golden.json` with the placeholder severity `unsure` for `pr-review label`. A case with no kept item is a clean case. `reviews.json` records what each blind review returned. A failed Codex call keeps the end of its stderr.\n- `pr-review adjudicate <case-dir> (--record <path> --fingerprint <fp> | --finding <path>)` runs step 5 on one finding. D4b R3 uses it, or `adjudicateFinding` in `src/eval/pool/adjudicate.ts`, for a dismissed finding.\n- The new case source is `pool`. The prompts are `prompts/pool-review.md`, `prompts/pool-group.md` and `prompts/pool-adjudicate.md`. The eval roles are pinned apart from the pipeline roles in `src/config/models.ts`.\n- `src/eval/codex.ts` holds the Codex runner that the labeler and the pool share. The labeler tests do not change. `src/run.ts` gets a type-only change (`isEvalRole`).\n- The README and design section 8 describe the pool. The design line that made records into goldens without labeling is removed, because the ticket says the eval takes no golden from a record.\n- The version goes to 0.7.0.\n\n## The cases (cases repo branch `r2-own-repo-cases`)\n\nThese are `pool-websites-130`, `pool-websites-114`, `pool-walle-14`, `pool-walle-16`, `pool-pr-review-15` and `pool-pr-review-17`: TypeScript and Python, from 34 to 271 added lines, with a feature, a refactor, two fixes and a config change. Each case uses the head that the first recorded run saw. A later head holds the fixes of the review findings, so it reviews clean.\n\nThe pool of four cases is finished: walle 14, walle 16 and websites 130 adjudicated to no item and are clean cases, and pr-review 15 kept one of two items. The pools of websites 114 and pr-review 17 stopped on the Codex account usage limit. They run again when the quota returns. Then `pr-review label` sets the severities, and the cases branch is pushed, before the final baseline PR. The TICKETS.md note still says that the pin and the baseline wait for R1 and R4. The final baseline PR corrects it.\n\n## Checks\n\n`npm test` (1354 tests), `npm run lint`, `npm run typecheck` and `npm run build` pass.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZe2YAo7mtXgqgPccjn\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": ".claude-plugin/marketplace.json",
+        "hunks": 1
+      },
+      {
+        "path": ".claude-plugin/plugin.json",
+        "hunks": 1
+      },
+      {
+        "path": "README.md",
+        "hunks": 2
+      },
+      {
+        "path": "TICKETS.md",
+        "hunks": 1
+      },
+      {
+        "path": "docs/design/high-level-design.md",
+        "hunks": 3
+      },
+      {
+        "path": "package.json",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/pool-adjudicate.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/pool-group.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/pool-review.md",
+        "hunks": 1
+      },
+      {
+        "path": "src/cli.ts",
+        "hunks": 2
+      },
+      {
+        "path": "src/config/models.ts",
+        "hunks": 2
+      },
+      {
+        "path": "src/eval/case.ts",
+        "hunks": 5
+      },
+      {
+        "path": "src/eval/codex.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/label/codex.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/pool/adjudicate.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/pool/calls.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/pool/group.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/pool/index.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/pool/pool.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/pool/prompts.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/pool/records.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/pool/review.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/pool/schemas.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/run.ts",
+        "hunks": 3
+      },
+      {
+        "path": "test/fixtures/pool-fakes.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/fixtures/pool-record.json",
+        "hunks": 1
+      },
+      {
+        "path": "test/pool-adjudicate.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/pool-case.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/pool-cli.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/pool-prompts.test.ts",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [
+      {
+        "path": "package-lock.json",
+        "reason": "generated"
+      }
+    ],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "Adds a large new feature (pool and adjudicate commands) with new logic, model calls, subprocess spawning, file writes, public CLI interfaces, and a refactor of shared codex and role-config code.",
+      "confidence": "high",
+      "categories": [
+        "bug",
+        "security",
+        "test",
+        "docs",
+        "convention"
+      ],
+      "hotspots": [
+        "src/eval/pool/pool.ts (joinKept, goldenSpan, poolInCheckout, golden.json write conditions)",
+        "src/eval/pool/group.ts (toGroups validation, groupClusters)",
+        "src/eval/pool/calls.ts (withRetry, semaphore, cost accounting)",
+        "src/eval/codex.ts (extracted runCodex; label/codex.ts behavior preserved)",
+        "src/eval/pool/index.ts (exit codes, record validation, runAdjudicate)",
+        "src/config/models.ts and src/run.ts (isEvalRole, roleConfig refactor)",
+        "src/eval/pool/prompts.ts (byte cap, argv size limit)",
+        "src/eval/pool/records.ts (record and repo matching)"
+      ],
+      "file_notes": [
+        {
+          "file": "src/eval/codex.ts",
+          "note": "Extracted generic runCodex from label/codex.ts; check the behavior is unchanged (temp dir prefix changed)."
+        },
+        {
+          "file": "src/eval/label/codex.ts",
+          "note": "Now a thin wrapper over the shared runCodex; re-exports constants."
+        },
+        {
+          "file": "src/config/models.ts",
+          "note": "New EvalRole type, three new role configs, isEvalRole; roleConfig refactored."
+        },
+        {
+          "file": "src/run.ts",
+          "note": "Uses isEvalRole in place of explicit judge and labeler checks."
+        },
+        {
+          "file": "src/eval/case.ts",
+          "note": "Adds the pool source and loadPoolCase, which needs no golden.json; loadMeta factored out of loadCase."
+        },
+        {
+          "file": "src/eval/pool/pool.ts",
+          "note": "Main pipeline: reviews, grouping, anonymise, adjudicate, join, golden write."
+        },
+        {
+          "file": "src/eval/pool/index.ts",
+          "note": "New CLI commands, exit codes, and input validation."
+        },
+        {
+          "file": "src/cli.ts",
+          "note": "Registers the pool commands."
+        },
+        {
+          "file": "src/eval/pool/calls.ts",
+          "note": "New retry and semaphore wrapper for both model families."
+        },
+        {
+          "file": "src/eval/pool/group.ts",
+          "note": "New grouping logic with validation of model output."
+        },
+        {
+          "file": "src/eval/pool/records.ts",
+          "note": "New record reader and lenient parsing."
+        },
+        {
+          "file": "src/eval/pool/prompts.ts",
+          "note": "New prompt building with byte caps."
+        },
+        {
+          "file": "src/eval/pool/review.ts",
+          "note": "New blind review runner."
+        },
+        {
+          "file": "src/eval/pool/adjudicate.ts",
+          "note": "New adjudication with a 75 threshold."
+        },
+        {
+          "file": "src/eval/pool/schemas.ts",
+          "note": "New zod schemas."
+        },
+        {
+          "file": "prompts/pool-review.md",
+          "note": "New prompt file."
+        },
+        {
+          "file": "prompts/pool-group.md",
+          "note": "New prompt file."
+        },
+        {
+          "file": "prompts/pool-adjudicate.md",
+          "note": "New prompt file."
+        },
+        {
+          "file": "package.json",
+          "note": "Version bump to 0.7.0."
+        },
+        {
+          "file": ".claude-plugin/plugin.json",
+          "note": "Version bump."
+        },
+        {
+          "file": ".claude-plugin/marketplace.json",
+          "note": "Version bump."
+        },
+        {
+          "file": "README.md",
+          "note": "Docs for the new commands."
+        },
+        {
+          "file": "docs/design/high-level-design.md",
+          "note": "Design doc update; also removes one bullet."
+        },
+        {
+          "file": "TICKETS.md",
+          "note": "Status note."
+        },
+        {
+          "file": "test/pool-cli.test.ts",
+          "note": "Large CLI test with fakes."
+        },
+        {
+          "file": "test/pool-adjudicate.test.ts",
+          "note": "Tests for adjudicate."
+        },
+        {
+          "file": "test/pool-case.test.ts",
+          "note": "Tests for loading a pool case."
+        },
+        {
+          "file": "test/pool-prompts.test.ts",
+          "note": "Tests for prompt files and role pins."
+        },
+        {
+          "file": "test/fixtures/pool-fakes.ts",
+          "note": "Test fakes, including a fake codex shim."
+        },
+        {
+          "file": "test/fixtures/pool-record.json",
+          "note": "Record fixture."
+        }
+      ],
+      "summary": "Adds `pr-review pool` and `pr-review adjudicate`. They build golden findings for a case from blind reviews by Claude and GPT (through Codex) plus record findings. The pool groups the findings, anonymises them, scores each one with two model families, and writes `golden.json`. The change also moves the Codex runner into a shared module, adds eval roles to the model config, and bumps the version to 0.7.0."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: Adds a large new feature (pool and adjudicate commands) with new logic, model calls, subprocess spawning, file writes, public CLI interfaces, and a refactor of shared codex and role-config code.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 2207,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 4177,
+              "outputTokens": 25,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0004302,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 176,
+              "cacheReadInputTokens": 5136,
+              "cacheCreationInputTokens": 3681,
+              "webSearchRequests": 0,
+              "costUSD": 0.0340032,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 60,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.034433399999999996
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "TICKETS.md",
+            "start_line": 51,
+            "end_line": 51,
+            "category": "docs",
+            "severity_estimate": "blocking",
+            "confidence": "medium",
+            "claim": "The description says the change adds `pr-review pool` and `pr-review adjudicate`, the pool prompts, `src/eval/codex.ts`, the eval roles, README and design updates and the 0.7.0 version bump. The diff changes only TICKETS.md.",
+            "evidence": "- R2 in progress 2026-11-12: `pr-review pool` builds the goldens of an own-repo case, and `pr-review adjudicate` adjudicates one finding, such as a finding from a record (R3 uses it). See the README.",
+            "suggested_fix": "Add the missing commits to the change, or reduce the description to the TICKETS.md note.",
+            "explanation": "The only changed file is TICKETS.md, so none of the code, prompt, config or version changes in the description are in this change.",
+            "needs_context": true
+          },
+          {
+            "file": "TICKETS.md",
+            "start_line": 51,
+            "end_line": 51,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "medium",
+            "claim": "The description says the pools of four cases are finished and that pr-review 15 kept one of two items. The TICKETS.md note reports only three finished pools and does not mention pr-review 15.",
+            "evidence": "The pool of three cases adjudicated to no item: walle 14, walle 16 and websites 130 are clean cases.",
+            "suggested_fix": "Add the note that the pool of pr-review 15 kept one of two items.",
+            "explanation": "The note leaves out the finished pool of pr-review 15, so it does not match the status in the description.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6651,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 4173,
+              "outputTokens": 24,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0004293,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 708,
+              "cacheReadInputTokens": 5094,
+              "cacheCreationInputTokens": 3677,
+              "webSearchRequests": 0,
+              "costUSD": 0.0446028,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 105,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0450321
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1504,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 68,
+              "cacheReadInputTokens": 5363,
+              "cacheCreationInputTokens": 3673,
+              "webSearchRequests": 0,
+              "costUSD": 0.0318246,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0318246
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1760,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 4183,
+              "outputTokens": 26,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0004313,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 71,
+              "cacheReadInputTokens": 5363,
+              "cacheCreationInputTokens": 3687,
+              "webSearchRequests": 0,
+              "costUSD": 0.0319966,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0324279
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1923,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 4191,
+              "outputTokens": 25,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.00043160000000000003,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 138,
+              "cacheReadInputTokens": 5046,
+              "cacheCreationInputTokens": 3695,
+              "webSearchRequests": 0,
+              "costUSD": 0.0333372,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 84,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.033768799999999995
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 2131,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 20687,
+              "outputTokens": 28,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0020827000000000003,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 102,
+              "cacheReadInputTokens": 5438,
+              "cacheCreationInputTokens": 20191,
+              "webSearchRequests": 0,
+              "costUSD": 0.1646636,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1667463
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1723,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 4179,
+              "outputTokens": 23,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0004294000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 73,
+              "cacheReadInputTokens": 5330,
+              "cacheCreationInputTokens": 3683,
+              "webSearchRequests": 0,
+              "costUSD": 0.031998,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0324274
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1947,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 4183,
+              "outputTokens": 26,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0004313,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 84,
+              "cacheReadInputTokens": 5330,
+              "cacheCreationInputTokens": 3687,
+              "webSearchRequests": 0,
+              "costUSD": 0.03225,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0326813
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1420,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 4173,
+              "outputTokens": 25,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0004298,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 81,
+              "cacheReadInputTokens": 6105,
+              "cacheCreationInputTokens": 3677,
+              "webSearchRequests": 0,
+              "costUSD": 0.032265,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0326948
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "TICKETS.md",
+          "start_line": 51,
+          "end_line": 51,
+          "category": "docs",
+          "severity_estimate": "blocking",
+          "confidence": "medium",
+          "claim": "The description says the change adds `pr-review pool` and `pr-review adjudicate`, the pool prompts, `src/eval/codex.ts`, the eval roles, README and design updates and the 0.7.0 version bump. The diff changes only TICKETS.md.",
+          "evidence": "- R2 in progress 2026-11-12: `pr-review pool` builds the goldens of an own-repo case, and `pr-review adjudicate` adjudicates one finding, such as a finding from a record (R3 uses it). See the README.",
+          "suggested_fix": "Add the missing commits to the change, or reduce the description to the TICKETS.md note.",
+          "explanation": "The only changed file is TICKETS.md, so none of the code, prompt, config or version changes in the description are in this change.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": false,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "- R2 in progress 2026-11-12: `pr-review pool` builds the goldens of an own-repo case, and `pr-review adjudicate` adjudicates one finding"
+          ],
+          "rationale": "The review gave only the TICKETS.md diff, which is how it is built for the file the finding names. The head checkout holds src/eval/codex.ts and src/eval/pool/*.ts, so the change does include the code in the description.",
+          "score": 3,
+          "severity": "not_real"
+        },
+        "final": {
+          "in_scope": false,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "- R2 in progress 2026-11-12: `pr-review pool` builds the goldens of an own-repo case, and `pr-review adjudicate` adjudicates one finding"
+          ],
+          "rationale": "The review gave only the TICKETS.md diff, which is how it is built for the file the finding names. The head checkout holds src/eval/codex.ts and src/eval/pool/*.ts, so the change does include the code in the description.",
+          "score": 3,
+          "severity": "not_real"
+        },
+        "passed": false
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5880856345,
+      "review_url": "https://github.com/jerridan/pr-review/pull/45#pullrequestreview-5880856345",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 131439792030
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": [
+      {
+        "file": "src/eval/case.ts",
+        "start_line": 1,
+        "end_line": 2,
+        "category": "docs",
+        "severity_estimate": "nit",
+        "confidence": "medium",
+        "claim": "The file header says that every case holds golden.json, but loadPoolCase now loads a case without it.",
+        "evidence": "// Load and validate the cases of an eval. A case is one directory with\n// case.json, repo.bundle, diff.patch and golden.json.",
+        "suggested_fix": "Add that the pool loads a case without golden.json.",
+        "explanation": "The pool loader needs no golden.json.",
+        "needs_context": false,
+        "fingerprint": "58c3615c7d46a1c5",
+        "severity": "nit",
+        "score": 72,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "// Load and validate the cases of an eval. A case is one directory with\n// case.json, repo.bundle, diff.patch and golden.json.",
+            "/** The files that the pool needs, apart from case.json. The pool writes golden.json. */",
+            "export async function loadPoolCase(dir: string): Promise<Case> {"
+          ],
+          "rationale": "The file header still says that a case holds golden.json. The new loadPoolCase loads a case that has no golden.json, so the header is now incomplete. The header does describe eval cases, and the pool writes golden.json in the end, so the gap is small. It is a minor docs point and cheap to fix.",
+          "score": 72,
+          "severity": "nit"
+        },
+        "span_text": "// Load and validate the cases of an eval. A case is one directory with // case.json, repo.bundle, diff.patch and golden.json."
+      },
+      {
+        "file": "src/eval/pool/group.ts",
+        "start_line": 48,
+        "end_line": 71,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "No test covers the validation errors of toGroups: an unknown id, a finding in two groups, or a representative outside its group.",
+        "evidence": "if (i === undefined) return `the grouping names the unknown id ${name}`;\n      if (seen.has(i)) return `the grouping puts ${name} in two groups`;",
+        "suggested_fix": "Add pool CLI tests whose grouper returns an unknown id, a duplicate member, or a bad representative. Each test asserts a failed case and no pool.json.",
+        "explanation": "A grouping answer that is not valid can silently drop or duplicate items, and no test fails when this check breaks.",
+        "needs_context": false,
+        "fingerprint": "eba9f66f893ea33e",
+        "severity": "suggestion",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (i === undefined) return `the grouping names the unknown id ${name}`;",
+            "if (seen.has(i)) return `the grouping puts ${name} in two groups`;",
+            "return `the representative ${g.representative} is not a member of its group`;",
+            "export const failGrouping: Grouper = () => \"fail\";",
+            "return out === \"fail\" ? FAILED : { ok: true, output: out, raw: META };"
+          ],
+          "rationale": "The only test groupers are byTag, allInOne and failGrouping. failGrouping makes the call itself fail, so toGroups never runs on it, and no test sends a grouping with an unknown id, a duplicate member or a bad representative. The new validation branches have no test.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "span_text": "function toGroups(out: GroupOutput, names: readonly string[]): Group[] | string { const index = new Map(names.map((name, i) => [name, i])); const seen = new Set<number>(); const groups: Group[] = []; for (const g of out.groups) { const members: number[] = []; for (const name of g.members) { const i = index.get(name); if (i === undefined) return `the grouping names the unknown id ${name}`; if (seen.has(i)) return `the grouping puts ${name} in two groups`; seen.add(i); members.push(i); } if (members.length === 0) continue; const rep = index.get(g.representative); if (rep === undefined || !members.includes(rep)) { return `the representative ${g.representative} is not a member of its group`; } groups.push({ members, representative: rep }); } for (let i = 0; i < names.length; i++) { if (!seen.has(i)) groups.push({ members: [i], representative: i }); } return groups;"
+      },
+      {
+        "file": "src/eval/pool/pool.ts",
+        "start_line": 290,
+        "end_line": 290,
+        "category": "bug",
+        "severity_estimate": "blocking",
+        "confidence": "medium",
+        "claim": "With --write-golden, golden.json is overwritten even when blind reviews or adjudication calls failed, so a quota failure can turn a case into a false clean case.",
+        "evidence": "if (opts.writeGolden) await writeFile(join(c.dir, \"golden.json\"), json({ findings: goldens }));",
+        "suggested_fix": "Skip the golden write (or refuse it) when any review failed or any item has the outcome failed.",
+        "explanation": "Failed calls make items not kept, and the code still writes the reduced golden list over the existing golden.json. The exit code 1 does not undo that write.",
+        "needs_context": false,
+        "fingerprint": "53abf3e67915144f",
+        "severity": "suggestion",
+        "score": 92,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (opts.writeGolden) await writeFile(join(c.dir, \"golden.json\"), json({ findings: goldens }));",
+            "outcome: failed ? \"failed\" : \"not_kept\",",
+            "r.outcome === \"golden\" && r.span !== undefined",
+            "r.ok ? r.findings.map((finding) => ({ source: r.source, finding })) : [],",
+            "if (result.reviewErrors.length > 0 || result.failed > 0) code = EXIT_FAILURE;"
+          ],
+          "rationale": "With --write-golden, golden.json is written whatever happened earlier. A failed blind review adds no findings, and a failed adjudication gets the outcome \"failed\" and makes no golden. So when quota runs out, the golden list can be cut down or even empty, and that list still replaces the file. The CLI only sets exit code 1 after the write. The user sees the failure and can rerun or restore the file, so this fits a suggestion rather than a blocker.",
+          "score": 92,
+          "severity": "suggestion"
+        },
+        "span_text": ": [],"
+      }
+    ]
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 11645,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 69136,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0069236,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1717,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 68648,
+            "webSearchRequests": 0,
+            "costUSD": 0.2918922,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.29881579999999996
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 1504,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 68,
+            "cacheReadInputTokens": 5363,
+            "cacheCreationInputTokens": 3673,
+            "webSearchRequests": 0,
+            "costUSD": 0.0318246,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0318246
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 1760,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 4183,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0004313,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 71,
+            "cacheReadInputTokens": 5363,
+            "cacheCreationInputTokens": 3687,
+            "webSearchRequests": 0,
+            "costUSD": 0.0319966,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0324279
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 2207,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 4177,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0004302,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 176,
+            "cacheReadInputTokens": 5136,
+            "cacheCreationInputTokens": 3681,
+            "webSearchRequests": 0,
+            "costUSD": 0.0340032,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 60,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.034433399999999996
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "model": "claude-opus-5-5",
+        "duration_ms": 1923,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 4191,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00043160000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 138,
+            "cacheReadInputTokens": 5046,
+            "cacheCreationInputTokens": 3695,
+            "webSearchRequests": 0,
+            "costUSD": 0.0333372,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 84,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.033768799999999995
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 1723,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 4179,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0004294000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 73,
+            "cacheReadInputTokens": 5330,
+            "cacheCreationInputTokens": 3683,
+            "webSearchRequests": 0,
+            "costUSD": 0.031998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0324274
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "model": "claude-opus-5-5",
+        "duration_ms": 2131,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 20687,
+            "outputTokens": 28,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0020827000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 102,
+            "cacheReadInputTokens": 5438,
+            "cacheCreationInputTokens": 20191,
+            "webSearchRequests": 0,
+            "costUSD": 0.1646636,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1667463
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "model": "claude-opus-5-5",
+        "duration_ms": 1420,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 4173,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0004298,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 81,
+            "cacheReadInputTokens": 6105,
+            "cacheCreationInputTokens": 3677,
+            "webSearchRequests": 0,
+            "costUSD": 0.032265,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0326948
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 1947,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 4183,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0004313,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 84,
+            "cacheReadInputTokens": 5330,
+            "cacheCreationInputTokens": 3687,
+            "webSearchRequests": 0,
+            "costUSD": 0.03225,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0326813
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6651,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 4173,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0004293,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 708,
+            "cacheReadInputTokens": 5094,
+            "cacheCreationInputTokens": 3677,
+            "webSearchRequests": 0,
+            "costUSD": 0.0446028,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 105,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0450321
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6749,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 13818,
+            "outputTokens": 29,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0013963,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 608,
+            "cacheReadInputTokens": 22064,
+            "cacheCreationInputTokens": 13831,
+            "webSearchRequests": 0,
+            "costUSD": 0.06361839999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 143,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0650147
+      }
+    ],
+    "total_cost_usd": 0.8058671,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 37,
+      "gather": 189,
+      "scope": 8,
+      "triage": 12372,
+      "find_verify": 15177,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
