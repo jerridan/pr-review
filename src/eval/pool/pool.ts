@@ -14,6 +14,7 @@ import { cloneCase } from "../checkout.js";
 import {
   adjudicateFinding,
   DISMISS_BELOW,
+  KEEP_SCORE,
   scoreOf,
   type Adjudication,
   type FamilyResult,
@@ -227,12 +228,14 @@ function components(items: readonly Spanned[]): Spanned[][] {
  * span-overlap graph go through the grouping call once more, one call for
  * each component of two or more items. A group never holds items of two
  * components. Each group keeps the member with the highest lower score.
- * Set the outcome of each joined item.
+ * Set the outcome of each joined item. The dismissals of a joined item move
+ * to the item that stays, so its golden names the label of the verifier.
  */
 async function joinKept(
   name: string,
   items: readonly PoolItem[],
   results: ItemAdjudication[],
+  noteMarks: Mark[][],
   ctx: PoolContext,
 ): Promise<void> {
   const withSpan = results
@@ -266,6 +269,7 @@ async function joinKept(
         if (m === best) continue;
         m.r.outcome = "joined";
         m.r.joined_into = best.item.id;
+        noteMarks[items.indexOf(best.item)]?.push(...(noteMarks[items.indexOf(m.item)] ?? []));
       }
     }
   });
@@ -455,11 +459,12 @@ async function poolInCheckout(
   await writeFile(join(dir, "adjudications.json"), json({ items: results }));
 
   // Step 6: join the kept items.
-  await joinKept(c.name, items, results, ctx);
+  const noteMarks = itemMarks.map((marks) => [...marks]);
+  await joinKept(c.name, items, results, noteMarks, ctx);
   await writeFile(join(dir, "adjudications.json"), json({ items: results }));
   const goldens = results.flatMap((r, n) =>
     (r.outcome === "golden" || r.outcome === "dismissed_golden") && r.span !== undefined
-      ? [golden(items[n] as PoolItem, { ...r, span: r.span }, itemMarks[n] as Mark[])]
+      ? [golden(items[n] as PoolItem, { ...r, span: r.span }, noteMarks[n] as Mark[])]
       : [],
   );
   const failedReviews = runs.filter((r) => !r.ok).length;
@@ -491,6 +496,13 @@ async function poolInCheckout(
   };
 }
 
+// True when a score is from DISMISS_BELOW to one below KEEP_SCORE.
+function inBand(r: ItemAdjudication): boolean {
+  return [scoreOf(r.claude), scoreOf(r.gpt)].some(
+    (n) => n !== null && n >= DISMISS_BELOW && n < KEEP_SCORE,
+  );
+}
+
 function summariseDismissed(
   d: Dismissals,
   items: readonly PoolItem[],
@@ -516,7 +528,9 @@ function summariseDismissed(
           ? "a model call failed"
           : r.outcome === "no_span"
             ? "no valid span"
-            : "the families do not agree";
+            : inBand(r)
+              ? "a score from 50 to 74"
+              : "the families do not agree";
       summary.noGolden.push(
         `${id}: ${why} (Claude ${scoreOf(r.claude) ?? "failed"}, GPT ${scoreOf(r.gpt) ?? "failed"})`,
       );
