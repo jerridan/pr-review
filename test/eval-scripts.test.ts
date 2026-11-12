@@ -21,6 +21,7 @@ const run = promisify(execFile);
 const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
 const FIXTURE_SCRIPT = fileURLToPath(new URL("../scripts/make-fixture.sh", import.meta.url));
 const MAKE_CASE = fileURLToPath(new URL("../scripts/make-case.sh", import.meta.url));
+const INJECT_CASE = fileURLToPath(new URL("../scripts/inject-case.sh", import.meta.url));
 const FETCH_CASES = fileURLToPath(new URL("../scripts/fetch-cases.sh", import.meta.url));
 const FETCH_PR = fileURLToPath(new URL("../scripts/fetch-pr.sh", import.meta.url));
 
@@ -228,6 +229,153 @@ describe("scripts/make-case.sh (R2.10)", () => {
     );
     expect(result.code).not.toBe(0);
     expect(existsSync(join(out, "bad"))).toBe(false);
+  }, 30_000);
+});
+
+describe("inject-case.sh", () => {
+  const PATCH = [
+    "diff --git a/a.txt b/a.txt",
+    "--- a/a.txt",
+    "+++ b/a.txt",
+    "@@ -1,3 +1,3 @@",
+    " alpha",
+    "-beta",
+    "+BETA",
+    " gamma",
+    "",
+  ].join("\n");
+  const MESSAGE = "Host title\n\nHost body line one.\n\nHost body line two.\n";
+
+  type Host = { repo: string; base: string; head: string; patch: string; message: string };
+
+  async function makeHost(): Promise<Host> {
+    const dir = newDir("inject-host");
+    const repo = join(dir, "repo");
+    mkdirSync(repo);
+    await git(repo, ["init", "--quiet", "--initial-branch=main"]);
+    const commit = async (msg: string) => {
+      await git(repo, ["add", "-A"]);
+      await git(repo, ["-c", "commit.gpgsign=false", "commit", "--quiet", "-m", msg]);
+      return git(repo, ["rev-parse", "HEAD"]);
+    };
+    writeFileSync(join(repo, "a.txt"), "alpha\nbeta\ngamma\n");
+    const base = await commit("Base");
+    writeFileSync(join(repo, "b.txt"), "extra\n");
+    await commit("Head one");
+    writeFileSync(join(repo, "c.txt"), "more\n");
+    const head = await commit("Head two");
+    const patch = join(dir, "bug.patch");
+    writeFileSync(patch, PATCH);
+    const message = join(dir, "message.txt");
+    writeFileSync(message, MESSAGE);
+    return { repo, base, head, patch, message };
+  }
+
+  async function inject(h: Host, out: string, name = "inj"): Promise<Result> {
+    return runScript(INJECT_CASE, [h.repo, h.base, h.head, h.patch, h.message, name], out);
+  }
+
+  it("writes case.json with source injection and the title and body of the message file", async () => {
+    const h = await makeHost();
+    const out = newDir("inject-out");
+    const result = await inject(h, out);
+    expect(result.code, result.stderr).toBe(0);
+    const meta = JSON.parse(readFileSync(join(out, "inj", "case.json"), "utf8")) as {
+      name: string;
+      source: string;
+      base: string;
+      title: string;
+      body: string;
+    };
+    expect(meta.name).toBe("inj");
+    expect(meta.source).toBe("injection");
+    expect(meta.base).toBe(h.base);
+    expect(meta.title).toBe("Host title");
+    expect(meta.body).toBe("Host body line one.\n\nHost body line two.");
+  }, 30_000);
+
+  it("bundles one commit on base whose tree is the head tree with the patch applied", async () => {
+    const h = await makeHost();
+    const out = newDir("inject-out");
+    await inject(h, out);
+    const meta = JSON.parse(readFileSync(join(out, "inj", "case.json"), "utf8")) as {
+      head: string;
+    };
+    const clone = join(out, "clone");
+    await run("git", ["clone", "--quiet", join(out, "inj", "repo.bundle"), clone], { env: ENV });
+    expect(await git(clone, ["rev-list", "--count", `${h.base}..${meta.head}`])).toBe("1");
+    expect(await git(clone, ["rev-parse", `${meta.head}^`])).toBe(h.base);
+    expect(await git(clone, ["show", `${meta.head}:a.txt`])).toBe("alpha\nBETA\ngamma");
+    expect(await git(clone, ["show", `${meta.head}:b.txt`])).toBe("extra");
+    expect(await git(clone, ["show", `${meta.head}:c.txt`])).toBe("more");
+    expect(await git(clone, ["log", "-1", "--format=%B", meta.head])).toBe(MESSAGE.trim());
+  }, 30_000);
+
+  it("copies the patch to injection.patch", async () => {
+    const h = await makeHost();
+    const out = newDir("inject-out");
+    await inject(h, out);
+    expect(readFileSync(join(out, "inj", "injection.patch"), "utf8")).toBe(PATCH);
+  }, 30_000);
+
+  it("does not change the source repo", async () => {
+    const h = await makeHost();
+    const snapshot = async () => ({
+      refs: await git(h.repo, ["for-each-ref"]),
+      status: await git(h.repo, ["status", "--porcelain"]),
+      objects: await git(h.repo, ["count-objects", "-v"]),
+    });
+    const before = await snapshot();
+    const result = await inject(h, newDir("inject-out"));
+    expect(result.code, result.stderr).toBe(0);
+    expect(await snapshot()).toEqual(before);
+  }, 30_000);
+
+  it("gives the same head sha for the same inputs", async () => {
+    const h = await makeHost();
+    const heads: string[] = [];
+    for (let i = 0; i < 2; i += 1) {
+      const out = newDir("inject-out");
+      await inject(h, out);
+      const meta = JSON.parse(readFileSync(join(out, "inj", "case.json"), "utf8")) as {
+        head: string;
+      };
+      heads.push(meta.head);
+    }
+    expect(heads[0]).toBe(heads[1]);
+  }, 30_000);
+
+  it("exits non-zero and writes no directory when the patch does not apply", async () => {
+    const h = await makeHost();
+    writeFileSync(h.patch, PATCH.replace("-beta", "-delta"));
+    const out = newDir("inject-out");
+    const result = await inject(h, out);
+    expect(result.code).not.toBe(0);
+    expect(existsSync(join(out, "inj"))).toBe(false);
+  }, 30_000);
+
+  it("exits non-zero and keeps the directory when the name exists", async () => {
+    const h = await makeHost();
+    const out = newDir("inject-out");
+    mkdirSync(join(out, "inj"));
+    writeFileSync(join(out, "inj", "golden.json"), "labelled\n");
+    const result = await inject(h, out);
+    expect(result.code).not.toBe(0);
+    expect(readdirSync(join(out, "inj"))).toEqual(["golden.json"]);
+  }, 30_000);
+
+  it("exits non-zero when the message file is missing or the arguments are short", async () => {
+    const h = await makeHost();
+    const out = newDir("inject-out");
+    const missing = await runScript(
+      INJECT_CASE,
+      [h.repo, h.base, h.head, h.patch, join(out, "none.txt"), "inj"],
+      out,
+    );
+    expect(missing.code).not.toBe(0);
+    expect(existsSync(join(out, "inj"))).toBe(false);
+    const short = await runScript(INJECT_CASE, [h.repo, h.base, h.head], out);
+    expect(short.code).not.toBe(0);
   }, 30_000);
 });
 
