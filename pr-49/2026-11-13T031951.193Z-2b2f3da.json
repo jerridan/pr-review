@@ -1,0 +1,2145 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 49,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Resume a stopped label run (label --resume)",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/49"
+    },
+    "run_kind": "later",
+    "prior": {
+      "head": "703479d5942bf517bd6d557ca0dccb41f046ecb8",
+      "source": "record",
+      "record": "/home/runner/work/_temp/pr-review-records/pr-49/2026-11-13T030956.658Z-703479d.json",
+      "open": [
+        "b63d7dfda69e5746",
+        "b698df9d4155e816",
+        "d2c8165c6148155d"
+      ],
+      "dismissed": [],
+      "fetch_failed": false
+    },
+    "base": "ee35ce281f298ed914d5a57f686fccf8c732b7b4",
+    "head": "2b2f3dab2d4031a8592caf74a686d092cc04c197",
+    "started_at": "2026-11-13T03:19:51.193Z",
+    "tool_version": "0.9.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Resume a stopped label run (label --resume)\n\n`pr-review label --resume`: a label run that stops keeps each finding that reached a result, and a second run labels only the findings that are missing or that have a failed run.\n\n## Why\n\nOn 2026-11-12, Codex reached its usage limit during the D4b R3 labeling. Case `pool-pr-review-44` kept 5 of its 9 labels, and two cases were not labeled. Without a resume, each new run labels every finding again and pays every Claude call again.\n\n## What changes\n\n- With `--resume`, the labeler reads the `labels.json` of each case in the output directory. It reuses a finding when its runs all completed, its text matches (file, lines, claim), and the labeling input is the same: run count, model ids, policy text and the labeler prompt files.\n- Every run now writes a `digest` of that input in `labels.json`. A file with another digest, or with none, gives no reuse, and the run says so on stderr. So the `labels.json` files of the stopped R3 run give no reuse: they have no digest.\n- The scorer cost counts only new calls. The summary names the reused findings per case.\n- `labels.json`, `disagreements.json` and `human-queue.json` are written through a temp file and a rename.\n- README, and the version goes to 0.10.0.\n\n## Tests\n\n`test/label-resume.test.ts` runs the CLI with a fake SDK client and a fake `codex`. `npm test` (1415), lint, typecheck, build and the version check pass.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZe8a4pwY82rqWPJvix\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": ".claude-plugin/marketplace.json",
+        "hunks": 1
+      },
+      {
+        "path": ".claude-plugin/plugin.json",
+        "hunks": 1
+      },
+      {
+        "path": "README.md",
+        "hunks": 3
+      },
+      {
+        "path": "package.json",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/atomic.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/label/index.ts",
+        "hunks": 8
+      },
+      {
+        "path": "src/eval/label/loop.ts",
+        "hunks": 7
+      },
+      {
+        "path": "src/eval/label/output.ts",
+        "hunks": 8
+      },
+      {
+        "path": "src/eval/label/resume.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/run.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/label-resume.test.ts",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [
+      {
+        "path": "package-lock.json",
+        "reason": "generated"
+      }
+    ],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "Adds a new --resume feature to the label command, with reuse logic, digest-based cache invalidation, incremental atomic writes and concurrency changes, so the change touches logic, data and a public CLI interface.",
+      "confidence": "high",
+      "categories": [
+        "bug",
+        "test",
+        "docs",
+        "other"
+      ],
+      "hotspots": [
+        "src/eval/label/resume.ts: readKept validation and reuse conditions (digest, runs length, failed flag, raw cast to FindingEntry)",
+        "src/eval/label/resume.ts: labelDigest covers all inputs that affect results",
+        "src/eval/label/index.ts: onOutcome write chaining and incremental labels.json writes (ordering, error propagation, sort by index)",
+        "src/eval/label/loop.ts: labelCase reuse path bypasses the semaphore; reused entry gets the new index and severity",
+        "src/eval/label/output.ts: caseResult digest/reused fields, writeCaseFiles atomic writes",
+        "src/eval/atomic.ts: temp file name shared by concurrent writes in the same process",
+        "src/eval/run.ts: refactor to writeFileAtomic",
+        "test/label-resume.test.ts: fake codex timing assumptions"
+      ],
+      "file_notes": [
+        {
+          "file": "src/eval/label/resume.ts",
+          "note": "new module: digest, finding key, zod schemas, readKept"
+        },
+        {
+          "file": "src/eval/label/loop.ts",
+          "note": "labelCase takes kept entries and an onOutcome callback; FindingEntry gains category; labelFinding split into outcomeOf"
+        },
+        {
+          "file": "src/eval/label/index.ts",
+          "note": "wires --resume, reads diff.patch, computes digest, writes labels.json after each finding"
+        },
+        {
+          "file": "src/eval/label/output.ts",
+          "note": "adds digest and reused fields, writeLabels, reusedLines; switches to atomic writes"
+        },
+        {
+          "file": "src/eval/atomic.ts",
+          "note": "new helper extracted from run.ts; fixed temp name per pid"
+        },
+        {
+          "file": "src/eval/run.ts",
+          "note": "uses writeFileAtomic; behavior unchanged"
+        },
+        {
+          "file": "test/label-resume.test.ts",
+          "note": "new end-to-end tests with fake SDK client and fake codex"
+        },
+        {
+          "file": "README.md",
+          "note": "documents --resume"
+        },
+        {
+          "file": "package.json",
+          "note": "version bump to 0.10.0"
+        },
+        {
+          "file": ".claude-plugin/plugin.json",
+          "note": "version bump"
+        },
+        {
+          "file": ".claude-plugin/marketplace.json",
+          "note": "version bump"
+        }
+      ],
+      "summary": "Adds a --resume flag to `pr-review label`. It stores a digest of the labeling input in labels.json and reuses entries whose runs all completed and whose finding text and category match. labels.json is now rewritten atomically after each finding so an interrupted run keeps its progress. Also extracts writeFileAtomic into a shared helper, adds tests, updates the README, and bumps the version to 0.10.0."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: Adds a new --resume feature to the label command, with reuse logic, digest-based cache invalidation, incremental atomic writes and concurrency changes, so the change touches logic, data and a public CLI interface.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 9769,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 16398,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0016498,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 651,
+              "cacheReadInputTokens": 26174,
+              "cacheCreationInputTokens": 16315,
+              "webSearchRequests": 0,
+              "costUSD": 0.14879079999999997,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 485,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.15044059999999998
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/label/resume.ts",
+            "start_line": 41,
+            "end_line": 49,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The description says a finding is reused when its text matches (file, lines, claim), but the key also holds the category, and the digest also holds the case head and diff.",
+            "evidence": "return JSON.stringify([f.file, f.start_line, f.end_line, f.claim, f.category]);",
+            "suggested_fix": "Add the category, the head and the diff to the description.",
+            "explanation": "A changed category or diff stops reuse, and the description does not say so.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6611,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 16406,
+              "outputTokens": 17,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0016491000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 535,
+              "cacheReadInputTokens": 26098,
+              "cacheCreationInputTokens": 16210,
+              "webSearchRequests": 0,
+              "costUSD": 0.1456156,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 176,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1472647
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/label/index.ts",
+            "start_line": 87,
+            "end_line": 92,
+            "category": "bug",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "If one incremental labels.json write fails, every later write and the whole case fail, so the labeling results already paid for are lost.",
+            "evidence": "writing = writing.then(() => writeLabels(dir, caseResult(c.name, opts.runs, done, extra)));",
+            "suggested_fix": "Catch the error of each incremental write, report it on stderr, and keep the chain alive (for example `writing.then(...).catch(...)`).",
+            "explanation": "The write chain has no rejection handler. After one failed write, every later `.then` also rejects, and `labelCase` rejects even though the labeling calls succeeded.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7137,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 16414,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0016519000000000004,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 610,
+              "cacheReadInputTokens": 5363,
+              "cacheCreationInputTokens": 15918,
+              "webSearchRequests": 0,
+              "costUSD": 0.14062460000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 245,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.14227650000000003
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/label/index.ts",
+            "start_line": 88,
+            "end_line": 93,
+            "category": "bug",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "One failed write of labels.json leaves the write chain rejected, so every later onOutcome fails and labelCase rejects for the whole case.",
+            "evidence": "writing = writing.then(() => writeLabels(dir, caseResult(c.name, opts.runs, done, extra)));",
+            "suggested_fix": "Make each progress write independent of the error of the last one, e.g. writing = writing.catch(() => {}).then(...).",
+            "explanation": "A rejected promise in the chain makes every later write skip and return the same error, so the case aborts instead of continuing to label.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 10331,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 16400,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0016505000000000003,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 953,
+              "cacheReadInputTokens": 5363,
+              "cacheCreationInputTokens": 15904,
+              "webSearchRequests": 0,
+              "costUSD": 0.14737260000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 376,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.14902310000000002
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/label/loop.ts",
+            "start_line": 332,
+            "end_line": 336,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The doc says a semaphore slot stays taken until onOutcome returns, but a reused finding calls onOutcome outside the semaphore.",
+            "evidence": "gets each outcome when its finding is done, and a slot of the semaphore",
+            "suggested_fix": "Say that the slot stays taken only for a finding that makes calls.",
+            "explanation": "On the reuse path, onOutcome runs and no semaphore slot is taken, so the doc is wrong for kept findings.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7202,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 16408,
+              "outputTokens": 18,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0016497999999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 619,
+              "cacheReadInputTokens": 26004,
+              "cacheCreationInputTokens": 17256,
+              "webSearchRequests": 0,
+              "costUSD": 0.15564479999999997,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 242,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.15729459999999998
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6051,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 29139,
+              "outputTokens": 18,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0029229000000000004,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 497,
+              "cacheReadInputTokens": 5438,
+              "cacheCreationInputTokens": 28643,
+              "webSearchRequests": 0,
+              "costUSD": 0.2401796,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 151,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.2431025
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 3778,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 16402,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0016502,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 326,
+              "cacheReadInputTokens": 5330,
+              "cacheCreationInputTokens": 15906,
+              "webSearchRequests": 0,
+              "costUSD": 0.134842,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 91,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.13649219999999998
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4891,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 16398,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0016498,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 389,
+              "cacheReadInputTokens": 5330,
+              "cacheCreationInputTokens": 15902,
+              "webSearchRequests": 0,
+              "costUSD": 0.13607,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 54,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1377198
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/label/resume.ts",
+            "start_line": 21,
+            "end_line": 35,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "No test shows that a change of the policy text, the case head, the model ids or the labeler prompt files stops reuse; only the run count and the diff are tested.",
+            "evidence": "    policy,\n    prompts: [\"label-scorer.md\", \"label-judge.md\"].map((file) => {",
+            "suggested_fix": "Add a unit test of labelDigest: changing the policy string or the head gives a different digest. Add a CLI resume test that edits the policy and expects 'another digest' on stderr.",
+            "explanation": "If the digest drops the policy or the prompts, --resume silently reuses labels made under another input, and no test fails.",
+            "needs_context": false
+          },
+          {
+            "file": "src/eval/label/resume.ts",
+            "start_line": 125,
+            "end_line": 125,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "No test reaches the branch that drops a kept entry whose run count differs from --runs, because a change of the run count also changes the digest.",
+            "evidence": "    if (entry.data.runs.length !== runs || entry.data.runs.some((r) => r.failed)) continue;",
+            "suggested_fix": "Unit-test readKept with a matching digest and an entry whose runs array is shorter than the runs argument.",
+            "explanation": "The runs.length guard can break or be removed and every test still passes.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 11325,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 16402,
+              "outputTokens": 18,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0016492,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 1061,
+              "cacheReadInputTokens": 6105,
+              "cacheCreationInputTokens": 15906,
+              "webSearchRequests": 0,
+              "costUSD": 0.149697,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 314,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1513462
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "src/eval/label/resume.ts",
+          "start_line": 41,
+          "end_line": 49,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The description says a finding is reused when its text matches (file, lines, claim), but the key also holds the category, and the digest also holds the case head and diff.",
+          "evidence": "return JSON.stringify([f.file, f.start_line, f.end_line, f.claim, f.category]);",
+          "suggested_fix": "Add the category, the head and the diff to the description.",
+          "explanation": "A changed category or diff stops reuse, and the description does not say so.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": false,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "return JSON.stringify([f.file, f.start_line, f.end_line, f.claim, f.category]);",
+            "export function labelDigest(runs: number, policy: string, head: string, diff: string): string {"
+          ],
+          "rationale": "The key does include category and the digest includes head and diff, so the PR description is incomplete. But the code comments document this accurately, and the gap is only in the PR text, so it isn't worth the author's time.",
+          "score": 80,
+          "severity": "dont_post"
+        },
+        "final": {
+          "in_scope": false,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "return JSON.stringify([f.file, f.start_line, f.end_line, f.claim, f.category]);",
+            "export function labelDigest(runs: number, policy: string, head: string, diff: string): string {"
+          ],
+          "rationale": "The key does include category and the digest includes head and diff, so the PR description is incomplete. But the code comments document this accurately, and the gap is only in the PR text, so it isn't worth the author's time.",
+          "score": 80,
+          "severity": "dont_post"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "src/eval/label/index.ts",
+          "start_line": 87,
+          "end_line": 92,
+          "category": "bug",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "If one incremental labels.json write fails, every later write and the whole case fail, so the labeling results already paid for are lost.",
+          "evidence": "writing = writing.then(() => writeLabels(dir, caseResult(c.name, opts.runs, done, extra)));",
+          "suggested_fix": "Catch the error of each incremental write, report it on stderr, and keep the chain alive (for example `writing.then(...).catch(...)`).",
+          "explanation": "The write chain has no rejection handler. After one failed write, every later `.then` also rejects, and `labelCase` rejects even though the labeling calls succeeded.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "writing = writing.then(() => writeLabels(dir, caseResult(c.name, opts.runs, done, extra)));",
+            "await onOutcome(outcome);"
+          ],
+          "rationale": "The chain has no catch, so one failed writeLabels rejects every later write and the awaited onOutcome inside labelCase's semaphore callback, so Promise.all rejects and labelOneCase throws. A persistent disk failure would likely fail the final write as well, so this matters only for a transient write error.",
+          "score": 72,
+          "severity": "suggestion"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "writing = writing.then(() => writeLabels(dir, caseResult(c.name, opts.runs, done, extra)));",
+            "return writing;",
+            "await onOutcome(outcome);",
+            "return Promise.all("
+          ],
+          "rationale": "The `writing` chain has no catch, so after one failed write every later write is skipped and rejects too. Each rejection reaches labelCase's Promise.all, so the case fails and runLabel's Promise.all fails with it, even though the labeling calls succeeded. The losses are smaller than the finding says: labels.json still holds the findings written before the failure. A failed disk write is also an unusual path, so this is a suggestion.",
+          "score": 80,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "writing = writing.then(() => writeLabels(dir, caseResult(c.name, opts.runs, done, extra)));",
+            "return writing;",
+            "await onOutcome(outcome);",
+            "return Promise.all("
+          ],
+          "rationale": "The `writing` chain has no catch, so after one failed write every later write is skipped and rejects too. Each rejection reaches labelCase's Promise.all, so the case fails and runLabel's Promise.all fails with it, even though the labeling calls succeeded. The losses are smaller than the finding says: labels.json still holds the findings written before the failure. A failed disk write is also an unusual path, so this is a suggestion.",
+          "score": 80,
+          "severity": "suggestion"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "src/eval/label/loop.ts",
+          "start_line": 332,
+          "end_line": 336,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The doc says a semaphore slot stays taken until onOutcome returns, but a reused finding calls onOutcome outside the semaphore.",
+          "evidence": "gets each outcome when its finding is done, and a slot of the semaphore",
+          "suggested_fix": "Say that the slot stays taken only for a finding that makes calls.",
+          "explanation": "On the reuse path, onOutcome runs and no semaphore slot is taken, so the doc is wrong for kept findings.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "gets each outcome when its finding is done, and a slot of the semaphore",
+            "return onOutcome(outcome).then(() => outcome);",
+            "return semaphore(async () => {\n        const outcome = await labelFinding(input, ctx);\n        await onOutcome(outcome);"
+          ],
+          "rationale": "For a kept finding, onOutcome runs outside the semaphore, so the doc is imprecise for reused findings. The sentence before it says a kept finding makes no call, so the gap is small and the fix is cheap.",
+          "score": 80,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "gets each outcome when its finding is done, and a slot of the semaphore",
+            "stays taken until it returns.",
+            "return onOutcome(outcome).then(() => outcome);",
+            "return semaphore(async () => {"
+          ],
+          "rationale": "The doc comment says a semaphore slot stays taken until onOutcome returns, but this is wrong for reused findings: on that path onOutcome is called directly, outside semaphore(). The comment was added by this change, the behaviour is unaffected, and the fix is a one-line wording change.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "gets each outcome when its finding is done, and a slot of the semaphore",
+            "stays taken until it returns.",
+            "return onOutcome(outcome).then(() => outcome);",
+            "return semaphore(async () => {"
+          ],
+          "rationale": "The doc comment says a semaphore slot stays taken until onOutcome returns, but this is wrong for reused findings: on that path onOutcome is called directly, outside semaphore(). The comment was added by this change, the behaviour is unaffected, and the fix is a one-line wording change.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "src/eval/label/index.ts",
+          "start_line": 88,
+          "end_line": 93,
+          "category": "bug",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "One failed write of labels.json leaves the write chain rejected, so every later onOutcome fails and labelCase rejects for the whole case.",
+          "evidence": "writing = writing.then(() => writeLabels(dir, caseResult(c.name, opts.runs, done, extra)));",
+          "suggested_fix": "Make each progress write independent of the error of the last one, e.g. writing = writing.catch(() => {}).then(...).",
+          "explanation": "A rejected promise in the chain makes every later write skip and return the same error, so the case aborts instead of continuing to label.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "writing = writing.then(() => writeLabels(dir, caseResult(c.name, opts.runs, done, extra)));",
+            "return writing;",
+            "await onOutcome(outcome);"
+          ],
+          "rationale": "The chain does stay rejected after a failed write, so later writes skip. But the first failed write already rejects the Promise.all in labelCase, because onOutcome returns the chain. The suggested fix would not stop the case from aborting. A failed progress write (a disk error) is also reasonable to treat as fatal.",
+          "score": 40,
+          "severity": "dont_post"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "writing = writing.then(() => writeLabels(dir, caseResult(c.name, opts.runs, done, extra)));",
+            "await onOutcome(outcome);",
+            "return Promise.all("
+          ],
+          "rationale": "The finding is technically correct: once one write fails, the `writing` chain stays rejected, so every later `onOutcome` fails too. But in labelCase each finding awaits `onOutcome` inside `Promise.all`, so the first failed write already rejects labelCase and aborts the case. The chained rejection changes nothing, and the suggested `.catch` would not keep labeling going.",
+          "score": 60,
+          "severity": "dont_post"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "writing = writing.then(() => writeLabels(dir, caseResult(c.name, opts.runs, done, extra)));",
+            "await onOutcome(outcome);",
+            "return Promise.all("
+          ],
+          "rationale": "The finding is technically correct: once one write fails, the `writing` chain stays rejected, so every later `onOutcome` fails too. But in labelCase each finding awaits `onOutcome` inside `Promise.all`, so the first failed write already rejects labelCase and aborts the case. The chained rejection changes nothing, and the suggested `.catch` would not keep labeling going.",
+          "score": 60,
+          "severity": "dont_post"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "src/eval/label/resume.ts",
+          "start_line": 21,
+          "end_line": 35,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "No test shows that a change of the policy text, the case head, the model ids or the labeler prompt files stops reuse; only the run count and the diff are tested.",
+          "evidence": "    policy,\n    prompts: [\"label-scorer.md\", \"label-judge.md\"].map((file) => {",
+          "suggested_fix": "Add a unit test of labelDigest: changing the policy string or the head gives a different digest. Add a CLI resume test that edits the policy and expects 'another digest' on stderr.",
+          "explanation": "If the digest drops the policy or the prompts, --resume silently reuses labels made under another input, and no test fails.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "    policy,\n    prompts: [\"label-scorer.md\", \"label-judge.md\"].map((file) => {"
+          ],
+          "rationale": "The tests in label-resume.test.ts cover only the run count, a missing digest and a changed diff. Nothing tests a change of the policy, the head, the model ids or the prompt files.",
+          "score": 85,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "    policy,\n    prompts: [\"label-scorer.md\", \"label-judge.md\"].map((file) => {",
+            "reuses nothing, and says so, after a change of the run count",
+            "reuses nothing, and says so, after a change of the diff of the case",
+            "const second = await labelRun(cases, [], [\"--resume\", \"--runs\", \"3\"]);"
+          ],
+          "rationale": "The tests reference labelDigest nowhere. The \"another digest\" cases in test/label-resume.test.ts change only the run count and the diff, so no test shows that a change of the policy, the head, the model ids or the prompt files stops reuse.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "    policy,\n    prompts: [\"label-scorer.md\", \"label-judge.md\"].map((file) => {",
+            "reuses nothing, and says so, after a change of the run count",
+            "reuses nothing, and says so, after a change of the diff of the case",
+            "const second = await labelRun(cases, [], [\"--resume\", \"--runs\", \"3\"]);"
+          ],
+          "rationale": "The tests reference labelDigest nowhere. The \"another digest\" cases in test/label-resume.test.ts change only the run count and the diff, so no test shows that a change of the policy, the head, the model ids or the prompt files stops reuse.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "src/eval/label/resume.ts",
+          "start_line": 125,
+          "end_line": 125,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "No test reaches the branch that drops a kept entry whose run count differs from --runs, because a change of the run count also changes the digest.",
+          "evidence": "    if (entry.data.runs.length !== runs || entry.data.runs.some((r) => r.failed)) continue;",
+          "suggested_fix": "Unit-test readKept with a matching digest and an entry whose runs array is shorter than the runs argument.",
+          "explanation": "The runs.length guard can break or be removed and every test still passes.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (entry.data.runs.length !== runs || entry.data.runs.some((r) => r.failed)) continue;",
+            "const input = {\n    runs,"
+          ],
+          "rationale": "The digest includes the run count, so the only test that changes --runs (line 290) stops at the digest check. Nothing calls readKept directly in tests, so the runs.length guard is untested. The guard is defensive and only matters for a hand-edited file, so a missing test for it has little value.",
+          "score": 80,
+          "severity": "dont_post"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (entry.data.runs.length !== runs || entry.data.runs.some((r) => r.failed)) continue;",
+            "    runs,\n    head,",
+            "const second = await labelRun(cases, [], [\"--resume\", \"--runs\", \"3\"]);",
+            "expect(second.stderr).toMatch(/another digest/);"
+          ],
+          "rationale": "The run count is part of labelDigest, so the only run-count test stops at the digest check. No test calls readKept directly, so nothing reaches the runs.length guard with a matching digest. The gap is real, but the guard is defensive and only matters for a labels.json that was edited by hand or is inconsistent.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (entry.data.runs.length !== runs || entry.data.runs.some((r) => r.failed)) continue;",
+            "    runs,\n    head,",
+            "const second = await labelRun(cases, [], [\"--resume\", \"--runs\", \"3\"]);",
+            "expect(second.stderr).toMatch(/another digest/);"
+          ],
+          "rationale": "The run count is part of labelDigest, so the only run-count test stops at the digest check. No test calls readKept directly, so nothing reaches the runs.length guard with a matching digest. The gap is real, but the guard is defensive and only matters for a labels.json that was edited by hand or is inconsistent.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "passed": true
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5885513581,
+      "review_url": "https://github.com/jerridan/pr-review/pull/49#pullrequestreview-5885513581",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 131665642615
+      },
+      "cleanup_comment_id": null,
+      "resolved": [
+        {
+          "thread_id": "PRRT_kwDOVHw73s627-pM",
+          "fingerprint": "d2c8165c6148155d"
+        }
+      ],
+      "errors": []
+    },
+    "below_floor": [
+      {
+        "file": "src/eval/label/resume.ts",
+        "start_line": 21,
+        "end_line": 35,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "No test shows that a change of the policy text, the case head, the model ids or the labeler prompt files stops reuse; only the run count and the diff are tested.",
+        "evidence": "    policy,\n    prompts: [\"label-scorer.md\", \"label-judge.md\"].map((file) => {",
+        "suggested_fix": "Add a unit test of labelDigest: changing the policy string or the head gives a different digest. Add a CLI resume test that edits the policy and expects 'another digest' on stderr.",
+        "explanation": "If the digest drops the policy or the prompts, --resume silently reuses labels made under another input, and no test fails.",
+        "needs_context": false,
+        "fingerprint": "86bbe97c3ea9c968",
+        "severity": "suggestion",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "    policy,\n    prompts: [\"label-scorer.md\", \"label-judge.md\"].map((file) => {",
+            "reuses nothing, and says so, after a change of the run count",
+            "reuses nothing, and says so, after a change of the diff of the case",
+            "const second = await labelRun(cases, [], [\"--resume\", \"--runs\", \"3\"]);"
+          ],
+          "rationale": "The tests reference labelDigest nowhere. The \"another digest\" cases in test/label-resume.test.ts change only the run count and the diff, so no test shows that a change of the policy, the head, the model ids or the prompt files stops reuse.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "span_text": "export function labelDigest(runs: number, policy: string, head: string, diff: string): string { const input = { runs, head, diff: createHash(\"sha256\").update(diff).digest(\"hex\"), scorer: resolveModel(roleConfig(\"labeler\").model), judge: `${CODEX_MODEL}:${CODEX_EFFORT}`, policy, prompts: [\"label-scorer.md\", \"label-judge.md\"].map((file) => { const p = loadPrompt(file); return [p.frontmatter, p.body]; }), }; return createHash(\"sha256\").update(JSON.stringify(input)).digest(\"hex\"); }"
+      },
+      {
+        "file": "src/eval/label/index.ts",
+        "start_line": 87,
+        "end_line": 92,
+        "category": "bug",
+        "severity_estimate": "suggestion",
+        "confidence": "low",
+        "claim": "If one incremental labels.json write fails, every later write and the whole case fail, so the labeling results already paid for are lost.",
+        "evidence": "writing = writing.then(() => writeLabels(dir, caseResult(c.name, opts.runs, done, extra)));",
+        "suggested_fix": "Catch the error of each incremental write, report it on stderr, and keep the chain alive (for example `writing.then(...).catch(...)`).",
+        "explanation": "The write chain has no rejection handler. After one failed write, every later `.then` also rejects, and `labelCase` rejects even though the labeling calls succeeded.",
+        "needs_context": true,
+        "fingerprint": "3a45a33cac06ad6f",
+        "severity": "suggestion",
+        "score": 80,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "writing = writing.then(() => writeLabels(dir, caseResult(c.name, opts.runs, done, extra)));",
+            "return writing;",
+            "await onOutcome(outcome);",
+            "return Promise.all("
+          ],
+          "rationale": "The `writing` chain has no catch, so after one failed write every later write is skipped and rejects too. Each rejection reaches labelCase's Promise.all, so the case fails and runLabel's Promise.all fails with it, even though the labeling calls succeeded. The losses are smaller than the finding says: labels.json still holds the findings written before the failure. A failed disk write is also an unusual path, so this is a suggestion.",
+          "score": 80,
+          "severity": "suggestion"
+        },
+        "span_text": "let writing: Promise<void> = Promise.resolve(); const onOutcome = (outcome: FindingOutcome): Promise<void> => { finished.push(outcome); const done = [...finished].sort((a, b) => a.entry.index - b.entry.index); writing = writing.then(() => writeLabels(dir, caseResult(c.name, opts.runs, done, extra))); return writing;"
+      },
+      {
+        "file": "src/eval/label/loop.ts",
+        "start_line": 332,
+        "end_line": 336,
+        "category": "docs",
+        "severity_estimate": "nit",
+        "confidence": "low",
+        "claim": "The doc says a semaphore slot stays taken until onOutcome returns, but a reused finding calls onOutcome outside the semaphore.",
+        "evidence": "gets each outcome when its finding is done, and a slot of the semaphore",
+        "suggested_fix": "Say that the slot stays taken only for a finding that makes calls.",
+        "explanation": "On the reuse path, onOutcome runs and no semaphore slot is taken, so the doc is wrong for kept findings.",
+        "needs_context": false,
+        "fingerprint": "0f189aaf45bb6ed1",
+        "severity": "nit",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "gets each outcome when its finding is done, and a slot of the semaphore",
+            "stays taken until it returns.",
+            "return onOutcome(outcome).then(() => outcome);",
+            "return semaphore(async () => {"
+          ],
+          "rationale": "The doc comment says a semaphore slot stays taken until onOutcome returns, but this is wrong for reused findings: on that path onOutcome is called directly, outside semaphore(). The comment was added by this change, the behaviour is unaffected, and the fix is a one-line wording change.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "span_text": "* in parallel under \"semaphore\". The outcomes come back in index order. A * finding with an entry in \"kept\" makes no call: its kept runs give the * outcome, with the index and the severity of the golden now. \"onOutcome\" * gets each outcome when its finding is done, and a slot of the semaphore * stays taken until it returns."
+      },
+      {
+        "file": "src/eval/label/resume.ts",
+        "start_line": 125,
+        "end_line": 125,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "low",
+        "claim": "No test reaches the branch that drops a kept entry whose run count differs from --runs, because a change of the run count also changes the digest.",
+        "evidence": "    if (entry.data.runs.length !== runs || entry.data.runs.some((r) => r.failed)) continue;",
+        "suggested_fix": "Unit-test readKept with a matching digest and an entry whose runs array is shorter than the runs argument.",
+        "explanation": "The runs.length guard can break or be removed and every test still passes.",
+        "needs_context": false,
+        "fingerprint": "54bd742095796a1b",
+        "severity": "nit",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (entry.data.runs.length !== runs || entry.data.runs.some((r) => r.failed)) continue;",
+            "    runs,\n    head,",
+            "const second = await labelRun(cases, [], [\"--resume\", \"--runs\", \"3\"]);",
+            "expect(second.stderr).toMatch(/another digest/);"
+          ],
+          "rationale": "The run count is part of labelDigest, so the only run-count test stops at the digest check. No test calls readKept directly, so nothing reaches the runs.length guard with a matching digest. The gap is real, but the guard is defensive and only matters for a labels.json that was edited by hand or is inconsistent.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "span_text": "const entry = EntrySchema.safeParse(raw);"
+      }
+    ],
+    "not_reposted": [],
+    "carried": [
+      {
+        "file": "src/eval/label/index.ts",
+        "start_line": 134,
+        "end_line": 136,
+        "category": "test",
+        "severity_estimate": "nit",
+        "confidence": "low",
+        "claim": "No test checks that `--format json` with `--resume` prints no extra reuse lines, so stdout stays valid JSON.",
+        "evidence": "if (opts.format === \"table\") {",
+        "suggested_fix": "Add a test that runs `--resume --format json` and parses stdout as JSON.",
+        "explanation": "If the format guard breaks, JSON stdout gets corrupted and no test fails.",
+        "needs_context": false,
+        "fingerprint": "b63d7dfda69e5746",
+        "severity": "nit",
+        "score": 85,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (opts.format === \"table\") {",
+            "for (const line of reusedLines(results)) process.stdout.write(`${line}\\n`);",
+            "if (reused === undefined) return [];",
+            "expect(JSON.parse(stdout)).toEqual(readJson(join(out, \"label-summary.json\")));"
+          ],
+          "rationale": "The reuse lines print only when the summary has a `reused` field, which is set only with `--resume`. The one test that parses stdout as JSON (label-cli.test.ts) runs without `--resume`, and test/label-resume.test.ts never passes `--format`. So if someone removes the table-only guard, no test fails. This is a real but minor coverage gap around a simple guard.",
+          "score": 85,
+          "severity": "nit"
+        },
+        "span_text": "if (opts.format === \"table\") { for (const line of reusedLines(results)) process.stdout.write(`${line}\\n`); }"
+      },
+      {
+        "file": "src/eval/label/resume.ts",
+        "start_line": 84,
+        "end_line": 88,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "No test covers the error paths for a labels.json that is not JSON or that is not a labels file.",
+        "evidence": "return none(\"labels.json is not JSON, so nothing is reused.\");",
+        "suggested_fix": "Add a resume test that writes a corrupt labels.json and a labels.json with the wrong shape. Assert that the run makes all 6 scorer calls and prints the message on stderr.",
+        "explanation": "If these branches break, a corrupt labels.json could crash the run or reuse bad entries, and no test would fail.",
+        "needs_context": false,
+        "fingerprint": "b698df9d4155e816",
+        "severity": "nit",
+        "score": 92,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "return none(\"labels.json is not JSON, so nothing is reused.\");",
+            "if (!file.success) return none(\"labels.json is not a labels file, so nothing is reused.\");",
+            "it(\"reuses nothing, and says so, for a labels.json with no digest\", async () => {"
+          ],
+          "rationale": "The finding holds: test/label-resume.test.ts covers the missing-file, no-digest and other-digest cases, but no test reaches the 'not JSON' or 'not a labels file' branches, and no test calls readKept directly. These branches are small and simple, so the gap is minor.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "span_text": "} catch { return none(\"labels.json is not JSON, so nothing is reused.\"); } const file = FileSchema.safeParse(value); if (!file.success) return none(\"labels.json is not a labels file, so nothing is reused.\");"
+      }
+    ]
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 8390,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 19096,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0019191,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1115,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 18608,
+            "webSearchRequests": 0,
+            "costUSD": 0.0857122,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0876313
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6611,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16406,
+            "outputTokens": 17,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016491000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 535,
+            "cacheReadInputTokens": 26098,
+            "cacheCreationInputTokens": 16210,
+            "webSearchRequests": 0,
+            "costUSD": 0.1456156,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 176,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1472647
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7137,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16414,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016519000000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 610,
+            "cacheReadInputTokens": 5363,
+            "cacheCreationInputTokens": 15918,
+            "webSearchRequests": 0,
+            "costUSD": 0.14062460000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 245,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.14227650000000003
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7202,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16408,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016497999999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 619,
+            "cacheReadInputTokens": 26004,
+            "cacheCreationInputTokens": 17256,
+            "webSearchRequests": 0,
+            "costUSD": 0.15564479999999997,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 242,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.15729459999999998
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 9769,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16398,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016498,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 651,
+            "cacheReadInputTokens": 26174,
+            "cacheCreationInputTokens": 16315,
+            "webSearchRequests": 0,
+            "costUSD": 0.14879079999999997,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 485,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.15044059999999998
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 10331,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16400,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016505000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 953,
+            "cacheReadInputTokens": 5363,
+            "cacheCreationInputTokens": 15904,
+            "webSearchRequests": 0,
+            "costUSD": 0.14737260000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 376,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.14902310000000002
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 3778,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16402,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016502,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 326,
+            "cacheReadInputTokens": 5330,
+            "cacheCreationInputTokens": 15906,
+            "webSearchRequests": 0,
+            "costUSD": 0.134842,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 91,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.13649219999999998
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 4891,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16398,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016498,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 389,
+            "cacheReadInputTokens": 5330,
+            "cacheCreationInputTokens": 15902,
+            "webSearchRequests": 0,
+            "costUSD": 0.13607,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 54,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1377198
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6051,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 29139,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0029229000000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 497,
+            "cacheReadInputTokens": 5438,
+            "cacheCreationInputTokens": 28643,
+            "webSearchRequests": 0,
+            "costUSD": 0.2401796,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 151,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.2431025
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 4706,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 6629,
+            "outputTokens": 409,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0008674000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 388,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 494,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 6141,
+            "webSearchRequests": 0,
+            "costUSD": 0.029944699999999998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 166,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0308121
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 5938,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11299,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011419000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 738,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 10811,
+            "webSearchRequests": 0,
+            "costUSD": 0.0510647,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 204,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0522066
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "model": "claude-opus-5-5",
+        "duration_ms": 11325,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16402,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016492,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1061,
+            "cacheReadInputTokens": 6105,
+            "cacheCreationInputTokens": 15906,
+            "webSearchRequests": 0,
+            "costUSD": 0.149697,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 314,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1513462
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 9344,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10555,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0010645,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 829,
+            "cacheReadInputTokens": 18801,
+            "cacheCreationInputTokens": 11751,
+            "webSearchRequests": 0,
+            "costUSD": 0.0571821,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 332,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.058246599999999996
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5153,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11307,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011412,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 470,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 10811,
+            "webSearchRequests": 0,
+            "costUSD": 0.09676939999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 112,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.09791059999999999
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 10994,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10538,
+            "outputTokens": 710,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0014088000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 686,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 921,
+            "cacheReadInputTokens": 18784,
+            "cacheCreationInputTokens": 10842,
+            "webSearchRequests": 0,
+            "costUSD": 0.054464399999999996,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 412,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0558732
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 10163,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10549,
+            "outputTokens": 233,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011714,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 213,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 974,
+            "cacheReadInputTokens": 18787,
+            "cacheCreationInputTokens": 10808,
+            "webSearchRequests": 0,
+            "costUSD": 0.10971739999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 438,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1108888
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 11444,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 6699,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0006794,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 792,
+            "cacheReadInputTokens": 38945,
+            "cacheCreationInputTokens": 8919,
+            "webSearchRequests": 0,
+            "costUSD": 0.0475065,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 97,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0481859
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 13169,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 6655,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0006755000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 1026,
+            "cacheReadInputTokens": 37754,
+            "cacheCreationInputTokens": 7974,
+            "webSearchRequests": 0,
+            "costUSD": 0.0459474,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 160,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.046622899999999995
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 10413,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 1088,
+            "cacheReadInputTokens": 18780,
+            "cacheCreationInputTokens": 10786,
+            "webSearchRequests": 0,
+            "costUSD": 0.11182,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 571,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-haiku-5-5": {
+            "inputTokens": 10542,
+            "outputTokens": 366,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012372,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 347,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1130572
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 9810,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 6715,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.000682,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 977,
+            "cacheReadInputTokens": 38983,
+            "cacheCreationInputTokens": 8858,
+            "webSearchRequests": 0,
+            "costUSD": 0.0982326,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 154,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.09891459999999999
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 10351,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 6653,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0006763000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 1023,
+            "cacheReadInputTokens": 41102,
+            "cacheCreationInputTokens": 11165,
+            "webSearchRequests": 0,
+            "costUSD": 0.11803240000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 243,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1187087
+      }
+    ],
+    "total_cost_usd": 2.3340186999999997,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 43,
+      "gather": 159,
+      "scope": 6,
+      "triage": 9543,
+      "find_verify": 47453,
+      "merge": 8
+    },
+    "errors": []
+  }
+}
