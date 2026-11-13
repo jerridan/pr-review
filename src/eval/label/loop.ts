@@ -67,6 +67,8 @@ export type FindingEntry = {
   start_line: number;
   end_line: number;
   claim: string;
+  /** The category in golden.json when the run started. The scorer sees it. */
+  category: Category;
   current_severity: string;
   chosen: Chosen | null;
   runs: RunResult[];
@@ -284,6 +286,7 @@ function outcomeOf(input: FindingInput, runs: RunResult[], cost: number): Findin
       start_line: f.start_line,
       end_line: f.end_line,
       claim: f.claim,
+      category: f.category,
       current_severity: f.severity,
       chosen,
       runs,
@@ -328,7 +331,9 @@ export async function caseInputs(
  * Label every golden finding of a case in its checkout. The findings run
  * in parallel under "semaphore". The outcomes come back in index order. A
  * finding with an entry in "kept" makes no call: its kept runs give the
- * outcome, with the index and the severity of the golden now.
+ * outcome, with the index and the severity of the golden now. "onOutcome"
+ * gets each outcome when its finding is done, and a slot of the semaphore
+ * stays taken until it returns.
  */
 export async function labelCase(
   c: Case,
@@ -336,13 +341,21 @@ export async function labelCase(
   policy: string,
   semaphore: Semaphore,
   kept: ReadonlyMap<string, FindingEntry> = new Map(),
+  onOutcome: (outcome: FindingOutcome) => Promise<void> = () => Promise.resolve(),
 ): Promise<FindingOutcome[]> {
   const inputs = await caseInputs(c, ctx.checkout, policy);
   return Promise.all(
     inputs.map((input) => {
       const old = kept.get(findingKey(input.finding));
-      if (old) return Promise.resolve({ ...outcomeOf(input, old.runs, 0), reused: true });
-      return semaphore(() => labelFinding(input, ctx));
+      if (old) {
+        const outcome = { ...outcomeOf(input, old.runs, 0), reused: true };
+        return onOutcome(outcome).then(() => outcome);
+      }
+      return semaphore(async () => {
+        const outcome = await labelFinding(input, ctx);
+        await onOutcome(outcome);
+        return outcome;
+      });
     }),
   );
 }

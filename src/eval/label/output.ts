@@ -1,6 +1,7 @@
 // The output files of the labeler, the golden rewrite, and the printers.
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { writeFileAtomic } from "../atomic.js";
 import { POSTED_SEVERITIES } from "../../schemas/label.js";
 import type { FindingEntry, FindingOutcome, QueueReason, RunResult } from "./loop.js";
 
@@ -138,18 +139,17 @@ export function summaryOf(results: CaseResult[]): SummaryFile {
 
 export const json = (value: unknown): string => `${JSON.stringify(value, null, 2)}\n`;
 
-// Write a temporary file, then rename it, so a stop in the write cannot damage the file.
-async function writeAtomic(path: string, text: string): Promise<void> {
-  await writeFile(`${path}.tmp`, text);
-  await rename(`${path}.tmp`, path);
+/** Write labels.json alone into "dir". A running case calls it after each finding. */
+export async function writeLabels(dir: string, result: CaseResult): Promise<void> {
+  await mkdir(dir, { recursive: true });
+  await writeFileAtomic(join(dir, "labels.json"), json(result.labels));
 }
 
 /** Write labels.json, disagreements.json and human-queue.json into "dir". */
 export async function writeCaseFiles(dir: string, result: CaseResult): Promise<void> {
-  await mkdir(dir, { recursive: true });
-  await writeAtomic(join(dir, "labels.json"), json(result.labels));
-  await writeAtomic(join(dir, "disagreements.json"), json({ findings: result.disagreements }));
-  await writeAtomic(join(dir, "human-queue.json"), json({ findings: result.queue }));
+  await writeLabels(dir, result);
+  await writeFileAtomic(join(dir, "disagreements.json"), json({ findings: result.disagreements }));
+  await writeFileAtomic(join(dir, "human-queue.json"), json({ findings: result.queue }));
 }
 
 /** The lines that name the findings that a resumed run reused, one for each case. */
@@ -183,7 +183,7 @@ export async function writeGolden(caseDir: string, entries: FindingEntry[]): Pro
       changed = true;
     }
   }
-  if (changed) await writeFile(path, json(golden));
+  if (changed) await writeFileAtomic(path, json(golden));
 }
 
 const ratio = (value: number | null): string => (value === null ? "-" : value.toFixed(3));

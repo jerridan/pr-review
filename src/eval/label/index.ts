@@ -2,7 +2,7 @@
 // a category under the severity policy. Exit 0 when every call succeeded,
 // 1 when a case checkout failed or a call failed after its retry, and 2 on
 // a usage error.
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { CommanderError, type Command, InvalidArgumentError, Option } from "commander";
@@ -12,7 +12,7 @@ import type { RunOptions } from "../../sdk/options.js";
 import { createSemaphore } from "../../semaphore.js";
 import { CaseError, loadCases, type Case } from "../case.js";
 import { cloneCase } from "../checkout.js";
-import { labelCase, type FindingEntry } from "./loop.js";
+import { labelCase, type FindingEntry, type FindingOutcome } from "./loop.js";
 import {
   caseResult,
   json,
@@ -20,6 +20,7 @@ import {
   reusedLines,
   summaryOf,
   writeCaseFiles,
+  writeLabels,
   writeGolden,
   type CaseResult,
 } from "./output.js";
@@ -72,18 +73,26 @@ async function labelOneCase(
     }
     const ctx = { client: shared.client, options: shared.options, checkout, runs: opts.runs };
     const dir = opts.out === undefined ? c.dir : join(resolve(opts.out), c.name);
-    const digest = labelDigest(opts.runs, shared.policy);
+    const diff = await readFile(join(c.dir, "diff.patch"), "utf8");
+    const digest = labelDigest(opts.runs, shared.policy, c.head, diff);
     let kept = new Map<string, FindingEntry>();
     if (opts.resume === true) {
       const old = await readKept(dir, digest, opts.runs);
       if (old.message !== null) say(`case ${c.name}: ${old.message}`);
       kept = old.entries;
     }
-    const outcomes = await labelCase(c, ctx, shared.policy, semaphore, kept);
-    const result = caseResult(c.name, opts.runs, outcomes, {
-      digest,
-      resume: opts.resume === true,
-    });
+    const extra = { digest, resume: opts.resume === true };
+    // After each finding, labels.json gets the finished findings, so a stop keeps them.
+    const finished: FindingOutcome[] = [];
+    let writing: Promise<void> = Promise.resolve();
+    const onOutcome = (outcome: FindingOutcome): Promise<void> => {
+      finished.push(outcome);
+      const done = [...finished].sort((a, b) => a.entry.index - b.entry.index);
+      writing = writing.then(() => writeLabels(dir, caseResult(c.name, opts.runs, done, extra)));
+      return writing;
+    };
+    const outcomes = await labelCase(c, ctx, shared.policy, semaphore, kept, onOutcome);
+    const result = caseResult(c.name, opts.runs, outcomes, extra);
     await writeCaseFiles(dir, result);
     if (opts.writeGolden) await writeGolden(c.dir, result.labels.findings);
     return result;
