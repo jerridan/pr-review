@@ -171,7 +171,7 @@ async function labelRun(cases: string, failing: string[], flags: string[] = []):
   });
   registerLabelCommand(program, { client });
   process.exitCode = undefined;
-  let code = 0;
+  let code: number;
   try {
     await program.parseAsync([
       "node",
