@@ -3,7 +3,8 @@
 // and report the metrics. The gate compares the report with a baseline.
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { writeFileAtomic } from "./atomic.js";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { z } from "zod";
@@ -260,9 +261,7 @@ async function writeResult(ctx: EvalContext, c: Case, m: RepeatMetrics): Promise
     metrics: m,
   };
   await mkdir(dirname(path), { recursive: true });
-  const temp = `${path}.tmp-${process.pid}`;
-  await writeFile(temp, `${JSON.stringify(file, null, 2)}\n`);
-  await rename(temp, path);
+  await writeFileAtomic(path, `${JSON.stringify(file, null, 2)}\n`);
 }
 
 // Read the result file of repeat slot "repeat". A missing file, a file that

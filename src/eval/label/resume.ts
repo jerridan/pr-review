@@ -15,12 +15,14 @@ import type { FindingEntry } from "./loop.js";
 
 /**
  * A digest of what the runs of the labeler depend on, apart from the
- * finding: the run count, the model ids, the severity policy, and the
- * prompt files of the scorer and the judge.
+ * finding: the run count, the case head and diff, the model ids, the
+ * severity policy, and the prompt files of the scorer and the judge.
  */
-export function labelDigest(runs: number, policy: string): string {
+export function labelDigest(runs: number, policy: string, head: string, diff: string): string {
   const input = {
     runs,
+    head,
+    diff: createHash("sha256").update(diff).digest("hex"),
     scorer: resolveModel(roleConfig("labeler").model),
     judge: `${CODEX_MODEL}:${CODEX_EFFORT}`,
     policy,
@@ -32,15 +34,38 @@ export function labelDigest(runs: number, policy: string): string {
   return createHash("sha256").update(JSON.stringify(input)).digest("hex");
 }
 
-/** The key of a finding: its text, not the severity or the category. */
+/**
+ * The key of a finding: its text and its category, which the scorer sees.
+ * The severity is not in the key, because the labeler writes it.
+ */
 export function findingKey(f: {
   file: string;
   start_line: number;
   end_line: number;
   claim: string;
+  category: string;
 }): string {
-  return JSON.stringify([f.file, f.start_line, f.end_line, f.claim]);
+  return JSON.stringify([f.file, f.start_line, f.end_line, f.claim, f.category]);
 }
+
+const CallSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("scorer"),
+    severity: z.enum(LABEL_SEVERITIES).nullable(),
+    category: z.enum(CATEGORIES).nullable(),
+    policy_section: z.string().nullable(),
+    rationale: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  z.object({
+    kind: z.literal("judge"),
+    accept: z.boolean().nullable(),
+    policy_section: z.string().nullable(),
+    reason: z.string().optional(),
+    stderr: z.string(),
+    error: z.string().optional(),
+  }),
+]);
 
 const RunSchema = z.object({
   converged: z.boolean(),
@@ -48,7 +73,8 @@ const RunSchema = z.object({
   severity: z.enum(LABEL_SEVERITIES).nullable(),
   category: z.enum(CATEGORIES).nullable(),
   first_pass_accepted: z.boolean(),
-  calls: z.array(z.unknown()),
+  calls: z.array(CallSchema),
+  error: z.string().optional(),
 });
 
 const EntrySchema = z.object({
@@ -56,6 +82,7 @@ const EntrySchema = z.object({
   start_line: z.number(),
   end_line: z.number(),
   claim: z.string(),
+  category: z.enum(CATEGORIES),
   runs: z.array(RunSchema),
 });
 
