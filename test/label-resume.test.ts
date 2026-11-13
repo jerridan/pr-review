@@ -21,9 +21,6 @@ import { registerLabelCommand } from "../src/eval/label/index.js";
 import type { QueryMeta, QueryOutcome } from "../src/sdk/client.js";
 import { createFakeSdkClient } from "../src/sdk/fake.js";
 
-const policy = vi.hoisted(() => ({ text: "POLICY ONE" }));
-vi.mock("../src/eval/label/policy.js", () => ({ readPolicy: () => policy.text }));
-
 const run = promisify(execFile);
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
 
@@ -37,6 +34,9 @@ const out = argv[argv.indexOf("-o") + 1];
 appendFileSync(join(dir, "log.jsonl"), JSON.stringify({ argv }) + "\\n");
 const prompt = argv.at(-1) ?? "";
 const marker = (prompt.match(/MARK-[A-Za-z0-9]+/) ?? ["default"])[0];
+try {
+  writeFileSync(join(dir, "labels-at-" + marker + ".json"), readFileSync(process.env.FAKE_LABELS, "utf8"), { flag: "wx" });
+} catch {}
 const failing = JSON.parse(readFileSync(join(dir, "plan.json"), "utf8")).failing;
 if (failing.includes(marker)) {
   process.stderr.write("ERROR: You have hit your usage limit.");
@@ -91,7 +91,6 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
   process.exitCode = undefined;
-  policy.text = "POLICY ONE";
 });
 
 function finding(marker: string): GoldenFinding {
@@ -131,6 +130,8 @@ type Result = {
   stderr: string;
   scorerCalls: string[];
   judgeCalls: string[];
+  /** The labels.json on disk when the judge first saw the finding with this marker. */
+  labelsAt: (marker: string) => { findings: { claim: string }[] } | null;
 };
 
 // One label run. "failing" lists the markers for which the fake codex fails.
@@ -149,6 +150,7 @@ async function labelRun(cases: string, failing: string[], flags: string[] = []):
   writeFileSync(join(codexDir, "plan.json"), JSON.stringify({ failing }));
   vi.stubEnv("PATH", `${codexDir}:${process.env.PATH ?? ""}`);
   vi.stubEnv("FAKE_CODEX_DIR", codexDir);
+  vi.stubEnv("FAKE_LABELS", join(cases, "r-three", "labels.json"));
   let stdout = "";
   let stderr = "";
   vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array) => {
@@ -204,6 +206,10 @@ async function labelRun(cases: string, failing: string[], flags: string[] = []):
     stderr,
     scorerCalls: client.calls.map((c) => c.userMessage),
     judgeCalls: judge,
+    labelsAt: (marker: string) => {
+      const path = join(codexDir, `labels-at-${marker}.json`);
+      return existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : null;
+    },
   };
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
@@ -278,15 +284,6 @@ describe("pr-review label --resume", () => {
     ]);
   }, 120_000);
 
-  it("reuses nothing, and says so, after a change of the policy", async () => {
-    const cases = casesDir();
-    await labelRun(cases, ["MARK-R2"]);
-    policy.text = "POLICY TWO";
-    const second = await labelRun(cases, [], ["--resume"]);
-    expect(second.scorerCalls).toHaveLength(6);
-    expect(second.stderr).toMatch(/r-three[^\n]*another digest/);
-  }, 120_000);
-
   it("reuses nothing, and says so, after a change of the run count", async () => {
     const cases = casesDir();
     await labelRun(cases, ["MARK-R2"]);
@@ -312,5 +309,78 @@ describe("pr-review label --resume", () => {
     const first = await labelRun(cases, [], ["--resume"]);
     expect(first.code).toBe(0);
     expect(first.scorerCalls).toHaveLength(6);
+  }, 120_000);
+
+  it("labels again a finding whose category changed", async () => {
+    const cases = casesDir();
+    await labelRun(cases, ["MARK-R2"]);
+    writeGolden(cases, [{ ...goldenSet()[0]!, category: "bug" }, ...goldenSet().slice(1)]);
+    const second = await labelRun(cases, [], ["--resume"]);
+    expect(markers(second.scorerCalls).sort()).toEqual([
+      "MARK-R1",
+      "MARK-R1",
+      "MARK-R2",
+      "MARK-R2",
+    ]);
+  }, 120_000);
+
+  it("reuses nothing, and says so, after a change of the diff of the case", async () => {
+    const cases = casesDir();
+    await labelRun(cases, ["MARK-R2"]);
+    const diff = join(cases, "r-three", "diff.patch");
+    writeFileSync(diff, `${readFileSync(diff, "utf8")}\n`);
+    const second = await labelRun(cases, [], ["--resume"]);
+    expect(second.scorerCalls).toHaveLength(6);
+    expect(second.stderr).toMatch(/r-three[^\n]*another digest/);
+  }, 120_000);
+
+  it("keeps the finished findings in labels.json while the case is still running", async () => {
+    const cases = casesDir();
+    const first = await labelRun(cases, []);
+    const seen = first.labelsAt("MARK-R3");
+    expect(seen?.findings.map((f) => /MARK-R\d/.exec(f.claim)?.[0])).toEqual([
+      "MARK-R1",
+      "MARK-R2",
+    ]);
+    expect(first.labelsAt("MARK-R1")).toBeNull();
+  }, 120_000);
+
+  it("labels again a finding whose kept entry is damaged, with no crash", async () => {
+    const cases = casesDir();
+    await labelRun(cases, []);
+    const path = join(cases, "r-three", "labels.json");
+    const labels = JSON.parse(readFileSync(path, "utf8")) as {
+      findings: { runs: { calls: unknown[] }[] }[];
+    };
+    const damaged = labels.findings[0]?.runs[0];
+    if (damaged) damaged.calls = [null];
+    writeFileSync(path, JSON.stringify(labels));
+    const second = await labelRun(cases, [], ["--resume"]);
+    expect(second.code).toBe(0);
+    expect(markers(second.scorerCalls)).toEqual(["MARK-R1", "MARK-R1"]);
+  }, 120_000);
+
+  it.each([
+    ["is not JSON", "{not json", /not JSON/],
+    ["is not a labels file", '{"digest":"x"}', /not a labels file/],
+  ])(
+    "reuses nothing, with no crash, for a labels.json that %s",
+    async (_name, text, message) => {
+      const cases = casesDir();
+      writeFileSync(join(cases, "r-three", "labels.json"), text);
+      const result = await labelRun(cases, [], ["--resume"]);
+      expect(result.code).toBe(0);
+      expect(result.scorerCalls).toHaveLength(6);
+      expect(result.stderr).toMatch(message);
+    },
+    120_000,
+  );
+
+  it("prints only JSON on stdout with --format json and --resume", async () => {
+    const cases = casesDir();
+    await labelRun(cases, ["MARK-R2"]);
+    const second = await labelRun(cases, [], ["--resume", "--format", "json"]);
+    const summary = JSON.parse(second.stdout) as { cases: { reused?: number[] }[] };
+    expect(summary.cases[0]?.reused).toEqual([0, 2]);
   }, 120_000);
 });
