@@ -1,0 +1,212 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 48,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Record the D4b R1 benchmark cases",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/48"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "05daa9cf1536c23f886983fc1f28685345287ad2",
+    "head": "70346e81e26fb4dbf46bfa0e309d9aec988f5e92",
+    "started_at": "2026-11-13T02:08:34.990Z",
+    "tool_version": "0.9.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Record the D4b R1 benchmark cases\n\nD4b revision R1: four benchmark cases from Martian and ReviewBench join the eval case set in jerridan/pr-review-cases PR #8. This PR records R1 in TICKETS.md, in the same shape as the R4 line.\n\n- Cases: `martian-sentry-67876` (Python, 297 changed lines), `martian-calcom-10600` (TypeScript, 316), `reviewbench-spm-19` (TypeScript, 543) and `reviewbench-node-postgres-3650` (JavaScript, 568). 56 goldens: 32 posted, 24 not real. The set holds 18 cases and 142 goldens.\n- The labeling loop set every severity (three runs per finding). No finding went to the human queue.\n- `reviewbench-42-transcendence-115` is built but not labeled: the usage limit of the judge stopped its labels two times. A later revision can add it.\n- No pin move, no baseline and no version bump. The final D4b baseline PR moves the pin one time for the four revisions (TICKETS.md, D4b). The change touches no shipped file.\n- Merge order: pr-review-cases PR #8 first, then this PR.\n\nChecks: `npm test` (1382 passed), `npm run lint`, `npm run typecheck` and `npm run build` pass.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZgpJZ1ahheDxuskhj2\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [],
+    "changed_files": [
+      {
+        "path": "TICKETS.md",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "skip",
+      "reason": "The change adds one status line to a tickets markdown file, and no code reads that text.",
+      "confidence": "high",
+      "categories": [
+        "docs"
+      ],
+      "hotspots": [],
+      "file_notes": [
+        {
+          "file": "TICKETS.md",
+          "note": "One added 'Done 2026-11-12, R1' bullet that records four new benchmark cases. Docs only."
+        }
+      ],
+      "summary": "The change adds a progress note for revision R1 to TICKETS.md. It records four new benchmark cases in the cases repo (PR #8), the golden counts, the label cost, and one case that is built but not labeled. It changes no code or configuration."
+    },
+    "tier": "skip",
+    "tier_reason": "Triage: The change adds one status line to a tickets markdown file, and no code reads that text.",
+    "selected_reviewers": [],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [],
+    "verifications": [],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "skipped",
+    "coverage": {
+      "reviewers_ran": [],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5885011005,
+      "review_url": "https://github.com/jerridan/pr-review/pull/48#pullrequestreview-5885011005",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 131638581161
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 3562,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 2709,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0002839,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 350,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 3484,
+            "webSearchRequests": 0,
+            "costUSD": 0.01744,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0177239
+      }
+    ],
+    "total_cost_usd": 0.0177239,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 39,
+      "gather": 40,
+      "triage": 4483,
+      "find_verify": 1,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
