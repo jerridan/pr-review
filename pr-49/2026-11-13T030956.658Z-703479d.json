@@ -1,0 +1,1640 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 49,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Resume a stopped label run (label --resume)",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/49"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "ee35ce281f298ed914d5a57f686fccf8c732b7b4",
+    "head": "703479d5942bf517bd6d557ca0dccb41f046ecb8",
+    "started_at": "2026-11-13T03:09:56.658Z",
+    "tool_version": "0.9.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Resume a stopped label run (label --resume)\n\n`pr-review label --resume`: a label run that stops keeps each finding that reached a result, and a second run labels only the findings that are missing or that have a failed run.\n\n## Why\n\nOn 2026-11-12, Codex reached its usage limit during the D4b R3 labeling. Case `pool-pr-review-44` kept 5 of its 9 labels, and two cases were not labeled. Without a resume, each new run labels every finding again and pays every Claude call again.\n\n## What changes\n\n- With `--resume`, the labeler reads the `labels.json` of each case in the output directory. It reuses a finding when its runs all completed, its text matches (file, lines, claim), and the labeling input is the same: run count, model ids, policy text and the labeler prompt files.\n- Every run now writes a `digest` of that input in `labels.json`. A file with another digest, or with none, gives no reuse, and the run says so on stderr. So the `labels.json` files of the stopped R3 run give no reuse: they have no digest.\n- The scorer cost counts only new calls. The summary names the reused findings per case.\n- `labels.json`, `disagreements.json` and `human-queue.json` are written through a temp file and a rename.\n- README, and the version goes to 0.10.0.\n\n## Tests\n\n`test/label-resume.test.ts` runs the CLI with a fake SDK client and a fake `codex`. `npm test` (1415), lint, typecheck, build and the version check pass.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZe8a4pwY82rqWPJvix\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": ".claude-plugin/marketplace.json",
+        "hunks": 1
+      },
+      {
+        "path": ".claude-plugin/plugin.json",
+        "hunks": 1
+      },
+      {
+        "path": "README.md",
+        "hunks": 3
+      },
+      {
+        "path": "package.json",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/label/index.ts",
+        "hunks": 7
+      },
+      {
+        "path": "src/eval/label/loop.ts",
+        "hunks": 5
+      },
+      {
+        "path": "src/eval/label/output.ts",
+        "hunks": 7
+      },
+      {
+        "path": "src/eval/label/resume.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/label-resume.test.ts",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [
+      {
+        "path": "package-lock.json",
+        "reason": "generated"
+      }
+    ],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "Adds a new --resume feature with reuse logic, digest-based cache invalidation, atomic file writes and a changed CLI interface, so the logic needs a careful review.",
+      "confidence": "high",
+      "categories": [
+        "bug",
+        "test",
+        "docs",
+        "other"
+      ],
+      "hotspots": [
+        "src/eval/label/resume.ts: readKept validation and reuse criteria (raw cast to FindingEntry, run count check)",
+        "src/eval/label/resume.ts: labelDigest covers all inputs that affect labeling",
+        "src/eval/label/loop.ts: labelCase reuse path and outcomeOf with cost 0 (index/severity refresh from current golden)",
+        "src/eval/label/output.ts: writeAtomic (fixed .tmp name, rename) and caseResult digest/reused",
+        "src/eval/label/index.ts: ordering of readKept vs writeCaseFiles, and overwriting labels.json when the digest mismatches",
+        "test/label-resume.test.ts: coverage of the resume cases"
+      ],
+      "file_notes": [
+        {
+          "file": "src/eval/label/resume.ts",
+          "note": "New module: digest, finding key, and a zod-validated reader of the old labels.json for reuse."
+        },
+        {
+          "file": "src/eval/label/loop.ts",
+          "note": "labelFinding refactored into outcomeOf. labelCase now skips the calls for kept findings and marks them reused."
+        },
+        {
+          "file": "src/eval/label/output.ts",
+          "note": "Adds digest and reused fields, atomic writes via a temp file and rename, and the reusedLines printer."
+        },
+        {
+          "file": "src/eval/label/index.ts",
+          "note": "Wires the --resume flag, reads the kept entries, passes them to labelCase, and prints the reused lines in table format."
+        },
+        {
+          "file": "test/label-resume.test.ts",
+          "note": "New end-to-end tests with a fake SDK client and a fake codex."
+        },
+        {
+          "file": "README.md",
+          "note": "Documents the --resume flag and the reuse rules."
+        },
+        {
+          "file": ".claude-plugin/marketplace.json",
+          "note": "Version bump to 0.10.0."
+        },
+        {
+          "file": ".claude-plugin/plugin.json",
+          "note": "Version bump to 0.10.0."
+        },
+        {
+          "file": "package.json",
+          "note": "Version bump to 0.10.0."
+        }
+      ],
+      "summary": "Adds a --resume flag to `pr-review label`. labels.json now stores a digest of the labeling input (run count, model ids, policy, prompts). On resume, findings whose runs all completed and whose text is unchanged are reused without model calls, and the others are relabeled. Case files are written atomically, the summary lists the reused indexes, and the version is bumped to 0.10.0."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: Adds a new --resume feature with reuse logic, digest-based cache invalidation, atomic file writes and a changed CLI interface, so the logic needs a careful review.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "test/label-resume.test.ts",
+            "start_line": 24,
+            "end_line": 25,
+            "category": "convention",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "The test fakes the repo module policy.js, which is fast and deterministic.",
+            "evidence": "vi.mock(\"../src/eval/label/policy.js\", () => ({ readPolicy: () => policy.text }));",
+            "suggested_fix": "Change the policy input through a real file or a parameter, and do not mock policy.js.",
+            "explanation": "CLAUDE.md rule 2 says a module of this repo is fast and deterministic, so do not fake it.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4859,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 16580,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0016690000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 425,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 21222,
+              "webSearchRequests": 0,
+              "costUSD": 0.178284,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 153,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.179953
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4885,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 16574,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0016683999999999998,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 449,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 21174,
+              "webSearchRequests": 0,
+              "costUSD": 0.17837999999999998,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 156,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.18004839999999997
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 9194,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 16576,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0016686000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 6,
+              "outputTokens": 706,
+              "cacheReadInputTokens": 24504,
+              "cacheCreationInputTokens": 19079,
+              "webSearchRequests": 0,
+              "costUSD": 0.1716768,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 273,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.17334539999999998
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6269,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 16584,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0016684000000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 522,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 21453,
+              "webSearchRequests": 0,
+              "costUSD": 0.182072,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 193,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1837404
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5029,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 16580,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0016680000000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 442,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 21132,
+              "webSearchRequests": 0,
+              "costUSD": 0.177904,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 141,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.179572
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 2996,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 27236,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0027336,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 161,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 29121,
+              "webSearchRequests": 0,
+              "costUSD": 0.2368078,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 39,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.23954140000000002
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4079,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 16596,
+              "outputTokens": 16,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0016676,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 319,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 18373,
+              "webSearchRequests": 0,
+              "costUSD": 0.1539838,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 80,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1556514
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5624,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 16582,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0016682,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 435,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 18359,
+              "webSearchRequests": 0,
+              "costUSD": 0.1561918,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 58,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.15786
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/label/resume.ts",
+            "start_line": 84,
+            "end_line": 88,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "No test covers the error paths for a labels.json that is not JSON or that is not a labels file.",
+            "evidence": "return none(\"labels.json is not JSON, so nothing is reused.\");",
+            "suggested_fix": "Add a resume test that writes a corrupt labels.json and a labels.json with the wrong shape. Assert that the run makes all 6 scorer calls and prints the message on stderr.",
+            "explanation": "If these branches break, a corrupt labels.json could crash the run or reuse bad entries, and no test would fail.",
+            "needs_context": false
+          },
+          {
+            "file": "src/eval/label/index.ts",
+            "start_line": 134,
+            "end_line": 136,
+            "category": "test",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "No test checks that `--format json` with `--resume` prints no extra reuse lines, so stdout stays valid JSON.",
+            "evidence": "if (opts.format === \"table\") {",
+            "suggested_fix": "Add a test that runs `--resume --format json` and parses stdout as JSON.",
+            "explanation": "If the format guard breaks, JSON stdout gets corrupted and no test fails.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 8397,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 16580,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0016680000000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 854,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 19132,
+              "webSearchRequests": 0,
+              "costUSD": 0.1707558,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 368,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.17242380000000002
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "test/label-resume.test.ts",
+          "start_line": 24,
+          "end_line": 25,
+          "category": "convention",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "The test fakes the repo module policy.js, which is fast and deterministic.",
+          "evidence": "vi.mock(\"../src/eval/label/policy.js\", () => ({ readPolicy: () => policy.text }));",
+          "suggested_fix": "Change the policy input through a real file or a parameter, and do not mock policy.js.",
+          "explanation": "CLAUDE.md rule 2 says a module of this repo is fast and deterministic, so do not fake it.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "vi.mock(\"../src/eval/label/policy.js\", () => ({ readPolicy: () => policy.text }));"
+          ],
+          "rationale": "The new test mocks src/eval/label/policy.js, a repo module that only reads a file. CLAUDE.md rule 2 says a repo module is fast and deterministic, so do not fake it. The mock is used to change the policy text for the digest test, and readPolicy takes no parameter, so the fix is not trivial.",
+          "score": 80,
+          "severity": "suggestion"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "vi.mock(\"../src/eval/label/policy.js\", () => ({ readPolicy: () => policy.text }));",
+            "A module of this repo is fast and deterministic, so do not fake it.",
+            "return readFileSync(POLICY_PATH, \"utf8\");"
+          ],
+          "rationale": "The new test mocks the repo module policy.js, which only reads a fixed doc file. CLAUDE.md rule 2 says not to fake repo modules. The mock exists because the policy path is hard-coded, so the test cannot change the policy any other way. The test still gives correct results, so this is a small convention issue.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "vi.mock(\"../src/eval/label/policy.js\", () => ({ readPolicy: () => policy.text }));",
+            "A module of this repo is fast and deterministic, so do not fake it.",
+            "return readFileSync(POLICY_PATH, \"utf8\");"
+          ],
+          "rationale": "The new test mocks the repo module policy.js, which only reads a fixed doc file. CLAUDE.md rule 2 says not to fake repo modules. The mock exists because the policy path is hard-coded, so the test cannot change the policy any other way. The test still gives correct results, so this is a small convention issue.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "src/eval/label/resume.ts",
+          "start_line": 84,
+          "end_line": 88,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "No test covers the error paths for a labels.json that is not JSON or that is not a labels file.",
+          "evidence": "return none(\"labels.json is not JSON, so nothing is reused.\");",
+          "suggested_fix": "Add a resume test that writes a corrupt labels.json and a labels.json with the wrong shape. Assert that the run makes all 6 scorer calls and prints the message on stderr.",
+          "explanation": "If these branches break, a corrupt labels.json could crash the run or reuse bad entries, and no test would fail.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "return none(\"labels.json is not JSON, so nothing is reused.\");",
+            "if (!file.success) return none(\"labels.json is not a labels file, so nothing is reused.\");"
+          ],
+          "rationale": "The resume tests cover another digest, no digest, no file and no --resume. They never write a labels.json that isn't JSON or isn't a labels file. The branches are simple and fail safe, so the gap is minor.",
+          "score": 85,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "return none(\"labels.json is not JSON, so nothing is reused.\");",
+            "if (!file.success) return none(\"labels.json is not a labels file, so nothing is reused.\");",
+            "it(\"reuses nothing, and says so, for a labels.json with no digest\", async () => {"
+          ],
+          "rationale": "The finding holds: test/label-resume.test.ts covers the missing-file, no-digest and other-digest cases, but no test reaches the 'not JSON' or 'not a labels file' branches, and no test calls readKept directly. These branches are small and simple, so the gap is minor.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "return none(\"labels.json is not JSON, so nothing is reused.\");",
+            "if (!file.success) return none(\"labels.json is not a labels file, so nothing is reused.\");",
+            "it(\"reuses nothing, and says so, for a labels.json with no digest\", async () => {"
+          ],
+          "rationale": "The finding holds: test/label-resume.test.ts covers the missing-file, no-digest and other-digest cases, but no test reaches the 'not JSON' or 'not a labels file' branches, and no test calls readKept directly. These branches are small and simple, so the gap is minor.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "src/eval/label/index.ts",
+          "start_line": 134,
+          "end_line": 136,
+          "category": "test",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "No test checks that `--format json` with `--resume` prints no extra reuse lines, so stdout stays valid JSON.",
+          "evidence": "if (opts.format === \"table\") {",
+          "suggested_fix": "Add a test that runs `--resume --format json` and parses stdout as JSON.",
+          "explanation": "If the format guard breaks, JSON stdout gets corrupted and no test fails.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (opts.format === \"table\") {",
+            "for (const line of reusedLines(results)) process.stdout.write(`${line}\\n`);"
+          ],
+          "rationale": "The guard is there. No test in label-resume.test.ts or label-cli.test.ts runs `--resume` together with `--format json`. The claim is true, but it is a minor coverage gap for a one-line guard that is easy to see.",
+          "score": 80,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (opts.format === \"table\") {",
+            "for (const line of reusedLines(results)) process.stdout.write(`${line}\\n`);",
+            "if (reused === undefined) return [];",
+            "expect(JSON.parse(stdout)).toEqual(readJson(join(out, \"label-summary.json\")));"
+          ],
+          "rationale": "The reuse lines print only when the summary has a `reused` field, which is set only with `--resume`. The one test that parses stdout as JSON (label-cli.test.ts) runs without `--resume`, and test/label-resume.test.ts never passes `--format`. So if someone removes the table-only guard, no test fails. This is a real but minor coverage gap around a simple guard.",
+          "score": 85,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (opts.format === \"table\") {",
+            "for (const line of reusedLines(results)) process.stdout.write(`${line}\\n`);",
+            "if (reused === undefined) return [];",
+            "expect(JSON.parse(stdout)).toEqual(readJson(join(out, \"label-summary.json\")));"
+          ],
+          "rationale": "The reuse lines print only when the summary has a `reused` field, which is set only with `--resume`. The one test that parses stdout as JSON (label-cli.test.ts) runs without `--resume`, and test/label-resume.test.ts never passes `--format`. So if someone removes the table-only guard, no test fails. This is a real but minor coverage gap around a simple guard.",
+          "score": 85,
+          "severity": "nit"
+        },
+        "passed": true
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [
+      {
+        "file": "src/eval/label/resume.ts",
+        "start_line": 84,
+        "end_line": 88,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "No test covers the error paths for a labels.json that is not JSON or that is not a labels file.",
+        "evidence": "return none(\"labels.json is not JSON, so nothing is reused.\");",
+        "suggested_fix": "Add a resume test that writes a corrupt labels.json and a labels.json with the wrong shape. Assert that the run makes all 6 scorer calls and prints the message on stderr.",
+        "explanation": "If these branches break, a corrupt labels.json could crash the run or reuse bad entries, and no test would fail.",
+        "needs_context": false,
+        "fingerprint": "b698df9d4155e816",
+        "severity": "nit",
+        "score": 92,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "return none(\"labels.json is not JSON, so nothing is reused.\");",
+            "if (!file.success) return none(\"labels.json is not a labels file, so nothing is reused.\");",
+            "it(\"reuses nothing, and says so, for a labels.json with no digest\", async () => {"
+          ],
+          "rationale": "The finding holds: test/label-resume.test.ts covers the missing-file, no-digest and other-digest cases, but no test reaches the 'not JSON' or 'not a labels file' branches, and no test calls readKept directly. These branches are small and simple, so the gap is minor.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "span_text": "} catch { return none(\"labels.json is not JSON, so nothing is reused.\"); } const file = FileSchema.safeParse(value); if (!file.success) return none(\"labels.json is not a labels file, so nothing is reused.\");"
+      },
+      {
+        "file": "test/label-resume.test.ts",
+        "start_line": 24,
+        "end_line": 25,
+        "category": "convention",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "The test fakes the repo module policy.js, which is fast and deterministic.",
+        "evidence": "vi.mock(\"../src/eval/label/policy.js\", () => ({ readPolicy: () => policy.text }));",
+        "suggested_fix": "Change the policy input through a real file or a parameter, and do not mock policy.js.",
+        "explanation": "CLAUDE.md rule 2 says a module of this repo is fast and deterministic, so do not fake it.",
+        "needs_context": true,
+        "fingerprint": "d2c8165c6148155d",
+        "severity": "nit",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "vi.mock(\"../src/eval/label/policy.js\", () => ({ readPolicy: () => policy.text }));",
+            "A module of this repo is fast and deterministic, so do not fake it.",
+            "return readFileSync(POLICY_PATH, \"utf8\");"
+          ],
+          "rationale": "The new test mocks the repo module policy.js, which only reads a fixed doc file. CLAUDE.md rule 2 says not to fake repo modules. The mock exists because the policy path is hard-coded, so the test cannot change the policy any other way. The test still gives correct results, so this is a small convention issue.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "span_text": "const policy = vi.hoisted(() => ({ text: \"POLICY ONE\" })); vi.mock(\"../src/eval/label/policy.js\", () => ({ readPolicy: () => policy.text }));"
+      },
+      {
+        "file": "src/eval/label/index.ts",
+        "start_line": 134,
+        "end_line": 136,
+        "category": "test",
+        "severity_estimate": "nit",
+        "confidence": "low",
+        "claim": "No test checks that `--format json` with `--resume` prints no extra reuse lines, so stdout stays valid JSON.",
+        "evidence": "if (opts.format === \"table\") {",
+        "suggested_fix": "Add a test that runs `--resume --format json` and parses stdout as JSON.",
+        "explanation": "If the format guard breaks, JSON stdout gets corrupted and no test fails.",
+        "needs_context": false,
+        "fingerprint": "b63d7dfda69e5746",
+        "severity": "nit",
+        "score": 85,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (opts.format === \"table\") {",
+            "for (const line of reusedLines(results)) process.stdout.write(`${line}\\n`);",
+            "if (reused === undefined) return [];",
+            "expect(JSON.parse(stdout)).toEqual(readJson(join(out, \"label-summary.json\")));"
+          ],
+          "rationale": "The reuse lines print only when the summary has a `reused` field, which is set only with `--resume`. The one test that parses stdout as JSON (label-cli.test.ts) runs without `--resume`, and test/label-resume.test.ts never passes `--format`. So if someone removes the table-only guard, no test fails. This is a real but minor coverage gap around a simple guard.",
+          "score": 85,
+          "severity": "nit"
+        },
+        "span_text": "if (opts.format === \"table\") { for (const line of reusedLines(results)) process.stdout.write(`${line}\\n`); }"
+      }
+    ],
+    "github": {
+      "review_id": 5885449570,
+      "review_url": "https://github.com/jerridan/pr-review/pull/49#pullrequestreview-5885449570",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [
+        {
+          "fingerprint": "b698df9d4155e816",
+          "comment_id": 4559223892
+        },
+        {
+          "fingerprint": "d2c8165c6148155d",
+          "comment_id": 4559223901
+        },
+        {
+          "fingerprint": "b63d7dfda69e5746",
+          "comment_id": 4559223905
+        }
+      ],
+      "in_body": [],
+      "check_run": {
+        "id": 131661987226
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 7578,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 15467,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0015567,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1010,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 16243,
+            "webSearchRequests": 0,
+            "costUSD": 0.075076,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0766327
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 4859,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16580,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016690000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 425,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 21222,
+            "webSearchRequests": 0,
+            "costUSD": 0.178284,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 153,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.179953
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "model": "claude-opus-5-5",
+        "duration_ms": 4885,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16574,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016683999999999998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 449,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 21174,
+            "webSearchRequests": 0,
+            "costUSD": 0.17837999999999998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 156,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.18004839999999997
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5029,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16580,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016680000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 442,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 21132,
+            "webSearchRequests": 0,
+            "costUSD": 0.177904,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 141,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.179572
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6269,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16584,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016684000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 522,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 21453,
+            "webSearchRequests": 0,
+            "costUSD": 0.182072,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 193,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1837404
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "model": "claude-opus-5-5",
+        "duration_ms": 2996,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 27236,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0027336,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 161,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 29121,
+            "webSearchRequests": 0,
+            "costUSD": 0.2368078,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 39,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.23954140000000002
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 9194,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16576,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016686000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 706,
+            "cacheReadInputTokens": 24504,
+            "cacheCreationInputTokens": 19079,
+            "webSearchRequests": 0,
+            "costUSD": 0.1716768,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 273,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.17334539999999998
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 4079,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16596,
+            "outputTokens": 16,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016676,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 319,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 18373,
+            "webSearchRequests": 0,
+            "costUSD": 0.1539838,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 80,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1556514
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5624,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16582,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016682,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 435,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 18359,
+            "webSearchRequests": 0,
+            "costUSD": 0.1561918,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 58,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.15786
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "model": "claude-opus-5-5",
+        "duration_ms": 8397,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16580,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016680000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 854,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 19132,
+            "webSearchRequests": 0,
+            "costUSD": 0.1707558,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 368,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.17242380000000002
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 10257,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5891,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005991000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 854,
+            "cacheReadInputTokens": 24570,
+            "cacheCreationInputTokens": 6586,
+            "webSearchRequests": 0,
+            "costUSD": 0.037353,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 206,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0379521
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 18947,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 13471,
+            "outputTokens": 16,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0013551000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 10,
+            "outputTokens": 1254,
+            "cacheReadInputTokens": 72792,
+            "cacheCreationInputTokens": 20483,
+            "webSearchRequests": 0,
+            "costUSD": 0.1017712,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 228,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1031263
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 12267,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10233,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0010328000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 892,
+            "cacheReadInputTokens": 47912,
+            "cacheCreationInputTokens": 11427,
+            "webSearchRequests": 0,
+            "costUSD": 0.059435199999999994,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 128,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.060467999999999994
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7643,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5881,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005981000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 733,
+            "cacheReadInputTokens": 19935,
+            "cacheCreationInputTokens": 10787,
+            "webSearchRequests": 0,
+            "costUSD": 0.104967,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 123,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1055651
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 11484,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-opus-5-5": {
+            "inputTokens": 10,
+            "outputTokens": 1125,
+            "cacheReadInputTokens": 63387,
+            "cacheCreationInputTokens": 11679,
+            "webSearchRequests": 0,
+            "costUSD": 0.12864939999999997,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 208,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-haiku-5-5": {
+            "inputTokens": 10233,
+            "outputTokens": 288,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011673000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 270,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.12981669999999998
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 15511,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 13447,
+            "outputTokens": 17,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0013532000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 1357,
+            "cacheReadInputTokens": 58725,
+            "cacheCreationInputTokens": 15553,
+            "webSearchRequests": 0,
+            "costUSD": 0.16334100000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 539,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1646942
+      }
+    ],
+    "total_cost_usd": 2.3003909000000005,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 40,
+      "gather": 132,
+      "triage": 8602,
+      "find_verify": 45920,
+      "merge": 8
+    },
+    "errors": []
+  }
+}
