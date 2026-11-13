@@ -234,7 +234,7 @@ describe("pr-review label --resume", () => {
     };
     expect(summary.cases[0]?.reused).toEqual([0, 2]);
     expect(summary.cases[0]?.scorer_cost_usd).toBeCloseTo(0.02);
-    expect(second.stdout).toMatch(/reused[^\n]*r-three[^\n]*0, 2/);
+    expect(second.stdout).toMatch(/resume r-three: reused findings 0, 2/);
   }, 120_000);
 
   it("writes the files that one run with no failure writes", async () => {
@@ -243,9 +243,14 @@ describe("pr-review label --resume", () => {
     await labelRun(resumed, [], ["--resume"]);
     const clean = casesDir();
     expect((await labelRun(clean, [])).code).toBe(0);
-    for (const name of ["labels.json", "human-queue.json", "disagreements.json", "golden.json"]) {
-      expect(read(resumed, name)).toBe(read(clean, name));
+    // current_severity is the severity in golden.json when the run starts. The first run
+    // of the resumed case already wrote its labels there, so the field is left out.
+    const plain = (cases: string, name: string) =>
+      read(cases, name).replace(/\s*"current_severity": "[a-z_]+",?/g, "");
+    for (const name of ["labels.json", "human-queue.json", "disagreements.json"]) {
+      expect(plain(resumed, name)).toBe(plain(clean, name));
     }
+    expect(read(resumed, "golden.json")).toBe(read(clean, "golden.json"));
   }, 120_000);
 
   it("makes every call without --resume", async () => {

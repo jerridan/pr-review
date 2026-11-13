@@ -651,7 +651,7 @@ The output is `{finding, claude, gpt, kept}`. `claude` and `gpt` are each `{scor
 The labeler gives each golden finding of each case a severity and a category under `docs/design/severity-policy.md`. A scorer on Claude labels the finding. A judge from another model family accepts or rejects the label.
 
 ```bash
-pr-review label --cases <dir> [--runs <n>] [--concurrency <n>] [--write-golden] [--only <case>] [--out <dir>] [--format table|json] [--allow-api-key]
+pr-review label --cases <dir> [--runs <n>] [--concurrency <n>] [--write-golden] [--resume] [--only <case>] [--out <dir>] [--format table|json] [--allow-api-key]
 ```
 
 The labeler makes real model calls. It needs a Claude login for the scorer. It needs the Codex CLI on your `PATH`, with its own login, for the judge. The tool reads no credential of either.
@@ -662,6 +662,7 @@ The labeler makes real model calls. It needs a Claude login for the scorer. It n
 | `--runs <n>` | The independent runs of each finding. A positive integer. | 3 |
 | `--concurrency <n>` | The most findings in flight at once. A positive integer. | 2 |
 | `--write-golden` | Write every chosen label to `golden.json`: `blocking`, `suggestion`, `nit`, `dont_post`, `not_real` or `unsure`. The category does not change. | off |
+| `--resume` | Reuse the findings whose runs all completed in the `labels.json` of an earlier run. See "Resume a stopped label run" below. | off |
 | `--only <case>` | Label only the case with this name. | every case |
 | `--out <dir>` | The directory for the output files. | each case directory |
 | `--format table\|json` | The format of the totals on stdout. | `table` |
@@ -678,6 +679,14 @@ A severity that at least two converged runs agree on, and that a majority of the
 | `labels.json` | Every finding with its runs, its calls and its chosen label, and the two rates of the case, with `run_agreement_excluded`. `current_severity` is the severity in `golden.json` before the run. |
 | `disagreements.json` | The findings whose runs did not all converge to one severity. Read it to find the policy rules that read two ways. |
 | `human-queue.json` | The findings with no chosen label, and the findings whose chosen severity is `dont_post`, `not_real` or `unsure`. Each has a `reason`. |
+
+### Resume a stopped label run
+
+A label run can stop in the middle, for example when the judge hits its usage limit. The finished findings are then in `labels.json`, and the findings with a failed run have no chosen label. Run the same command again with `--resume`. The command reads the `labels.json` of each case (in `--out/<case>/`, or in the case directory without `--out`). It reuses the entry of each golden finding whose runs all completed, and it labels only the other findings. Without `--resume`, the command makes every call.
+
+An entry is reused only when two things match. The finding text must be the same: file, `start_line`, `end_line` and claim. The severity and the category do not count, because the labeler writes them. The labeling input must also be the same: the number of runs, the model ids, the text of `docs/design/severity-policy.md` and the text of the two labeler prompt files. `labels.json` holds a `digest` of this input. A `labels.json` with another digest, or with none, gives no reuse, and the command says so on stderr.
+
+The output files of a resumed run are the files that one run with no failure writes from the same results. The only change is `current_severity`, which shows the severity in `golden.json` when the run starts. The scorer cost counts only the new calls. `label-summary.json` lists the reused findings of each case (`reused`, the indexes in `golden.json`), and the table format prints one line for each case that names them.
 
 `label-summary.json` goes in the cases directory, or in `<out>/`. It holds the counts of each case and the two rates over all cases. The command exits 0 when every call succeeded. It exits 1 when a case checkout failed or a call failed after its retry, and it still writes every file. It exits 2 on a usage error. Without `--write-golden`, `golden.json` does not change. With it, the `severity` of each finding with a chosen label changes to that label. The category and every other field stay. The chosen category stays in `labels.json`.
 

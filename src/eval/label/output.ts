@@ -1,5 +1,5 @@
 // The output files of the labeler, the golden rewrite, and the printers.
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { POSTED_SEVERITIES } from "../../schemas/label.js";
 import type { FindingEntry, FindingOutcome, QueueReason, RunResult } from "./loop.js";
@@ -11,6 +11,8 @@ const rate = (r: Ratio): number | null => (r.den === 0 ? null : r.num / r.den);
 
 export type LabelsFile = {
   case: string;
+  /** The digest of the labeling input, for --resume. */
+  digest?: string;
   runs_per_finding: number;
   findings: FindingEntry[];
   first_pass_acceptance_rate: number | null;
@@ -28,6 +30,8 @@ export type SummaryCase = {
   queued: number;
   failed_runs: number;
   scorer_cost_usd: number;
+  /** With --resume: the indexes of the findings that kept entries served. */
+  reused?: number[];
 };
 
 export type SummaryFile = {
@@ -65,7 +69,12 @@ function allAgree(entry: FindingEntry): boolean {
 }
 
 /** Build the files of one case from the outcomes of its findings. */
-export function caseResult(name: string, runs: number, outcomes: FindingOutcome[]): CaseResult {
+export function caseResult(
+  name: string,
+  runs: number,
+  outcomes: FindingOutcome[],
+  extra?: { digest: string; resume: boolean },
+): CaseResult {
   const entries = outcomes.map((o) => o.entry);
   const allRuns = entries.flatMap((e) => e.runs);
   const firstPass: Ratio = {
@@ -86,6 +95,7 @@ export function caseResult(name: string, runs: number, outcomes: FindingOutcome[
     name,
     labels: {
       case: name,
+      ...(extra ? { digest: extra.digest } : {}),
       runs_per_finding: runs,
       findings: entries,
       first_pass_acceptance_rate: rate(firstPass),
@@ -101,6 +111,9 @@ export function caseResult(name: string, runs: number, outcomes: FindingOutcome[
       queued: queue.length,
       failed_runs: allRuns.filter((r) => r.failed).length,
       scorer_cost_usd: outcomes.reduce((sum, o) => sum + o.scorerCostUsd, 0),
+      ...(extra?.resume
+        ? { reused: outcomes.filter((o) => o.reused).map((o) => o.entry.index) }
+        : {}),
     },
     firstPass,
     agreement,
@@ -125,12 +138,29 @@ export function summaryOf(results: CaseResult[]): SummaryFile {
 
 export const json = (value: unknown): string => `${JSON.stringify(value, null, 2)}\n`;
 
+// Write a temporary file, then rename it, so a stop in the write cannot damage the file.
+async function writeAtomic(path: string, text: string): Promise<void> {
+  await writeFile(`${path}.tmp`, text);
+  await rename(`${path}.tmp`, path);
+}
+
 /** Write labels.json, disagreements.json and human-queue.json into "dir". */
 export async function writeCaseFiles(dir: string, result: CaseResult): Promise<void> {
   await mkdir(dir, { recursive: true });
-  await writeFile(join(dir, "labels.json"), json(result.labels));
-  await writeFile(join(dir, "disagreements.json"), json({ findings: result.disagreements }));
-  await writeFile(join(dir, "human-queue.json"), json({ findings: result.queue }));
+  await writeAtomic(join(dir, "labels.json"), json(result.labels));
+  await writeAtomic(join(dir, "disagreements.json"), json({ findings: result.disagreements }));
+  await writeAtomic(join(dir, "human-queue.json"), json({ findings: result.queue }));
+}
+
+/** The lines that name the findings that a resumed run reused, one for each case. */
+export function reusedLines(results: CaseResult[]): string[] {
+  return results.flatMap((r) => {
+    const reused = r.summary.reused;
+    if (reused === undefined) return [];
+    return [
+      `resume ${r.name}: reused findings ${reused.length === 0 ? "none" : reused.join(", ")}`,
+    ];
+  });
 }
 
 /**

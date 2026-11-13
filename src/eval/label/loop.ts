@@ -20,6 +20,7 @@ import type { RunOptions } from "../../sdk/options.js";
 import type { Semaphore } from "../../semaphore.js";
 import type { Case } from "../case.js";
 import { runCodexJudge } from "./codex.js";
+import { findingKey } from "./resume.js";
 import { judgePromptText, scorerMessage, type FindingInput, type Rejection } from "./prompts.js";
 
 /** The most re-scores of one run. */
@@ -75,6 +76,8 @@ export type FindingOutcome = {
   entry: FindingEntry;
   queueReason: QueueReason | null;
   scorerCostUsd: number;
+  /** True when a kept entry of an earlier run serves the finding. */
+  reused?: boolean;
 };
 
 /** What every call of a case shares. */
@@ -270,18 +273,8 @@ export function aggregate(
   return { chosen: { severity, category }, queueReason: posted ? null : "not_posted_label" };
 }
 
-/** Label one finding: its runs go in sequence, then the aggregate. */
-export async function labelFinding(
-  input: FindingInput,
-  ctx: LabelContext,
-): Promise<FindingOutcome> {
-  const runs: RunResult[] = [];
-  let cost = 0;
-  for (let i = 0; i < ctx.runs; i++) {
-    const { run, scorerCostUsd } = await labelRun(input, ctx);
-    runs.push(run);
-    cost += scorerCostUsd;
-  }
+// The outcome of a finding from its runs.
+function outcomeOf(input: FindingInput, runs: RunResult[], cost: number): FindingOutcome {
   const f = input.finding;
   const { chosen, queueReason } = aggregate(runs, f.category);
   return {
@@ -298,6 +291,21 @@ export async function labelFinding(
     queueReason,
     scorerCostUsd: cost,
   };
+}
+
+/** Label one finding: its runs go in sequence, then the aggregate. */
+export async function labelFinding(
+  input: FindingInput,
+  ctx: LabelContext,
+): Promise<FindingOutcome> {
+  const runs: RunResult[] = [];
+  let cost = 0;
+  for (let i = 0; i < ctx.runs; i++) {
+    const { run, scorerCostUsd } = await labelRun(input, ctx);
+    runs.push(run);
+    cost += scorerCostUsd;
+  }
+  return outcomeOf(input, runs, cost);
 }
 
 /** The inputs of every golden finding of a case, from its checkout and diff.patch. */
@@ -318,14 +326,23 @@ export async function caseInputs(
 
 /**
  * Label every golden finding of a case in its checkout. The findings run
- * in parallel under "semaphore". The outcomes come back in index order.
+ * in parallel under "semaphore". The outcomes come back in index order. A
+ * finding with an entry in "kept" makes no call: its kept runs give the
+ * outcome, with the index and the severity of the golden now.
  */
 export async function labelCase(
   c: Case,
   ctx: LabelContext,
   policy: string,
   semaphore: Semaphore,
+  kept: ReadonlyMap<string, FindingEntry> = new Map(),
 ): Promise<FindingOutcome[]> {
   const inputs = await caseInputs(c, ctx.checkout, policy);
-  return Promise.all(inputs.map((input) => semaphore(() => labelFinding(input, ctx))));
+  return Promise.all(
+    inputs.map((input) => {
+      const old = kept.get(findingKey(input.finding));
+      if (old) return Promise.resolve({ ...outcomeOf(input, old.runs, 0), reused: true });
+      return semaphore(() => labelFinding(input, ctx));
+    }),
+  );
 }

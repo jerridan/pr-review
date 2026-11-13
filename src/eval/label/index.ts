@@ -12,17 +12,19 @@ import type { RunOptions } from "../../sdk/options.js";
 import { createSemaphore } from "../../semaphore.js";
 import { CaseError, loadCases, type Case } from "../case.js";
 import { cloneCase } from "../checkout.js";
-import { labelCase } from "./loop.js";
+import { labelCase, type FindingEntry } from "./loop.js";
 import {
   caseResult,
   json,
   renderLabelTable,
+  reusedLines,
   summaryOf,
   writeCaseFiles,
   writeGolden,
   type CaseResult,
 } from "./output.js";
 import { readPolicy } from "./policy.js";
+import { labelDigest, readKept } from "./resume.js";
 
 /** The flags of "pr-review label". */
 export type LabelOptions = {
@@ -34,6 +36,7 @@ export type LabelOptions = {
   out?: string;
   format: "table" | "json";
   allowApiKey: boolean;
+  resume?: boolean;
 };
 
 function messageOf(err: unknown): string {
@@ -68,9 +71,19 @@ async function labelOneCase(
       return null;
     }
     const ctx = { client: shared.client, options: shared.options, checkout, runs: opts.runs };
-    const outcomes = await labelCase(c, ctx, shared.policy, semaphore);
-    const result = caseResult(c.name, opts.runs, outcomes);
     const dir = opts.out === undefined ? c.dir : join(resolve(opts.out), c.name);
+    const digest = labelDigest(opts.runs, shared.policy);
+    let kept = new Map<string, FindingEntry>();
+    if (opts.resume === true) {
+      const old = await readKept(dir, digest, opts.runs);
+      if (old.message !== null) say(`case ${c.name}: ${old.message}`);
+      kept = old.entries;
+    }
+    const outcomes = await labelCase(c, ctx, shared.policy, semaphore, kept);
+    const result = caseResult(c.name, opts.runs, outcomes, {
+      digest,
+      resume: opts.resume === true,
+    });
     await writeCaseFiles(dir, result);
     if (opts.writeGolden) await writeGolden(c.dir, result.labels.findings);
     return result;
@@ -118,6 +131,9 @@ export async function runLabel(opts: LabelOptions, deps: ProgramDeps): Promise<n
   await mkdir(summaryDir, { recursive: true });
   await writeFile(join(summaryDir, "label-summary.json"), json(summary));
   process.stdout.write(opts.format === "json" ? json(summary) : renderLabelTable(results, summary));
+  if (opts.format === "table") {
+    for (const line of reusedLines(results)) process.stdout.write(`${line}\n`);
+  }
 
   const failedRuns = summary.cases.reduce((n, c) => n + c.failed_runs, 0);
   if (failedRuns > 0) say(`${failedRuns} runs failed after a retry.`);
@@ -140,7 +156,8 @@ function exitOverride(err: CommanderError): never {
   throw new CommanderError(EXIT_USAGE, err.code, err.message);
 }
 
-type LabelCliOptions = Omit<LabelOptions, "writeGolden" | "allowApiKey"> & {
+type LabelCliOptions = Omit<LabelOptions, "writeGolden" | "allowApiKey" | "resume"> & {
+  resume?: boolean;
   writeGolden?: boolean;
   allowApiKey?: boolean;
 };
@@ -162,6 +179,10 @@ export function registerLabelCommand(program: Command, deps: ProgramDeps): void 
       2,
     )
     .option("--write-golden", "write every chosen label to golden.json")
+    .option(
+      "--resume",
+      "reuse the findings whose runs all completed in the labels.json of an earlier run",
+    )
     .option("--only <case>", "label only the case with this name")
     .option("--out <dir>", "the output directory (default: each case directory)")
     .addOption(
@@ -185,6 +206,7 @@ export function registerLabelCommand(program: Command, deps: ProgramDeps): void 
             ...(options.out !== undefined ? { out: options.out } : {}),
             format: options.format,
             allowApiKey: options.allowApiKey === true,
+            resume: options.resume === true,
           },
           deps,
         );
