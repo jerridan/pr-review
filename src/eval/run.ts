@@ -42,7 +42,7 @@ import {
 import { failedMetrics, metrics, type RepeatMetrics } from "./metrics.js";
 import { hasSources, pairedRepeat } from "./paired.js";
 import { buildReport, renderTable, type Report } from "./report.js";
-import { findingKey, scoreRecord, type ScoreJudge } from "./score.js";
+import { findingKey, scoreRecord, type ScoreJudge, type ScoreResult } from "./score.js";
 
 /** The flags of "pr-review eval". */
 export type EvalOptions = {
@@ -212,6 +212,8 @@ type ResultOptions = {
   reviewers: string[] | null;
   /** --passes by name, or null. */
   passes: Record<string, number> | null;
+  /** True for --paired: the metrics then hold the paired figures. */
+  paired: boolean;
 };
 
 // The fields of the metrics that buildReport and renderTable read.
@@ -251,6 +253,7 @@ const ResultFileSchema = z.object({
     // A result from before D8 has neither: it ran every reviewer.
     reviewers: z.array(z.string()).nullable().default(null),
     passes: z.record(z.string(), number).nullable().default(null),
+    paired: z.boolean().default(false),
   }),
   metrics: MetricsShape.loose(),
 });
@@ -283,6 +286,7 @@ const resultOptions = (ctx: EvalContext): ResultOptions => ({
   passes: ctx.opts.passes
     ? Object.fromEntries(Object.entries(ctx.opts.passes).sort(([a], [b]) => (a < b ? -1 : 1)))
     : null,
+  paired: ctx.opts.paired === true,
 });
 
 // A hash of the golden findings. A change of golden.json changes it.
@@ -336,7 +340,8 @@ const sameOptions = (a: ResultOptions, b: ResultOptions): boolean =>
   a.extras === b.extras &&
   a.raw_judge === b.raw_judge &&
   JSON.stringify(a.reviewers) === JSON.stringify(b.reviewers) &&
-  JSON.stringify(a.passes) === JSON.stringify(b.passes);
+  JSON.stringify(a.passes) === JSON.stringify(b.passes) &&
+  a.paired === b.paired;
 
 // The results to reuse, by "<case>/<repeat>". A result that is failed, or
 // that has another case, head or golden fingerprint, is not reused. It runs
@@ -439,6 +444,16 @@ async function runRepeat(ctx: EvalContext, c: Case, repeat: number): Promise<Rep
     kind: "done",
     metrics: failedMetrics(repeat, error, Math.round(performance.now() - start)),
   });
+  // The judge answers go to the cache file of the repeat, so a later
+  // offline report can score the record with no model call. A cache file
+  // that is not valid fails the repeat before the review costs anything.
+  const cachePath = join(ctx.out, c.name, String(repeat), JUDGE_CACHE_FILE);
+  let cache: JudgeCache;
+  try {
+    cache = await readJudgeCache(cachePath);
+  } catch (err) {
+    return failed(messageOf(err));
+  }
   const tmp = await mkdtemp(join(tmpdir(), "pr-review-eval-"));
   try {
     const checkout = await cloneCase(c, join(tmp, "repo"));
@@ -466,44 +481,48 @@ async function runRepeat(ctx: EvalContext, c: Case, repeat: number): Promise<Rep
     if (same.length > 0 && !ctx.opts.allowSameJudge) {
       return { kind: "same-judge", reviewers: same.map((r) => r.name) };
     }
-    // The judge answers go to the cache file of the repeat, so a later
-    // offline report can score the record with no model call.
-    const cachePath = join(ctx.out, c.name, String(repeat), JUDGE_CACHE_FILE);
-    const cache: JudgeCache = await readJudgeCache(cachePath).catch(() => new Map());
     const judge: ScoreJudge = {
       client: ctx.client,
       model: ctx.judgeModel,
       options: ctx.options,
       cache,
+      asked: new Set(),
     };
-    const score = await scoreRecord(result.record, c.golden, checkout, judge, {
-      extras: ctx.opts.extras,
-      rawJudge: ctx.opts.rawJudge,
-    });
-    const m = metrics(result.record, score, repeat);
-    if (ctx.opts.paired === true) {
-      if (hasSources(result.record)) {
-        const p = await pairedRepeat(
-          result.record,
-          c.golden,
-          checkout,
-          judge,
-          { rawJudge: ctx.opts.rawJudge },
-          score,
-        );
-        m.paired = p.paired;
-        m.judge_calls += p.judgeCalls;
-        m.judge_cost_usd += p.judgeCostUsd;
-      } else {
-        m.paired = null;
-      }
-    }
+    let score: ScoreResult;
+    let m: RepeatMetrics;
+    // The cache is written also when the scoring throws, so the answers
+    // that the eval paid for stay.
     try {
-      await writeJudgeCache(cachePath, cache);
-    } catch (err) {
-      say(
-        `warning: case ${c.name}, repeat ${repeat}: cannot write ${JUDGE_CACHE_FILE}: ${messageOf(err)}`,
-      );
+      score = await scoreRecord(result.record, c.golden, checkout, judge, {
+        extras: ctx.opts.extras,
+        rawJudge: ctx.opts.rawJudge,
+      });
+      m = metrics(result.record, score, repeat);
+      if (ctx.opts.paired === true) {
+        if (hasSources(result.record)) {
+          const p = await pairedRepeat(
+            result.record,
+            c.golden,
+            checkout,
+            judge,
+            { rawJudge: ctx.opts.rawJudge },
+            score,
+          );
+          m.paired = p.paired;
+          m.judge_calls += p.judgeCalls;
+          m.judge_cost_usd += p.judgeCostUsd;
+        } else {
+          m.paired = null;
+        }
+      }
+    } finally {
+      try {
+        await writeJudgeCache(cachePath, cache);
+      } catch (err) {
+        say(
+          `warning: case ${c.name}, repeat ${repeat}: cannot write ${JUDGE_CACHE_FILE}: ${messageOf(err)}`,
+        );
+      }
     }
     // A candidates.json problem does not fail a repeat with a good score.
     try {

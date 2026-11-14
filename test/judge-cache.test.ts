@@ -236,7 +236,18 @@ describe("the judge cache and a failed answer (D8 R2, review)", () => {
     );
     expect(again.calls.length).toBe(2);
     expect(two.matched.length).toBe(1);
-    expect([...cache.values()].sort()).toEqual(["yes", "yes"]);
+    expect(two.judgeUnknown).toBe(0);
+    expect(two.extras).toMatchObject({ unknown: 0, accepted: [1] });
+    // The new answers replace the failed ones in the cache.
+    const replay = judge();
+    await scoreRecord(
+      record(),
+      GOLDEN,
+      head,
+      { client: replay, model: MODEL, options: OPTIONS, cache },
+      { extras: true },
+    );
+    expect(replay.calls).toEqual([]);
   });
 
   it("uses a cached unknown with no client, and counts it as unknown", async () => {

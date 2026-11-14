@@ -1,7 +1,8 @@
 // The judge cache of one eval repeat: every answer of the match judge and
-// of the extras judge, keyed by the judge model and the texts that the
-// judge saw of the finding and the golden finding. A later scoring of the
-// same record reads it and asks the judge only for a pair with no answer.
+// of the extras judge. The key of an answer holds the judge model and all
+// that the judge saw: the system prompt, the message template and the text
+// of each block. A later scoring of the same record reads the cache and
+// asks the judge only for a question with no answer, or with a failed one.
 import { createHash } from "node:crypto";
 import { mkdir, readFile } from "node:fs/promises";
 import { dirname } from "node:path";
@@ -24,8 +25,8 @@ const CacheFileSchema = z.strictObject({
 
 /**
  * The key of one judge answer: a hash of the judge, the judge model and
- * the texts of the question. The match judge gives the posted finding and
- * the golden finding. The extras judge gives the posted finding.
+ * the texts of the question. The scoring gives the system prompt, the
+ * message template and the label and text of each block.
  */
 export function judgeKey(judge: "match" | "extras", model: string, texts: string[]): string {
   return createHash("sha256")
@@ -43,7 +44,8 @@ export async function readJudgeCache(path: string): Promise<JudgeCache> {
     text = await readFile(path, "utf8");
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") return new Map();
-    throw err;
+    const reason = err instanceof Error ? err.message : String(err);
+    throw new Error(`cannot read the judge cache ${path}: ${reason}`, { cause: err });
   }
   let parsed;
   try {
