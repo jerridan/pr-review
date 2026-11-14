@@ -237,7 +237,10 @@ function rawCandidates(record: RunRecord): Finding[] {
  * golden gets one query only. With "extras"
  * on, each posted finding that matches no golden then gets one query of
  * the extras judge. Extras are off by default. An unknown answer of the
- * extras judge counts in "extras.unknown", not in "judgeUnknown".
+ * extras judge counts in "extras.unknown", not in "judgeUnknown". With
+ * a cache in "judge", a cached answer sends no query, and each new answer
+ * goes into the cache. With no client, a question with no cached answer
+ * counts as no match and in "uncached".
  */
 export async function scoreRecord(
   record: RunRecord,
