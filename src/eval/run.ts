@@ -64,6 +64,10 @@ export type EvalOptions = {
   resume: boolean;
   /** True for --paired: score the one-pass set and the all set of each repeat (D8). */
   paired?: boolean;
+  /** --reviewers: run only these reviewers. Absent means every reviewer that a run selects. */
+  reviewers?: string[];
+  /** --passes: the passes of named reviewers for every run. */
+  passes?: Record<string, number>;
 };
 
 function messageOf(err: unknown): string {
@@ -101,49 +105,66 @@ const TIER_RANK: Record<Tier, number> = { skip: 0, fast: 1, full: 2 };
  * config that does not load gives no reviewer: the run of that case then
  * fails as a failed repeat.
  */
-async function judgeModelReviewers(
+async function caseReviewers(
   clone: string,
   c: Case,
-  tier: Tier,
+  opts: EvalOptions,
   judgeModel: string,
-): Promise<string[]> {
-  if (tier === "skip") return [];
+): Promise<{ judgeModel: string[]; custom: string[] }> {
   let loaded;
   try {
     loaded = await loadRepoConfig(clone, c.base);
   } catch {
-    return [];
+    return { judgeModel: [], custom: [] };
   }
+  const custom = loaded.customReviewers.map((def) => def.frontmatter.name);
+  const tier = opts.tier;
+  if (tier === "skip") return { judgeModel: [], custom };
+  const only = opts.reviewers ? new Set(opts.reviewers) : null;
   const { config } = loaded;
-  return [...loadBuiltinReviewers(), ...loaded.customReviewers]
+  const same = [...loadBuiltinReviewers(), ...loaded.customReviewers]
+    .filter((def) => only === null || only.has(def.frontmatter.name))
     .filter((def) => TIER_RANK[def.frontmatter.triggers.min_tier] <= TIER_RANK[tier])
     .filter((def) => config.reviewers[def.frontmatter.name]?.enabled !== false)
     .filter((def) => effectiveModel(def, config).model === judgeModel)
     .map((def) => def.frontmatter.name);
+  return { judgeModel: same, custom };
 }
 
 type SameJudge = { case: string; reviewers: string[] };
 
 // Clone the bundle of each case once, so a sha that does not resolve
 // stops the eval before any model call. Unless --allow-same-judge is
-// given, give the first case whose reviewers use the judge model.
+// given, give the first case whose reviewers use the judge model. Also
+// give the reviewer names that a run can know: the built-in reviewers and
+// the custom reviewers of each case.
 async function checkCases(
   cases: Case[],
   opts: EvalOptions,
   judgeModel: string,
-): Promise<SameJudge | null> {
+): Promise<{ sameJudge: SameJudge | null; names: Set<string> }> {
+  const names = new Set(loadBuiltinReviewers().map((def) => def.frontmatter.name));
   const root = await mkdtemp(join(tmpdir(), "pr-review-eval-check-"));
   try {
     for (const c of cases) {
       const clone = await cloneCase(c, join(root, c.name));
+      const found = await caseReviewers(clone, c, opts, judgeModel);
+      for (const name of found.custom) names.add(name);
       if (opts.allowSameJudge) continue;
-      const reviewers = await judgeModelReviewers(clone, c, opts.tier, judgeModel);
-      if (reviewers.length > 0) return { case: c.name, reviewers };
+      if (found.judgeModel.length > 0) {
+        return { sameJudge: { case: c.name, reviewers: found.judgeModel }, names };
+      }
     }
-    return null;
+    return { sameJudge: null, names };
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+}
+
+// The names of --reviewers and --passes that no reviewer has, in order.
+function unknownReviewers(opts: EvalOptions, names: Set<string>): string[] {
+  const asked = [...(opts.reviewers ?? []), ...Object.keys(opts.passes ?? {})];
+  return [...new Set(asked.filter((name) => !names.has(name)))];
 }
 
 function sameJudgeMessage(where: string, reviewers: string[], judgeModel: string): string {
@@ -187,6 +208,10 @@ type ResultOptions = {
   judge_model: string;
   extras: boolean;
   raw_judge: boolean;
+  /** --reviewers in name order, or null. */
+  reviewers: string[] | null;
+  /** --passes by name, or null. */
+  passes: Record<string, number> | null;
 };
 
 // The fields of the metrics that buildReport and renderTable read.
@@ -223,6 +248,9 @@ const ResultFileSchema = z.object({
     judge_model: z.string(),
     extras: z.boolean(),
     raw_judge: z.boolean(),
+    // A result from before D8 has neither: it ran every reviewer.
+    reviewers: z.array(z.string()).nullable().default(null),
+    passes: z.record(z.string(), number).nullable().default(null),
   }),
   metrics: MetricsShape.loose(),
 });
@@ -251,6 +279,10 @@ const resultOptions = (ctx: EvalContext): ResultOptions => ({
   judge_model: ctx.judgeModel,
   extras: ctx.opts.extras,
   raw_judge: ctx.opts.rawJudge,
+  reviewers: ctx.opts.reviewers ? [...new Set(ctx.opts.reviewers)].sort() : null,
+  passes: ctx.opts.passes
+    ? Object.fromEntries(Object.entries(ctx.opts.passes).sort(([a], [b]) => (a < b ? -1 : 1)))
+    : null,
 });
 
 // A hash of the golden findings. A change of golden.json changes it.
@@ -302,7 +334,9 @@ const sameOptions = (a: ResultOptions, b: ResultOptions): boolean =>
   a.tier === b.tier &&
   a.judge_model === b.judge_model &&
   a.extras === b.extras &&
-  a.raw_judge === b.raw_judge;
+  a.raw_judge === b.raw_judge &&
+  JSON.stringify(a.reviewers) === JSON.stringify(b.reviewers) &&
+  JSON.stringify(a.passes) === JSON.stringify(b.passes);
 
 // The results to reuse, by "<case>/<repeat>". A result that is failed, or
 // that has another case, head or golden fingerprint, is not reused. It runs
@@ -418,6 +452,8 @@ async function runRepeat(ctx: EvalContext, c: Case, repeat: number): Promise<Rep
       allowApiKey: ctx.opts.allowApiKey,
       description: { title: c.title, body: c.body },
       client: ctx.client,
+      ...(ctx.opts.reviewers ? { onlyReviewers: ctx.opts.reviewers } : {}),
+      ...(ctx.opts.passes ? { passes: new Map(Object.entries(ctx.opts.passes)) } : {}),
     });
     if (result.exitCode !== 0) return failed(result.error ?? "The run exited with code 1.");
     // An incomplete review exits 0, but its findings do not show the
@@ -521,17 +557,26 @@ export async function runEval(opts: EvalOptions, deps: ProgramDeps): Promise<num
   }
 
   let cases: Case[];
-  let sameJudge: SameJudge | null;
+  let checked: { sameJudge: SameJudge | null; names: Set<string> };
   try {
     cases = await loadCases(opts.cases);
-    sameJudge = await checkCases(cases, opts, judgeModel);
+    checked = await checkCases(cases, opts, judgeModel);
   } catch (err) {
     if (!(err instanceof CaseError)) throw err;
     say(err.message);
     return EXIT_USAGE;
   }
+  const { sameJudge } = checked;
   if (sameJudge !== null) {
     say(sameJudgeMessage(`case ${sameJudge.case}`, sameJudge.reviewers, judgeModel));
+    return EXIT_USAGE;
+  }
+  const unknown = unknownReviewers(opts, checked.names);
+  if (unknown.length > 0) {
+    say(
+      `${unknown.map((name) => `unknown reviewer ${name}`).join("; ")}. ` +
+        "Give a built-in reviewer or a custom reviewer of a case.",
+    );
     return EXIT_USAGE;
   }
 
