@@ -59,13 +59,26 @@ async function outCosts(dir: string, cases: Case[]): Promise<Map<string, number>
     }
     const repeats: z.infer<typeof RepeatCost>[] = [];
     for (const n of names) {
+      // A repeat with no result.json did not end, so it has no cost. A
+      // result.json that is not valid stops the command: a cost from fewer
+      // repeats would not show.
+      const path = join(dir, c.name, n, "result.json");
+      let text: string;
       try {
-        const text = await readFile(join(dir, c.name, n, "result.json"), "utf8");
-        const parsed = ResultCost.safeParse(JSON.parse(text));
-        if (parsed.success) repeats.push(parsed.data.metrics);
-      } catch {
-        // A repeat with no readable result.json has no cost.
+        text = await readFile(path, "utf8");
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === "ENOENT") continue;
+        const reason = err instanceof Error ? err.message : String(err);
+        throw new SubsetError(`cannot read ${path}: ${reason}`);
       }
+      let parsed;
+      try {
+        parsed = ResultCost.safeParse(JSON.parse(text));
+      } catch {
+        throw new SubsetError(`${path} is not valid JSON`);
+      }
+      if (!parsed.success) throw new SubsetError(`${path} has no failed flag or cost`);
+      repeats.push(parsed.data.metrics);
     }
     const cost = costPerRun(repeats);
     if (cost !== null) costs.set(c.name, cost);
