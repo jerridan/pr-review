@@ -97,7 +97,8 @@ export const NO_SOURCES = "no source fields";
 /** The reason of a repeat that the eval scored without --paired. */
 export const NOT_PAIRED = "not scored with --paired";
 
-const VERIFIER_ROLES = new Set(["verifier", "verifier-escalation"]);
+/** The roles of the queries that serve one verification. */
+export const VERIFIER_ROLES = new Set(["verifier", "verifier-escalation"]);
 
 /**
  * True when the record names the sources of each verification and posted
@@ -118,14 +119,18 @@ export function hasSources(record: RunRecord): boolean {
   );
 }
 
-type Keep = (source: FindingSource) => boolean;
+/** True for each source that a set keeps. */
+export type Keep = (source: FindingSource) => boolean;
 
-const keepsAny = (sources: FindingSource[] | undefined, keep: Keep): boolean =>
+/** True when "keep" keeps one of the sources. */
+export const keepsAny = (sources: FindingSource[] | undefined, keep: Keep): boolean =>
   (sources ?? []).some(keep);
 
-// The record with only the reviewer entries and the posted findings of
-// the set. Every other part stays.
-function setRecord(record: RunRecord, keep: Keep): RunRecord {
+/**
+ * The record with only the reviewer entries and the posted findings of
+ * the set. Every other part stays.
+ */
+export function setRecord(record: RunRecord, keep: Keep): RunRecord {
   return {
     ...record,
     stages: {

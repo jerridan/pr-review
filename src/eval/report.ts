@@ -2,6 +2,7 @@
 // mean of each repeat over the cases, and the spread of those means.
 import type { Gate } from "./baseline.js";
 import type { RepeatMetrics } from "./metrics.js";
+import type { ByPassSection } from "./by-pass.js";
 import { buildPaired, renderPaired, type PairedSection } from "./paired.js";
 
 export type Spread = { mean: number | null; min: number | null; max: number | null };
@@ -45,6 +46,8 @@ export type Report = {
   cases_ref: string | null;
   /** One pass against all passes. Present only for an eval with --paired, and offline. */
   paired?: PairedSection;
+  /** Pass 1, pass 2 and both, of each reviewer with two passes. Offline with --by-pass only. */
+  by_pass?: ByPassSection;
 };
 
 /** The mean of the values that are not null. A mean of no value is null. */

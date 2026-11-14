@@ -36,7 +36,7 @@ captureOutput();
 const golden = (
   file: string,
   line: number,
-  category: string,
+  category: GoldenFinding["category"],
   severity: GoldenFinding["severity"],
   claim: string,
 ): GoldenFinding => ({ file, start_line: line, end_line: line, category, severity, claim });
@@ -64,7 +64,13 @@ const finding = (
   needs_context: false,
 });
 // A: the shared golden. P1 and P2: one golden for each pass. F: false.
-const A = finding("src/stats.ts", 11, "bug", "CLAIM-A", "for (let i = 0; i <= values.length; i++) {");
+const A = finding(
+  "src/stats.ts",
+  11,
+  "bug",
+  "CLAIM-A",
+  "for (let i = 0; i <= values.length; i++) {",
+);
 const P1 = finding("src/stats.ts", 14, "bug", "CLAIM-P1", "return total / values.length;");
 const P2 = finding(".github/workflows/ci.yml", 8, "security", "CLAIM-P2", "- run: npm test");
 const F = finding("README.md", 3, "docs", "CLAIM-F", "A small repo for pr-review tests.");
@@ -476,7 +482,12 @@ const set = (goldens: number, posted: number, cost: number): PassSet => ({
   raw_goldens: goldens,
   uncached: 0,
 });
-const row = (name: string, p1: PassSet, p2: PassSet, both: PassSet): { case: string } & ByPassRow => ({
+const row = (
+  name: string,
+  p1: PassSet,
+  p2: PassSet,
+  both: PassSet,
+): { case: string } & ByPassRow => ({
   case: name,
   pass_1: p1,
   pass_2: p2,
