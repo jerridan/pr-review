@@ -3,24 +3,56 @@
 // each case, because the key of a judge answer holds the head lines and
 // the diff that the judge saw. The judge
 // answers come from the cache file of each repeat. A question with no
-// cached answer counts as no match, and the report says so.
+// cached answer counts as no match, and the report says so. With
+// --by-pass, it adds the by-pass section (by-pass.ts). With --ask-missing,
+// the judge answers the by-pass questions that have no cached answer, and
+// those answers go into the cache file of the repeat.
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { EXIT_OK, EXIT_USAGE } from "../cli.js";
 import { isRecordFileName } from "../record/write.js";
 import { RecordSchema, type RunRecord } from "../schemas/record.js";
+import type { SdkClient } from "../sdk/client.js";
+import {
+  byPassRecord,
+  emptySection,
+  multiPassReviewers,
+  renderByPass,
+  summarizeScope,
+  type ByPassRow,
+  type ByPassSection,
+} from "./by-pass.js";
 import { CaseError, casesRef, loadCases, type Case } from "./case.js";
 import { cloneCase } from "./checkout.js";
-import { JUDGE_CACHE_FILE, readJudgeCache } from "./judge-cache.js";
+import {
+  JUDGE_CACHE_FILE,
+  readJudgeCache,
+  writeJudgeCache,
+  type JudgeCache,
+} from "./judge-cache.js";
 import { failedMetrics, metrics, type RepeatMetrics } from "./metrics.js";
-import { hasSources, notValidLines, pairedRepeat, type PairedSection } from "./paired.js";
+import {
+  hasSources,
+  NO_SOURCES,
+  notValidLines,
+  pairedRepeat,
+  type PairedSection,
+} from "./paired.js";
 import { buildReport, renderTable } from "./report.js";
 import { readResult } from "./run.js";
 import { scoreRecord, type ScoreJudge } from "./score.js";
 
 /** The flags of "pr-review eval-report". */
-export type EvalReportOptions = { cases: string; out: string; format: "table" | "json" };
+export type EvalReportOptions = {
+  cases: string;
+  out: string;
+  format: "table" | "json";
+  /** Add the by-pass section. */
+  byPass?: boolean;
+  /** Let the judge answer the by-pass questions with no cached answer. Needs byPass. */
+  askMissing?: boolean;
+};
 
 function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -63,7 +95,17 @@ async function readRecord(dir: string, named: string | undefined): Promise<RunRe
   return parsed.data;
 }
 
-type Scored = { metrics: RepeatMetrics; uncached: number };
+/** What the by-pass scoring of a repeat needs: a record with source fields. */
+type Kept = {
+  record: RunRecord;
+  head: string;
+  cache: JudgeCache;
+  cachePath: string;
+  judgeModel: string;
+  rawJudge: boolean;
+};
+
+type Scored = { metrics: RepeatMetrics; uncached: number; kept?: Kept };
 
 // Score one repeat again from its record and its judge cache. A repeat
 // that failed in the eval keeps its metrics. "checkout" is a clone of the
@@ -81,11 +123,13 @@ async function scoreRepeat(
   }
   if (result.metrics.failed) return { metrics: result.metrics, uncached: 0 };
   const record = await readRecord(dir, result.record);
+  const cachePath = join(dir, JUDGE_CACHE_FILE);
+  const cache = await readJudgeCache(cachePath);
   const judge: ScoreJudge = {
     client: null,
     model: result.options.judge_model,
     options: { allowApiKey: false, env: {} },
-    cache: await readJudgeCache(join(dir, JUDGE_CACHE_FILE)),
+    cache,
   };
   const head = await checkout();
   const score = await scoreRecord(record, c.golden, head, judge, {
@@ -94,7 +138,16 @@ async function scoreRepeat(
   });
   const m = metrics(record, score, repeat);
   let uncached = score.uncached;
+  let kept: Kept | undefined;
   if (hasSources(record)) {
+    kept = {
+      record,
+      head,
+      cache,
+      cachePath,
+      judgeModel: result.options.judge_model,
+      rawJudge: result.options.raw_judge,
+    };
     const p = await pairedRepeat(
       record,
       c.golden,
@@ -108,14 +161,75 @@ async function scoreRepeat(
   } else {
     m.paired = null;
   }
-  return { metrics: m, uncached };
+  return { metrics: m, uncached, ...(kept ? { kept } : {}) };
+}
+
+type ByPassInput = { case: Case; repeat: number; kept: Kept };
+
+/**
+ * The by-pass section of the kept repeats. The scopes of a repeat are the
+ * reviewers that ran two passes in one of its records, and every such
+ * reviewer together. With "client", the judge answers each question with
+ * no cached answer, and the cache file of the repeat gets the new answers.
+ * A cached answer, also "unknown", gets no new query.
+ */
+async function byPassSection(
+  inputs: ByPassInput[],
+  missing: ByPassSection["missing"],
+  client: SdkClient | null,
+): Promise<ByPassSection> {
+  let questions = 0;
+  let costUsd = 0;
+  const numbers = [...new Set(inputs.map((i) => i.repeat))].sort((a, b) => a - b);
+  const repeats: ByPassSection["repeats"] = [];
+  for (const repeat of numbers) {
+    const ours = inputs.filter((i) => i.repeat === repeat);
+    const multi = [...new Set(ours.flatMap((i) => multiPassReviewers(i.kept.record)))].sort();
+    const scopes = [null, ...multi];
+    const rows: ({ case: string } & ByPassRow)[][] = scopes.map(() => []);
+    for (const { case: c, kept } of ours) {
+      const judge: ScoreJudge = {
+        client,
+        model: kept.judgeModel,
+        options: { allowApiKey: false, env: client === null ? {} : process.env },
+        cache: kept.cache,
+        // Every cached key counts as asked, so a cached "unknown" gets no
+        // new query: the client answers the missing questions only.
+        asked: new Set(kept.cache.keys()),
+      };
+      const scored = await byPassRecord(
+        kept.record,
+        c.golden,
+        kept.head,
+        judge,
+        scopes,
+        multi,
+        kept.rawJudge,
+      );
+      scored.rows.forEach((row, i) => rows[i]?.push({ case: c.name, ...row }));
+      questions += scored.judgeCalls;
+      costUsd += scored.judgeCostUsd;
+      if (scored.judgeCalls > 0) await writeJudgeCache(kept.cachePath, kept.cache);
+    }
+    repeats.push({
+      repeat,
+      scopes: scopes.map((scope, i) => summarizeScope(scope, rows[i] ?? [])),
+    });
+  }
+  return {
+    ...emptySection(missing, client === null ? null : { questions, cost_usd: costUsd }),
+    repeats,
+  };
 }
 
 /**
  * Print the report of the records in the --out directory: the normal
  * metrics and the paired section. Give 0, or 2 for an invalid case.
  */
-export async function runEvalReport(opts: EvalReportOptions): Promise<number> {
+export async function runEvalReport(
+  opts: EvalReportOptions,
+  clientOf: () => Promise<SdkClient> = () => Promise.reject(new Error("no judge client")),
+): Promise<number> {
   let cases: Case[];
   try {
     cases = await loadCases(opts.cases);
@@ -127,6 +241,9 @@ export async function runEvalReport(opts: EvalReportOptions): Promise<number> {
   const out = resolve(opts.out);
   const results: { name: string; repeats: RepeatMetrics[] }[] = [];
   const uncached: PairedSection["uncached"] = [];
+  const byPassInputs: ByPassInput[] = [];
+  const byPassMissing: ByPassSection["missing"] = [];
+  let byPass: ByPassSection | null = null;
   const tmp = await mkdtemp(join(tmpdir(), "pr-review-eval-report-"));
   try {
     for (const c of cases) {
@@ -141,24 +258,38 @@ export async function runEvalReport(opts: EvalReportOptions): Promise<number> {
           const scored = await scoreRepeat(c, dir, repeat, checkout);
           repeats.push(scored.metrics);
           if (scored.uncached > 0) uncached.push({ case: c.name, repeat, pairs: scored.uncached });
+          if (scored.kept) byPassInputs.push({ case: c, repeat, kept: scored.kept });
+          else
+            byPassMissing.push({
+              case: c.name,
+              repeat,
+              reason: scored.metrics.failed ? "failed repeat" : NO_SOURCES,
+            });
         } catch (err) {
           repeats.push(failedMetrics(repeat, messageOf(err), 0));
+          byPassMissing.push({ case: c.name, repeat, reason: "failed repeat" });
           say(`case ${c.name}, repeat ${repeat}: ${messageOf(err)}`);
         }
       }
       if (repeats.length > 0) results.push({ name: c.name, repeats });
     }
+    if (opts.byPass === true) {
+      const client = opts.askMissing === true ? await clientOf() : null;
+      byPass = await byPassSection(byPassInputs, byPassMissing, client);
+    }
   } finally {
     await rm(tmp, { recursive: true, force: true });
   }
   const report = buildReport(results, null, await casesRef(opts.cases), { uncached });
+  if (byPass !== null) report.by_pass = byPass;
   const notValid = notValidLines(report.paired as PairedSection);
   if (opts.format === "json") {
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
     for (const line of notValid) say(line);
   } else {
     const top = notValid.length > 0 ? `${notValid.join("\n")}\n\n` : "";
-    process.stdout.write(`${top}${renderTable(report)}`);
+    const tail = byPass !== null ? `${renderByPass(byPass).join("\n")}\n` : "";
+    process.stdout.write(`${top}${renderTable(report)}${tail}`);
   }
   return EXIT_OK;
 }

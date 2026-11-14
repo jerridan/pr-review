@@ -74,6 +74,14 @@ interface EvalCliOptions {
   passes?: Record<string, number>;
 }
 
+interface EvalReportCliOptions {
+  cases: string;
+  out: string;
+  format: "table" | "json";
+  byPass?: boolean;
+  askMissing?: boolean;
+}
+
 // Commander exits with 1 on a usage error. This makes it 2. Help and
 // version keep 0. The callback throws, so commander does not call
 // process.exit, and the caller of parseAsync sets the exit code.
@@ -426,9 +434,20 @@ export function createProgram(deps: ProgramDeps): Command {
         .choices(["table", "json"])
         .default("table"),
     )
-    .action(async (options: { cases: string; out: string; format: "table" | "json" }) => {
+    .option(
+      "--by-pass",
+      "add the by-pass section: pass 1, pass 2 and both, of each reviewer with two passes",
+    )
+    .option(
+      "--ask-missing",
+      "with --by-pass, ask the judge the by-pass questions that have no cached answer, and cache the answers",
+    )
+    .action(async (options: EvalReportCliOptions, command: Command) => {
+      if (options.askMissing === true && options.byPass !== true) {
+        command.error("error: --ask-missing needs --by-pass", { exitCode: EXIT_USAGE });
+      }
       try {
-        process.exitCode = await runEvalReport(options);
+        process.exitCode = await runEvalReport(options, () => clientFrom(deps));
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         process.stderr.write(`pr-review eval-report: ${message}\n`);
