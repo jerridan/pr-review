@@ -431,6 +431,24 @@ describe("the wall-clock timeout of a query", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it("ends a reviewer query at the time of its override, not at the role default", async () => {
+    const seen: Seen[] = [];
+    const client = createSdkClient(hangingQuery(seen, true));
+    const override = ROLE_DEFAULTS.reviewer.timeoutMs + 500_000;
+    const outcome = client.query(
+      request("reviewer", { overrides: { timeoutMs: override } }),
+      runOptions(false),
+    );
+    await vi.advanceTimersByTimeAsync(ROLE_DEFAULTS.reviewer.timeoutMs);
+    expect(seen[0]?.abortController?.signal.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(500_000);
+    expect(await outcome).toMatchObject({
+      ok: false,
+      failure: { kind: "timeout", message: expect.stringContaining(String(override)) },
+    });
+    expect(seen[0]?.abortController?.signal.aborted).toBe(true);
+  });
+
   it("ends the query also when the SDK does not stop on abort", async () => {
     const client = createSdkClient(hangingQuery([], false));
     const outcome = client.query(request("triage"), runOptions(false));
