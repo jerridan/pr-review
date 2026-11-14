@@ -1,13 +1,17 @@
 // The offline report (D8): score the run records of an earlier eval in its
-// --out directory against the cases again, with no model call. The judge
+// --out directory against the cases again, with no model call. It clones
+// each case, because the key of a judge answer holds the head lines and
+// the diff that the judge saw. The judge
 // answers come from the cache file of each repeat. A question with no
 // cached answer counts as no match, and the report says so.
-import { readdir, readFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { EXIT_OK, EXIT_USAGE } from "../cli.js";
 import { isRecordFileName } from "../record/write.js";
 import { RecordSchema, type RunRecord } from "../schemas/record.js";
 import { CaseError, casesRef, loadCases, type Case } from "./case.js";
+import { cloneCase } from "./checkout.js";
 import { JUDGE_CACHE_FILE, readJudgeCache } from "./judge-cache.js";
 import { failedMetrics, metrics, type RepeatMetrics } from "./metrics.js";
 import { hasSources, notValidLines, pairedRepeat, type PairedSection } from "./paired.js";
@@ -60,8 +64,15 @@ async function readRecord(dir: string, named: string | undefined): Promise<RunRe
 type Scored = { metrics: RepeatMetrics; uncached: number };
 
 // Score one repeat again from its record and its judge cache. A repeat
-// that failed in the eval keeps its metrics.
-async function scoreRepeat(c: Case, dir: string, repeat: number): Promise<Scored> {
+// that failed in the eval keeps its metrics. "checkout" is a clone of the
+// case: the key of each judge answer holds the head lines and the diff
+// that the judge saw, so the scoring reads them as the eval did.
+async function scoreRepeat(
+  c: Case,
+  dir: string,
+  repeat: number,
+  checkout: () => Promise<string>,
+): Promise<Scored> {
   const result = await readResult(join(dir, "result.json"), repeat);
   if (result === null) {
     return { metrics: failedMetrics(repeat, `no valid result.json in ${dir}`, 0), uncached: 0 };
@@ -74,8 +85,8 @@ async function scoreRepeat(c: Case, dir: string, repeat: number): Promise<Scored
     options: { allowApiKey: false, env: {} },
     cache: await readJudgeCache(join(dir, JUDGE_CACHE_FILE)),
   };
-  // No query goes out, so the head checkout is never read.
-  const score = await scoreRecord(record, c.golden, dir, judge, {
+  const head = await checkout();
+  const score = await scoreRecord(record, c.golden, head, judge, {
     extras: result.options.extras,
     rawJudge: result.options.raw_judge,
   });
@@ -85,7 +96,7 @@ async function scoreRepeat(c: Case, dir: string, repeat: number): Promise<Scored
     const p = await pairedRepeat(
       record,
       c.golden,
-      dir,
+      head,
       judge,
       { rawJudge: result.options.raw_judge },
       score,
@@ -114,20 +125,29 @@ export async function runEvalReport(opts: EvalReportOptions): Promise<number> {
   const out = resolve(opts.out);
   const results: { name: string; repeats: RepeatMetrics[] }[] = [];
   const uncached: PairedSection["uncached"] = [];
-  for (const c of cases) {
-    const caseDir = join(out, c.name);
-    const repeats: RepeatMetrics[] = [];
-    for (const repeat of await repeatNumbers(caseDir)) {
-      const dir = join(caseDir, String(repeat));
-      try {
-        const scored = await scoreRepeat(c, dir, repeat);
-        repeats.push(scored.metrics);
-        if (scored.uncached > 0) uncached.push({ case: c.name, repeat, pairs: scored.uncached });
-      } catch (err) {
-        repeats.push(failedMetrics(repeat, messageOf(err), 0));
+  const tmp = await mkdtemp(join(tmpdir(), "pr-review-eval-report-"));
+  try {
+    for (const c of cases) {
+      const caseDir = join(out, c.name);
+      const repeats: RepeatMetrics[] = [];
+      // The case is cloned once, at its first repeat that needs a score.
+      let clone: Promise<string> | null = null;
+      const checkout = (): Promise<string> => (clone ??= cloneCase(c, join(tmp, c.name)));
+      for (const repeat of await repeatNumbers(caseDir)) {
+        const dir = join(caseDir, String(repeat));
+        try {
+          const scored = await scoreRepeat(c, dir, repeat, checkout);
+          repeats.push(scored.metrics);
+          if (scored.uncached > 0) uncached.push({ case: c.name, repeat, pairs: scored.uncached });
+        } catch (err) {
+          repeats.push(failedMetrics(repeat, messageOf(err), 0));
+          say(`case ${c.name}, repeat ${repeat}: ${messageOf(err)}`);
+        }
       }
+      if (repeats.length > 0) results.push({ name: c.name, repeats });
     }
-    if (repeats.length > 0) results.push({ name: c.name, repeats });
+  } finally {
+    await rm(tmp, { recursive: true, force: true });
   }
   const report = buildReport(results, null, await casesRef(opts.cases), { uncached });
   const notValid = notValidLines(report.paired as PairedSection);
