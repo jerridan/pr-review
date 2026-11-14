@@ -89,6 +89,30 @@ export function captureOutput(): void {
   });
 }
 
+/**
+ * Run "body" with stdout and stderr captured into "output", outside of a
+ * test (in beforeAll, for example). Restore both after.
+ */
+export async function captured<T>(body: () => Promise<T>): Promise<T> {
+  output.stdout = "";
+  output.stderr = "";
+  const out = vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array) => {
+    output.stdout += String(chunk);
+    return true;
+  });
+  const err = vi.spyOn(process.stderr, "write").mockImplementation((chunk: string | Uint8Array) => {
+    output.stderr += String(chunk);
+    return true;
+  });
+  try {
+    return await body();
+  } finally {
+    out.mockRestore();
+    err.mockRestore();
+    process.exitCode = undefined;
+  }
+}
+
 /** The exit code of a parseAsync call. */
 export async function exitCodeOf(promise: Promise<unknown>): Promise<number> {
   try {

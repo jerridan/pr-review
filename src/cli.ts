@@ -16,6 +16,7 @@ import { z } from "zod";
 import { JUDGE_DEFAULTS, ROLE_DEFAULTS, resolveModel } from "./config/models.js";
 import { registerLabelCommand } from "./eval/label/index.js";
 import { registerPoolCommands } from "./eval/pool/index.js";
+import { runEvalReport } from "./eval/offline.js";
 import { runEval } from "./eval/run.js";
 import { explain } from "./explain/index.js";
 import { renderExplainJson, renderExplainTable } from "./explain/format.js";
@@ -67,6 +68,7 @@ interface EvalCliOptions {
   extras: boolean;
   rawJudge?: boolean;
   resume?: boolean;
+  paired?: boolean;
 }
 
 // Commander exits with 1 on a usage error. This makes it 2. Help and
@@ -317,6 +319,10 @@ export function createProgram(deps: ProgramDeps): Command {
       "--resume",
       "reuse the finished repeats that the --out directory holds, and run the others",
     )
+    .option(
+      "--paired",
+      "also score the findings of pass 1 against all the findings, and report the paired difference",
+    )
     .action(async (options: EvalCliOptions, command: Command) => {
       if (options.writeBaseline === true && options.baseline === undefined) {
         command.error("error: --write-baseline needs --baseline", { exitCode: EXIT_USAGE });
@@ -337,12 +343,35 @@ export function createProgram(deps: ProgramDeps): Command {
             extras: options.extras,
             rawJudge: options.rawJudge === true,
             resume: options.resume === true,
+            paired: options.paired === true,
           },
           deps,
         );
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         process.stderr.write(`pr-review eval: ${message}\n`);
+        process.exitCode = EXIT_FAILURE;
+      }
+    });
+
+  program
+    .command("eval-report")
+    .description(
+      "Score the run records of an earlier eval again from its judge cache, with no model call, and print the report with the paired section.",
+    )
+    .requiredOption("--cases <dir>", "the cases directory of the eval")
+    .requiredOption("--out <dir>", "the --out directory of the eval")
+    .addOption(
+      new Option("--format <format>", "the format of the report on stdout")
+        .choices(["table", "json"])
+        .default("table"),
+    )
+    .action(async (options: { cases: string; out: string; format: "table" | "json" }) => {
+      try {
+        process.exitCode = await runEvalReport(options);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        process.stderr.write(`pr-review eval-report: ${message}\n`);
         process.exitCode = EXIT_FAILURE;
       }
     });

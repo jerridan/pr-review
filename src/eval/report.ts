@@ -2,6 +2,7 @@
 // mean of each repeat over the cases, and the spread of those means.
 import type { Gate } from "./baseline.js";
 import type { RepeatMetrics } from "./metrics.js";
+import { buildPaired, renderPaired, type PairedSection } from "./paired.js";
 
 export type Spread = { mean: number | null; min: number | null; max: number | null };
 
@@ -42,6 +43,8 @@ export type Report = {
   failed_repeats: { case: string; repeat: number; error: string }[];
   gate: Gate | null;
   cases_ref: string | null;
+  /** One pass against all passes. Present only for an eval with --paired, and offline. */
+  paired?: PairedSection;
 };
 
 /** The mean of the values that are not null. A mean of no value is null. */
@@ -122,6 +125,7 @@ export function buildReport(
   cases: CaseMetrics[],
   gate: Gate | null,
   casesRef: string | null,
+  paired?: { uncached: PairedSection["uncached"] },
 ): Report {
   const all = cases.flatMap((c) => c.repeats.map((r) => ({ name: c.name, r })));
   const numbers = [...new Set(all.map(({ r }) => r.repeat))].sort((a, b) => a - b);
@@ -163,6 +167,7 @@ export function buildReport(
       .map(({ name, r }) => ({ case: name, repeat: r.repeat, error: r.error ?? "" })),
     gate,
     cases_ref: casesRef,
+    ...(paired ? { paired: buildPaired(cases, paired.uncached) } : {}),
   };
 }
 
@@ -286,5 +291,6 @@ export function renderTable(report: Report, baselineCasesRef: string | null = nu
     `Cases ref: ${report.cases_ref ?? "unknown"}` +
       (mismatch ? `; the baseline has ${baselineCasesRef}` : ""),
   );
+  if (report.paired) lines.push(...renderPaired(report.paired));
   return `${lines.join("\n")}\n`;
 }

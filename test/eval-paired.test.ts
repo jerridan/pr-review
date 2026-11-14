@@ -10,6 +10,7 @@ import { ExtrasOutputSchema } from "../src/eval/score.js";
 import type { QueryMeta, QueryOutcome, QueryRequest } from "../src/sdk/client.js";
 import { createFakeSdkClient } from "../src/sdk/fake.js";
 import {
+  captured,
   captureOutput,
   casesFrom,
   cleanup,
@@ -154,25 +155,35 @@ function fake() {
   });
 }
 
-async function evalPaired(): Promise<{ code: number; out: string; report: Report }> {
+async function evalPaired(): Promise<{
+  code: number;
+  out: string;
+  report: Report;
+  stderr: string;
+}> {
   const out = tempDir("paired-out", made);
-  const code = await exitCodeOf(
-    createProgram({ client: fake() }).parseAsync([
-      "node",
-      "pr-review",
-      "eval",
-      "--cases",
-      cases,
-      "--out",
-      out,
-      "--repeat",
-      "2",
-      "--paired",
-      "--format",
-      "json",
-    ]),
-  );
-  return { code, out, report: JSON.parse(output.stdout) as Report };
+  const run = (): Promise<number> =>
+    exitCodeOf(
+      createProgram({ client: fake() }).parseAsync([
+        "node",
+        "pr-review",
+        "eval",
+        "--cases",
+        cases,
+        "--out",
+        out,
+        "--repeat",
+        "2",
+        "--paired",
+        "--format",
+        "json",
+      ]),
+    );
+  // The eval runs in beforeAll, before the capture of each test.
+  return captured(async () => {
+    const code = await run();
+    return { code, out, report: JSON.parse(output.stdout) as Report, stderr: output.stderr };
+  });
 }
 
 async function evalReport(out: string, format: "json" | "table") {
@@ -206,9 +217,10 @@ function filesUnder(dir: string, test: (name: string) => boolean): string[] {
   });
 }
 
-const isRecordFile = (name: string) => /^\d{8}T\d{6}\.\d{3}Z-[0-9a-f]{7}\.json$/.test(name);
+const isRecordFile = (name: string) =>
+  /^\d{4}-\d{2}-\d{2}T\d{6}\.\d{3}Z-[0-9a-f]{7}\.json$/.test(name);
 
-let live: { code: number; out: string; report: Report };
+let live: { code: number; out: string; report: Report; stderr: string };
 beforeAll(async () => {
   fx = await makeFixture();
   made.push(fx.repo);
@@ -220,7 +232,7 @@ beforeAll(async () => {
 
 describe("pr-review eval --paired (D8 R3)", () => {
   it("exits 0 and adds the paired section to report.json", () => {
-    expect(live.code, output.stderr).toBe(0);
+    expect(live.code, live.stderr).toBe(0);
     const file = JSON.parse(readFileSync(join(live.out, "report.json"), "utf8")) as Report;
     expect(file.paired).toEqual(live.report.paired);
   });

@@ -118,6 +118,7 @@ function scoreOf(parts: Partial<ScoreResult> = {}): ScoreResult {
     postedGoldenCount: 0,
     raw: { matched: [], candidates: 0 },
     extras: { enabled: false, judged: 0, accepted: [], unknown: 0 },
+    uncached: 0,
     ...parts,
   };
 }

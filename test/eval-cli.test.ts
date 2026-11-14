@@ -386,7 +386,8 @@ function recordsUnder(out: string): { path: string; record: RunRecord }[] {
       else if (
         entry.name.endsWith(".json") &&
         entry.name !== "report.json" &&
-        entry.name !== "result.json"
+        entry.name !== "result.json" &&
+        entry.name !== "judge-cache.json"
       ) {
         found.push({ path: full, record: JSON.parse(readFileSync(full, "utf8")) as RunRecord });
       }
@@ -540,7 +541,7 @@ describe("pr-review eval: the runs (R3.2 to R3.7)", () => {
       for (const name of ["a-planted", "b-unmatched"]) {
         for (const repeat of ["1", "2"]) {
           const files = readdirSync(join(out, name, repeat)).filter(
-            (f) => f.endsWith(".json") && f !== "result.json",
+            (f) => f.endsWith(".json") && f !== "result.json" && f !== "judge-cache.json",
           );
           expect(files, `${name}/${repeat}`).toHaveLength(1);
         }
@@ -1680,7 +1681,7 @@ describe("pr-review eval --resume", () => {
 
   const recordFiles = (out: string) =>
     readdirSync(join(out, "a-planted", "1")).filter(
-      (f) => f.endsWith(".json") && f !== "result.json",
+      (f) => f.endsWith(".json") && f !== "result.json" && f !== "judge-cache.json",
     );
 
   it(
