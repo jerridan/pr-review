@@ -50,6 +50,7 @@ import {
 import { selectReviewers, skipSelected } from "./reviewers/select.js";
 import type { Finding } from "./schemas/finding.js";
 import type {
+  FindingSource,
   PostedFinding,
   PostedGitHub,
   QueryFailure,
@@ -118,6 +119,16 @@ export interface RunInput {
    * description comes from the commit messages.
    */
   description?: { title: string; body: string };
+  /**
+   * Run only these reviewers. Each one still needs the tier and its
+   * triggers to select it. Absent means every reviewer that the run selects.
+   */
+  onlyReviewers?: readonly string[];
+  /**
+   * The passes of named reviewers for this run. They replace the passes of
+   * the config and the frontmatter. The fast tier still runs one pass.
+   */
+  passes?: ReadonlyMap<string, number>;
   client?: SdkClient;
   now?: () => Date;
 }
@@ -221,46 +232,68 @@ function runRole(role: QueryRole): Role {
   return role;
 }
 
-// Wrap the client so that each query gives one cost entry, also a query
-// that fails or throws. The wrapper also applies the role overrides of
-// the repo config.
 // The tokens of every finished query of the run, for the token ceiling.
 type TokenCounter = { tokens: number };
 
+/** What a cost entry names beyond the request: the pass, or the verification. */
+type CostTag = { pass?: number; verification?: number };
+
+/** The client of the run, and a client that adds a tag to each cost entry. */
+type RecordingClient = SdkClient & { tagged: (tag: CostTag) => SdkClient };
+
+// Wrap the client so that each query gives one cost entry, also a query
+// that fails or throws. The wrapper also applies the role overrides of
+// the repo config. A tagged client adds its tag to each entry.
 function recordingClient(
   inner: SdkClient,
   entries: CostEntry[],
   config: RepoConfig,
   counter: TokenCounter,
-): SdkClient {
-  return {
-    async query<T>(original: QueryRequest, options: RunOptions): Promise<QueryOutcome<T>> {
-      const role = runRole(original.role);
-      const req = withRoleOverrides(original, config);
-      const start = performance.now();
-      let outcome: QueryOutcome<T> | null = null;
-      try {
-        outcome = await inner.query<T>(req, options);
-        return outcome;
-      } finally {
-        const raw = outcome?.raw ?? null;
-        const subtype = raw?.subtype ?? (outcome && !outcome.ok ? outcome.failure.kind : "thrown");
-        // The count goes up before the query's promise resolves, so before
-        // its semaphore slot is free for the next query.
-        counter.tokens += usageTokens(raw?.usage);
-        entries.push({
-          role,
-          ...(req.reviewerName !== undefined ? { reviewer: req.reviewerName } : {}),
-          model: raw?.model ?? resolveModel(req.overrides?.model ?? ROLE_DEFAULTS[role].model),
-          duration_ms: raw?.durationMs ?? Math.round(performance.now() - start),
-          stop_reason: raw?.stopReason ?? null,
-          subtype,
-          usage: raw?.usage ?? null,
-          cost_usd: raw?.costUsd ?? null,
-        });
-      }
-    },
+): RecordingClient {
+  const query = async <T>(
+    original: QueryRequest,
+    options: RunOptions,
+    tag: CostTag,
+  ): Promise<QueryOutcome<T>> => {
+    const role = runRole(original.role);
+    const req = withRoleOverrides(original, config);
+    const start = performance.now();
+    let outcome: QueryOutcome<T> | null = null;
+    try {
+      outcome = await inner.query<T>(req, options);
+      return outcome;
+    } finally {
+      const raw = outcome?.raw ?? null;
+      const subtype = raw?.subtype ?? (outcome && !outcome.ok ? outcome.failure.kind : "thrown");
+      // The count goes up before the query's promise resolves, so before
+      // its semaphore slot is free for the next query.
+      counter.tokens += usageTokens(raw?.usage);
+      entries.push({
+        role,
+        ...(req.reviewerName !== undefined ? { reviewer: req.reviewerName } : {}),
+        ...tag,
+        model: raw?.model ?? resolveModel(req.overrides?.model ?? ROLE_DEFAULTS[role].model),
+        duration_ms: raw?.durationMs ?? Math.round(performance.now() - start),
+        stop_reason: raw?.stopReason ?? null,
+        subtype,
+        usage: raw?.usage ?? null,
+        cost_usd: raw?.costUsd ?? null,
+      });
+    }
   };
+  return {
+    query: <T>(req: QueryRequest, options: RunOptions) => query<T>(req, options, {}),
+    tagged: (tag) => ({
+      query: <T>(req: QueryRequest, options: RunOptions) => query<T>(req, options, tag),
+    }),
+  };
+}
+
+// The sources in a stable order: by reviewer, then by pass.
+function sortedSources(sources: readonly FindingSource[]): FindingSource[] {
+  return [...sources].sort(
+    (a, b) => (a.reviewer < b.reviewer ? -1 : a.reviewer > b.reviewer ? 1 : 0) || a.pass - b.pass,
+  );
 }
 
 // The sensitive paths with no text hunk, such as a mode flip or a binary.
@@ -608,12 +641,15 @@ export async function runReview(input: RunInput): Promise<RunResult> {
       // reviewers. A selected reviewer that the config disables does not
       // run, nor does the description reviewer when the description is
       // empty. Coverage names each of them.
+      // With "onlyReviewers", the run keeps only the named reviewers that
+      // the normal selection picked.
+      const only = input.onlyReviewers ? new Set(input.onlyReviewers) : null;
       const candidates = selectReviewers(
         [...loadBuiltinReviewers(), ...loaded.customReviewers],
         decision.tier,
         scoped.changedFiles.map((f) => f.path),
         brief?.categories ?? [],
-      );
+      ).filter((s) => only === null || only.has(s.def.frontmatter.name));
       const { run: selected, skipped } = skipSelected(candidates, {
         config,
         description: gathered.description,
@@ -651,7 +687,11 @@ export async function runReview(input: RunInput): Promise<RunResult> {
       // The reviewer name of each verification, in the order of "pending".
       // Suppressions match it, and the verification entry does not hold it.
       const reviewerNames: string[] = [];
-      const onFinding = (finding: Finding, reviewer: string): void => {
+      // The sources of each verification, in the order of "pending". A later
+      // pass can add a source after the verification starts, so the record
+      // reads each list only after every pass returned.
+      const sourceLists: FindingSource[][] = [];
+      const onFinding = (finding: Finding, reviewer: string, sources: FindingSource[]): void => {
         const verifyConfig = verifyConfigFor(
           thresholds.get(reviewer) ?? config.thresholds.default,
           config,
@@ -665,7 +705,7 @@ export async function runReview(input: RunInput): Promise<RunResult> {
         const verification = Promise.resolve()
           .then(() => {
             verifierPrompt ??= loadVerifierPrompt();
-            return verifyFinding(client, options, finding, {
+            return verifyFinding(client.tagged({ verification: index }), options, finding, {
               cwd,
               sections,
               prompt: verifierPrompt,
@@ -689,6 +729,7 @@ export async function runReview(input: RunInput): Promise<RunResult> {
           );
         pending.push(verification);
         reviewerNames.push(reviewer);
+        sourceLists.push(sources);
       };
       let runs: ReviewerRun[] = [];
       let verifications: VerificationEntry[] = [];
@@ -719,6 +760,8 @@ export async function runReview(input: RunInput): Promise<RunResult> {
                 canStartPass,
                 onPassSkipped: (name, pass) =>
                   ceilingSkipped.push({ name, reason: "token ceiling", pass }),
+                clientForPass: (pass) => client.tagged({ pass }),
+                ...(input.passes ? { passes: input.passes } : {}),
               },
               onFinding,
             );
@@ -727,7 +770,15 @@ export async function runReview(input: RunInput): Promise<RunResult> {
             await Promise.allSettled(pending);
             throw err;
           }
-          return { runs: found, verifications: await settleAll(pending) };
+          // Every pass returned, so each sources list is complete.
+          const settled = await settleAll(pending);
+          return {
+            runs: found,
+            verifications: settled.map((v, i) => ({
+              ...v,
+              sources: sortedSources(sourceLists[i] ?? []),
+            })),
+          };
         }));
 
         // A suppression removes a verified finding before the merge groups
@@ -735,7 +786,14 @@ export async function runReview(input: RunInput): Promise<RunResult> {
         const applied = applySuppressions(
           verifications.flatMap((v, i) =>
             v.passed && v.final
-              ? [{ finding: v.finding, result: v.final, reviewer: reviewerNames[i] ?? "" }]
+              ? [
+                  {
+                    finding: v.finding,
+                    result: v.final,
+                    reviewer: reviewerNames[i] ?? "",
+                    sources: v.sources ?? [],
+                  },
+                ]
               : [],
           ),
           config.suppressions,
@@ -771,7 +829,10 @@ export async function runReview(input: RunInput): Promise<RunResult> {
             ? [
                 {
                   finding: v.finding,
-                  posted: toPostedFinding(v.finding, v.first, readHeadFile(cwd, v.finding.file)),
+                  posted: {
+                    ...toPostedFinding(v.finding, v.first, readHeadFile(cwd, v.finding.file)),
+                    sources: v.sources ?? [],
+                  },
                   reviewer: reviewerNames[i] ?? "",
                 },
               ]

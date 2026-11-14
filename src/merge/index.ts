@@ -4,7 +4,7 @@ import { readHeadFile } from "../find/evidence.js";
 import { loadPrompt, render } from "../prompts/load.js";
 import type { Finding, Severity } from "../schemas/finding.js";
 import { MergeOutputSchema, type MergeOutput } from "../schemas/merge.js";
-import type { PostedFinding, QueryFailure, RunRecord } from "../schemas/record.js";
+import type { FindingSource, PostedFinding, QueryFailure, RunRecord } from "../schemas/record.js";
 import { isPostedSeverity, type VerifierResult } from "../schemas/verifier.js";
 import type { SdkClient } from "../sdk/client.js";
 import type { RunOptions } from "../sdk/options.js";
@@ -13,7 +13,8 @@ import { wrapUntrusted } from "../untrusted.js";
 import { applyCap, nonBlockingCap, type CapConfig } from "./cap.js";
 import { fingerprint, fingerprintSpanText } from "./fingerprint.js";
 
-type Verified = { finding: Finding; result: VerifierResult };
+/** A verified finding, with the reviewer passes that raised it when the run knows them. */
+type Verified = { finding: Finding; result: VerifierResult; sources?: FindingSource[] };
 type MergeRecord = RunRecord["stages"]["merges"][number];
 
 const SEVERITY_RANK: Record<Severity, number> = { blocking: 0, suggestion: 1, nit: 2 };
@@ -138,6 +139,19 @@ export function toPostedFinding(
   };
 }
 
+// The union of the sources of the members, by reviewer and then pass.
+// Undefined when a member has no sources.
+function unionSources(members: Verified[]): FindingSource[] | undefined {
+  if (members.some((m) => m.sources === undefined)) return undefined;
+  const all = new Map<string, FindingSource>();
+  for (const m of members) {
+    for (const s of m.sources ?? []) all.set(`${s.reviewer}\u0000${s.pass}`, s);
+  }
+  return [...all.values()].sort(
+    (a, b) => (a.reviewer < b.reviewer ? -1 : a.reviewer > b.reviewer ? 1 : 0) || a.pass - b.pass,
+  );
+}
+
 export async function mergeFindings(
   client: SdkClient,
   options: RunOptions,
@@ -154,8 +168,11 @@ export async function mergeFindings(
     return headFiles.get(file) ?? null;
   };
   // The posted severity is always the verifier's, unless merge lowers it.
-  const toPosted = (v: Verified): PostedFinding =>
-    toPostedFinding(v.finding, v.result, headFile(v.finding.file));
+  // A posted finding keeps the sources of its verification.
+  const toPosted = (v: Verified): PostedFinding => ({
+    ...toPostedFinding(v.finding, v.result, headFile(v.finding.file)),
+    ...(v.sources ? { sources: v.sources } : {}),
+  });
 
   const prompt = loadPrompt("merge.md");
   const template = prompt.frontmatter.user_message;
@@ -212,7 +229,9 @@ export async function mergeFindings(
     if (reason) return { posted: unmerged, record: { group, result: output, rejected: reason } };
 
     // Merge rewrites only claim, explanation and suggested_fix, and may
-    // lower the severity. The rest comes from the member that it keeps.
+    // lower the severity. The rest comes from the member that it keeps. A
+    // merged finding has the sources of every member of its group.
+    const sources = unionSources(members);
     const posted = output.merged.map((entry) => {
       const base = toPosted(members[entry.member_index] as Verified);
       const { suggested_fix: _old, ...rest } = base;
@@ -222,6 +241,7 @@ export async function mergeFindings(
         explanation: entry.explanation,
         ...(entry.suggested_fix !== undefined ? { suggested_fix: entry.suggested_fix } : {}),
         severity: entry.severity,
+        ...(sources ? { sources } : {}),
       };
     });
     return { posted, record: { group, result: output } };

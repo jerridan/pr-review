@@ -559,6 +559,10 @@ describe("the record parts", () => {
         escalated: { kind: "thrown", message: "x" },
         final: null,
         passed: false,
+        sources: [
+          { reviewer: "diff-bugs", pass: 1 },
+          { reviewer: "diff-bugs", pass: 2 },
+        ],
       },
     ]);
     expect(record.stages.merges).toEqual([]);
