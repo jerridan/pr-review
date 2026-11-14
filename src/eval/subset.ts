@@ -5,7 +5,7 @@ import { cp, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path";
 import { z } from "zod";
 import { EXIT_OK, EXIT_USAGE } from "../cli.js";
-import { costPerRun, readBaseline } from "./baseline.js";
+import { costPerRun, readBaseline, TOLERANCE } from "./baseline.js";
 import { CaseError, loadCases, type Case } from "./case.js";
 
 /** The flags of "pr-review eval-subset". Exactly one mode is set. */
@@ -18,9 +18,6 @@ export type EvalSubsetOptions = {
 
 /** The file that the subset command writes at the root of the new cases directory. */
 export const SUBSET_FILE = "subset.json";
-
-// A limit or a sum within this distance of the budget is at the budget.
-const TOLERANCE = 1e-9;
 
 class SubsetError extends Error {}
 
@@ -54,8 +51,11 @@ async function outCosts(dir: string, cases: Case[]): Promise<Map<string, number>
     let names: string[];
     try {
       names = (await readdir(join(dir, c.name))).filter((n) => /^[1-9][0-9]*$/.test(n));
-    } catch {
-      continue;
+    } catch (err) {
+      // A case with no directory did not run, so it has no cost.
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") continue;
+      const reason = err instanceof Error ? err.message : String(err);
+      throw new SubsetError(`cannot read ${join(dir, c.name)}: ${reason}`);
     }
     const repeats: z.infer<typeof RepeatCost>[] = [];
     for (const n of names) {

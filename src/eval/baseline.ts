@@ -56,9 +56,10 @@ export function costPerRun(repeats: { failed: boolean; cost_usd: number | null }
 /** The margin of a baseline that the eval writes when no file exists. */
 const DEFAULT_MARGIN = { recall: 0.05, precision: 0.05 };
 
-// A drop equal to the margin passes. This tolerance keeps that true when
-// the float sum of a mean has a small error.
-const TOLERANCE = 1e-9;
+// A drop equal to the margin passes, and a cost equal to a limit stays.
+// This tolerance keeps that true when the float sum of a mean has a small
+// error.
+export const TOLERANCE = 1e-9;
 
 /** Read and validate a baseline file. Throw when it is missing or invalid. */
 export async function readBaseline(path: string): Promise<Baseline> {
