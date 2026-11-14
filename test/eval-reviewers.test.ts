@@ -111,6 +111,12 @@ describe("pr-review eval --reviewers --passes (D8 R4)", () => {
       client.calls.filter((c) => c.role === "reviewer").map((c) => c.reviewerName),
     );
     expect([...asked].sort()).toEqual(["history", "tests"]);
+    // A pass that --passes adds gets the turn budget of every pass: 150
+    // turns, $0.05 per turn and 10 s per turn.
+    const budgets = client.calls
+      .filter((c) => c.role === "reviewer")
+      .map((c) => [c.overrides?.maxTurns, c.overrides?.maxBudgetUsd, c.overrides?.timeoutMs]);
+    expect(budgets).toEqual(Array.from({ length: 4 }, () => [150, 7.5, 1_500_000]));
   }, 60_000);
 
   it("refuses to resume a run with other reviewers", async () => {
