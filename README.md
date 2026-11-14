@@ -778,7 +778,50 @@ The paired scoring asks the judge about the pairs of each one-pass set that the 
 
 ### Report again with no model call
 
-`pr-review eval-report --cases <dir> --out <dir> [--format table|json]` scores the run records of an earlier eval again. It reads `result.json`, the record and `judge-cache.json` of each repeat in `--out`. When `result.json` names no record, it uses the one record file of the directory. It clones each case, because the key of a judge answer holds the head lines and the diff that the judge saw. It makes no model call. It prints the normal report and the paired section, and it writes no file. A repeat that failed in the eval keeps its result. A judge question with no cached answer counts as no match. A repeat whose cache file or record is not valid shows as a failed repeat, with the name of the file. `paired.uncached` counts those questions for each repeat. When the count of a repeat is above 0, the table starts with a line that says that the figures of that repeat are not valid. With `--format json`, the line goes to stderr. A record with no source fields gives no paired figures for its repeat. The command names the repeat in `paired.missing` and still exits 0.
+`pr-review eval-report --cases <dir> --out <dir> [--format table|json]` scores the run records of an earlier eval again. It reads `result.json`, the record and `judge-cache.json` of each repeat in `--out`. When `result.json` names no record, it uses the one record file of the directory. It clones each case, because the key of a judge answer holds the head lines and the diff that the judge saw. It prints the normal report and the paired section. Without `--ask-missing`, it makes no model call and writes no file. A repeat that failed in the eval keeps its result. A judge question with no cached answer counts as no match. A repeat whose cache file or record is not valid shows as a failed repeat, with the name of the file. `paired.uncached` counts those questions for each repeat. When the count of a repeat is above 0, the table starts with a line that says that the figures of that repeat are not valid. With `--format json`, the line goes to stderr. A record with no source fields gives no paired figures for its repeat. The command names the repeat in `paired.missing` and still exits 0.
+
+### The by-pass report
+
+`pr-review eval-report --by-pass --cases <dir> --out <dir> [--ask-missing] [--format table|json]` adds the by-pass section (`by_pass` in the JSON output). The section treats the two passes of one reviewer as two independent samples of one pass. Use it on the records of an eval with `--paired`.
+
+| Flag | Meaning |
+|------|---------|
+| `--by-pass` | Add the by-pass section. |
+| `--ask-missing` | Ask the judge the by-pass questions that have no cached answer. Needs `--by-pass`. |
+
+The section has one block for each repeat. A block has one scope for each reviewer that ran two passes, and scope `null` (`every reviewer with two passes` in the table) for all of them together. A reviewer scope holds only the sources of that reviewer. Each scope scores three sets:
+
+- `pass_1`: the posted findings with a pass 1 source in the scope.
+- `pass_2`: the posted findings with a pass 2 source in the scope.
+- `both`: the posted findings with a source of either pass in the scope.
+
+For each set, of each case and summed over the cases (`total`), the section gives:
+
+| Key | Meaning |
+|-----|---------|
+| `goldens`, `by_label` | The posted-label goldens that the set matches, in total and by label. |
+| `posted`, `false_posted` | The posted findings of the set, and those that match no posted-label golden. |
+| `precision` | `goldens` over `posted`. The sum pools the cases. Null with no posted finding. |
+| `cost_usd` | The reviewer queries of the set's passes, and the verifier and escalation queries of each verification with a source in the set. Triage, merge and the other run-wide queries are in no set. A verification with sources in both passes counts once in `both`. |
+| `raw_goldens` | The posted-label goldens that the reviewer findings of the set's passes match. |
+| `uncached` | The judge questions with no cached answer. Each one counts as no match. |
+
+Each row also gives `only_pass_1_goldens` and `only_pass_2_goldens`: the goldens that one pass matched and the other did not. `only_pass_1_false` and `only_pass_2_false` count the false posted findings of a single set whose sources in the scope are all of that pass. `added_goldens`, `added_false` and `added_cost_usd` give `both` less the mean of the two single sets.
+
+For each scope, the section also gives:
+
+| Key | Meaning |
+|-----|---------|
+| `one_pass` | The one-pass arm: the mean goldens and cost of the two single sets, the precision pooled over them, and the cost per golden. |
+| `noise` | Pass 1 less pass 2: goldens, false posted findings and precision. |
+| `added` | `both` less the one-pass arm: goldens, false posted findings, cost, cost per added golden, and the mean added goldens per case with its interval. |
+| `decision` | Test (b), test (c) and the result. |
+
+Test (b) computes R: the added cost per added golden, over the one-pass cost per golden. It passes when the upper end of the interval of R is at most 2. Test (c) passes when the precision of `both` is at most 0.05 below the one-pass precision. A null precision fails (c). A reviewer gets `passes 2` when (b) and (c) pass. Otherwise it gets `stays at 1`. The result of scope `null` is information only.
+
+Each interval is a 90% percentile bootstrap over the cases, with the fixed seed and 10000 resamples. The section states both in `bootstrap`. A resample draws the cases with replacement, and it computes R from its sums. A resample with no added golden, or with no one-pass golden, has an unbounded R. `unbounded_resamples` counts those resamples. JSON gives an unbounded R or end as null.
+
+Without `--ask-missing`, no query goes out. A pass 2 set can need a question that the eval never asked, for example when a pass 1 finding took the golden first. `uncached` counts those questions, and the table prints them for each scope. With `--ask-missing`, the judge answers those questions only. A cached answer, also `unknown`, gets no new query. The answers go into `judge-cache.json` of the repeat, so a later run reads them. `ask_missing` gives the count of the queries and the judge cost. `missing` names each repeat with no by-pass figures, with the reason: `failed repeat` or `no source fields`.
 
 ### A cases subset by cost
 
