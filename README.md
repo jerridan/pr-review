@@ -725,16 +725,69 @@ The eval makes real SDK calls. It needs a Claude login and it costs money.
 | `--no-extras` | Do not ask the extras judge about the posted findings that match no golden finding. Adjudicated precision is then null, and the eval writes no `candidates.json`. | extras on |
 | `--raw-judge` | Also ask the judge about the ambiguous pairs of the raw candidates. Without it, raw recall counts exact matches and the judge answers that the posted pass already got. | off |
 | `--resume` | Reuse the finished repeats that the `--out` directory holds. See "Resume a run". | off |
+| `--paired` | Also score the findings of pass 1 against all the findings. See "The paired report". | off |
+| `--reviewers <name,...>` | Run only these reviewers. Each one still needs the tier, its paths and its triggers to select it. An unknown name is a usage error. | every reviewer |
+| `--passes <name=n,...>` | Set the passes of these reviewers for every run. The value replaces the repo config and the frontmatter. `n` is a positive integer. An unknown name is a usage error, and so is `--tier fast`. | the config |
+
+`--reviewers` and `--passes` make a run that is not comparable to the baseline. With either one, `--baseline` and `--write-baseline` are usage errors.
 
 For each case in name order, the eval clones the case into a temporary directory and runs the review there, once for each repeat. The runs go one at a time. The run takes the `title` and the `body` of the case as the PR text. It makes no `gh` call. Each run writes a normal record in `<out>/<case>/<repeat>/`.
 
 ### Resume a run
 
-When a repeat ends, the eval writes `<out>/<case>/<repeat>/result.json`. The file holds the metrics of the repeat, whether it failed or not. It also holds the case name, the case head sha, a fingerprint of the golden findings, the repeat number, the tool version, and the options that change the result: the tier, the judge model, `--no-extras` and `--raw-judge`. The eval writes the file in one step, so a kill leaves no half file.
+When a repeat ends, the eval writes `<out>/<case>/<repeat>/result.json`. The file holds the metrics of the repeat, whether it failed or not. It also holds the case name, the case head sha, a fingerprint of the golden findings, the repeat number, the tool version, the file name of the run record, and the options that change the result: the tier, the judge model, `--no-extras`, `--raw-judge`, `--reviewers` and `--passes`. The eval writes the file in one step, so a kill leaves no half file.
 
 A run that stops continues with `--resume` and the same `--out`. This holds also for a baseline run with `--write-baseline`. For each repeat, `--resume` reads the result file. It reuses a result that did not fail and that has the same case name, head sha and golden findings. A reused repeat makes no model call and no clone. It runs again when the result failed, when the file is missing or not valid, or when the repeat number in the file differs from its directory. It also runs again when the head sha differs, or when `golden.json` changed after the result. With `--resume`, the eval clears the old output of a repeat before the repeat runs again. Without `--resume`, the old records stay, and the new result file replaces the old one. The report, the aggregate, the exit code, `candidates.json` and the baseline treat a reused result like a new one. A stopped run that continues gives the same aggregate as one run that does not stop. The eval prints on stderr how many repeats it reused.
 
 When a result would be reused, but its tool version or an option differs, the eval exits 2 before any model call. This keeps one report from mixing two configurations. Give the same options, or use another `--out`. Without `--resume`, every repeat runs.
+
+### The judge cache
+
+Each repeat writes `<out>/<case>/<repeat>/judge-cache.json`. The file holds every answer of the match judge and of the extras judge that the scoring used, also an `unknown` answer. The key of an answer is a hash of the judge, the judge model and the text that the judge saw of the finding and of the golden finding. A later scoring of the same record with the same goldens and the same judge model finds each answer, and it sends no query for it. A golden that changed, or another judge model, gives new keys, so the judge gets new queries.
+
+### The paired report
+
+`--paired` adds a paired section to the table, to the JSON output and to `report.json`. The section compares two sets of one run. The all set holds every finding of the run. The one-pass set holds the findings that pass 1 raised. The record names the sources of each finding, so one run gives the two sets, and they share every other source of noise.
+
+- The raw one-pass set is the reviewer findings of pass 1.
+- A posted finding is in the one-pass set when a pass 1 finding is one of its sources.
+- The one-pass cost is the run cost, less the reviewer queries of pass 2 or later, and less the verifier and escalation queries of each verification that no pass 1 finding raised.
+
+The one-pass set filters the posted findings of the run. It does not model the merge or the cap that a run of one pass would make.
+
+For each set, the section gives raw recall, posted recall, strict precision and cost. It gives them for each case and repeat, and for each repeat over all cases. Scope `null` (`every reviewer` in the table) leaves out the later passes of every reviewer. A scope for each reviewer that ran more than one pass leaves out the later passes of that reviewer only. For each scope, the section also gives:
+
+| Key | Meaning |
+|-----|---------|
+| `added_goldens` | The posted goldens that the all set matches and the one-pass set does not. |
+| `added_false` | The false posted findings of the all set that are not in the one-pass set. A false finding matches no golden, or a not-real golden. |
+| `added_cost_per_golden` | The all cost less the one-pass cost, divided by `added_goldens`. Null when `added_goldens` is 0. |
+| `recall_diff`, `precision_diff` | For each repeat: the all value less the one-pass value. |
+| `aggregate` | The mean, the minimum and the maximum of `recall_diff` and `precision_diff` over the repeats. |
+
+The paired scoring asks the judge about the pairs of each one-pass set that the all set did not ask about. Those queries count in `judge_calls` and `judge_cost_usd`. `missing` names each repeat with no paired figures, with the reason: `no source fields` for a record from before this version, or `not scored with --paired` for a result that `--resume` reused from a run without `--paired`.
+
+### Report again with no model call
+
+`pr-review eval-report --cases <dir> --out <dir> [--format table|json]` scores the run records of an earlier eval again. It reads `result.json`, the record and `judge-cache.json` of each repeat in `--out`. It makes no model call and no clone. It prints the normal report and the paired section, and it writes no file. A repeat that failed in the eval keeps its result. A judge question with no cached answer counts as no match. `paired.uncached` counts those questions for each repeat. When the count of a repeat is above 0, the table starts with a line that says that the figures of that repeat are not valid. With `--format json`, the line goes to stderr. A record with no source fields gives no paired figures for its repeat. The command names the repeat in `paired.missing` and still exits 0.
+
+### A cases subset by cost
+
+`pr-review eval-subset` makes a new cases directory that leaves out the expensive cases.
+
+```bash
+pr-review eval-subset --cases eval/cases --costs pr-review-eval --max-cost 8 --to eval/subset
+pr-review eval-subset --cases eval/cases --costs pr-review-eval/report.json --budget 150 --repeats 3 --to eval/subset
+```
+
+`--costs` gives the cost per run of each case. It is the `report.json` of an eval, the `--out` directory of an eval, or a baseline file that holds `case_costs`. The cost per run of a case is the mean review cost of its repeats that did not fail. The judge cost is not in it. A case of `--cases` with no cost in the source is an error that names the case.
+
+Give one mode:
+
+- `--max-cost <usd>` leaves out each case whose cost per run is above the limit.
+- `--budget <usd> --repeats <n>` leaves out the most expensive case until `n` times the sum of the costs of the other cases is at or below the budget. Of two cases with the same cost, the case with the later name goes first. The command states the limit: the highest cost per run that stays.
+
+The command prints each case with its cost and `kept` or `left out`, then the source and the limit. It copies each kept case to `--to`, which must not exist. It writes `subset.json` at the root of `--to` with the mode, the limit, the source, the costs and the two lists. The case loader reads only the subdirectories, so it ignores this file. `pr-review eval --cases <to>` then loads the kept cases.
 
 ### Cases
 
@@ -852,7 +905,7 @@ pr-review eval --cases eval/cases --repeat 2 --baseline eval/baseline.json --wri
 
 Two repeats give the spread that the margin rule below needs, at less cost than three. A routine eval against the baseline runs at one repeat. To make the eval less noisy, add cases before you add repeats: more cases reduce both the noise of one case and the noise between runs, and more repeats reduce only the noise between runs.
 
-The write keeps the `margin` of the existing file, or uses 0.05 for each metric. It writes nothing when a repeat failed. An incomplete review is a failed repeat. No CI step writes the baseline.
+The write keeps the `margin` of the existing file, or uses 0.05 for each metric. It also writes `case_costs`: the cost per run of each case, as `eval-subset` reads it. A baseline file without `case_costs` stays valid. It writes nothing when a repeat failed. An incomplete review is a failed repeat. No CI step writes the baseline.
 
 A margin smaller than the noise of the case set makes the gate fail on a run with no change. Pick each margin from the report of the baseline run:
 
@@ -872,12 +925,12 @@ For example, a precision with mean 0.667 and min 0.5 has a spread of 0.167. Twic
 
 ### Exit codes
 
-| Code | `eval` | `explain` |
-|------|--------|-----------|
-| 0 | The eval ran, and the gate passed or did not run. | The command printed the rows. |
-| 1 | A repeat failed, or a run error occurred. | Not used. |
-| 2 | A usage error, an invalid case, or a configuration error such as a judge model equal to a reviewer model. | A usage error, or a file that is missing, is not JSON or is not a run record. |
-| 3 | The gate failed. | Not used. |
+| Code | `eval` | `explain` | `eval-report` | `eval-subset` |
+|------|--------|-----------|---------------|---------------|
+| 0 | The eval ran, and the gate passed or did not run. | The command printed the rows. | The command printed the report. | The command made the subset. |
+| 1 | A repeat failed, or a run error occurred. | Not used. | An error that is not a usage error. | An error that is not a usage error. |
+| 2 | A usage error, an invalid case, or a configuration error such as a judge model equal to a reviewer model. | A usage error, or a file that is missing, is not JSON or is not a run record. | A usage error or an invalid case. | A usage error, an invalid case, a cost source that is not valid, a case with no cost, or a `--to` that exists. |
+| 3 | The gate failed. | Not used. | Not used. | Not used. |
 
 A failed repeat is a run that exits 1, throws, or gives an incomplete review. A review is incomplete when its record has the verdict `incomplete`, for example when every reviewer query hits a session limit. Such a run exits 0, but its findings do not show the reviewers. So the eval does not score it. The error of the repeat gives the errors of the record. A case whose `.pr-review/` config is not valid makes each of its runs fail. A judge query that fails is not a failed repeat. The eval counts it as no match and warns. With a failed repeat and a failed gate, the eval exits 1, and the report still holds the gate.
 
