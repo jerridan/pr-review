@@ -534,6 +534,14 @@ describe("the decision of a scope (R4)", () => {
     expect(scope.decision.ratio.unbounded_resamples).toBe(10000);
   });
 
+  it("counts a resample whose added goldens are below zero as a ratio above 2", () => {
+    // Both finds 1 golden, and each single pass finds 2: added -1.
+    const worse = row("x", set(2, 2, 1), set(2, 2, 1), set(1, 2, 1.5));
+    const scope = summarizeScope("history", [worse, worse]);
+    expect(scope.decision.ratio).toMatchObject({ value: null, upper: null, passed: false });
+    expect(scope.decision.ratio.unbounded_resamples).toBe(10000);
+  });
+
   it("fails (b) when the upper end of R is above 2", () => {
     // R = (2 / 1) / (1 / 2) = 4 in every resample.
     const dear = row("x", set(2, 2, 1), set(2, 2, 1), set(3, 3, 3));
