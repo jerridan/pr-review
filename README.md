@@ -744,7 +744,7 @@ For each case in name order, the eval clones the case into a temporary directory
 
 ### Resume a run
 
-When a repeat ends, the eval writes `<out>/<case>/<repeat>/result.json`. The file holds the metrics of the repeat, whether it failed or not. It also holds the case name, the case head sha, a fingerprint of the golden findings, the repeat number, the tool version, the file name of the run record, and the options that change the result: the tier, the judge model, `--no-extras`, `--raw-judge`, `--reviewers` and `--passes`. The eval writes the file in one step, so a kill leaves no half file.
+When a repeat ends, the eval writes `<out>/<case>/<repeat>/result.json`. The file holds the metrics of the repeat, whether it failed or not. It also holds the case name, the case head sha, a fingerprint of the golden findings, the repeat number, the tool version, the file name of the run record, and the options that change the result: the tier, the judge model, `--no-extras`, `--raw-judge`, `--reviewers`, `--passes` and `--paired`. The eval writes the file in one step, so a kill leaves no half file.
 
 A run that stops continues with `--resume` and the same `--out`. This holds also for a baseline run with `--write-baseline`. For each repeat, `--resume` reads the result file. It reuses a result that did not fail and that has the same case name, head sha and golden findings. A reused repeat makes no model call and no clone. It runs again when the result failed, when the file is missing or not valid, or when the repeat number in the file differs from its directory. It also runs again when the head sha differs, or when `golden.json` changed after the result. With `--resume`, the eval clears the old output of a repeat before the repeat runs again. Without `--resume`, the old records stay, and the new result file replaces the old one. The report, the aggregate, the exit code, `candidates.json` and the baseline treat a reused result like a new one. A stopped run that continues gives the same aggregate as one run that does not stop. The eval prints on stderr how many repeats it reused.
 
@@ -752,7 +752,7 @@ When a result would be reused, but its tool version or an option differs, the ev
 
 ### The judge cache
 
-Each repeat writes `<out>/<case>/<repeat>/judge-cache.json`. The file holds every answer of the match judge and of the extras judge that the scoring used, also an `unknown` answer. The key of an answer is a hash of the judge, the judge model and the text that the judge saw of the finding and of the golden finding. A later scoring of the same record with the same goldens and the same judge model finds each answer, and it sends no query for it. A golden that changed, or another judge model, gives new keys, so the judge gets new queries.
+Each repeat writes `<out>/<case>/<repeat>/judge-cache.json`. The file holds every answer of the match judge and of the extras judge that the scoring used, also an `unknown` answer. The key of an answer is a hash of the judge, the judge model and all that the judge saw: the system prompt, the message template, and the text of each block. For the match judge, the blocks are the finding, the golden finding and the head lines of each. For the extras judge, they are the finding, the head lines around it, the diff of its file and the severity policy. A later scoring of the same record finds each answer, and it sends no query for it. A change of a prompt, of the policy, of a golden or of the judge model gives new keys, so the judge gets new queries. A cached `unknown` answer comes from a failed query, so a scoring with the judge asks that question again, and the new answer replaces it. The eval writes the cache also when the scoring stops on an error, so the answers that it paid for stay. A cache file that is not valid fails its repeat before the review starts. The error names the file.
 
 ### The paired report
 
@@ -774,11 +774,11 @@ For each set, the section gives raw recall, posted recall, strict precision and 
 | `recall_diff`, `precision_diff` | For each repeat: the all value less the one-pass value. |
 | `aggregate` | The mean, the minimum and the maximum of `recall_diff` and `precision_diff` over the repeats. |
 
-The paired scoring asks the judge about the pairs of each one-pass set that the all set did not ask about. Those queries count in `judge_calls` and `judge_cost_usd`. `missing` names each repeat with no paired figures, with the reason: `no source fields` for a record from before this version, or `not scored with --paired` for a result that `--resume` reused from a run without `--paired`.
+The paired scoring asks the judge about the pairs of each one-pass set that the all set did not ask about. Those queries count in `judge_calls` and `judge_cost_usd`. `missing` names each repeat with no paired figures, with the reason `no source fields`: the record is from before this version. `--paired` is one of the options in `result.json`, so `--resume` refuses to mix results with and without it.
 
 ### Report again with no model call
 
-`pr-review eval-report --cases <dir> --out <dir> [--format table|json]` scores the run records of an earlier eval again. It reads `result.json`, the record and `judge-cache.json` of each repeat in `--out`. It makes no model call and no clone. It prints the normal report and the paired section, and it writes no file. A repeat that failed in the eval keeps its result. A judge question with no cached answer counts as no match. `paired.uncached` counts those questions for each repeat. When the count of a repeat is above 0, the table starts with a line that says that the figures of that repeat are not valid. With `--format json`, the line goes to stderr. A record with no source fields gives no paired figures for its repeat. The command names the repeat in `paired.missing` and still exits 0.
+`pr-review eval-report --cases <dir> --out <dir> [--format table|json]` scores the run records of an earlier eval again. It reads `result.json`, the record and `judge-cache.json` of each repeat in `--out`. When `result.json` names no record, it uses the one record file of the directory. It clones each case, because the key of a judge answer holds the head lines and the diff that the judge saw. It makes no model call. It prints the normal report and the paired section, and it writes no file. A repeat that failed in the eval keeps its result. A judge question with no cached answer counts as no match. A repeat whose cache file or record is not valid shows as a failed repeat, with the name of the file. `paired.uncached` counts those questions for each repeat. When the count of a repeat is above 0, the table starts with a line that says that the figures of that repeat are not valid. With `--format json`, the line goes to stderr. A record with no source fields gives no paired figures for its repeat. The command names the repeat in `paired.missing` and still exits 0.
 
 ### A cases subset by cost
 
@@ -789,7 +789,7 @@ pr-review eval-subset --cases eval/cases --costs pr-review-eval --max-cost 8 --t
 pr-review eval-subset --cases eval/cases --costs pr-review-eval/report.json --budget 150 --repeats 3 --to eval/subset
 ```
 
-`--costs` gives the cost per run of each case. It is the `report.json` of an eval, the `--out` directory of an eval, or a baseline file that holds `case_costs`. The cost per run of a case is the mean review cost of its repeats that did not fail. The judge cost is not in it. A case of `--cases` with no cost in the source is an error that names the case.
+`--costs` gives the cost per run of each case. It is the `report.json` of an eval, the `--out` directory of an eval, or a baseline file that holds `case_costs`. The cost per run of a case is the mean review cost of its repeats that did not fail. The judge cost is not in it. A case of `--cases` with no cost in the source is an error that names the case. In an `--out` directory, a repeat with no `result.json` gives no cost, and a `result.json` that is not valid is an error that names the file.
 
 Give one mode:
 
