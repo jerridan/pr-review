@@ -1,0 +1,1817 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 52,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "D8 budget: a turn budget per reviewer, and the design updates from issues 22, 23 and 28",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/52"
+    },
+    "run_kind": "later",
+    "prior": {
+      "head": "e75d2dda1a1b57bc1ff245eb5108f0e7e3bed090",
+      "source": "record",
+      "record": "/home/runner/work/_temp/pr-review-records/pr-52/2026-11-14T194755.126Z-e75d2dd.json",
+      "open": [],
+      "dismissed": [
+        "4ef67ad4317478ba"
+      ],
+      "fetch_failed": false
+    },
+    "base": "39250e7045b250c5b84d7e887ac7cd85978f085c",
+    "head": "66457b6075d2b79fa7b38605765ea4d0de47443f",
+    "started_at": "2026-11-14T19:57:07.571Z",
+    "tool_version": "0.10.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "D8 budget: a turn budget per reviewer, and the design updates from issues 22, 23 and 28\n\nPart \"budget\" of D8 (the third bullet), and the TICKETS.md entry \"Design updates from issues 22, 23 and 28\". The passes default and the paired measurement are not in this PR.\n\n## Turn budget\n\n- Each reviewer pass now has a turn budget of 150 turns (was 40).\n- A repo sets the budget of one reviewer with `reviewers.<name>.max_turns` in `.pr-review/config.yaml`, an integer of 1 or more.\n- The dollar cap of a reviewer query follows the budget: `REVIEWER_USD_PER_TURN` ($0.05) times the turn budget. That is $7.50 at the default (was a flat $2). A repo that buys depth with more turns gets a cap that permits them.\n- The wall-clock limit of a reviewer pass also follows the budget: `REVIEWER_MS_PER_TURN` (10 s) times the turn budget. That is 25 minutes at the default (was 10 minutes).\n- The run-level `token_ceiling` does not change. It stays the limit of a whole run. No other role changes.\n- Worst case, before and after: one reviewer pass $2 → $7.50. The reviewer stage of one full-tier run with all built-in reviewers selected (9 passes) $18 → $67.50.\n\n## Limit stops in the recorded runs\n\nBefore the default changed, I counted the reviewer passes that stopped at the 40-turn limit or the $2 cap. The count is 0 of 1,117 reviewer passes, over 158 run records: the `pr-review-records` branch and the local eval run records. The pass cost had a median of $0.09, a p99 of $1.35 and a maximum of $1.85. So the new default does not change the typical cost of a review. It raises only the worst case.\n\n## Design updates (docs/design/high-level-design.md)\n\n- Section 10, decision 18: one SDK `query()` for each reviewer pass is the dispatch mechanism. A subagent mode is a budget option for the deep reviewers, not a recall lever. Closes #22.\n- Section 6: a trusted custom reviewer with Bash gets read-only git commands. Explicit deny rules block fetch, pull, checkout, switch and gh. The record lists every permission denial. The text says that the current build does not apply these rules yet. Closes #28.\n- Section 3.6 and decision 10: the non-blocking cap stays until D4c measures it against real records. If it changes, it caps nits only. Issue #23 stays open.\n- Sections 3.4, 4 and 5 name the turn budget.\n\n## Checks\n\n- `npm test` (1428 passed), `npm run lint`, `npm run typecheck` and `npm run build` pass.\n- The new tests fail at the red commit 2cc62c2 (5 failures).\n- The version goes from 0.10.0 to 0.11.0.\n- No eval run: the change raises a limit that no recorded pass reached.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZhKp5D6XiHaCEij36E\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": ".claude-plugin/marketplace.json",
+        "hunks": 1
+      },
+      {
+        "path": ".claude-plugin/plugin.json",
+        "hunks": 1
+      },
+      {
+        "path": "README.md",
+        "hunks": 2
+      },
+      {
+        "path": "docs/design/high-level-design.md",
+        "hunks": 7
+      },
+      {
+        "path": "package.json",
+        "hunks": 1
+      },
+      {
+        "path": "src/config/models.ts",
+        "hunks": 2
+      },
+      {
+        "path": "src/config/repo-config.ts",
+        "hunks": 2
+      },
+      {
+        "path": "src/find/index.ts",
+        "hunks": 2
+      },
+      {
+        "path": "src/reviewers/loader.ts",
+        "hunks": 2
+      },
+      {
+        "path": "src/sdk/client.ts",
+        "hunks": 2
+      },
+      {
+        "path": "src/sdk/options.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/find.test.ts",
+        "hunks": 3
+      },
+      {
+        "path": "test/repo-config.test.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/run.test.ts",
+        "hunks": 7
+      },
+      {
+        "path": "test/sdk-options.test.ts",
+        "hunks": 4
+      }
+    ],
+    "excluded_files": [
+      {
+        "path": "package-lock.json",
+        "reason": "generated"
+      }
+    ],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "Changes reviewer run limits (turns, dollar cap, timeout) and adds a public config key, which affects cost, concurrency and config validation logic.",
+      "confidence": "high",
+      "categories": [
+        "bug",
+        "performance",
+        "test",
+        "docs",
+        "other"
+      ],
+      "hotspots": [
+        "src/reviewers/loader.ts effectiveBudget",
+        "src/sdk/client.ts timeoutMs override",
+        "src/sdk/options.ts maxTurns/maxBudgetUsd overrides",
+        "src/config/models.ts ROLE_DEFAULTS reviewer (40→150 turns, $2→$7.50, 10→25 min)",
+        "src/config/repo-config.ts max_turns schema",
+        "src/find/index.ts overrides merge"
+      ],
+      "file_notes": [
+        {
+          "file": "src/config/models.ts",
+          "note": "New per-turn constants; reviewer defaults raised nearly 4x in turns, 3.75x in cost, 2.5x in timeout."
+        },
+        {
+          "file": "src/reviewers/loader.ts",
+          "note": "New exported effectiveBudget derives turns, USD cap and timeout from max_turns."
+        },
+        {
+          "file": "src/sdk/client.ts",
+          "note": "Overrides type widened; timeout now taken from the override."
+        },
+        {
+          "file": "src/sdk/options.ts",
+          "note": "maxTurns and maxBudgetUsd now read from the override first."
+        },
+        {
+          "file": "src/config/repo-config.ts",
+          "note": "New max_turns key in the strict reviewer schema, integer 1 or more."
+        },
+        {
+          "file": "src/find/index.ts",
+          "note": "Merges the budget into the overrides sent per pass."
+        },
+        {
+          "file": "README.md",
+          "note": "Documents max_turns and worst-case cost figures."
+        },
+        {
+          "file": "docs/design/high-level-design.md",
+          "note": "Design doc updates, including the non-blocking cap, the dispatch decision and a Bash deny-rule note. Docs only."
+        },
+        {
+          "file": "package.json",
+          "note": "Version bump to 0.11.0."
+        },
+        {
+          "file": ".claude-plugin/plugin.json",
+          "note": "Version bump."
+        },
+        {
+          "file": ".claude-plugin/marketplace.json",
+          "note": "Version bump."
+        },
+        {
+          "file": "test/find.test.ts",
+          "note": "Tests budget propagation per reviewer."
+        },
+        {
+          "file": "test/repo-config.test.ts",
+          "note": "Tests max_turns accept and reject cases."
+        },
+        {
+          "file": "test/run.test.ts",
+          "note": "Overrides expectations updated with the default budget."
+        },
+        {
+          "file": "test/sdk-options.test.ts",
+          "note": "Tests the new defaults, the overrides and the timeout override."
+        }
+      ],
+      "summary": "Adds a per-reviewer `max_turns` config key. The dollar cap ($0.05 per turn) and the wall-clock timeout (10 s per turn) follow it. The default reviewer budget rises from 40 turns, $2 and 10 minutes to 150 turns, $7.50 and 25 minutes. The overrides pass through find, the SDK options and the client timeout. Tests, docs and version numbers are updated."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: Changes reviewer run limits (turns, dollar cap, timeout) and adds a public config key, which affects cost, concurrency and config validation logic.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1849,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 65,
+              "cacheReadInputTokens": 5136,
+              "cacheCreationInputTokens": 11245,
+              "webSearchRequests": 0,
+              "costUSD": 0.0922952,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0922952
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 8532,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11736,
+              "outputTokens": 18,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011826,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 645,
+              "cacheReadInputTokens": 21429,
+              "cacheCreationInputTokens": 11929,
+              "webSearchRequests": 0,
+              "costUSD": 0.11263379999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 424,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1138164
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/reviewers/loader.ts",
+            "start_line": 222,
+            "end_line": 228,
+            "category": "bug",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "`max_turns` has no upper bound. A value above about 214,748 makes `timeoutMs` larger than the 32-bit limit of setTimeout. Node then fires the timer at once, so the reviewer pass times out right away.",
+            "evidence": "    timeoutMs: REVIEWER_MS_PER_TURN * maxTurns,",
+            "suggested_fix": "Put an upper bound on max_turns in the schema, or limit timeoutMs to 2_147_483_647.",
+            "explanation": "setTimeout treats any delay above 2^31-1 ms as 1 ms. A very large turn budget therefore aborts the pass at once instead of giving it more time.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 8924,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11730,
+              "outputTokens": 18,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.001182,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 6,
+              "outputTokens": 788,
+              "cacheReadInputTokens": 39739,
+              "cacheCreationInputTokens": 12754,
+              "webSearchRequests": 0,
+              "costUSD": 0.12576379999999998,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 190,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1269458
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/reviewers/loader.ts",
+            "start_line": 218,
+            "end_line": 229,
+            "category": "bug",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "max_turns has no upper bound, so a large value makes timeoutMs exceed the setTimeout limit of 2^31-1 ms, and Node then fires the timer at once and aborts the pass.",
+            "evidence": "timeoutMs: REVIEWER_MS_PER_TURN * maxTurns,",
+            "suggested_fix": "Add an upper bound to max_turns in the schema, or clamp timeoutMs to 2147483647.",
+            "explanation": "Node treats a delay above 2147483647 ms as 1 ms, so max_turns of 214749 or more makes every pass of that reviewer time out at once.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 8114,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11730,
+              "outputTokens": 18,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.001182,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 6,
+              "outputTokens": 716,
+              "cacheReadInputTokens": 39221,
+              "cacheCreationInputTokens": 12506,
+              "webSearchRequests": 0,
+              "costUSD": 0.1222362,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 154,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1234182
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 8513,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11732,
+              "outputTokens": 24,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011852000000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 641,
+              "cacheReadInputTokens": 21329,
+              "cacheCreationInputTokens": 11881,
+              "webSearchRequests": 0,
+              "costUSD": 0.11214980000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 448,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.113335
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4106,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 31168,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0031278000000000005,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 278,
+              "cacheReadInputTokens": 41549,
+              "cacheCreationInputTokens": 31803,
+              "webSearchRequests": 0,
+              "costUSD": 0.2683098,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 112,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.2714376
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/reviewers/loader.ts",
+            "start_line": 222,
+            "end_line": 229,
+            "category": "security",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "`max_turns` has no upper bound, so the dollar cap and the timeout of a reviewer pass grow with any value that the config sets.",
+            "evidence": "    maxBudgetUsd: REVIEWER_USD_PER_TURN * maxTurns,\n    timeoutMs: REVIEWER_MS_PER_TURN * maxTurns,",
+            "suggested_fix": "Add a maximum to the `max_turns` schema, for example 1000, or clamp the derived limits.",
+            "explanation": "The schema checks only `atLeast(1)`, so a very large `max_turns` removes the cost cap. Above about 214,748 turns, the timeout also passes the setTimeout maximum of 2^31-1 ms, and Node then fires the timer at once.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6454,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11724,
+              "outputTokens": 177,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0012609000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 157,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 590,
+              "cacheReadInputTokens": 21889,
+              "cacheCreationInputTokens": 11632,
+              "webSearchRequests": 0,
+              "costUSD": 0.1092498,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 120,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.11051069999999999
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/reviewers/loader.ts",
+            "start_line": 222,
+            "end_line": 228,
+            "category": "security",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "`reviewers.<name>.max_turns` has no upper bound, so a repo config can raise the dollar cap and the timeout of a reviewer pass without any limit.",
+            "evidence": "    maxBudgetUsd: REVIEWER_USD_PER_TURN * maxTurns,\n    timeoutMs: REVIEWER_MS_PER_TURN * maxTurns,",
+            "suggested_fix": "Add an upper bound to `max_turns` in the schema, for example 1000, or clamp the derived cap and timeout.",
+            "explanation": "The schema only checks `atLeast(1)`. A very large value removes the per-pass spending cap. Above about 214,748 turns, the timeout also goes past the setTimeout maximum, and Node then fires the timer at once.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6119,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11726,
+              "outputTokens": 18,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011816,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 580,
+              "cacheReadInputTokens": 21891,
+              "cacheCreationInputTokens": 11648,
+              "webSearchRequests": 0,
+              "costUSD": 0.10917819999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 105,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1103598
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 3756,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11744,
+              "outputTokens": 171,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0012599,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 151,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 272,
+              "cacheReadInputTokens": 23459,
+              "cacheCreationInputTokens": 12670,
+              "webSearchRequests": 0,
+              "costUSD": 0.1115078,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 141,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1127677
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "src/reviewers/loader.ts",
+          "start_line": 218,
+          "end_line": 229,
+          "category": "bug",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "max_turns has no upper bound, so a large value makes timeoutMs exceed the setTimeout limit of 2^31-1 ms, and Node then fires the timer at once and aborts the pass.",
+          "evidence": "timeoutMs: REVIEWER_MS_PER_TURN * maxTurns,",
+          "suggested_fix": "Add an upper bound to max_turns in the schema, or clamp timeoutMs to 2147483647.",
+          "explanation": "Node treats a delay above 2147483647 ms as 1 ms, so max_turns of 214749 or more makes every pass of that reviewer time out at once.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "timeoutMs: REVIEWER_MS_PER_TURN * maxTurns,",
+            "max_turns: atLeast(1).optional(),",
+            "}, timeoutMs);"
+          ],
+          "rationale": "The schema `max_turns: atLeast(1)` has no upper bound. `timeoutMs` is 10_000 × `maxTurns`, and `client.ts` passes it straight to `setTimeout`. A `max_turns` of 214749 or more would exceed 2^31-1 ms and fire the timer at once. Only a repo owner who sets an absurd value can trigger this, and that value would also give a huge dollar cap.",
+          "score": 85,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "timeoutMs: REVIEWER_MS_PER_TURN * maxTurns,",
+            "max_turns: atLeast(1).optional(),",
+            "export const REVIEWER_MS_PER_TURN = 10_000;",
+            "const timeoutMs = req.overrides?.timeoutMs ?? roleConfig(req.role).timeoutMs;",
+            "}, timeoutMs);"
+          ],
+          "rationale": "The finding is correct: the schema sets only a minimum of 1 for max_turns, and the product of 10_000 ms and max_turns goes straight into setTimeout. Any max_turns of 214749 or more is over 2^31-1 ms, so Node fires the timer at once and every pass times out. Only an absurd config value triggers this, and the failure shows up as a timeout, so it is a suggestion rather than a blocker.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "timeoutMs: REVIEWER_MS_PER_TURN * maxTurns,",
+            "max_turns: atLeast(1).optional(),",
+            "export const REVIEWER_MS_PER_TURN = 10_000;",
+            "const timeoutMs = req.overrides?.timeoutMs ?? roleConfig(req.role).timeoutMs;",
+            "}, timeoutMs);"
+          ],
+          "rationale": "The finding is correct: the schema sets only a minimum of 1 for max_turns, and the product of 10_000 ms and max_turns goes straight into setTimeout. Any max_turns of 214749 or more is over 2^31-1 ms, so Node fires the timer at once and every pass times out. Only an absurd config value triggers this, and the failure shows up as a timeout, so it is a suggestion rather than a blocker.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "src/reviewers/loader.ts",
+          "start_line": 222,
+          "end_line": 228,
+          "category": "bug",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "`max_turns` has no upper bound. A value above about 214,748 makes `timeoutMs` larger than the 32-bit limit of setTimeout. Node then fires the timer at once, so the reviewer pass times out right away.",
+          "evidence": "    timeoutMs: REVIEWER_MS_PER_TURN * maxTurns,",
+          "suggested_fix": "Put an upper bound on max_turns in the schema, or limit timeoutMs to 2_147_483_647.",
+          "explanation": "setTimeout treats any delay above 2^31-1 ms as 1 ms. A very large turn budget therefore aborts the pass at once instead of giving it more time.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "timeoutMs: REVIEWER_MS_PER_TURN * maxTurns,",
+            "max_turns: atLeast(1).optional(),"
+          ],
+          "rationale": "max_turns has only a lower bound, and timeoutMs is passed straight to setTimeout, so a value above about 214,748 overflows the 32-bit delay. It needs an implausible config (a cap of about $10k), so the practical impact is low.",
+          "score": 85,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "timeoutMs: REVIEWER_MS_PER_TURN * maxTurns,",
+            "export const REVIEWER_MS_PER_TURN = 10_000;",
+            "max_turns: atLeast(1).optional(),",
+            "}, timeoutMs);"
+          ],
+          "rationale": "The schema only sets a lower bound on max_turns (`atLeast(1)`), and the code passes `timeoutMs = 10_000 * maxTurns` straight to setTimeout. Any value above 214,748 goes past 2^31-1 ms, and Node then fires the timer after about 1 ms, so the pass aborts at once. Only an absurd config value triggers it, and the fix is cheap.",
+          "score": 92,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "timeoutMs: REVIEWER_MS_PER_TURN * maxTurns,",
+            "export const REVIEWER_MS_PER_TURN = 10_000;",
+            "max_turns: atLeast(1).optional(),",
+            "}, timeoutMs);"
+          ],
+          "rationale": "The schema only sets a lower bound on max_turns (`atLeast(1)`), and the code passes `timeoutMs = 10_000 * maxTurns` straight to setTimeout. Any value above 214,748 goes past 2^31-1 ms, and Node then fires the timer after about 1 ms, so the pass aborts at once. Only an absurd config value triggers it, and the fix is cheap.",
+          "score": 92,
+          "severity": "suggestion"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "src/reviewers/loader.ts",
+          "start_line": 222,
+          "end_line": 229,
+          "category": "security",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "`max_turns` has no upper bound, so the dollar cap and the timeout of a reviewer pass grow with any value that the config sets.",
+          "evidence": "    maxBudgetUsd: REVIEWER_USD_PER_TURN * maxTurns,\n    timeoutMs: REVIEWER_MS_PER_TURN * maxTurns,",
+          "suggested_fix": "Add a maximum to the `max_turns` schema, for example 1000, or clamp the derived limits.",
+          "explanation": "The schema checks only `atLeast(1)`, so a very large `max_turns` removes the cost cap. Above about 214,748 turns, the timeout also passes the setTimeout maximum of 2^31-1 ms, and Node then fires the timer at once.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "max_turns: atLeast(1).optional(),",
+            "timeoutMs: REVIEWER_MS_PER_TURN * maxTurns,",
+            "maxBudgetUsd: REVIEWER_USD_PER_TURN * maxTurns,"
+          ],
+          "rationale": "The schema only enforces a minimum of 1 for `max_turns`, and the new `effectiveBudget` multiplies it without a clamp. The cost cap and timeout therefore scale without limit, and a value above about 214,748 pushes the timeout past setTimeout's 2^31-1 ms maximum. The value comes from the repo owner's own base-commit config, so the damage is self-inflicted.",
+          "score": 85,
+          "severity": "suggestion"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "max_turns: atLeast(1).optional(),",
+            "integer().refine((value) => value >= min, { message: `must be an integer of ${min} or more` });",
+            "maxBudgetUsd: REVIEWER_USD_PER_TURN * maxTurns,",
+            "timeoutMs: REVIEWER_MS_PER_TURN * maxTurns,",
+            "}, timeoutMs);"
+          ],
+          "rationale": "The schema has no upper bound on `max_turns`, and the dollar cap and timeout scale with it. Above about 214,748 turns the timeout passes setTimeout's 2^31-1 ms limit, so Node fires the timer at once. The higher cost is intended: the repo's own trusted config sets it, and the run-level token_ceiling still applies. That leaves the setTimeout overflow, which needs an absurd value, as a minor edge case with a cheap fix.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "max_turns: atLeast(1).optional(),",
+            "integer().refine((value) => value >= min, { message: `must be an integer of ${min} or more` });",
+            "maxBudgetUsd: REVIEWER_USD_PER_TURN * maxTurns,",
+            "timeoutMs: REVIEWER_MS_PER_TURN * maxTurns,",
+            "}, timeoutMs);"
+          ],
+          "rationale": "The schema has no upper bound on `max_turns`, and the dollar cap and timeout scale with it. Above about 214,748 turns the timeout passes setTimeout's 2^31-1 ms limit, so Node fires the timer at once. The higher cost is intended: the repo's own trusted config sets it, and the run-level token_ceiling still applies. That leaves the setTimeout overflow, which needs an absurd value, as a minor edge case with a cheap fix.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "src/reviewers/loader.ts",
+          "start_line": 222,
+          "end_line": 228,
+          "category": "security",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "`reviewers.<name>.max_turns` has no upper bound, so a repo config can raise the dollar cap and the timeout of a reviewer pass without any limit.",
+          "evidence": "    maxBudgetUsd: REVIEWER_USD_PER_TURN * maxTurns,\n    timeoutMs: REVIEWER_MS_PER_TURN * maxTurns,",
+          "suggested_fix": "Add an upper bound to `max_turns` in the schema, for example 1000, or clamp the derived cap and timeout.",
+          "explanation": "The schema only checks `atLeast(1)`. A very large value removes the per-pass spending cap. Above about 214,748 turns, the timeout also goes past the setTimeout maximum, and Node then fires the timer at once.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "max_turns: atLeast(1).optional(),",
+            "maxBudgetUsd: REVIEWER_USD_PER_TURN * maxTurns,",
+            "timeoutMs: REVIEWER_MS_PER_TURN * maxTurns,"
+          ],
+          "rationale": "The schema only enforces `atLeast(1)` for `max_turns`, and the cap and timeout scale linearly with no clamp. The claim is literally true. The config comes from the base commit, so only repo maintainers can set it. `passes` is also unbounded, the run-level `token_ceiling` stays, and the description deliberately says \"1 or more\". The setTimeout overflow only happens at absurd values.",
+          "score": 80,
+          "severity": "dont_post"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "max_turns: atLeast(1).optional(),",
+            "integer().refine((value) => value >= min, { message: `must be an integer of ${min} or more` });",
+            "maxBudgetUsd: REVIEWER_USD_PER_TURN * maxTurns,",
+            "timeoutMs: REVIEWER_MS_PER_TURN * maxTurns,",
+            "export const REVIEWER_MS_PER_TURN = 10_000;"
+          ],
+          "rationale": "The schema only checks a lower bound on `max_turns`, and this PR multiplies it into both the dollar cap and the setTimeout delay. Above about 214,748 turns the delay passes 2^31−1 ms, so Node fires the timer at once and the query times out right away. The config is read from the base commit, so only a maintainer can set it. This makes it an edge case on a misconfiguration path, not a security hole.",
+          "score": 85,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "max_turns: atLeast(1).optional(),",
+            "integer().refine((value) => value >= min, { message: `must be an integer of ${min} or more` });",
+            "maxBudgetUsd: REVIEWER_USD_PER_TURN * maxTurns,",
+            "timeoutMs: REVIEWER_MS_PER_TURN * maxTurns,",
+            "export const REVIEWER_MS_PER_TURN = 10_000;"
+          ],
+          "rationale": "The schema only checks a lower bound on `max_turns`, and this PR multiplies it into both the dollar cap and the setTimeout delay. Above about 214,748 turns the delay passes 2^31−1 ms, so Node fires the timer at once and the query times out right away. The config is read from the base commit, so only a maintainer can set it. This makes it an edge case on a misconfiguration path, not a security hole.",
+          "score": 85,
+          "severity": "suggestion"
+        },
+        "passed": true
+      }
+    ],
+    "merges": [
+      {
+        "group": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "result": {
+          "merged": [
+            {
+              "member_index": 1,
+              "claim": "`max_turns` has no upper bound, so a large value scales the dollar cap and pushes `timeoutMs` past setTimeout's 2^31-1 ms limit, which makes the reviewer pass time out at once.",
+              "explanation": "setTimeout treats any delay above 2^31-1 ms as 1 ms, so max_turns above about 214,748 aborts the pass immediately. The same unbounded value also removes any practical per-pass spending cap.",
+              "suggested_fix": "Add an upper bound to max_turns in the schema (for example 1000), or clamp the derived timeoutMs to 2_147_483_647 and cap maxBudgetUsd.",
+              "severity": "suggestion"
+            }
+          ]
+        }
+      }
+    ],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5906823371,
+      "review_url": "https://github.com/jerridan/pr-review/pull/52#pullrequestreview-5906823371",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 132569530031
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [
+      {
+        "file": "src/reviewers/loader.ts",
+        "start_line": 222,
+        "end_line": 228,
+        "category": "bug",
+        "severity_estimate": "suggestion",
+        "confidence": "low",
+        "claim": "`max_turns` has no upper bound, so a large value scales the dollar cap and pushes `timeoutMs` past setTimeout's 2^31-1 ms limit, which makes the reviewer pass time out at once.",
+        "evidence": "    timeoutMs: REVIEWER_MS_PER_TURN * maxTurns,",
+        "explanation": "setTimeout treats any delay above 2^31-1 ms as 1 ms, so max_turns above about 214,748 aborts the pass immediately. The same unbounded value also removes any practical per-pass spending cap.",
+        "needs_context": false,
+        "fingerprint": "0d55fa8cdda8c126",
+        "severity": "suggestion",
+        "score": 92,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "timeoutMs: REVIEWER_MS_PER_TURN * maxTurns,",
+            "export const REVIEWER_MS_PER_TURN = 10_000;",
+            "max_turns: atLeast(1).optional(),",
+            "}, timeoutMs);"
+          ],
+          "rationale": "The schema only sets a lower bound on max_turns (`atLeast(1)`), and the code passes `timeoutMs = 10_000 * maxTurns` straight to setTimeout. Any value above 214,748 goes past 2^31-1 ms, and Node then fires the timer after about 1 ms, so the pass aborts at once. Only an absurd config value triggers it, and the fix is cheap.",
+          "score": 92,
+          "severity": "suggestion"
+        },
+        "span_text": "const maxTurns = reviewerEntry(config, def.frontmatter.name)?.max_turns ?? ROLE_DEFAULTS.reviewer.maxTurns; return { maxTurns, maxBudgetUsd: REVIEWER_USD_PER_TURN * maxTurns, timeoutMs: REVIEWER_MS_PER_TURN * maxTurns, };",
+        "suggested_fix": "Add an upper bound to max_turns in the schema (for example 1000), or clamp the derived timeoutMs to 2_147_483_647 and cap maxBudgetUsd."
+      }
+    ],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 7847,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16000,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016120000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1131,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 15513,
+            "webSearchRequests": 0,
+            "costUSD": 0.07349220000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.07510420000000001
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 1849,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 65,
+            "cacheReadInputTokens": 5136,
+            "cacheCreationInputTokens": 11245,
+            "webSearchRequests": 0,
+            "costUSD": 0.0922952,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0922952
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "model": "claude-opus-5-5",
+        "duration_ms": 4106,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 31168,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0031278000000000005,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 278,
+            "cacheReadInputTokens": 41549,
+            "cacheCreationInputTokens": 31803,
+            "webSearchRequests": 0,
+            "costUSD": 0.2683098,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 112,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.2714376
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 8114,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11730,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.001182,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 716,
+            "cacheReadInputTokens": 39221,
+            "cacheCreationInputTokens": 12506,
+            "webSearchRequests": 0,
+            "costUSD": 0.1222362,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 154,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1234182
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "model": "claude-opus-5-5",
+        "duration_ms": 8513,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11732,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011852000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 641,
+            "cacheReadInputTokens": 21329,
+            "cacheCreationInputTokens": 11881,
+            "webSearchRequests": 0,
+            "costUSD": 0.11214980000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 448,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.113335
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "model": "claude-opus-5-5",
+        "duration_ms": 8532,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11736,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011826,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 645,
+            "cacheReadInputTokens": 21429,
+            "cacheCreationInputTokens": 11929,
+            "webSearchRequests": 0,
+            "costUSD": 0.11263379999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 424,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1138164
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 8924,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11730,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.001182,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 788,
+            "cacheReadInputTokens": 39739,
+            "cacheCreationInputTokens": 12754,
+            "webSearchRequests": 0,
+            "costUSD": 0.12576379999999998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 190,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1269458
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "model": "claude-opus-5-5",
+        "duration_ms": 3756,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11744,
+            "outputTokens": 171,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012599,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 151,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 272,
+            "cacheReadInputTokens": 23459,
+            "cacheCreationInputTokens": 12670,
+            "webSearchRequests": 0,
+            "costUSD": 0.1115078,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 141,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1127677
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6454,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11724,
+            "outputTokens": 177,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012609000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 157,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 590,
+            "cacheReadInputTokens": 21889,
+            "cacheCreationInputTokens": 11632,
+            "webSearchRequests": 0,
+            "costUSD": 0.1092498,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 120,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.11051069999999999
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6119,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11726,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011816,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 580,
+            "cacheReadInputTokens": 21891,
+            "cacheCreationInputTokens": 11648,
+            "webSearchRequests": 0,
+            "costUSD": 0.10917819999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 105,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1103598
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 8142,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8866,
+            "outputTokens": 28,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009006000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 937,
+            "cacheReadInputTokens": 31000,
+            "cacheCreationInputTokens": 10963,
+            "webSearchRequests": 0,
+            "costUSD": 0.056333999999999995,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 157,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0572346
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 9433,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8876,
+            "outputTokens": 28,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009016000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 1098,
+            "cacheReadInputTokens": 30894,
+            "cacheCreationInputTokens": 10668,
+            "webSearchRequests": 0,
+            "costUSD": 0.0567534,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 407,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.057655000000000005
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 8544,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8921,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009011000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 954,
+            "cacheReadInputTokens": 30347,
+            "cacheCreationInputTokens": 10024,
+            "webSearchRequests": 0,
+            "costUSD": 0.0526827,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 318,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0535838
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 9668,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8914,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009034000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 973,
+            "cacheReadInputTokens": 44633,
+            "cacheCreationInputTokens": 10544,
+            "webSearchRequests": 0,
+            "costUSD": 0.0563853,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 206,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0572887
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 11397,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8856,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0008975999999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 1158,
+            "cacheReadInputTokens": 45914,
+            "cacheCreationInputTokens": 11295,
+            "webSearchRequests": 0,
+            "costUSD": 0.1227348,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 190,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1236324
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 9478,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8888,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0008993,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 1013,
+            "cacheReadInputTokens": 31004,
+            "cacheCreationInputTokens": 10880,
+            "webSearchRequests": 0,
+            "costUSD": 0.11352480000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 230,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1144241
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 12009,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8909,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009039,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 1203,
+            "cacheReadInputTokens": 31145,
+            "cacheCreationInputTokens": 11392,
+            "webSearchRequests": 0,
+            "costUSD": 0.121449,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 337,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.12235289999999999
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 13092,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8908,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009027999999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 1237,
+            "cacheReadInputTokens": 31127,
+            "cacheCreationInputTokens": 10478,
+            "webSearchRequests": 0,
+            "costUSD": 0.1148134,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 434,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1157162
+      },
+      {
+        "role": "merge",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 4078,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 2572,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0002682,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 461,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 3147,
+            "webSearchRequests": 0,
+            "costUSD": 0.017202,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 168,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.017470199999999998
+      }
+    ],
+    "total_cost_usd": 1.9693484999999997,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 40,
+      "gather": 296,
+      "scope": 9,
+      "triage": 8889,
+      "find_verify": 40038,
+      "merge": 4901
+    },
+    "errors": []
+  }
+}
