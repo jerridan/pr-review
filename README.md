@@ -862,7 +862,7 @@ A margin smaller than the noise of the case set makes the gate fail on a run wit
 
 For example, a precision with mean 0.667 and min 0.5 has a spread of 0.167. Twice the spread is 0.333, so the margin is 0.35. `--write-baseline` keeps an existing margin, so edit `margin` in the file after the run, then commit it.
 
-The case set is empty and the repo holds no baseline until D5 adds the first ten cases and writes one. The eval job in CI runs on a manual dispatch only. Before a change to behaviour merges, run the eval locally at one repeat and put the table in the PR description. Read the numbers. Do not read only the gate status.
+`eval/cases.json` pins the case set, and `eval/baseline.json` holds the baseline for that pin. `test/eval-pin.test.ts` fails when the baseline was written for another pin or at one repeat, so a pin move needs a new baseline in the same PR. The eval job in CI runs on a manual dispatch only. Before a change to behaviour merges, run the eval locally at one repeat and put the table in the PR description. Read the numbers. Do not read only the gate status.
 
 ### Explain a record
 
