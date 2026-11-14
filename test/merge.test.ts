@@ -545,3 +545,68 @@ describe("applySuppressions (R3)", () => {
     expect(out.kept).toEqual([items[0], items[2], items[3]]);
   });
 });
+
+describe("the sources of a posted finding (D8 R1.2)", () => {
+  const a = finding(3, 5);
+  const b = finding(4, 6, { evidence: "const line4 = 4;" });
+  const verified = () => [
+    {
+      finding: a,
+      result: result(82, "blocking"),
+      sources: [{ reviewer: "diff-bugs", pass: 1 }],
+    },
+    {
+      finding: b,
+      result: result(91, "blocking"),
+      sources: [
+        { reviewer: "diff-bugs", pass: 2 },
+        { reviewer: "security", pass: 1 },
+      ],
+    },
+  ];
+
+  it("gives a merged finding the union of the sources of its group", async () => {
+    const fake = createFakeSdkClient(() =>
+      ok({
+        merged: [{ member_index: 1, claim: "M", explanation: "E", severity: "blocking" }],
+      }),
+    );
+    const out = await mergeFindings(fake, OPTIONS, verified(), ctx());
+    expect(out.posted.map((p) => p.sources)).toEqual([
+      [
+        { reviewer: "diff-bugs", pass: 1 },
+        { reviewer: "diff-bugs", pass: 2 },
+        { reviewer: "security", pass: 1 },
+      ],
+    ]);
+  });
+
+  it("keeps the own sources of each member when the merge query fails", async () => {
+    const fake = createFakeSdkClient(() => ({
+      ok: false,
+      failure: { kind: "refusal", message: "no" },
+      raw: META,
+    }));
+    const out = await mergeFindings(fake, OPTIONS, verified(), ctx());
+    const byClaim = new Map(out.posted.map((p) => [p.claim, p.sources]));
+    expect(byClaim.get(a.claim)).toEqual([{ reviewer: "diff-bugs", pass: 1 }]);
+    expect(byClaim.get(b.claim)).toEqual([
+      { reviewer: "diff-bugs", pass: 2 },
+      { reviewer: "security", pass: 1 },
+    ]);
+  });
+
+  it("keeps the own sources of each member when code rejects the merge", async () => {
+    // The merge result drops the highest-scoring member, so code rejects it.
+    const fake = createFakeSdkClient(() =>
+      ok({
+        merged: [{ member_index: 0, claim: "M", explanation: "E", severity: "blocking" }],
+      }),
+    );
+    const out = await mergeFindings(fake, OPTIONS, verified(), ctx());
+    expect(out.merges[0]?.rejected).toBeDefined();
+    const byClaim = new Map(out.posted.map((p) => [p.claim, p.sources]));
+    expect(byClaim.get(a.claim)).toEqual([{ reviewer: "diff-bugs", pass: 1 }]);
+    expect(byClaim.get(b.claim)?.length).toBe(2);
+  });
+});

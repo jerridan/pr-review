@@ -1,12 +1,21 @@
 // D8 R3: the paired report of one pass against all passes, from the eval
 // and from the records of an earlier eval with no model call.
-import { cpSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createProgram } from "../src/cli.js";
 import type { GoldenFinding } from "../src/eval/case.js";
 import type { Report } from "../src/eval/report.js";
 import { ExtrasOutputSchema } from "../src/eval/score.js";
+import { isRecordFileName } from "../src/record/write.js";
 import type { QueryMeta, QueryOutcome, QueryRequest } from "../src/sdk/client.js";
 import { createFakeSdkClient } from "../src/sdk/fake.js";
 import {
@@ -186,6 +195,22 @@ async function evalPaired(): Promise<{
   });
 }
 
+// Run the eval in a test, into "out", with the extra flags.
+async function evalInto(out: string, ...extra: string[]): Promise<number> {
+  return exitCodeOf(
+    createProgram({ client: fake() }).parseAsync([
+      "node",
+      "pr-review",
+      "eval",
+      "--cases",
+      cases,
+      "--out",
+      out,
+      ...extra,
+    ]),
+  );
+}
+
 async function evalReport(out: string, format: "json" | "table") {
   const client = createFakeSdkClient(() => {
     throw new Error("the offline report makes no query");
@@ -216,9 +241,6 @@ function filesUnder(dir: string, test: (name: string) => boolean): string[] {
     return test(name) ? [full] : [];
   });
 }
-
-const isRecordFile = (name: string) =>
-  /^\d{4}-\d{2}-\d{2}T\d{6}\.\d{3}Z-[0-9a-f]{7}\.json$/.test(name);
 
 let live: { code: number; out: string; report: Report; stderr: string };
 beforeAll(async () => {
@@ -297,7 +319,7 @@ describe("pr-review eval-report (D8 R3.2)", () => {
   it("exits 0 and names the repeat whose record has no source fields", async () => {
     const out = tempDir("paired-nosources", made);
     cpSync(live.out, out, { recursive: true });
-    const [path] = filesUnder(join(out, "case-a", "1"), isRecordFile);
+    const [path] = filesUnder(join(out, "case-a", "1"), isRecordFileName);
     if (!path) throw new Error("no record");
     const text = readFileSync(path, "utf8");
     // Remove every source field that R1 adds.
@@ -327,5 +349,42 @@ describe("pr-review eval-report (D8 R3.2)", () => {
     expect(first).toMatch(
       /^Not valid: case-a repeat 1: \d+ judge (pair|pairs) had no cached answer/,
     );
+  });
+});
+
+describe("the review fixes of the paired report (D8 R2, R3)", () => {
+  it("refuses to resume a --paired run without --paired", async () => {
+    const out = tempDir("paired-resume", made);
+    cpSync(live.out, out, { recursive: true });
+    const code = await evalInto(out, "--repeat", "2", "--resume", "--format", "json");
+    expect(code).toBe(2);
+    expect(output.stderr).toMatch(/other options/);
+  });
+
+  it("fails the repeat, and names the file, when its judge cache is not valid", async () => {
+    const out = tempDir("paired-corrupt", made);
+    const path = join(out, "case-a", "1", "judge-cache.json");
+    mkdirSync(join(out, "case-a", "1"), { recursive: true });
+    writeFileSync(path, "{ not json");
+    const code = await evalInto(out, "--repeat", "1", "--paired", "--format", "json");
+    expect(code).toBe(1);
+    expect(output.stderr).toContain(path);
+    expect(readFileSync(path, "utf8")).toBe("{ not json");
+  }, 60_000);
+
+  it("finds the record of a result.json that names no record", async () => {
+    const out = tempDir("paired-norecord", made);
+    cpSync(live.out, out, { recursive: true });
+    const resultPath = join(out, "case-a", "1", "result.json");
+    const result = JSON.parse(readFileSync(resultPath, "utf8")) as Record<string, unknown>;
+    expect(result.record).toBeDefined();
+    delete result.record;
+    writeFileSync(resultPath, JSON.stringify(result));
+
+    const { code } = await evalReport(out, "json");
+    expect(code, output.stderr).toBe(0);
+    const report = JSON.parse(output.stdout) as Report;
+    expect(report.failed_repeats).toEqual([]);
+    expect(report.paired?.scopes).toEqual(live.report.paired?.scopes);
   });
 });
