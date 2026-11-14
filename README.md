@@ -420,6 +420,7 @@ A config file that does not parse or validate stops the run. An unknown key is a
 | `thresholds.middle_band` | two integers 0 to 100, low then high | `[60, 85]` | The score range that sends a finding to verifier escalation. |
 | `reviewers.<name>.enabled` | boolean | `true` | Whether the reviewer may run. |
 | `reviewers.<name>.passes` | integer, 1 or more | the frontmatter value | The number of passes of the reviewer. |
+| `reviewers.<name>.max_turns` | integer, 1 or more | 150 | The turn budget of each pass of the reviewer. See "Turn budget" below. |
 | `reviewers.<name>.threshold` | integer 0 to 100 | the frontmatter value, raised to `thresholds.default` when it is lower | The threshold of the reviewer. A value below `thresholds.default` is an error. |
 | `reviewers.<name>.model` | alias or exact model id | `models.reviewer.model`, else the frontmatter value, else the role default | The model of one reviewer. This key pins that reviewer. |
 | `reviewers.<name>.effort` | `low`, `medium`, `high`, `xhigh` or `max` | `models.reviewer.effort`, else the frontmatter value, else the role default | The effort of one reviewer. This key pins that reviewer. |
@@ -447,6 +448,7 @@ Notes on the keys:
 - **Roles.** The roles of `models.<role>` are `triage`, `reviewer`, `verifier`, `verifier-escalation` and `merge`. The defaults are `sonnet` with `medium` for triage, `opus` with `low` for reviewer, `sonnet` with `high` for verifier, `opus` with `high` for verifier-escalation, and `sonnet` with `medium` for merge. A `models.<role>` object can give `model` alone, `effort` alone, or both.
 - **`pre_existing`.** With `comment`, the run posts the verified pre-existing findings as one issue comment. See [What the run posts](#what-the-run-posts).
 - **Token ceiling.** When the tokens of the finished queries reach the ceiling, no new reviewer pass starts. Coverage lists each pass that did not start with the reason `token ceiling`, and the verdict is `incomplete`. Verification of findings that the run already has still runs.
+- **Turn budget.** `reviewers.<name>.max_turns` buys depth: a higher budget lets each pass of that reviewer make more tool calls. The default is 150. The dollar cap of a pass follows the budget at $0.05 per turn, so it is $7.50 at the default. Other reviewers keep the default. The worst case of one reviewer pass was $2 and is now $7.50. The worst case of the reviewer stage of one full-tier run with all built-in reviewers selected (9 passes: `diff-bugs` 2, `security` 2, five others 1) was $18 and is now $67.50. `token_ceiling` stays the limit of a whole run.
 - **Hash.** The record holds `config_hash`. It is the SHA-256 of the loaded `.pr-review/` files. Each entry is the path, one newline, and the file bytes. The run sorts the entries by the bytes of the path and joins them with one NUL byte. The `CLAUDE.md` is not an entry. The hash is `null` when the base commit has no `.pr-review/` file.
 
 ### Suppressions

@@ -86,7 +86,7 @@ Each reviewer declares triggers in frontmatter: path globs, languages, categorie
 
 ### 3.4 Find (parallel reviewer agents)
 
-Each reviewer gets: the triage brief, the description block, the list of changed files, the diff, the repo rules, read-only tools over the checkout, and a per-reviewer token budget. The history reviewer also gets the history block. A deleted file has its own line in the list, because the head checkout has no file to read. The diff shows which lines changed. It is not the only context. Each returns structured findings:
+Each reviewer gets: the triage brief, the description block, the list of changed files, the diff, the repo rules, read-only tools over the checkout, and a per-reviewer turn budget. A dollar cap follows the budget at $0.05 for each turn. The history reviewer also gets the history block. A deleted file has its own line in the list, because the head checkout has no file to read. The diff shows which lines changed. It is not the only context. Each returns structured findings:
 
 ```
 file, start_line, end_line, category, severity, claim,
@@ -149,7 +149,7 @@ Verification starts per finding as soon as its reviewer returns. Merge is the on
 2. Drop findings that match an open or dismissed thread from a previous run.
 3. Apply repo suppressions by category, path and reviewer. This happens before the groups form. The run checks each finding with the name of its own reviewer, and the record keeps each removed finding with its rule.
 4. Group by file and overlapping lines. One Sonnet call merges groups that say the same thing and picks the best wording.
-5. Rank by severity then verifier score. No cap on blocking findings. Non-blocking findings are capped per run at `3 + ceil(hunks / 4)`, at most 20, suggestions filled before nits. A 4-hunk PR gets 4, a 20-hunk PR gets 8. Overflow goes in the summary as a list. This is a starting formula for the harness to tune.
+5. Rank by severity then verifier score. No cap on blocking findings. Non-blocking findings are capped per run at `3 + ceil(hunks / 4)`, at most 20, suggestions filled before nits. A 4-hunk PR gets 4, a 20-hunk PR gets 8. Overflow goes in the summary as a list. This is a starting formula. The cap stays until the harness (D4c) measures it against real records. If it changes, it caps nits only.
 
 ### 3.7 Report
 
@@ -251,6 +251,7 @@ A custom reviewer can also override `threshold` to be stricter, never looser tha
 | `thresholds.middle_band` | `[60, 85]` | The score range that sends a finding to verifier escalation. |
 | `reviewers.<name>.enabled` | `true` | Whether the reviewer may run. |
 | `reviewers.<name>.passes` | the frontmatter value | The number of passes of the reviewer. |
+| `reviewers.<name>.max_turns` | 150 | The turn budget of each pass of the reviewer. An integer of 1 or more. The dollar cap of a pass is $0.05 times this value. |
 | `reviewers.<name>.threshold` | the frontmatter value, raised to `thresholds.default` | The threshold of the reviewer. A value below `thresholds.default` is an error. |
 | `reviewers.<name>.model` | `models.reviewer.model`, else the frontmatter value, else the role default | The model of one reviewer. This key pins that reviewer. |
 | `reviewers.<name>.effort` | `models.reviewer.effort`, else the frontmatter value, else the role default | The effort of one reviewer. This key pins that reviewer. |
@@ -283,7 +284,7 @@ A custom reviewer can also override `threshold` to be stricter, never looser tha
 
 Effort and output schema stay fixed per role within a run, because changing either invalidates the prompt cache. Haiku 5.5 is not used as a verifier or reviewer: its system card reports the highest over-refusal rate of any tested model and work reported done without checking at low and medium effort.
 
-A repo can override the model and effort of any role with `models.<role>`, and of one reviewer with `reviewers.<name>`. Section 4 gives the order. A run-level token ceiling stops new reviewer launches when reached and notes it in the summary. Each SDK query is its own Claude Code process of about 1 GiB, and a standard GitHub runner has 7 GiB, so the orchestrator runs at most 5 queries at once by default. Unattended runs set `CLAUDE_CODE_RETRY_WATCHDOG=1` so rate-limit responses retry without a cap.
+A repo can override the model and effort of any role with `models.<role>`, and of one reviewer with `reviewers.<name>`. Section 4 gives the order. Each reviewer pass has a turn budget. The default is 150 turns. A repo sets it with `reviewers.<name>.max_turns`. The dollar cap of a pass is $0.05 times the budget, so the cap is $7.50 at the default. The turn budget is how a repo buys depth. A run-level token ceiling stops new reviewer launches when reached and notes it in the summary. Each SDK query is its own Claude Code process of about 1 GiB, and a standard GitHub runner has 7 GiB, so the orchestrator runs at most 5 queries at once by default. Unattended runs set `CLAUDE_CODE_RETRY_WATCHDOG=1` so rate-limit responses retry without a cap.
 
 ### 5.1 Model versions
 
@@ -302,7 +303,7 @@ Prompts follow Anthropic's current prompting guidance for the 5.5 family, summar
 - All configuration and all agent files load from the base branch. PR versions are ignored and the diff of `.pr-review/` is itself reviewed by the security reviewer.
 - The PR head checks out into a separate directory. Reviewers read it as data. Every SDK query runs with `settingSources: []`, so no hooks, MCP servers, agents or CLAUDE.md load from the checkout. The orchestrator injects CLAUDE.md and the rules file from the base branch itself.
 - Built-in and custom reviewers get read-only tools by default: Read, Grep and Glob. Bash, Write and Edit go in `disallowedTools`, which removes them from the request, and `permissionMode` is set explicitly to `dontAsk`. The auto-approve list alone does not restrict, and an omitted mode can start in auto.
-- A custom reviewer may request `Bash`. The orchestrator grants it only when the PR author has write access to the repo and the reviewer sets `trusted: true`. Otherwise the reviewer runs without Bash and the summary says so.
+- A custom reviewer may request `Bash`. The orchestrator grants it only when the PR author has write access to the repo and the reviewer sets `trusted: true`. Otherwise the reviewer runs without Bash and the summary says so. When a trusted custom reviewer gets Bash, the run allows read-only git commands. The run denies `git fetch`, `git pull`, `git checkout`, `git switch` and `gh` with explicit deny rules, not by the allow list alone. The record lists every permission denial. The current build does not apply these rules yet: it still approves the bare rule `Bash`.
 - Fork PRs: no automatic run. A `pull_request` event from a fork has a read-only token and no secrets, so the reusable workflow skips it. A maintainer adds the label `review:full` or `review:fast`. GitHub lets only a user with triage permission or more add a label, so the label permission is the gate; the event carries no association for the labeler. The `pull_request_target` event for that label runs the fork PR. The comment `@pr-review full` from the same class of user is the second path; it runs fresh at the full tier. The run checks out the fork head and executes no code from it. The CLI reads git objects. It runs no script, hook or build of the repo under review. The consumer must not add a step that builds or tests the fork head in the same job. A fork run grants Bash to no custom reviewer, whatever the permission level of the author. The checkout keeps no token: `persist-credentials: false`, and the fetch and push steps get the job token through the `gh` credential helper from their own env. The other tool rules above hold as for any other run.
 - The PR title and body are untrusted data in every prompt.
 - Secrets: the Claude token is the only secret in the job. The GitHub token has `pull-requests: write`, `checks: write` and `contents: write`. The job needs `contents: write` to push the `pr-review-records` branch.
@@ -413,7 +414,7 @@ Settled on 2026-10-13:
 8. **Auth**: the user's Claude subscription, in CI and locally. See section 9.
 
 9. **Verifier model**: Sonnet, with Opus escalation. Severity assigned by the verifier, downgradable at merge.
-10. **Non-blocking cap**: `3 + ceil(hunks / 4)`, at most 20. A starting value for the harness to tune.
+10. **Non-blocking cap**: `3 + ceil(hunks / 4)`, at most 20. A starting value. The cap stays until the harness measures it against real records. If it changes, it caps nits only. See section 3.6.
 11. **Failures**: always visible in the review, verdict `incomplete`. Never post unverified findings.
 12. **Records**: workflow artifact plus a `pr-review-records` branch.
 13. **Distribution**: composite action run from source, wrapped in a reusable workflow, plus the CLI. No npm package. The concurrency limit is the `concurrency` key of the repo config, default 5, as decision 17 says.
@@ -421,6 +422,7 @@ Settled on 2026-10-13:
 15. **Model versions**: exact IDs pinned in config, 5.5 family by default. Reviewers on Opus 5.5 at low effort, verifier on Sonnet 5.5 at high with Opus escalation, triage and merge on Sonnet 5.5, summarizer on Haiku 5.5. Harness hypotheses, see section 5.1.
 16. **Reviewer prompts**: report everything in scope with confidence and severity; filtering is the verifier's job. Follows the 5.x guidance that conservative review prompts over-filter.
 17. **Parallelism**: a semaphore sized to runner memory, default 5, because each SDK query is a process of about 1 GiB. This is a resource bound, not a rate-limit policy.
+18. **Dispatch**: one SDK `query()` per reviewer pass is the dispatch mechanism. A subagent mode, if a later change adds one, is a budget option for the deep reviewers. It is not a recall lever. The turn budget, not the mechanism, is how a repo buys depth.
 
 ## 11. Open risks
 
