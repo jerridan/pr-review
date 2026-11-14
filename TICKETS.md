@@ -90,8 +90,21 @@ Goal: give the finders the briefing and the reading procedure that find the seri
 Goal: set two passes for the reviewers that find serious bugs. Closes issue 21. Depends on D5 for the measurement.
 
 - Set `passes: 2` for history and tests at the full tier. diff-bugs and security already have it. The fast tier stays at one pass.
-- Report recall, precision and cost per PR for one pass against two on the D4b case set, with at least 20 runs per arm. `docs/research/passes-recall.md` could not separate the arms on the fixture.
 - Add a per-reviewer turn budget, default 150 turns, as the knob a repo uses to buy depth. Issue 22 shows the dispatch mechanism is a cost knob and not a recall knob.
+- Measure one pass against two by the design below, and write the result to `docs/research/passes-recall.md`. That note could not separate the arms on the fixture.
+
+Measurement design. An earlier version of this entry asked for 20 runs per arm on the D4b case set. The D4b baseline showed that this is not possible: one run of the 28 cases costs about $133, the eval runs on the plan login, and one dollar uses about 0.93 points of a five-hour plan window. Forty runs are about $5,300 and about 100 windows. The design below gives the same answer for about $150.
+
+- Use paired arms. Run only the two-pass arm. A run record names the pass of each reviewer finding, so the one-pass arm is the same run with the findings of pass 2 left out. The two arms then share every other source of noise, and one run gives the two figures.
+- Give the eval a paired report. For each run, it scores two sets against the goldens: the findings that pass 1 raised, and all the findings. For each set it reports raw recall, posted recall, precision and cost. A posted finding belongs to the one-pass set when a pass 1 finding is one of its sources. The cost of the one-pass set leaves out the reviewer queries of pass 2 and the verifications of the findings that only pass 2 raised.
+- Give the eval an option that limits a run to named reviewers. The measurement runs history and tests only, each with two passes. This measures the two reviewers alone, so the gain is an upper limit of the gain in the full pipeline, where another reviewer can raise the same finding.
+- Use a subset of the cases. Make a cases directory that leaves out each case whose baseline cost per run is above $8. Keep the clean cases: they show the false findings that a second pass adds.
+- Set a budget, not a run count. The measurement uses at most $150 of model calls. Run as many full repeats of the subset as the budget permits, and three at the minimum. If three repeats do not fit, make the subset smaller by the same cost rule with a lower limit, and record the limit.
+- Run with `--resume`, and stop a run when the cases completed in one plan window reach $75.
+- Report, for each of the two reviewers and for the two together: the paired difference in posted recall and in precision for each repeat, its mean and its spread, the count of posted-label goldens that only pass 2 found, the count of false posted findings that only pass 2 raised, and the added cost per added golden.
+- If the run records of the D4b baseline still exist, make the same paired report for diff-bugs and security from them. Those records hold two passes of the two reviewers, so this costs nothing. If the records do not exist, state that and do not run the baseline again for it.
+- Decide by this rule: a reviewer keeps `passes: 2` when its paired gain in posted recall is above zero in every repeat. If the gain is not above zero in every repeat, the reviewer stays at one pass, and the note records that the arms were not separated.
+- After the default changes, run the full pipeline one time on the subset with the gate. Write a new baseline only if the gate fails, and only on the word of the principal: a baseline at two repeats on the 28 cases costs about $270 and five plan windows.
 
 ## Design updates from issues 22, 23 and 28
 
@@ -104,6 +117,8 @@ Goal: record three decisions in the design. No code change. Can ride with any de
 ## D4c: First experiments
 
 Goal: run the first experiments on the eval and write the results to `docs/research/`.
+
+Each experiment follows the cost rules of the D8 measurement design: a subset of the cases, a budget in dollars that is set before the run, `--resume`, and paired arms when one run can give the two arms.
 
 - diff-bugs on Opus 5.5 low against Sonnet 5.5 medium, on cost per confirmed finding.
 - One Opus reviewer at medium over the whole diff against the specialist set.
