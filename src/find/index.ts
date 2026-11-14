@@ -13,7 +13,7 @@ import {
   type ReviewerDefinition,
 } from "../reviewers/loader.js";
 import { FindingsOutputSchema, type Finding, type FindingsOutput } from "../schemas/finding.js";
-import type { QueryFailure } from "../schemas/record.js";
+import type { FindingSource, QueryFailure } from "../schemas/record.js";
 import type { TriageBrief } from "../schemas/triage.js";
 import type { QueryMeta, SdkClient } from "../sdk/client.js";
 import type { RunOptions } from "../sdk/options.js";
@@ -71,6 +71,16 @@ type FindContext = {
    * gives it here. When it is not set, runReviewers splits the diff itself.
    */
   sections?: Map<string, string>;
+  /**
+   * The passes of named reviewers for this run. They replace the passes of
+   * the config and the frontmatter, but not the one pass of the fast tier.
+   */
+  passes?: ReadonlyMap<string, number>;
+  /**
+   * The client for the queries of one pass. The run uses it to record the
+   * pass of each query. Absent means the client that runReviewers gets.
+   */
+  clientForPass?: (pass: number) => SdkClient;
 };
 
 /** The reviewer that gets the history block in its user message. */
@@ -246,14 +256,15 @@ function messageOf(err: unknown): string {
  * and the semaphore bounds them. "onFinding" gets each checked finding as
  * its pass returns, so verification starts per finding. A finding with the
  * fingerprint of a finding that the same reviewer already gave is not sent
- * again.
+ * again. Its pass goes into the "sources" list that "onFinding" got for
+ * the first copy, so that list is complete only when every pass returned.
  */
 export async function runReviewers(
   client: SdkClient,
   options: RunOptions,
   selected: { def: ReviewerDefinition; trigger: string }[],
   ctx: FindContext,
-  onFinding: (f: Finding, reviewer: string) => void,
+  onFinding: (f: Finding, reviewer: string, sources: FindingSource[]) => void,
 ): Promise<ReviewerRun[]> {
   const texts = reviewerTexts(loadPrompt("reviewer-user.md"));
   const sections = ctx.sections ?? diffSections(ctx.gathered.diff);
@@ -280,8 +291,9 @@ export async function runReviewers(
   const runPass = async (
     def: ReviewerDefinition,
     pass: number,
-    seen: Set<string>,
+    seen: Map<string, FindingSource[]>,
   ): Promise<ReviewerRun | null> => {
+    const passClient = ctx.clientForPass?.(pass) ?? client;
     const name = def.frontmatter.name;
     const userMessage = buildReviewerMessage(
       texts,
@@ -295,7 +307,7 @@ export async function runReviewers(
       // start, so it sees every query that ended before it.
       outcome = await ctx.semaphore(async () => {
         if (ctx.canStartPass && !ctx.canStartPass()) return null;
-        return client.query<FindingsOutput>(
+        return passClient.query<FindingsOutput>(
           {
             role: "reviewer",
             reviewerName: name,
@@ -352,12 +364,18 @@ export async function runReviewers(
     }
     // The passes of a reviewer have the same inputs, so they often give
     // the same finding. One copy per fingerprint goes to verification:
-    // the copy of the pass that returns first.
+    // the copy of the pass that returns first. Each pass that gives the
+    // fingerprint is a source of that copy.
     for (const finding of findings) {
       const key = fingerprint(finding, headFile(finding.file)?.raw ?? null);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      onFinding(finding, name);
+      const sources = seen.get(key);
+      if (sources) {
+        if (!sources.some((s) => s.pass === pass)) sources.push({ reviewer: name, pass });
+        continue;
+      }
+      const first: FindingSource[] = [{ reviewer: name, pass }];
+      seen.set(key, first);
+      onFinding(finding, name, first);
     }
     return { name, pass, status: "ok", findings, dropped, meta: outcome.raw };
   };
@@ -378,8 +396,11 @@ export async function runReviewers(
   );
   const tasks: Promise<ReviewerRun | null>[] = [];
   for (const { def } of selected) {
-    const seen = new Set<string>();
-    const passes = effectivePasses(def, ctx.config, ctx.tier ?? "full");
+    const seen = new Map<string, FindingSource[]>();
+    const tier = ctx.tier ?? "full";
+    const set = ctx.passes?.get(def.frontmatter.name);
+    const passes =
+      set !== undefined && tier !== "fast" ? set : effectivePasses(def, ctx.config, tier);
     for (let pass = 1; pass <= passes; pass++) {
       tasks.push(runPass(def, pass, seen));
     }

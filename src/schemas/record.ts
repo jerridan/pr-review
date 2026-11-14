@@ -32,6 +32,17 @@ export type UnsureCause = "claim" | "limit";
 
 export const UNSURE_CAUSES = ["claim", "limit"] as const satisfies readonly UnsureCause[];
 
+/**
+ * One reviewer pass that raised a finding. A finding that two passes
+ * raised, with one fingerprint, has two sources.
+ */
+export type FindingSource = { reviewer: string; pass: number };
+
+export const FindingSourceSchema: z.ZodType<FindingSource> = z.strictObject({
+  reviewer: z.string(),
+  pass: integer(),
+});
+
 export type PostedFinding = Finding & {
   fingerprint: string;
   severity: "blocking" | "suggestion" | "nit";
@@ -39,6 +50,12 @@ export type PostedFinding = Finding & {
   verifier: VerifierResult;
   /** The normalized span text that the fingerprint hashes (normalizeWs of the head lines). */
   span_text: string;
+  /**
+   * The reviewer passes that raised the finding: the union of the sources
+   * of its merge group, or the sources of its one verification. A record
+   * from before D8 has none.
+   */
+  sources?: FindingSource[];
 };
 
 /** What the run posted to GitHub with --format github (R5, R6). */
@@ -177,6 +194,12 @@ export type RunRecord = {
       rejected?: string;
       /** Present when the finding ended unsure. "passed" is then false. */
       unsure?: UnsureCause;
+      /**
+       * Every reviewer pass that raised a finding with this fingerprint,
+       * also the passes whose copy did not go to verification. A record
+       * from before D8 has none.
+       */
+      sources?: FindingSource[];
     }[];
     merges: { group: number[]; result: MergeOutput | QueryFailure; rejected?: string }[];
     capped: PostedFinding[];
@@ -224,6 +247,13 @@ export type RunRecord = {
     queries: {
       role: Role;
       reviewer?: string;
+      /** The pass of a reviewer query. A record from before D8 has none. */
+      pass?: number;
+      /**
+       * The index in stages.verifications of the verification that a
+       * verifier or escalation query served. A record from before D8 has none.
+       */
+      verification?: number;
       model: string;
       duration_ms: number;
       stop_reason: string | null;
@@ -275,6 +305,7 @@ export const PostedFindingSchema: z.ZodType<PostedFinding> = z.strictObject({
   score: integer(),
   verifier: VerifierResultSchema,
   span_text: z.string(),
+  sources: z.array(FindingSourceSchema).optional(),
 });
 
 export const PostedGitHubSchema: z.ZodType<PostedGitHub> = z.strictObject({
@@ -397,6 +428,7 @@ const StagesSchema = z.strictObject({
       passed: z.boolean(),
       rejected: z.string().optional(),
       unsure: z.enum(UNSURE_CAUSES).optional(),
+      sources: z.array(FindingSourceSchema).optional(),
     }),
   ),
   merges: z.array(
@@ -454,6 +486,8 @@ const CostSchema = z.strictObject({
     z.strictObject({
       role: roleEnum,
       reviewer: z.string().optional(),
+      pass: integer().optional(),
+      verification: integer().optional(),
       model: z.string(),
       duration_ms: z.number(),
       stop_reason: z.string().nullable(),

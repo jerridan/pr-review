@@ -787,6 +787,7 @@ describe("a verifier prompt that does not load", () => {
         },
         final: null,
         passed: false,
+        sources: [{ reviewer: "diff-bugs", pass: 1 }],
       },
     ]);
     expect(fake.calls.filter((c) => c.role === "verifier")).toEqual([]);
