@@ -182,3 +182,31 @@ describe("writeBaseline (R6.1, R6.5)", () => {
     expect(() => readFileSync(file)).toThrow();
   });
 });
+
+describe("the cost per case in the baseline (D8 R6)", () => {
+  it("writes the cost per run of each case, the mean of its repeats, and reads it back", async () => {
+    const file = path();
+    const withCost = (n: number, cost: number | null, failed = false): RepeatMetrics => ({
+      ...repeat(n, 0.5, 0.5),
+      cost_usd: cost,
+      failed,
+    });
+    const built = buildReport(
+      [
+        { name: "a-case", repeats: [withCost(1, 1), withCost(2, 3)] },
+        { name: "b-case", repeats: [withCost(1, 0.5), withCost(2, 9, true)] },
+      ],
+      null,
+      null,
+    );
+    await writeBaseline(file, built, null, { repeat: 2, tool_version: "1" });
+    const read = await readBaseline(file);
+    expect(read.case_costs).toEqual({ "a-case": 2, "b-case": 0.5 });
+  });
+
+  it("reads a baseline without the cost per case", async () => {
+    const file = path();
+    writeFileSync(file, JSON.stringify(baseline()));
+    expect((await readBaseline(file)).case_costs).toBeUndefined();
+  });
+});
