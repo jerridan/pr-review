@@ -558,6 +558,15 @@ The GitHub review adds these keys:
 | `posted.carried` | The full finding of every open fingerprint from earlier runs that this run did not post. |
 | `span_text` on each posted finding | The normalized span text that the fingerprint hashes. |
 
+These keys link each finding and each query to its reviewer pass. The paired report of the eval reads them. A record from before them does not hold them. `pr-review explain` and the eval scoring read such a record as before.
+
+| Key | Content |
+|-----|---------|
+| `stages.verifications[].sources` | For each reviewer pass that gave a finding with this fingerprint: `reviewer` and `pass`. The list also holds a pass whose copy did not go to verification, because an earlier pass already gave it. |
+| `sources` on each finding in `posted.findings`, `stages.capped`, `stages.pre_existing` and `posted.below_floor` | The sources of its verification. A merged finding holds the sources of every member of its merge group. `posted.carried` holds what the earlier run wrote. |
+| `cost.queries[].pass` | The pass of a query with the role `reviewer`. |
+| `cost.queries[].verification` | The index in `stages.verifications` of the verification that a query with the role `verifier` or `verifier-escalation` served. |
+
 The JSON output holds `reviewers_skipped`, `reviewers_without_bash` and `sensitive_without_hunks` in its `coverage` object. The table output shows the same three lists on its `Coverage` line.
 
 ## Pool
