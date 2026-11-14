@@ -898,7 +898,7 @@ describe("the repo config in a run (R3)", () => {
     // default low applies, and models.reviewer sets the model of each one.
     expect(byRole("reviewer").length).toBeGreaterThan(1);
     for (const call of byRole("reviewer")) {
-      expect(call.overrides, call.reviewerName).toEqual({
+      expect(call.overrides, call.reviewerName).toMatchObject({
         model: "claude-sonnet-5-5",
         effort: "low",
       });
@@ -999,7 +999,7 @@ describe("the repo config in a run (R3)", () => {
     const custom = fake.calls.filter((c) => c.reviewerName === "naming");
     expect(custom).toHaveLength(1);
     expect(custom[0]?.systemPrompt).toContain("CUSTOM-BODY");
-    expect(custom[0]?.overrides).toEqual({ model: "claude-haiku-5-5", effort: "medium" });
+    expect(custom[0]?.overrides).toMatchObject({ model: "claude-haiku-5-5", effort: "medium" });
     expect(record.identity.selected_reviewers.map((r) => r.name).sort()).toEqual([
       "conventions",
       "diff-bugs",
@@ -1071,7 +1071,7 @@ describe("the repo config in a run (R3)", () => {
     const expected = { model: resolveModel(role.model), effort: role.effort };
     expect(calls.map((c) => c.reviewerName)).toContain("naming");
     expect(calls.map((c) => c.reviewerName)).toContain("diff-bugs");
-    for (const call of calls) expect(call.overrides, call.reviewerName).toEqual(expected);
+    for (const call of calls) expect(call.overrides, call.reviewerName).toMatchObject(expected);
     expect(record.identity.models.reviewer).toEqual(expected);
   }, 30_000);
 
@@ -1079,7 +1079,7 @@ describe("the repo config in a run (R3)", () => {
     const cfx = await fixtureWithNaming(["effort: high"]);
     const { record, calls } = await reviewNaming(cfx, "config-frontmatter-effort");
     const naming = calls.find((c) => c.reviewerName === "naming");
-    expect(naming?.overrides).toEqual({ model: "claude-opus-5-5", effort: "high" });
+    expect(naming?.overrides).toMatchObject({ model: "claude-opus-5-5", effort: "high" });
     expect(record.identity.selected_reviewers.find((r) => r.name === "naming")).toMatchObject({
       effort: "high",
     });
@@ -1092,7 +1092,7 @@ describe("the repo config in a run (R3)", () => {
     );
     const { record, calls } = await reviewNaming(cfx, "config-own-beats-all");
     const naming = calls.find((c) => c.reviewerName === "naming");
-    expect(naming?.overrides).toEqual({ model: "claude-opus-5-5", effort: "max" });
+    expect(naming?.overrides).toMatchObject({ model: "claude-opus-5-5", effort: "max" });
     expect(record.identity.selected_reviewers.find((r) => r.name === "naming")).toMatchObject({
       effort: "max",
     });
@@ -1466,7 +1466,7 @@ describe("custom reviewers and the Bash policy (R7)", () => {
     );
     expect(prompt).toMatch(/confidence/i);
     expect(prompt).toMatch(/every issue/i);
-    expect(call?.overrides).toEqual({ model: "claude-sonnet-5-5", effort: "medium" });
+    expect(call?.overrides).toMatchObject({ model: "claude-sonnet-5-5", effort: "medium" });
   }, 30_000);
 
   it("puts the custom rules block before the repo rules block", async () => {

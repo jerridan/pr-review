@@ -6,6 +6,7 @@ import type { GatherResult } from "../gather/index.js";
 import { loadPrompt, render, type PromptFile } from "../prompts/load.js";
 import { fingerprint } from "../merge/fingerprint.js";
 import {
+  effectiveBudget,
   effectiveModel,
   effectivePasses,
   reviewerTools,
@@ -302,7 +303,7 @@ export async function runReviewers(
             userMessage,
             schema: FindingsOutputSchema,
             cwd: ctx.cwd,
-            overrides: effectiveModel(def, ctx.config),
+            overrides: { ...effectiveModel(def, ctx.config), ...effectiveBudget(def, ctx.config) },
             tools: def.frontmatter.tools,
             ...(tools.get(def)?.bashGranted ? { bash: true } : {}),
           },

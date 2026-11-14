@@ -14,6 +14,12 @@ export type EvalRole = "judge" | "labeler" | "pool-reviewer" | "pool-grouper" | 
 /** The role of one query. */
 export type QueryRole = Role | EvalRole;
 
+/**
+ * The dollar cap of a reviewer query for each turn of its budget. The cap
+ * is this rate times the turn budget, so the cap follows the budget.
+ */
+export const REVIEWER_USD_PER_TURN = 0.05;
+
 export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
 
 export interface RoleConfig {
@@ -63,8 +69,8 @@ export const ROLE_DEFAULTS: Record<Role, RoleConfig> = {
   reviewer: {
     model: MODEL_IDS.opus,
     effort: "low",
-    maxTurns: 40,
-    maxBudgetUsd: 2,
+    maxTurns: 150,
+    maxBudgetUsd: REVIEWER_USD_PER_TURN * 150,
     timeoutMs: 600_000,
     tools: "read-only",
   },

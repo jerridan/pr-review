@@ -251,7 +251,7 @@ describe("runReviewers (A5)", () => {
     expect(call.systemPrompt).toBe("SYSTEM diff-bugs");
     expect(call.schema).toBe(FindingsOutputSchema);
     expect(call.cwd).toBe(head);
-    expect(call.overrides).toEqual({ model: "claude-opus-5-5", effort: "low" });
+    expect(call.overrides).toMatchObject({ model: "claude-opus-5-5", effort: "low" });
     expect(call.tools).toEqual(["Read", "Grep", "Glob"]);
   });
 

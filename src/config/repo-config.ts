@@ -35,7 +35,14 @@ export type RepoConfig = {
   thresholds: { default: number; middle_band: [number, number] };
   reviewers: Record<
     string,
-    { enabled: boolean; passes?: number; threshold?: number; model?: string; effort?: Effort }
+    {
+      enabled: boolean;
+      passes?: number;
+      max_turns?: number;
+      threshold?: number;
+      model?: string;
+      effort?: Effort;
+    }
   >;
   suppressions: { reviewer?: string; category?: Category; path?: string; reason: string }[];
   sensitive_globs: string[];
@@ -108,6 +115,7 @@ const effort = () => ciEnum(EFFORTS as readonly [Effort, ...Effort[]]);
 const ReviewerEntrySchema = z.strictObject({
   enabled: z.boolean().default(true),
   passes: atLeast(1).optional(),
+  max_turns: atLeast(1).optional(),
   threshold: percent().optional(),
   model: modelName().optional(),
   effort: effort().optional(),

@@ -3,7 +3,12 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { RepoConfig } from "../config/repo-config.js";
-import { resolveModel, ROLE_DEFAULTS, type Effort } from "../config/models.js";
+import {
+  resolveModel,
+  REVIEWER_USD_PER_TURN,
+  ROLE_DEFAULTS,
+  type Effort,
+} from "../config/models.js";
 import { parseFrontmatter, promptPath } from "../prompts/load.js";
 import { narrowReadOnlyTools } from "../sdk/options.js";
 import { ReviewerFrontmatterSchema, type ReviewerFrontmatter } from "../schemas/reviewer.js";
@@ -201,6 +206,23 @@ export function effectiveModel(
     ),
     effort: own?.effort ?? role?.effort ?? def.frontmatter.effort ?? ROLE_DEFAULTS.reviewer.effort,
   };
+}
+
+/**
+ * The turn budget of each pass of a reviewer, and the dollar cap that
+ * follows it. The budget is reviewers.<name>.max_turns when set, else the
+ * role default. The cap is REVIEWER_USD_PER_TURN times the budget.
+ */
+export function effectiveBudget(
+  def: ReviewerDefinition,
+  config: RepoConfig,
+): { maxTurns: number; maxBudgetUsd: number } {
+  const maxTurns = reviewerEntry(config, def.frontmatter.name)?.max_turns;
+  if (maxTurns === undefined) {
+    const { maxTurns: base, maxBudgetUsd } = ROLE_DEFAULTS.reviewer;
+    return { maxTurns: base, maxBudgetUsd };
+  }
+  return { maxTurns, maxBudgetUsd: REVIEWER_USD_PER_TURN * maxTurns };
 }
 
 /**
