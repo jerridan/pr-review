@@ -157,6 +157,7 @@ describe("writeBaseline (R6.1, R6.5)", () => {
       repeat: 3,
       written_at: written.written_at,
       tool_version: "9.9.9",
+      case_costs: { "a-case": 0.1 },
     });
     expect(Date.parse(written.written_at)).toBeGreaterThanOrEqual(before - 1000);
     expect(new Date(written.written_at).toISOString()).toBe(written.written_at);
