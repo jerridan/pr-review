@@ -20,7 +20,9 @@ export interface QueryRequest {
   userMessage: string;
   schema: z.ZodType;
   cwd: string;
-  overrides?: Partial<Pick<RoleConfig, "model" | "effort" | "maxTurns" | "maxBudgetUsd">>;
+  overrides?: Partial<
+    Pick<RoleConfig, "model" | "effort" | "maxTurns" | "maxBudgetUsd" | "timeoutMs">
+  >;
   /**
    * The tools of a reviewer. They narrow the read-only set of the role and
    * never widen it. When this is not set, the role gets its full set.
@@ -158,7 +160,7 @@ export function createSdkClient(run: QueryFn = query): SdkClient {
       // query failure.
       const sdkOptions = buildQueryOptions(req, options);
       const model = sdkOptions.model as string;
-      const timeoutMs = roleConfig(req.role).timeoutMs;
+      const timeoutMs = req.overrides?.timeoutMs ?? roleConfig(req.role).timeoutMs;
       // Each query has its own controller. The timer aborts it, and the
       // query ends at that time also when the SDK does not stop.
       const controller = new AbortController();

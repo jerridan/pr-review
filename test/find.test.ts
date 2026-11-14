@@ -251,7 +251,13 @@ describe("runReviewers (A5)", () => {
     expect(call.systemPrompt).toBe("SYSTEM diff-bugs");
     expect(call.schema).toBe(FindingsOutputSchema);
     expect(call.cwd).toBe(head);
-    expect(call.overrides).toMatchObject({ model: "claude-opus-5-5", effort: "low" });
+    expect(call.overrides).toEqual({
+      model: "claude-opus-5-5",
+      effort: "low",
+      maxTurns: 150,
+      maxBudgetUsd: 7.5,
+      timeoutMs: 1_500_000,
+    });
     expect(call.tools).toEqual(["Read", "Grep", "Glob"]);
   });
 
@@ -546,24 +552,24 @@ describe("runReviewers (A5)", () => {
       );
       return fake.calls.map((call) => {
         const opts = buildQueryOptions(call, OPTIONS);
-        return `${call.reviewerName}:${opts.maxTurns}:${opts.maxBudgetUsd}`;
+        return `${call.reviewerName}:${opts.maxTurns}:${opts.maxBudgetUsd}:${call.overrides?.timeoutMs}`;
       });
     };
     expect(await budgets(DEFAULT_REPO_CONFIG)).toEqual([
-      "diff-bugs:150:7.5",
-      "diff-bugs:150:7.5",
-      "security:150:7.5",
-      "security:150:7.5",
+      "diff-bugs:150:7.5:1500000",
+      "diff-bugs:150:7.5:1500000",
+      "security:150:7.5:1500000",
+      "security:150:7.5:1500000",
     ]);
     const deep = {
       ...DEFAULT_REPO_CONFIG,
       reviewers: { "diff-bugs": { enabled: true, max_turns: 300 } },
     };
     expect(await budgets(deep)).toEqual([
-      "diff-bugs:300:15",
-      "diff-bugs:300:15",
-      "security:150:7.5",
-      "security:150:7.5",
+      "diff-bugs:300:15:3000000",
+      "diff-bugs:300:15:3000000",
+      "security:150:7.5:1500000",
+      "security:150:7.5:1500000",
     ]);
   });
 

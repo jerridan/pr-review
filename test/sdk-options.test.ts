@@ -48,7 +48,7 @@ const EXPECTED: Record<
     effort: "low",
     maxTurns: 150,
     maxBudgetUsd: 7.5,
-    timeoutMs: 600_000,
+    timeoutMs: 1_500_000,
     tools: "read-only",
     schema: FindingsOutputSchema,
   },
@@ -267,6 +267,23 @@ describe("A13: query options for every role", () => {
 
     const plain = buildQueryOptions(request("reviewer"), runOptions(false));
     expect(plain.model).toBe("claude-opus-5-5");
+  });
+});
+
+describe("the limits of a reviewer query", () => {
+  it("take the turns and the dollar cap from the overrides", () => {
+    const opts = buildQueryOptions(
+      request("reviewer", { overrides: { maxTurns: 300, maxBudgetUsd: 15 } }),
+      runOptions(false),
+    );
+    expect(opts.maxTurns).toBe(300);
+    expect(opts.maxBudgetUsd).toBe(15);
+  });
+
+  it("take the role default when no override sets them", () => {
+    const opts = buildQueryOptions(request("reviewer"), runOptions(false));
+    expect(opts.maxTurns).toBe(ROLE_DEFAULTS.reviewer.maxTurns);
+    expect(opts.maxBudgetUsd).toBe(ROLE_DEFAULTS.reviewer.maxBudgetUsd);
   });
 });
 
