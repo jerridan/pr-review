@@ -1,9 +1,10 @@
 // D8 R2: the eval keeps every judge answer it used, and a later scoring
 // of the same record reuses them.
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { DEFAULT_REPO_CONFIG } from "../src/config/repo-config.js";
 import type { GoldenFinding } from "../src/eval/case.js";
 import { readJudgeCache, writeJudgeCache } from "../src/eval/judge-cache.js";
@@ -130,8 +131,10 @@ const GOLDEN: GoldenFinding[] = [
   },
 ];
 
-function judge() {
+// A fake judge. With "fail", every query fails, so each answer is "unknown".
+function judge(fail = false) {
   return createFakeSdkClient((req: QueryRequest): QueryOutcome<unknown> => {
+    if (fail) return { ok: false, failure: { kind: "limit", message: "budget" }, raw: null };
     const raw = {
       model: MODEL,
       durationMs: 1,
@@ -208,5 +211,131 @@ describe("the judge cache (D8 R2)", () => {
       { extras: true },
     );
     expect(other.calls.length).toBe(2);
+  });
+});
+
+describe("the judge cache and a failed answer (D8 R2, review)", () => {
+  it("asks a cached unknown again when a client is given, and keeps the new answer", async () => {
+    const cache = await readJudgeCache(join(work, "none-1.json"));
+    const head = join(work, "head");
+    const failed = await scoreRecord(
+      record(),
+      GOLDEN,
+      head,
+      { client: judge(true), model: MODEL, options: OPTIONS, cache },
+      { extras: true },
+    );
+    expect(failed.judgeUnknown).toBe(1);
+    const again = judge();
+    const two = await scoreRecord(
+      record(),
+      GOLDEN,
+      head,
+      { client: again, model: MODEL, options: OPTIONS, cache },
+      { extras: true },
+    );
+    expect(again.calls.length).toBe(2);
+    expect(two.matched.length).toBe(1);
+    expect([...cache.values()].sort()).toEqual(["yes", "yes"]);
+  });
+
+  it("uses a cached unknown with no client, and counts it as unknown", async () => {
+    const cache = await readJudgeCache(join(work, "none-2.json"));
+    const head = join(work, "head");
+    await scoreRecord(
+      record(),
+      GOLDEN,
+      head,
+      { client: judge(true), model: MODEL, options: OPTIONS, cache },
+      { extras: true },
+    );
+    const offline = await scoreRecord(
+      record(),
+      GOLDEN,
+      head,
+      { client: null, model: MODEL, options: OPTIONS, cache },
+      { extras: true },
+    );
+    expect(offline.uncached).toBe(0);
+    expect(offline.judgeUnknown).toBe(1);
+    // The match judge failed, so both posted findings went to the extras judge.
+    expect(offline.extras.unknown).toBe(2);
+  });
+});
+
+describe("the key of a judge answer (D8 R2, review)", () => {
+  it("misses the cache when the head lines that the judge sees change", async () => {
+    const cache = await readJudgeCache(join(work, "none-3.json"));
+    await scoreRecord(
+      record(),
+      GOLDEN,
+      join(work, "head"),
+      { client: judge(), model: MODEL, options: OPTIONS, cache },
+      { extras: true },
+    );
+    const other = join(work, "head-other");
+    mkdirSync(join(other, "src"), { recursive: true });
+    const lines = Array.from({ length: 60 }, (_, i) => `let w${i + 1} = ${i + 1};`);
+    writeFileSync(join(other, "src", "a.ts"), `${lines.join("\n")}\n`);
+    const fresh = judge();
+    await scoreRecord(
+      record(),
+      GOLDEN,
+      other,
+      { client: fresh, model: MODEL, options: OPTIONS, cache },
+      { extras: true },
+    );
+    // Both the match question and the extras question show those lines.
+    expect(fresh.calls.length).toBe(2);
+  });
+
+  it("misses the cache when the judge prompts change", async () => {
+    const path = join(work, "judge-cache-prompt.json");
+    const cache = await readJudgeCache(path);
+    await scoreRecord(
+      record(),
+      GOLDEN,
+      join(work, "head"),
+      { client: judge(), model: MODEL, options: OPTIONS, cache },
+      { extras: true },
+    );
+    await writeJudgeCache(path, cache);
+
+    // The prompt loader reads PR_REVIEW_PROMPTS_DIR when it loads, so load
+    // new copies of the modules after the variable is set.
+    const prompts = join(work, "prompts");
+    cpSync(fileURLToPath(new URL("../prompts/", import.meta.url)), prompts, { recursive: true });
+    for (const file of ["judge.md", "extras-judge.md"]) {
+      writeFileSync(
+        join(prompts, file),
+        `${readFileSync(join(prompts, file), "utf8")}\nOne more line.\n`,
+      );
+    }
+    vi.stubEnv("PR_REVIEW_PROMPTS_DIR", prompts);
+    vi.resetModules();
+    try {
+      const fresh = await import("../src/eval/score.js");
+      const cacheModule = await import("../src/eval/judge-cache.js");
+      const client = judge();
+      await fresh.scoreRecord(
+        record(),
+        GOLDEN,
+        join(work, "head"),
+        { client, model: MODEL, options: OPTIONS, cache: await cacheModule.readJudgeCache(path) },
+        { extras: true },
+      );
+      expect(client.calls.length).toBe(2);
+    } finally {
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    }
+  });
+});
+
+describe("a judge cache file that is not valid (D8 R2, review)", () => {
+  it("throws an error that names the file", async () => {
+    const path = join(work, "corrupt-cache.json");
+    writeFileSync(path, "{ not json");
+    await expect(readJudgeCache(path)).rejects.toThrow(path);
   });
 });

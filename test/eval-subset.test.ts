@@ -1,5 +1,5 @@
 // D8 R5 and R6: a cases subset by the cost per run of each case.
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { createProgram } from "../src/cli.js";
@@ -145,6 +145,43 @@ describe("pr-review eval-subset (D8 R5)", () => {
     );
     expect(code).toBe(2);
     expect(output.stderr).toMatch(/case e has no cost/);
+  });
+
+  it("exits 2 and leaves --to unchanged when --to exists", async () => {
+    const to = tempDir("subset-exists", made);
+    writeFileSync(join(to, "keep.txt"), "mine");
+    const code = await subset(
+      "--cases",
+      writeCases(["a", "b", "c", "d"]),
+      "--costs",
+      writeReport(),
+      "--max-cost",
+      "2",
+      "--to",
+      to,
+    );
+    expect(code).toBe(2);
+    expect(output.stderr).toContain(to);
+    expect(readdirSync(to)).toEqual(["keep.txt"]);
+    expect(readFileSync(join(to, "keep.txt"), "utf8")).toBe("mine");
+  });
+
+  it("names a result.json that is not valid in an --out cost source", async () => {
+    const out = tempDir("subset-bad-result", made);
+    mkdirSync(join(out, "a", "1"), { recursive: true });
+    writeFileSync(join(out, "a", "1", "result.json"), "{ not json");
+    const code = await subset(
+      "--cases",
+      writeCases(["a"]),
+      "--costs",
+      out,
+      "--max-cost",
+      "2",
+      "--to",
+      join(tempDir("subset-to", made), "subset"),
+    );
+    expect(code).toBe(2);
+    expect(output.stderr).toContain(join(out, "a", "1", "result.json"));
   });
 
   it("exits 2 when no mode or both modes are given", async () => {
