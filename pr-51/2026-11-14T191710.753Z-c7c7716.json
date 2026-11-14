@@ -1,0 +1,212 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 51,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Give the D8 passes measurement a paired design with a budget",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/51"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "bc4469a21bf03c299035c7edfd48417243d4dbfd",
+    "head": "c7c7716b133546fdaaf48455a3a9c306970531e3",
+    "started_at": "2026-11-14T19:17:10.753Z",
+    "tool_version": "0.10.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Give the D8 passes measurement a paired design with a budget\n\nThis PR changes the D8 entry of `TICKETS.md`. It changes no code.\n\n## Why\n\nD8 asked for one pass against two \"with at least 20 runs per arm\" on the D4b case set. The D4b baseline measured what that costs:\n\n- One run of the 28 cases costs about $133.\n- The eval runs on the plan login, and one dollar uses about 0.93 points of a five-hour plan window.\n- Forty runs are about $5,300 and about 100 plan windows.\n\nSo the measurement needs a design that fits.\n\n## The new design\n\n- **Paired arms.** Only the two-pass arm runs. A run record names the pass of each reviewer finding, so the one-pass arm is the same run with the findings of pass 2 left out. One run gives the two figures, and the arms share all other noise.\n- **Two reviewers only.** A new eval option limits a run to named reviewers. The measurement runs history and tests, which are the two reviewers that D8 changes.\n- **A subset of the cases.** The cases with a baseline cost above $8 per run are left out. The clean cases stay.\n- **A budget, not a run count.** At most $150, with three repeats at the minimum, `--resume`, and $75 for each plan window.\n- **A decision rule.** A reviewer keeps `passes: 2` when its paired gain in posted recall is above zero in every repeat.\n- **No new baseline by default.** The gate decides. A new baseline needs the word of the principal, because it costs about $270.\n\nThe D4c entry gains one sentence that points its experiments to the same cost rules.\n\n## What a reviewer must check\n\n- The paired design assumes that the verification of a pass 1 finding does not depend on pass 2. The pipeline sends each finding to its verifier when its pass completes, and it removes duplicates by fingerprint before the verification. The entry states how the cost of the one-pass set is computed.\n- The measurement of two reviewers alone gives an upper limit of the gain in the full pipeline. The entry states this.\n\n## Verification\n\n`npm test` (1423 tests), `npm run lint`, `npm run typecheck` and `npm run build` pass.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZeE9g8BLHRTtXEThp4\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [],
+    "changed_files": [
+      {
+        "path": "TICKETS.md",
+        "hunks": 2
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "skip",
+      "reason": "The change edits only planning text in TICKETS.md, which no code reads, so it cannot cause a bug.",
+      "confidence": "high",
+      "categories": [
+        "docs"
+      ],
+      "hotspots": [],
+      "file_notes": [
+        {
+          "file": "TICKETS.md",
+          "note": "Planning doc only. It rewrites the D8 measurement design and adds a cost-rules note to the experiments section."
+        }
+      ],
+      "summary": "The change rewrites the D8 ticket in TICKETS.md. It replaces the \"20 runs per arm\" requirement with a cheaper paired-arm measurement design that has a dollar budget, a case subset, and a decision rule. It also adds a note that the first experiments follow the same cost rules. No code or configuration changes."
+    },
+    "tier": "skip",
+    "tier_reason": "Triage: The change edits only planning text in TICKETS.md, which no code reads, so it cannot cause a bug.",
+    "selected_reviewers": [],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [],
+    "verifications": [],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "skipped",
+    "coverage": {
+      "reviewers_ran": [],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5906666696,
+      "review_url": "https://github.com/jerridan/pr-review/pull/51#pullrequestreview-5906666696",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 132558168586
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 3076,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 2971,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0003096,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 387,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 3745,
+            "webSearchRequests": 0,
+            "costUSD": 0.018854,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0191636
+      }
+    ],
+    "total_cost_usd": 0.0191636,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 53,
+      "gather": 51,
+      "triage": 4586,
+      "find_verify": 2,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
