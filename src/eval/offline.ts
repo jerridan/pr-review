@@ -35,8 +35,10 @@ async function repeatNumbers(dir: string): Promise<number[]> {
   let entries;
   try {
     entries = await readdir(dir, { withFileTypes: true });
-  } catch {
-    return [];
+  } catch (err) {
+    // A case with no directory did not run. Any other error stops the report.
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw err;
   }
   return entries
     .filter((e) => e.isDirectory() && /^[1-9][0-9]*$/.test(e.name))
