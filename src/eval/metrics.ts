@@ -1,6 +1,7 @@
 // The metrics of one repeat of one case: the run record and its score.
 import { countDrops, explain } from "../explain/index.js";
 import type { RunRecord } from "../schemas/record.js";
+import type { RepeatPaired } from "./paired.js";
 import type { ScoreResult } from "./score.js";
 
 export type RepeatMetrics = {
@@ -36,6 +37,11 @@ export type RepeatMetrics = {
   extras_unknown: number;
   /** The matched and the accepted posted findings, over the posted findings. */
   adjudicated_precision: number | null;
+  /**
+   * The paired figures of an eval with --paired (D8). Null when the record
+   * has no source fields. Absent when the eval did not ask for them.
+   */
+  paired?: RepeatPaired | null;
 };
 
 /**

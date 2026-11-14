@@ -18,6 +18,7 @@ import type { SdkClient } from "../sdk/client.js";
 import type { RunOptions } from "../sdk/options.js";
 import { wrapUntrusted } from "../untrusted.js";
 import { isPostedGolden, type GoldenFinding } from "./case.js";
+import { judgeKey, type JudgeAnswer, type JudgeCache } from "./judge-cache.js";
 import { readPolicy } from "./label/policy.js";
 import { classifyPair, type PairKind } from "./match.js";
 
@@ -60,6 +61,24 @@ export type ScoreResult = {
    * unknown answers, also a failed query.
    */
   extras: { enabled: boolean; judged: number; accepted: number[]; unknown: number };
+  /**
+   * The questions with no cached answer in a scoring with no judge client.
+   * Each one counts as no match, or as no accepted extra. A scoring with a
+   * client asks the judge, so it gives 0.
+   */
+  uncached: number;
+};
+
+/**
+ * The judge of a scoring. With a cache, each cached answer is used and
+ * each new answer is added. With no client, no query goes out: a question
+ * with no cached answer counts as no match, and "uncached" counts it.
+ */
+export type ScoreJudge = {
+  client: SdkClient | null;
+  model: string;
+  options: RunOptions;
+  cache?: JudgeCache;
 };
 
 type Match = { posted: number; golden: number; via: "exact" | "judge" };
@@ -224,14 +243,16 @@ export async function scoreRecord(
   record: RunRecord,
   golden: GoldenFinding[],
   headDir: string,
-  judge: { client: SdkClient; model: string; options: RunOptions },
+  judge: ScoreJudge,
   opts: { extras?: boolean; rawJudge?: boolean } = {},
 ): Promise<ScoreResult> {
   const postedGolden = golden.map(isPostedGolden);
+  const client = judge.client;
 
   let judgeCalls = 0;
   let judgeUnknown = 0;
   let judgeCostUsd = 0;
+  let uncached = 0;
   let prompt: JudgePrompt | null = null;
   const fileLines = new Map<string, string[] | null>();
   const linesOf = (file: string): string[] | null => {
@@ -248,6 +269,7 @@ export async function scoreRecord(
   // query that throws gives "unknown". "pick" takes the answer from the
   // output.
   const queryJudge = async <T, A extends string>(
+    queryClient: SdkClient,
     system: string,
     userMessage: string,
     schema: z.ZodType<T>,
@@ -255,7 +277,7 @@ export async function scoreRecord(
   ): Promise<A | "unknown"> => {
     judgeCalls += 1;
     try {
-      const outcome = await judge.client.query<T>(
+      const outcome = await queryClient.query<T>(
         {
           role: "judge",
           systemPrompt: system,
@@ -273,7 +295,11 @@ export async function scoreRecord(
     }
   };
 
-  const query = async (p: Finding, g: GoldenFinding): Promise<JudgeOutput["same_issue"]> => {
+  const query = async (
+    queryClient: SdkClient,
+    p: Finding,
+    g: GoldenFinding,
+  ): Promise<JudgeOutput["same_issue"]> => {
     prompt ??= loadJudgePrompt();
     const blocks = {
       posted_finding: wrapUntrusted("posted_finding", describePosted(p)).block,
@@ -288,6 +314,7 @@ export async function scoreRecord(
       ).block,
     };
     return queryJudge(
+      queryClient,
       prompt.system,
       render(prompt.template, blocks),
       JudgeOutputSchema,
@@ -296,18 +323,32 @@ export async function scoreRecord(
   };
 
   // The judge sees the same text for two findings with the same
-  // describePosted text, so their answer for one golden is the same.
-  const answers = new Map<string, JudgeOutput["same_issue"]>();
-  const keyOf = (p: Finding, g: number): string => `${describePosted(p)}\u0000${g}`;
-  const ask = async (p: Finding, g: number): Promise<JudgeOutput["same_issue"]> => {
+  // describePosted text, so their answer for one golden is the same. The
+  // key holds the texts and the judge model, so a cache of an earlier
+  // scoring gives the same answer for the same question.
+  const answers: JudgeCache = judge.cache ?? new Map();
+  // The keys that this scoring used, with an answer or with none.
+  const used = new Set<string>();
+  const goldenTexts = golden.map(describeGolden);
+  const keyOf = (p: Finding, g: number): string =>
+    judgeKey("match", judge.model, [describePosted(p), goldenTexts[g] ?? ""]);
+  // The answer for a pair, from the cache or from a new query. Null when
+  // no client is given and the cache has no answer.
+  const ask = async (p: Finding, g: number): Promise<JudgeAnswer | null> => {
     const key = keyOf(p, g);
-    const known = answers.get(key);
-    if (known !== undefined) return known;
+    const first = !used.has(key);
+    used.add(key);
+    let answer = answers.get(key);
     const goldenFinding = golden[g];
-    if (!goldenFinding) return "no";
-    const answer = await query(p, goldenFinding);
-    if (answer === "unknown") judgeUnknown += 1;
-    answers.set(key, answer);
+    if (answer === undefined && goldenFinding && client !== null) {
+      answer = await query(client, p, goldenFinding);
+      answers.set(key, answer);
+    }
+    if (answer === undefined) {
+      if (first) uncached += 1;
+      return null;
+    }
+    if (first && answer === "unknown") judgeUnknown += 1;
     return answer;
   };
 
@@ -347,8 +388,10 @@ export async function scoreRecord(
       for (const [p, g] of pairsOf("ambiguous", posts)) {
         const finding = findings[p];
         if (!free(p, g) || !finding) continue;
-        // Without the judge, only a cached answer can match: no new query.
-        const answer = useJudge ? await ask(finding, g) : answers.get(keyOf(finding, g));
+        // Without the judge, only an answer that the posted findings of
+        // this scoring used can match: no new query.
+        const key = keyOf(finding, g);
+        const answer = useJudge ? await ask(finding, g) : used.has(key) ? answers.get(key) : null;
         if (answer === "yes") take(p, g, "judge");
       }
     }
@@ -364,44 +407,76 @@ export async function scoreRecord(
   // not here.
   const unmatchedPosted = posted.flatMap((_, p) => (fromPosted.taken.has(p) ? [] : [p]));
 
-  // The extras judge: one query for each posted finding with no golden.
+  // One query of the extras judge for one posted finding.
+  const askExtras = async (
+    queryClient: SdkClient,
+    finding: Finding,
+    loaded: { extras: ExtrasPrompt; policy: string; sections: Map<string, string> },
+  ): Promise<JudgeAnswer> => {
+    const { extras, policy, sections } = loaded;
+    const section = (sections.get(finding.file) ?? "").trim();
+    const blocks = {
+      posted_finding: wrapUntrusted("posted_finding", describePosted(finding)).block,
+      posted_span: wrapUntrusted(
+        "posted_span",
+        spanText(
+          linesOf(finding.file),
+          Math.max(1, finding.start_line - EXTRAS_WINDOW),
+          finding.end_line + EXTRAS_WINDOW,
+          extras.noSpanText,
+        ),
+      ).block,
+      diff: wrapUntrusted("diff", section === "" ? extras.noDiffText : section).block,
+      policy: wrapUntrusted("policy", policy).block,
+    };
+    return queryJudge(
+      queryClient,
+      extras.system,
+      render(extras.template, blocks),
+      ExtrasOutputSchema,
+      (out) => out.real,
+    );
+  };
+
+  // The extras judge: one answer for each posted finding with no golden,
+  // from the cache or from a new query.
   const enabled = opts.extras === true;
   const accepted: number[] = [];
   let judged = 0;
   let extrasUnknown = 0;
   if (enabled && unmatchedPosted.length > 0) {
-    const extras = loadExtrasPrompt();
-    // The diff of the change, split by file once. A git failure gives no diff.
-    const sections = await prDiff(headDir, record.identity.base, record.identity.head).then(
-      diffSections,
-      () => new Map<string, string>(),
-    );
-    const policy = readPolicy().trim();
+    // The prompt, the policy and the diff load at the first query only.
+    let loaded: {
+      extras: ExtrasPrompt;
+      policy: string;
+      sections: Map<string, string>;
+    } | null = null;
+    const load = async () => {
+      // The diff of the change, split by file once. A git failure gives no diff.
+      const sections = await prDiff(headDir, record.identity.base, record.identity.head).then(
+        diffSections,
+        () => new Map<string, string>(),
+      );
+      return { extras: loadExtrasPrompt(), policy: readPolicy().trim(), sections };
+    };
     for (const p of unmatchedPosted) {
       const finding = posted[p];
       if (!finding) continue;
+      const key = judgeKey("extras", judge.model, [describePosted(finding)]);
+      const cached = answers.get(key);
+      if (cached === undefined && client === null) {
+        uncached += 1;
+        continue;
+      }
       judged += 1;
-      const section = (sections.get(finding.file) ?? "").trim();
-      const blocks = {
-        posted_finding: wrapUntrusted("posted_finding", describePosted(finding)).block,
-        posted_span: wrapUntrusted(
-          "posted_span",
-          spanText(
-            linesOf(finding.file),
-            Math.max(1, finding.start_line - EXTRAS_WINDOW),
-            finding.end_line + EXTRAS_WINDOW,
-            extras.noSpanText,
-          ),
-        ).block,
-        diff: wrapUntrusted("diff", section === "" ? extras.noDiffText : section).block,
-        policy: wrapUntrusted("policy", policy).block,
-      };
-      const answer = await queryJudge(
-        extras.system,
-        render(extras.template, blocks),
-        ExtrasOutputSchema,
-        (out) => out.real,
-      );
+      let answer: JudgeAnswer;
+      if (cached !== undefined) {
+        answer = cached;
+      } else {
+        loaded ??= await load();
+        answer = await askExtras(client as SdkClient, finding, loaded);
+        answers.set(key, answer);
+      }
       if (answer === "yes") accepted.push(p);
       else if (answer === "unknown") extrasUnknown += 1;
     }
@@ -422,5 +497,6 @@ export async function scoreRecord(
       candidates: candidates.length,
     },
     extras: { enabled, judged, accepted, unknown: extrasUnknown },
+    uncached,
   };
 }

@@ -6,7 +6,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { writeFileAtomic } from "./atomic.js";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { z } from "zod";
 import { EXIT_FAILURE, EXIT_GATE, EXIT_OK, EXIT_USAGE, type ProgramDeps } from "../cli.js";
 import { JUDGE_DEFAULTS, ROLE_DEFAULTS, resolveModel } from "../config/models.js";
@@ -33,9 +33,16 @@ import {
   type GoldenFinding,
 } from "./case.js";
 import { cloneCase } from "./checkout.js";
+import {
+  JUDGE_CACHE_FILE,
+  readJudgeCache,
+  writeJudgeCache,
+  type JudgeCache,
+} from "./judge-cache.js";
 import { failedMetrics, metrics, type RepeatMetrics } from "./metrics.js";
+import { hasSources, pairedRepeat } from "./paired.js";
 import { buildReport, renderTable, type Report } from "./report.js";
-import { findingKey, scoreRecord } from "./score.js";
+import { findingKey, scoreRecord, type ScoreJudge } from "./score.js";
 
 /** The flags of "pr-review eval". */
 export type EvalOptions = {
@@ -55,6 +62,8 @@ export type EvalOptions = {
   rawJudge: boolean;
   /** True for --resume: reuse the finished repeats that the --out directory holds. */
   resume: boolean;
+  /** True for --paired: score the one-pass set and the all set of each repeat (D8). */
+  paired?: boolean;
 };
 
 function messageOf(err: unknown): string {
@@ -157,7 +166,8 @@ async function baselines(
 }
 
 type RepeatOutcome =
-  { kind: "done"; metrics: RepeatMetrics } | { kind: "same-judge"; reviewers: string[] };
+  | { kind: "done"; metrics: RepeatMetrics; record?: string }
+  | { kind: "same-judge"; reviewers: string[] };
 
 type EvalContext = {
   opts: EvalOptions;
@@ -206,6 +216,7 @@ const ResultFileSchema = z.object({
   head: z.string(),
   golden: z.string(),
   repeat: number,
+  record: z.string().optional(),
   tool_version: z.string(),
   options: z.object({
     tier: z.string(),
@@ -220,12 +231,14 @@ const ResultFileSchema = z.object({
  * The file "<out>/<case>/<repeat>/result.json". It holds the metrics of a
  * finished repeat and the facts that a later --resume run checks.
  */
-type ResultFile = {
+export type ResultFile = {
   case: string;
   head: string;
   /** The fingerprint of the golden findings that scored the repeat. */
   golden: string;
   repeat: number;
+  /** The file name of the run record in the repeat directory. A failed repeat can have none. */
+  record?: string;
   tool_version: string;
   options: ResultOptions;
   metrics: RepeatMetrics;
@@ -249,13 +262,19 @@ const resultPath = (out: string, c: Case, repeat: number): string =>
 
 // Write the file in one step: a temp file, then a rename. A kill leaves no
 // half file.
-async function writeResult(ctx: EvalContext, c: Case, m: RepeatMetrics): Promise<void> {
+async function writeResult(
+  ctx: EvalContext,
+  c: Case,
+  m: RepeatMetrics,
+  record: string | undefined,
+): Promise<void> {
   const path = resultPath(ctx.out, c, m.repeat);
   const file: ResultFile = {
     case: c.name,
     head: c.head,
     golden: goldenFingerprint(c),
     repeat: m.repeat,
+    ...(record !== undefined ? { record } : {}),
     tool_version: ctx.toolVersion,
     options: resultOptions(ctx),
     metrics: m,
@@ -267,7 +286,7 @@ async function writeResult(ctx: EvalContext, c: Case, m: RepeatMetrics): Promise
 // Read the result file of repeat slot "repeat". A missing file, a file that
 // is not JSON, a file of another shape, and a file for another repeat give
 // null.
-async function readResult(path: string, repeat: number): Promise<ResultFile | null> {
+export async function readResult(path: string, repeat: number): Promise<ResultFile | null> {
   try {
     const parsed = ResultFileSchema.safeParse(JSON.parse(await readFile(path, "utf8")));
     if (!parsed.success) return null;
@@ -411,13 +430,45 @@ async function runRepeat(ctx: EvalContext, c: Case, repeat: number): Promise<Rep
     if (same.length > 0 && !ctx.opts.allowSameJudge) {
       return { kind: "same-judge", reviewers: same.map((r) => r.name) };
     }
-    const score = await scoreRecord(
-      result.record,
-      c.golden,
-      checkout,
-      { client: ctx.client, model: ctx.judgeModel, options: ctx.options },
-      { extras: ctx.opts.extras, rawJudge: ctx.opts.rawJudge },
-    );
+    // The judge answers go to the cache file of the repeat, so a later
+    // offline report can score the record with no model call.
+    const cachePath = join(ctx.out, c.name, String(repeat), JUDGE_CACHE_FILE);
+    const cache: JudgeCache = await readJudgeCache(cachePath).catch(() => new Map());
+    const judge: ScoreJudge = {
+      client: ctx.client,
+      model: ctx.judgeModel,
+      options: ctx.options,
+      cache,
+    };
+    const score = await scoreRecord(result.record, c.golden, checkout, judge, {
+      extras: ctx.opts.extras,
+      rawJudge: ctx.opts.rawJudge,
+    });
+    const m = metrics(result.record, score, repeat);
+    if (ctx.opts.paired === true) {
+      if (hasSources(result.record)) {
+        const p = await pairedRepeat(
+          result.record,
+          c.golden,
+          checkout,
+          judge,
+          { rawJudge: ctx.opts.rawJudge },
+          score,
+        );
+        m.paired = p.paired;
+        m.judge_calls += p.judgeCalls;
+        m.judge_cost_usd += p.judgeCostUsd;
+      } else {
+        m.paired = null;
+      }
+    }
+    try {
+      await writeJudgeCache(cachePath, cache);
+    } catch (err) {
+      say(
+        `warning: case ${c.name}, repeat ${repeat}: cannot write ${JUDGE_CACHE_FILE}: ${messageOf(err)}`,
+      );
+    }
     // A candidates.json problem does not fail a repeat with a good score.
     try {
       await addCandidates(ctx, c, result.record, score.extras.accepted, repeat);
@@ -426,7 +477,7 @@ async function runRepeat(ctx: EvalContext, c: Case, repeat: number): Promise<Rep
         `warning: case ${c.name}, repeat ${repeat}: cannot update candidates.json: ${messageOf(err)}`,
       );
     }
-    return { kind: "done", metrics: metrics(result.record, score, repeat) };
+    return { kind: "done", metrics: m, record: basename(result.recordPath) };
   } catch (err) {
     return failed(messageOf(err));
   } finally {
@@ -540,7 +591,7 @@ export async function runEval(opts: EvalOptions, deps: ProgramDeps): Promise<num
         return EXIT_USAGE;
       }
       try {
-        await writeResult(ctx, c, outcome.metrics);
+        await writeResult(ctx, c, outcome.metrics, outcome.record);
       } catch (err) {
         say(
           `warning: case ${c.name}, repeat ${repeat}: cannot write result.json: ${messageOf(err)}`,
@@ -551,7 +602,8 @@ export async function runEval(opts: EvalOptions, deps: ProgramDeps): Promise<num
     results.push({ name: c.name, repeats });
   }
 
-  let report: Report = buildReport(results, null, ref);
+  const paired = opts.paired === true ? { uncached: [] } : undefined;
+  let report: Report = buildReport(results, null, ref, paired);
   const failed = report.failed_repeats.length > 0;
   let runError: string | null = null;
   if (base.gate) {
@@ -562,7 +614,7 @@ export async function runEval(opts: EvalOptions, deps: ProgramDeps): Promise<num
           "A change of the case set needs a new baseline.",
       );
     }
-    report = buildReport(results, compareBaseline(base.gate, report), ref);
+    report = buildReport(results, compareBaseline(base.gate, report), ref, paired);
   } else if (opts.writeBaseline && opts.baseline !== undefined) {
     if (failed) {
       say(`a repeat failed, so the baseline ${opts.baseline} does not change.`);
