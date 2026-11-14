@@ -1,0 +1,1638 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 52,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "D8 budget: a turn budget per reviewer, and the design updates from issues 22, 23 and 28",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/52"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "39250e7045b250c5b84d7e887ac7cd85978f085c",
+    "head": "e75d2dda1a1b57bc1ff245eb5108f0e7e3bed090",
+    "started_at": "2026-11-14T19:47:55.126Z",
+    "tool_version": "0.10.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "D8 budget: a turn budget per reviewer, and the design updates from issues 22, 23 and 28\n\nPart \"budget\" of D8 (the third bullet), and the TICKETS.md entry \"Design updates from issues 22, 23 and 28\". The passes default and the paired measurement are not in this PR.\n\n## Turn budget\n\n- Each reviewer pass now has a turn budget of 150 turns (was 40).\n- A repo sets the budget of one reviewer with `reviewers.<name>.max_turns` in `.pr-review/config.yaml`, an integer of 1 or more.\n- The dollar cap of a reviewer query follows the budget: `REVIEWER_USD_PER_TURN` ($0.05) times the turn budget. That is $7.50 at the default (was a flat $2). A repo that buys depth with more turns gets a cap that permits them.\n- The run-level `token_ceiling` does not change. It stays the limit of a whole run. No other role changes.\n- Worst case, before and after: one reviewer pass $2 → $7.50. The reviewer stage of one full-tier run with all built-in reviewers selected (9 passes) $18 → $67.50.\n\n## Limit stops in the recorded runs\n\nBefore the default changed, I counted the reviewer passes that stopped at the 40-turn limit or the $2 cap. The count is 0 of 1,117 reviewer passes, over 158 run records: the `pr-review-records` branch and the local eval run records. The pass cost had a median of $0.09, a p99 of $1.35 and a maximum of $1.85. So the new default does not change the typical cost of a review. It raises only the worst case.\n\n## Design updates (docs/design/high-level-design.md)\n\n- Section 10, decision 18: one SDK `query()` for each reviewer pass is the dispatch mechanism. A subagent mode is a budget option for the deep reviewers, not a recall lever. Closes #22.\n- Section 6: a trusted custom reviewer with Bash gets read-only git commands. Explicit deny rules block fetch, pull, checkout, switch and gh. The record lists every permission denial. The text says that the current build does not apply these rules yet. Closes #28.\n- Section 3.6 and decision 10: the non-blocking cap stays until D4c measures it against real records. If it changes, it caps nits only. Issue #23 stays open.\n- Sections 3.4, 4 and 5 name the turn budget.\n\n## Checks\n\n- `npm test` (1428 passed), `npm run lint`, `npm run typecheck` and `npm run build` pass.\n- The new tests fail at the red commit 2cc62c2 (5 failures).\n- The version goes from 0.10.0 to 0.11.0.\n- No eval run: the change raises a limit that no recorded pass reached.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZhKp5D6XiHaCEij36E\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": ".claude-plugin/marketplace.json",
+        "hunks": 1
+      },
+      {
+        "path": ".claude-plugin/plugin.json",
+        "hunks": 1
+      },
+      {
+        "path": "README.md",
+        "hunks": 2
+      },
+      {
+        "path": "docs/design/high-level-design.md",
+        "hunks": 7
+      },
+      {
+        "path": "package.json",
+        "hunks": 1
+      },
+      {
+        "path": "src/config/models.ts",
+        "hunks": 2
+      },
+      {
+        "path": "src/config/repo-config.ts",
+        "hunks": 2
+      },
+      {
+        "path": "src/find/index.ts",
+        "hunks": 2
+      },
+      {
+        "path": "src/reviewers/loader.ts",
+        "hunks": 2
+      },
+      {
+        "path": "src/sdk/client.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/sdk/options.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/find.test.ts",
+        "hunks": 3
+      },
+      {
+        "path": "test/repo-config.test.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/run.test.ts",
+        "hunks": 6
+      },
+      {
+        "path": "test/sdk-options.test.ts",
+        "hunks": 2
+      }
+    ],
+    "excluded_files": [
+      {
+        "path": "package-lock.json",
+        "reason": "generated"
+      }
+    ],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "Adds a new config key and changes the default reviewer turn and dollar budgets from 40 turns and $2 to 150 turns and $7.50. This changes runtime logic, cost exposure and a public config interface.",
+      "confidence": "high",
+      "categories": [
+        "bug",
+        "performance",
+        "test",
+        "docs",
+        "other"
+      ],
+      "hotspots": [
+        "src/reviewers/loader.ts: effectiveBudget",
+        "src/sdk/options.ts: buildQueryOptions maxTurns/maxBudgetUsd override",
+        "src/config/models.ts: ROLE_DEFAULTS.reviewer (150 turns, 7.5 USD) and REVIEWER_USD_PER_TURN",
+        "src/find/index.ts: overrides spread merge",
+        "src/config/repo-config.ts: max_turns schema",
+        "Other roles that use maxTurns from ROLE_DEFAULTS (a test asserted 40 and now asserts 150)"
+      ],
+      "file_notes": [
+        {
+          "file": "src/config/models.ts",
+          "note": "Default reviewer budget raised about 3.75x for turns and for the dollar cap. Adds the REVIEWER_USD_PER_TURN constant."
+        },
+        {
+          "file": "src/reviewers/loader.ts",
+          "note": "New effectiveBudget function. The cap is derived from max_turns, or taken from the role defaults when max_turns is unset."
+        },
+        {
+          "file": "src/sdk/options.ts",
+          "note": "Query options now honor the maxTurns and maxBudgetUsd overrides."
+        },
+        {
+          "file": "src/sdk/client.ts",
+          "note": "The overrides type is widened to include maxTurns and maxBudgetUsd."
+        },
+        {
+          "file": "src/find/index.ts",
+          "note": "Passes the budget overrides alongside the model overrides."
+        },
+        {
+          "file": "src/config/repo-config.ts",
+          "note": "New optional reviewers.<name>.max_turns key. It must be an integer of 1 or more, and the schema is strict."
+        },
+        {
+          "file": "test/find.test.ts",
+          "note": "New budget test. One assertion is loosened to toMatchObject."
+        },
+        {
+          "file": "test/run.test.ts",
+          "note": "Assertions on overrides are loosened from toEqual to toMatchObject. This weakens them slightly."
+        },
+        {
+          "file": "test/repo-config.test.ts",
+          "note": "Tests for accepting max_turns and for rejecting bad values."
+        },
+        {
+          "file": "test/sdk-options.test.ts",
+          "note": "Expected reviewer defaults updated to 150 turns and $7.50."
+        },
+        {
+          "file": "README.md",
+          "note": "Documents max_turns and the cost worst cases."
+        },
+        {
+          "file": "docs/design/high-level-design.md",
+          "note": "Design doc updates. They include a note that the Bash deny rules are not applied yet."
+        },
+        {
+          "file": ".claude-plugin/plugin.json",
+          "note": "Version bump to 0.11.0."
+        },
+        {
+          "file": ".claude-plugin/marketplace.json",
+          "note": "Version bump to 0.11.0."
+        },
+        {
+          "file": "package.json",
+          "note": "Version bump to 0.11.0."
+        }
+      ],
+      "summary": "The change adds a per-reviewer `max_turns` config key. It raises the default reviewer budget from 40 turns and $2 to 150 turns and $7.50, and the dollar cap is $0.05 per turn. The budget is passed through the overrides to the SDK query options. The change also updates the tests, the docs and the version, which goes to 0.11.0."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: Adds a new config key and changes the default reviewer turn and dollar budgets from 40 turns and $2 to 150 turns and $7.50. This changes runtime logic, cost exposure and a public config interface.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4836,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 15192,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0015302,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 460,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 19833,
+              "webSearchRequests": 0,
+              "costUSD": 0.167872,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 47,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1694022
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 9488,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 15172,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0015272,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 8,
+              "outputTokens": 757,
+              "cacheReadInputTokens": 60933,
+              "cacheCreationInputTokens": 21108,
+              "webSearchRequests": 0,
+              "costUSD": 0.1962226,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 317,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1977498
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6215,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 15182,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0015282,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 612,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 20050,
+              "webSearchRequests": 0,
+              "costUSD": 0.172648,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 254,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1741762
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6679,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 15176,
+              "outputTokens": 18,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0015266,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 593,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 16985,
+              "webSearchRequests": 0,
+              "costUSD": 0.1483598,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 207,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.14988639999999998
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 2974,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 15176,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0015276,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 194,
+              "cacheReadInputTokens": 22786,
+              "cacheCreationInputTokens": 17572,
+              "webSearchRequests": 0,
+              "costUSD": 0.14902919999999997,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.15055679999999996
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5582,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 32643,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0032753,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 514,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 34527,
+              "webSearchRequests": 0,
+              "costUSD": 0.28711580000000003,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 160,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.2903911
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/config/repo-config.ts",
+            "start_line": 118,
+            "end_line": 118,
+            "category": "security",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "The `reviewers.<name>.max_turns` key has no upper bound, and the dollar cap of each pass grows with it, so a large value removes the cost limit of a pass.",
+            "evidence": "  max_turns: atLeast(1).optional(),",
+            "suggested_fix": "Set a maximum on max_turns (for example 1000), or set an absolute maximum on maxBudgetUsd.",
+            "explanation": "The dollar cap is REVIEWER_USD_PER_TURN times max_turns, so a value like 1e9 sets a cap that is effectively unlimited. Only `token_ceiling` then limits the cost, and only for the whole run.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6091,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 15180,
+              "outputTokens": 24,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0015300000000000003,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 561,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 16956,
+              "webSearchRequests": 0,
+              "costUSD": 0.1474878,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 93,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1490178
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/config/repo-config.ts",
+            "start_line": 118,
+            "end_line": 118,
+            "category": "security",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "max_turns has no upper bound, so a repo config can lift the per-pass dollar cap without limit.",
+            "evidence": "  max_turns: atLeast(1).optional(),",
+            "suggested_fix": "Add an upper bound (for example .max(1000)) or cap maxBudgetUsd separately.",
+            "explanation": "The dollar cap is derived from max_turns, so a very large value effectively removes the spend safeguard of each reviewer query.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4022,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 15184,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0015284,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 373,
+              "cacheReadInputTokens": 5330,
+              "cacheCreationInputTokens": 14689,
+              "webSearchRequests": 0,
+              "costUSD": 0.126046,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 108,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1275744
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "test/find.test.ts",
+            "start_line": 534,
+            "end_line": 568,
+            "category": "test",
+            "severity_estimate": "nit",
+            "confidence": "medium",
+            "claim": "One test covers two behaviours: the default budget for every pass, and the per-reviewer `max_turns` override with the dollar cap scaled from it.",
+            "evidence": "    expect(await budgets(deep)).toEqual([",
+            "suggested_fix": "Split the test into a default-budget test and an override test.",
+            "explanation": "When the test fails, the name does not say if the default or the override broke.",
+            "needs_context": false
+          },
+          {
+            "file": "src/sdk/options.ts",
+            "start_line": 129,
+            "end_line": 130,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "No unit test in `test/sdk-options.test.ts` checks that `buildQueryOptions` uses `maxTurns` and `maxBudgetUsd` from the overrides; only the higher-level test in `test/find.test.ts` covers it.",
+            "evidence": "    maxTurns: req.overrides?.maxTurns ?? role.maxTurns,",
+            "suggested_fix": "Add a `buildQueryOptions` test with `overrides: { maxTurns: 300, maxBudgetUsd: 15 }`.",
+            "explanation": "The lower-scope behaviour should have its own test at the smallest scope, as the repo rules ask.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7743,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 15182,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0015282,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 802,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 17733,
+              "webSearchRequests": 0,
+              "costUSD": 0.1585238,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 166,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.160052
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "src/config/repo-config.ts",
+          "start_line": 118,
+          "end_line": 118,
+          "category": "security",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "max_turns has no upper bound, so a repo config can lift the per-pass dollar cap without limit.",
+          "evidence": "  max_turns: atLeast(1).optional(),",
+          "suggested_fix": "Add an upper bound (for example .max(1000)) or cap maxBudgetUsd separately.",
+          "explanation": "The dollar cap is derived from max_turns, so a very large value effectively removes the spend safeguard of each reviewer query.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "max_turns: atLeast(1).optional(),",
+            "return { maxTurns, maxBudgetUsd: REVIEWER_USD_PER_TURN * maxTurns };"
+          ],
+          "rationale": "The code has no upper bound, and the dollar cap scales linearly with max_turns. But the config comes from the trusted base commit, not from the PR. The description states \"an integer of 1 or more\" on purpose. `token_ceiling` and the unbounded `passes` already cover run-level spend, so this is a design choice and not a vulnerability.",
+          "score": 60,
+          "severity": "dont_post"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "  max_turns: atLeast(1).optional(),",
+            "  return { maxTurns, maxBudgetUsd: REVIEWER_USD_PER_TURN * maxTurns };",
+            "const atLeast = (min: number) =>\n  integer().refine((value) => value >= min, { message: `must be an integer of ${min} or more` });"
+          ],
+          "rationale": "It is true that max_turns has no upper bound and that the dollar cap grows with it (REVIEWER_USD_PER_TURN * maxTurns). But the config is read only from the base commit, so only repo maintainers can set it, and the description says the cap is meant to grow with the turn budget. This is a deliberate design choice, not a security hole.",
+          "score": 88,
+          "severity": "dont_post"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "  max_turns: atLeast(1).optional(),",
+            "  return { maxTurns, maxBudgetUsd: REVIEWER_USD_PER_TURN * maxTurns };",
+            "const atLeast = (min: number) =>\n  integer().refine((value) => value >= min, { message: `must be an integer of ${min} or more` });"
+          ],
+          "rationale": "It is true that max_turns has no upper bound and that the dollar cap grows with it (REVIEWER_USD_PER_TURN * maxTurns). But the config is read only from the base commit, so only repo maintainers can set it, and the description says the cap is meant to grow with the turn budget. This is a deliberate design choice, not a security hole.",
+          "score": 88,
+          "severity": "dont_post"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "test/find.test.ts",
+          "start_line": 534,
+          "end_line": 568,
+          "category": "test",
+          "severity_estimate": "nit",
+          "confidence": "medium",
+          "claim": "One test covers two behaviours: the default budget for every pass, and the per-reviewer `max_turns` override with the dollar cap scaled from it.",
+          "evidence": "    expect(await budgets(deep)).toEqual([",
+          "suggested_fix": "Split the test into a default-budget test and an override test.",
+          "explanation": "When the test fails, the name does not say if the default or the override broke.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(await budgets(DEFAULT_REPO_CONFIG)).toEqual([",
+            "expect(await budgets(deep)).toEqual(["
+          ],
+          "rationale": "The test does assert both the default budget and the per-reviewer override. Both checks use one helper and the same behaviour (the budget and cap sent per pass). The neighbouring test also combines cases. A failure message would show which expectation failed, so this is a very minor style point.",
+          "score": 60,
+          "severity": "dont_post"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(await budgets(DEFAULT_REPO_CONFIG)).toEqual([",
+            "reviewers: { \"diff-bugs\": { enabled: true, max_turns: 300 } },",
+            "expect(await budgets(deep)).toEqual([",
+            "it(\"sends the turn budget and its dollar cap with every pass of a reviewer\", async () => {"
+          ],
+          "rationale": "The finding is accurate: the new test checks both the default budget and the per-reviewer max_turns override. But the vitest failure output names the assertion line and shows the diff, so it is still clear which part broke. Neighbouring tests in this file, such as the passes test, also combine the default case and the variants in one test.",
+          "score": 92,
+          "severity": "dont_post"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(await budgets(DEFAULT_REPO_CONFIG)).toEqual([",
+            "reviewers: { \"diff-bugs\": { enabled: true, max_turns: 300 } },",
+            "expect(await budgets(deep)).toEqual([",
+            "it(\"sends the turn budget and its dollar cap with every pass of a reviewer\", async () => {"
+          ],
+          "rationale": "The finding is accurate: the new test checks both the default budget and the per-reviewer max_turns override. But the vitest failure output names the assertion line and shows the diff, so it is still clear which part broke. Neighbouring tests in this file, such as the passes test, also combine the default case and the variants in one test.",
+          "score": 92,
+          "severity": "dont_post"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "src/sdk/options.ts",
+          "start_line": 129,
+          "end_line": 130,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "No unit test in `test/sdk-options.test.ts` checks that `buildQueryOptions` uses `maxTurns` and `maxBudgetUsd` from the overrides; only the higher-level test in `test/find.test.ts` covers it.",
+          "evidence": "    maxTurns: req.overrides?.maxTurns ?? role.maxTurns,",
+          "suggested_fix": "Add a `buildQueryOptions` test with `overrides: { maxTurns: 300, maxBudgetUsd: 15 }`.",
+          "explanation": "The lower-scope behaviour should have its own test at the smallest scope, as the repo rules ask.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "maxTurns: req.overrides?.maxTurns ?? role.maxTurns,",
+            "maxBudgetUsd: req.overrides?.maxBudgetUsd ?? role.maxBudgetUsd,"
+          ],
+          "rationale": "The PR adds the maxTurns and maxBudgetUsd override lines. In test/sdk-options.test.ts, the only override test sets model and effort, and it asserts the default maxTurns of 150. Only test/find.test.ts checks the override values, and it does so through a higher-level path.",
+          "score": 85,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "maxTurns: req.overrides?.maxTurns ?? role.maxTurns,",
+            "request(\"reviewer\", { overrides: { model: \"sonnet\", effort: \"medium\" } }),",
+            "const opts = buildQueryOptions(call, OPTIONS);",
+            "\"diff-bugs:300:15\","
+          ],
+          "rationale": "test/sdk-options.test.ts only tests model and effort overrides, not maxTurns/maxBudgetUsd overrides. find.test.ts does call buildQueryOptions on the real override path and checks 300/15, so the behaviour is covered, and a unit test at the smallest scope would add little.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "maxTurns: req.overrides?.maxTurns ?? role.maxTurns,",
+            "request(\"reviewer\", { overrides: { model: \"sonnet\", effort: \"medium\" } }),",
+            "const opts = buildQueryOptions(call, OPTIONS);",
+            "\"diff-bugs:300:15\","
+          ],
+          "rationale": "test/sdk-options.test.ts only tests model and effort overrides, not maxTurns/maxBudgetUsd overrides. find.test.ts does call buildQueryOptions on the real override path and checks 300/15, so the behaviour is covered, and a unit test at the smallest scope would add little.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "passed": true
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [
+      {
+        "file": "src/sdk/options.ts",
+        "start_line": 129,
+        "end_line": 130,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "low",
+        "claim": "No unit test in `test/sdk-options.test.ts` checks that `buildQueryOptions` uses `maxTurns` and `maxBudgetUsd` from the overrides; only the higher-level test in `test/find.test.ts` covers it.",
+        "evidence": "    maxTurns: req.overrides?.maxTurns ?? role.maxTurns,",
+        "suggested_fix": "Add a `buildQueryOptions` test with `overrides: { maxTurns: 300, maxBudgetUsd: 15 }`.",
+        "explanation": "The lower-scope behaviour should have its own test at the smallest scope, as the repo rules ask.",
+        "needs_context": false,
+        "fingerprint": "4ef67ad4317478ba",
+        "severity": "nit",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "maxTurns: req.overrides?.maxTurns ?? role.maxTurns,",
+            "request(\"reviewer\", { overrides: { model: \"sonnet\", effort: \"medium\" } }),",
+            "const opts = buildQueryOptions(call, OPTIONS);",
+            "\"diff-bugs:300:15\","
+          ],
+          "rationale": "test/sdk-options.test.ts only tests model and effort overrides, not maxTurns/maxBudgetUsd overrides. find.test.ts does call buildQueryOptions on the real override path and checks 300/15, so the behaviour is covered, and a unit test at the smallest scope would add little.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "span_text": "maxTurns: req.overrides?.maxTurns ?? role.maxTurns, maxBudgetUsd: req.overrides?.maxBudgetUsd ?? role.maxBudgetUsd,"
+      }
+    ],
+    "github": {
+      "review_id": 5906787137,
+      "review_url": "https://github.com/jerridan/pr-review/pull/52#pullrequestreview-5906787137",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [
+        {
+          "fingerprint": "4ef67ad4317478ba",
+          "comment_id": 4575393054
+        }
+      ],
+      "in_body": [],
+      "check_run": {
+        "id": 132566991585
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 8693,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 13691,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0013811000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1250,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 13204,
+            "webSearchRequests": 0,
+            "costUSD": 0.06544620000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0668273
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "model": "claude-opus-5-5",
+        "duration_ms": 2974,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 15176,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0015276,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 194,
+            "cacheReadInputTokens": 22786,
+            "cacheCreationInputTokens": 17572,
+            "webSearchRequests": 0,
+            "costUSD": 0.14902919999999997,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.15055679999999996
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 4836,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 15192,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0015302,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 460,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 19833,
+            "webSearchRequests": 0,
+            "costUSD": 0.167872,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 47,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1694022
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6215,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 15182,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0015282,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 612,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 20050,
+            "webSearchRequests": 0,
+            "costUSD": 0.172648,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 254,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1741762
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6679,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 15176,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0015266,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 593,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 16985,
+            "webSearchRequests": 0,
+            "costUSD": 0.1483598,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 207,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.14988639999999998
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "model": "claude-opus-5-5",
+        "duration_ms": 9488,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 15172,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0015272,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 757,
+            "cacheReadInputTokens": 60933,
+            "cacheCreationInputTokens": 21108,
+            "webSearchRequests": 0,
+            "costUSD": 0.1962226,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 317,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1977498
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5582,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 32643,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0032753,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 514,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 34527,
+            "webSearchRequests": 0,
+            "costUSD": 0.28711580000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 160,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.2903911
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 4022,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 15184,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0015284,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 373,
+            "cacheReadInputTokens": 5330,
+            "cacheCreationInputTokens": 14689,
+            "webSearchRequests": 0,
+            "costUSD": 0.126046,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 108,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1275744
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 6091,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 15180,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0015300000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 561,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 16956,
+            "webSearchRequests": 0,
+            "costUSD": 0.1474878,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 93,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1490178
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7743,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 15182,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0015282,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 802,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 17733,
+            "webSearchRequests": 0,
+            "costUSD": 0.1585238,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 166,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.160052
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 5936,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 12085,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012190000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 688,
+            "cacheReadInputTokens": 15965,
+            "cacheCreationInputTokens": 17224,
+            "webSearchRequests": 0,
+            "costUSD": 0.0773805,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 174,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0785995
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 4351,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10930,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.001103,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 469,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 10443,
+            "webSearchRequests": 0,
+            "costUSD": 0.0469027,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 134,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0480057
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 7101,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 6451,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0006581,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 740,
+            "cacheReadInputTokens": 25972,
+            "cacheCreationInputTokens": 7522,
+            "webSearchRequests": 0,
+            "costUSD": 0.04009719999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 97,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.040755299999999994
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7566,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 12111,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012216000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 757,
+            "cacheReadInputTokens": 15983,
+            "cacheCreationInputTokens": 17134,
+            "webSearchRequests": 0,
+            "costUSD": 0.15542460000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 213,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1566462
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5523,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10918,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011018000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 539,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 10423,
+            "webSearchRequests": 0,
+            "costUSD": 0.0950454,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 120,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0961472
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 9505,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 6445,
+            "outputTokens": 239,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007640000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 217,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 905,
+            "cacheReadInputTokens": 27881,
+            "cacheCreationInputTokens": 10396,
+            "webSearchRequests": 0,
+            "costUSD": 0.1068682,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 146,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.10763220000000001
+      }
+    ],
+    "total_cost_usd": 2.1634201,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 32,
+      "gather": 226,
+      "triage": 9575,
+      "find_verify": 33948,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
