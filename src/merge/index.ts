@@ -4,7 +4,13 @@ import { readHeadFile } from "../find/evidence.js";
 import { loadPrompt, render } from "../prompts/load.js";
 import type { Finding, Severity } from "../schemas/finding.js";
 import { MergeOutputSchema, type MergeOutput } from "../schemas/merge.js";
-import type { FindingSource, PostedFinding, QueryFailure, RunRecord } from "../schemas/record.js";
+import {
+  compareSources,
+  type FindingSource,
+  type PostedFinding,
+  type QueryFailure,
+  type RunRecord,
+} from "../schemas/record.js";
 import { isPostedSeverity, type VerifierResult } from "../schemas/verifier.js";
 import type { SdkClient } from "../sdk/client.js";
 import type { RunOptions } from "../sdk/options.js";
@@ -147,9 +153,7 @@ function unionSources(members: Verified[]): FindingSource[] | undefined {
   for (const m of members) {
     for (const s of m.sources ?? []) all.set(`${s.reviewer}\u0000${s.pass}`, s);
   }
-  return [...all.values()].sort(
-    (a, b) => (a.reviewer < b.reviewer ? -1 : a.reviewer > b.reviewer ? 1 : 0) || a.pass - b.pass,
-  );
+  return [...all.values()].sort(compareSources);
 }
 
 export async function mergeFindings(

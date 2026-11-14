@@ -397,10 +397,7 @@ export async function runReviewers(
   const tasks: Promise<ReviewerRun | null>[] = [];
   for (const { def } of selected) {
     const seen = new Map<string, FindingSource[]>();
-    const tier = ctx.tier ?? "full";
-    const set = ctx.passes?.get(def.frontmatter.name);
-    const passes =
-      set !== undefined && tier !== "fast" ? set : effectivePasses(def, ctx.config, tier);
+    const passes = effectivePasses(def, ctx.config, ctx.tier ?? "full", ctx.passes);
     for (let pass = 1; pass <= passes; pass++) {
       tasks.push(runPass(def, pass, seen));
     }

@@ -38,6 +38,11 @@ export const UNSURE_CAUSES = ["claim", "limit"] as const satisfies readonly Unsu
  */
 export type FindingSource = { reviewer: string; pass: number };
 
+/** The order of sources: by reviewer name, then by pass. */
+export function compareSources(a: FindingSource, b: FindingSource): number {
+  return (a.reviewer < b.reviewer ? -1 : a.reviewer > b.reviewer ? 1 : 0) || a.pass - b.pass;
+}
+
 export const FindingSourceSchema: z.ZodType<FindingSource> = z.strictObject({
   reviewer: z.string(),
   pass: integer(),

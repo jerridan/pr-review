@@ -48,13 +48,14 @@ export type Report = {
 };
 
 /** The mean of the values that are not null. A mean of no value is null. */
-function mean(values: (number | null)[]): number | null {
+export function mean(values: (number | null)[]): number | null {
   const known = values.filter((v): v is number => v !== null);
   if (known.length === 0) return null;
   return known.reduce((sum, v) => sum + v, 0) / known.length;
 }
 
-function spread(values: (number | null)[]): Spread {
+/** The mean, the minimum and the maximum of the values that are not null. */
+export function spread(values: (number | null)[]): Spread {
   const known = values.filter((v): v is number => v !== null);
   if (known.length === 0) return { mean: null, min: null, max: null };
   return { mean: mean(known), min: Math.min(...known), max: Math.max(...known) };
@@ -171,11 +172,14 @@ export function buildReport(
   };
 }
 
-const ratio = (value: number | null): string => (value === null ? "-" : value.toFixed(3));
-const usd = (value: number | null): string => (value === null ? "-" : `$${value.toFixed(4)}`);
+/** A ratio as text with three decimals, or "-" for null. */
+export const ratio = (value: number | null): string => (value === null ? "-" : value.toFixed(3));
+/** An amount in US dollars as text with four decimals, or "-" for null. */
+export const usd = (value: number | null): string =>
+  value === null ? "-" : `$${value.toFixed(4)}`;
 
-// Pad each column to its widest cell, and join the columns with two spaces.
-function columns(rows: string[][]): string[] {
+/** Pad each column to its widest cell, and join the columns with two spaces. */
+export function columns(rows: string[][]): string[] {
   const widths: number[] = [];
   for (const row of rows) {
     row.forEach((cell, i) => (widths[i] = Math.max(widths[i] ?? 0, cell.length)));

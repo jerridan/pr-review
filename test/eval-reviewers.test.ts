@@ -6,6 +6,7 @@ import { createProgram } from "../src/cli.js";
 import type { RunRecord } from "../src/schemas/record.js";
 import type { QueryOutcome, QueryRequest } from "../src/sdk/client.js";
 import { createFakeSdkClient } from "../src/sdk/fake.js";
+import { isRecordFileName } from "../src/record/write.js";
 import {
   captureOutput,
   casesFrom,
@@ -82,7 +83,7 @@ function recordsUnder(dir: string): RunRecord[] {
   return readdirSync(dir).flatMap((name) => {
     const full = join(dir, name);
     if (statSync(full).isDirectory()) return recordsUnder(full);
-    if (!/^\d{4}-\d{2}-\d{2}T\d{6}\.\d{3}Z-[0-9a-f]{7}\.json$/.test(name)) return [];
+    if (!isRecordFileName(name)) return [];
     return [JSON.parse(readFileSync(full, "utf8")) as RunRecord];
   });
 }

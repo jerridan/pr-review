@@ -7,7 +7,7 @@
 import type { FindingSource, RunRecord } from "../schemas/record.js";
 import type { GoldenFinding } from "./case.js";
 import type { RepeatMetrics } from "./metrics.js";
-import type { Spread } from "./report.js";
+import { columns, mean, ratio, spread, usd, type Spread } from "./report.js";
 import { scoreRecord, type ScoreJudge, type ScoreResult } from "./score.js";
 
 /** The figures of one set of one repeat of one case. */
@@ -246,19 +246,6 @@ export async function pairedRepeat(
   };
 }
 
-/** The mean of the values that are not null. A mean of no value is null. */
-function mean(values: (number | null)[]): number | null {
-  const known = values.filter((v): v is number => v !== null);
-  if (known.length === 0) return null;
-  return known.reduce((sum, v) => sum + v, 0) / known.length;
-}
-
-function spread(values: (number | null)[]): Spread {
-  const known = values.filter((v): v is number => v !== null);
-  if (known.length === 0) return { mean: null, min: null, max: null };
-  return { mean: mean(known), min: Math.min(...known), max: Math.max(...known) };
-}
-
 function summary(sets: SetFigures[]): PairedSetSummary {
   const posted = sets.reduce((sum, s) => sum + s.posted, 0);
   return {
@@ -356,24 +343,8 @@ export function buildPaired(
   return { missing, uncached, scopes };
 }
 
-const ratio = (value: number | null): string => (value === null ? "-" : value.toFixed(3));
 const signed = (value: number | null): string =>
   value === null ? "-" : `${value >= 0 ? "+" : ""}${value.toFixed(3)}`;
-const usd = (value: number | null): string => (value === null ? "-" : `$${value.toFixed(4)}`);
-
-// Pad each column to its widest cell, and join the columns with two spaces.
-function columns(rows: string[][]): string[] {
-  const widths: number[] = [];
-  for (const row of rows) {
-    row.forEach((cell, i) => (widths[i] = Math.max(widths[i] ?? 0, cell.length)));
-  }
-  return rows.map((row) =>
-    row
-      .map((cell, i) => cell.padEnd(widths[i] ?? 0))
-      .join("  ")
-      .trimEnd(),
-  );
-}
 
 /** The not-valid lines of an offline report, one per repeat with uncached questions. */
 export function notValidLines(section: PairedSection): string[] {
