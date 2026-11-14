@@ -5,6 +5,7 @@ import { join } from "node:path";
 import type { RepoConfig } from "../config/repo-config.js";
 import {
   resolveModel,
+  REVIEWER_MS_PER_TURN,
   REVIEWER_USD_PER_TURN,
   ROLE_DEFAULTS,
   type Effort,
@@ -209,20 +210,22 @@ export function effectiveModel(
 }
 
 /**
- * The turn budget of each pass of a reviewer, and the dollar cap that
- * follows it. The budget is reviewers.<name>.max_turns when set, else the
- * role default. The cap is REVIEWER_USD_PER_TURN times the budget.
+ * The turn budget of each pass of a reviewer, and the limits that follow
+ * it. The budget is reviewers.<name>.max_turns when set, else the role
+ * default. The dollar cap is REVIEWER_USD_PER_TURN times the budget. The
+ * timeout is REVIEWER_MS_PER_TURN times the budget.
  */
 export function effectiveBudget(
   def: ReviewerDefinition,
   config: RepoConfig,
-): { maxTurns: number; maxBudgetUsd: number } {
-  const maxTurns = reviewerEntry(config, def.frontmatter.name)?.max_turns;
-  if (maxTurns === undefined) {
-    const { maxTurns: base, maxBudgetUsd } = ROLE_DEFAULTS.reviewer;
-    return { maxTurns: base, maxBudgetUsd };
-  }
-  return { maxTurns, maxBudgetUsd: REVIEWER_USD_PER_TURN * maxTurns };
+): { maxTurns: number; maxBudgetUsd: number; timeoutMs: number } {
+  const maxTurns =
+    reviewerEntry(config, def.frontmatter.name)?.max_turns ?? ROLE_DEFAULTS.reviewer.maxTurns;
+  return {
+    maxTurns,
+    maxBudgetUsd: REVIEWER_USD_PER_TURN * maxTurns,
+    timeoutMs: REVIEWER_MS_PER_TURN * maxTurns,
+  };
 }
 
 /**

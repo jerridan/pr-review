@@ -86,7 +86,7 @@ Each reviewer declares triggers in frontmatter: path globs, languages, categorie
 
 ### 3.4 Find (parallel reviewer agents)
 
-Each reviewer gets: the triage brief, the description block, the list of changed files, the diff, the repo rules, read-only tools over the checkout, and a per-reviewer turn budget. A dollar cap follows the budget at $0.05 for each turn. The history reviewer also gets the history block. A deleted file has its own line in the list, because the head checkout has no file to read. The diff shows which lines changed. It is not the only context. Each returns structured findings:
+Each reviewer gets: the triage brief, the description block, the list of changed files, the diff, the repo rules, read-only tools over the checkout, and a per-reviewer turn budget. A dollar cap follows the budget at $0.05 for each turn. The wall-clock limit of a pass follows it at 10 seconds for each turn. The history reviewer also gets the history block. A deleted file has its own line in the list, because the head checkout has no file to read. The diff shows which lines changed. It is not the only context. Each returns structured findings:
 
 ```
 file, start_line, end_line, category, severity, claim,
@@ -284,7 +284,7 @@ A custom reviewer can also override `threshold` to be stricter, never looser tha
 
 Effort and output schema stay fixed per role within a run, because changing either invalidates the prompt cache. Haiku 5.5 is not used as a verifier or reviewer: its system card reports the highest over-refusal rate of any tested model and work reported done without checking at low and medium effort.
 
-A repo can override the model and effort of any role with `models.<role>`, and of one reviewer with `reviewers.<name>`. Section 4 gives the order. Each reviewer pass has a turn budget. The default is 150 turns. A repo sets it with `reviewers.<name>.max_turns`. The dollar cap of a pass is $0.05 times the budget, so the cap is $7.50 at the default. The turn budget is how a repo buys depth. A run-level token ceiling stops new reviewer launches when reached and notes it in the summary. Each SDK query is its own Claude Code process of about 1 GiB, and a standard GitHub runner has 7 GiB, so the orchestrator runs at most 5 queries at once by default. Unattended runs set `CLAUDE_CODE_RETRY_WATCHDOG=1` so rate-limit responses retry without a cap.
+A repo can override the model and effort of any role with `models.<role>`, and of one reviewer with `reviewers.<name>`. Section 4 gives the order. Each reviewer pass has a turn budget. The default is 150 turns. A repo sets it with `reviewers.<name>.max_turns`. The dollar cap of a pass is $0.05 times the budget, so the cap is $7.50 at the default. The wall-clock limit of a pass is 10 seconds times the budget, so it is 25 minutes at the default. The turn budget is how a repo buys depth. A run-level token ceiling stops new reviewer launches when reached and notes it in the summary. Each SDK query is its own Claude Code process of about 1 GiB, and a standard GitHub runner has 7 GiB, so the orchestrator runs at most 5 queries at once by default. Unattended runs set `CLAUDE_CODE_RETRY_WATCHDOG=1` so rate-limit responses retry without a cap.
 
 ### 5.1 Model versions
 
@@ -429,3 +429,4 @@ Settled on 2026-10-13:
 - A Sonnet verifier may be too weak for findings that need cross-file reasoning. Mitigation: route a finding to Opus when the reviewer marks it `needs_context: true`.
 - Semantic merge is one more LLM step that can hide a real finding. Mitigation: the record keeps every input and output of the merge, and `explain` shows them.
 - The eval judge is a Claude model and the reviewer is a Claude model. Nobody has measured this bias. Mitigation: match by span first, use the judge only for ambiguous pairs, and use a different Claude model for the judge than for the reviewers, as Anthropic's evaluation guidance recommends.
+- The build does not yet apply the Bash deny rules of section 6. A trusted custom reviewer with Bash can still run `git fetch` or `gh`.

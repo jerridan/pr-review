@@ -20,6 +20,15 @@ export type QueryRole = Role | EvalRole;
  */
 export const REVIEWER_USD_PER_TURN = 0.05;
 
+/**
+ * The wall-clock limit of a reviewer query for each turn of its budget.
+ * The limit is this rate times the turn budget, so it follows the budget.
+ */
+export const REVIEWER_MS_PER_TURN = 10_000;
+
+/** The default turn budget of one reviewer pass. */
+export const REVIEWER_TURNS = 150;
+
 export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
 
 export interface RoleConfig {
@@ -69,9 +78,9 @@ export const ROLE_DEFAULTS: Record<Role, RoleConfig> = {
   reviewer: {
     model: MODEL_IDS.opus,
     effort: "low",
-    maxTurns: 150,
-    maxBudgetUsd: REVIEWER_USD_PER_TURN * 150,
-    timeoutMs: 600_000,
+    maxTurns: REVIEWER_TURNS,
+    maxBudgetUsd: REVIEWER_USD_PER_TURN * REVIEWER_TURNS,
+    timeoutMs: REVIEWER_MS_PER_TURN * REVIEWER_TURNS,
     tools: "read-only",
   },
   verifier: {
