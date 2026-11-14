@@ -1,0 +1,2355 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 53,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "D8 measure, phase 1: paired report, reviewer limit and cases subset (0.12.0)",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/53"
+    },
+    "run_kind": "later",
+    "prior": {
+      "head": "37d3220fc4bf3cbf6915a86299de08dd823a7411",
+      "source": "record",
+      "record": "/home/runner/work/_temp/pr-review-records/pr-53/2026-11-14T201857.122Z-37d3220.json",
+      "open": [
+        "983f39d585c2a6ed"
+      ],
+      "dismissed": [
+        "00ced6daa5d136c1",
+        "24e8ee9a584648d5",
+        "3b745076ea70caff",
+        "4475e503504a29c4",
+        "bd358f6728390f5f",
+        "bd82bcd7f774bfff",
+        "deced597b32d7f2d"
+      ],
+      "fetch_failed": false
+    },
+    "base": "bf4476dd703cf9c0b6fd7290459f9bba19751ccd",
+    "head": "60a76bac8d24da9f79dc17d5046077ac3317e70e",
+    "started_at": "2026-11-14T20:40:46.670Z",
+    "tool_version": "0.11.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "D8 measure, phase 1: paired report, reviewer limit and cases subset (0.12.0)\n\nD8 \"measure\", phase 1: the tooling for the passes measurement. Version 0.12.0. No eval with model calls ran for this change; every test uses the fake SDK client.\n\n## What changes\n\n- **Record sources (R1).** Each `stages.verifications[]` entry and each posted finding has `sources`: every `{reviewer, pass}` that raised a finding with that fingerprint, also the passes whose copy the dedup step dropped. A merged finding has the union of its group. Each reviewer query in `cost.queries` has `pass`, and each verifier or escalation query has `verification` (the index of its verification). All new fields are optional, so `explain` and the scorer read an older record as before.\n- **Judge cache (R2).** Each eval repeat writes `<out>/<case>/<repeat>/judge-cache.json` with every match and extras judge answer, keyed by the judge model and the texts the judge saw. A scoring with the cache asks no question twice.\n- **Paired report (R3).** `pr-review eval --paired` adds a paired section: for each case and repeat, and for each repeat over all cases, the one-pass set and the all set, each with raw recall, posted recall, strict precision and cost; the same for each reviewer that ran more than one pass; the added goldens, the added false findings, the added cost per added golden, and the mean and spread of the paired differences over the repeats. `pr-review eval-report --cases <dir> --out <dir>` makes the same report from an earlier `--out` with no model call. A pair with no cached answer counts as no match, and the report prints a \"Not valid\" line for that repeat.\n- **Reviewer limit (R4).** `eval --reviewers history,tests --passes history=2,tests=2` runs only the named reviewers (they still need the normal selection) with the passes set for the run. A pass that `--passes` adds gets the same turn budget as any other pass. Unknown names, `--passes` with `--tier fast`, and either option with `--baseline` or `--write-baseline` are usage errors (exit 2). Both options go into `result.json`, so `--resume` refuses a run with other values.\n- **Subset (R5).** `pr-review eval-subset --cases <dir> --costs <report.json | out dir | baseline> (--max-cost <usd> | --budget <usd> --repeats <n>) --to <dir>` copies the kept cases and writes the limit, the source and the costs into the new directory.\n- **Baseline cost per case (R6).** `--write-baseline` writes `case_costs`. The reader accepts a baseline without it, so `eval/baseline.json` stays valid.\n\n## What an old record gives\n\nA record from before 0.12.0 has no source fields. The paired report lists each such repeat under \"missing\" with the reason \"no source fields\" and gives no figures for it; the command does not fail. The `--out` directory of the D4b baseline run no longer exists, so its cost per case and its records are in no file. Phase 2 takes the subset from the measured cost of its own first repeat, as agreed with the principal.\n\n## Limits\n\nThe one-pass set filters the posted findings of the two-pass run. It does not model the merge or the cap that a one-pass run would form. The one-pass cost keeps the triage, merge and severity queries whole.\n\n## Spec\n\nThe spec of this PR is the D8 entry of TICKETS.md (\"Measurement design\"), phase 1, with these requirements: R1 the record links each finding and query to its pass; R2 the eval keeps every judge answer; R3 the paired report, live and offline; R4 a run limited to named reviewers with passes set for the run; R5 a cases subset by cost; R6 cost per case in the baseline. Non-goals: the measurement run, the research note and the passes default (phase 2); a reviewer or passes option on `pr-review review`.\n\n## Decisions\n\n- Change path, not investigation. Not the light path: the record and baseline data shapes change (band deep).\n- The principal agreed: the record changes are in scope; the baseline keeps the cost per case from the next `--write-baseline`; phase 2 takes its subset from the measured cost of its first repeat.\n- Names chosen (reversible): `eval --paired`, `eval-report`, `eval-subset`, `--reviewers`, `--passes`.\n- A merge that fails or that code rejects posts each member with its own sources, so a pass-2-only finding stays out of the one-pass set.\n- The judge cache also keeps `unknown` answers, so the offline report equals the live scoring.\n- `eval-subset` copies the kept cases: the case loader skips linked directories.\n\n## Checks\n\n`npm test` (1464 tests), `npm run lint`, `npm run typecheck`, `npm run build` pass. The new tests fail at the red commit d45a51c (20 failed).\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZdxyMz7K7QjPYwYbt4\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": true
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": ".claude-plugin/marketplace.json",
+        "hunks": 1
+      },
+      {
+        "path": ".claude-plugin/plugin.json",
+        "hunks": 1
+      },
+      {
+        "path": "README.md",
+        "hunks": 4
+      },
+      {
+        "path": "TICKETS.md",
+        "hunks": 1
+      },
+      {
+        "path": "package.json",
+        "hunks": 1
+      },
+      {
+        "path": "src/cli.ts",
+        "hunks": 6
+      },
+      {
+        "path": "src/eval/baseline.ts",
+        "hunks": 3
+      },
+      {
+        "path": "src/eval/judge-cache.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/metrics.ts",
+        "hunks": 2
+      },
+      {
+        "path": "src/eval/offline.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/paired.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/report.ts",
+        "hunks": 5
+      },
+      {
+        "path": "src/eval/run.ts",
+        "hunks": 20
+      },
+      {
+        "path": "src/eval/score.ts",
+        "hunks": 9
+      },
+      {
+        "path": "src/eval/subset.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/find/index.ts",
+        "hunks": 7
+      },
+      {
+        "path": "src/merge/index.ts",
+        "hunks": 6
+      },
+      {
+        "path": "src/record/write.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/reviewers/loader.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/run.ts",
+        "hunks": 11
+      },
+      {
+        "path": "src/schemas/record.ts",
+        "hunks": 7
+      },
+      {
+        "path": "test/eval-baseline.test.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/eval-cli.test.ts",
+        "hunks": 3
+      },
+      {
+        "path": "test/eval-metrics.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/eval-paired.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/eval-reviewers.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/eval-subset.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/fixtures/eval-fixture.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/judge-cache.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/merge.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/record-sources.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/record.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/run.test.ts",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [
+      {
+        "path": "package-lock.json",
+        "reason": "generated"
+      }
+    ],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "Large feature change touching the run pipeline, record schema, judge scoring and cache keys, and new CLI commands, so it has real logic risk.",
+      "confidence": "high",
+      "categories": [
+        "bug",
+        "test",
+        "docs",
+        "performance"
+      ],
+      "hotspots": [
+        "src/eval/score.ts (judge cache, key construction, asked/uncached logic, null-client path)",
+        "src/eval/paired.ts (setRecord, setCost, added_false/added_goldens, scopeOf)",
+        "src/run.ts (recordingClient tagging, sourceLists mutation timing, sources on posted findings)",
+        "src/find/index.ts (seen map of sources across passes, onFinding signature)",
+        "src/merge/index.ts (unionSources, posted sources)",
+        "src/eval/run.ts (cache read/write, result.json options/resume compat, caseReviewers)",
+        "src/eval/offline.ts (readRecord, scoring from cache, cloning)",
+        "src/eval/subset.ts (chooseSubset budget loop, cost source parsing, cp)",
+        "src/cli.ts (new options validation, eval-report and eval-subset commands)",
+        "src/schemas/record.ts (strict schema additions)"
+      ],
+      "file_notes": [
+        {
+          "file": "src/eval/score.ts",
+          "note": "Reworked judge querying with cache keyed by prompt text; behavior change in match/extras paths"
+        },
+        {
+          "file": "src/eval/paired.ts",
+          "note": "New: paired one-pass vs all computation and rendering"
+        },
+        {
+          "file": "src/eval/judge-cache.ts",
+          "note": "New: cache file read/write and key hashing"
+        },
+        {
+          "file": "src/eval/offline.ts",
+          "note": "New: eval-report command, no-model rescoring"
+        },
+        {
+          "file": "src/eval/subset.ts",
+          "note": "New: eval-subset command"
+        },
+        {
+          "file": "src/eval/run.ts",
+          "note": "Cache wiring, new options in result.json, reviewer name validation"
+        },
+        {
+          "file": "src/run.ts",
+          "note": "Client wrapper refactor with tags; sources threaded through verification/posting; onlyReviewers/passes"
+        },
+        {
+          "file": "src/find/index.ts",
+          "note": "Tracks sources per fingerprint across passes; passes override"
+        },
+        {
+          "file": "src/merge/index.ts",
+          "note": "Union of sources on merged findings"
+        },
+        {
+          "file": "src/schemas/record.ts",
+          "note": "New optional source fields on strict schemas"
+        },
+        {
+          "file": "src/reviewers/loader.ts",
+          "note": "effectivePasses gets run override"
+        },
+        {
+          "file": "src/eval/baseline.ts",
+          "note": "case_costs added; TOLERANCE exported"
+        },
+        {
+          "file": "src/eval/report.ts",
+          "note": "Exports helpers; paired section in report"
+        },
+        {
+          "file": "src/eval/metrics.ts",
+          "note": "Optional paired field type"
+        },
+        {
+          "file": "src/record/write.ts",
+          "note": "New isRecordFileName helper"
+        },
+        {
+          "file": "src/cli.ts",
+          "note": "New flags and two new commands"
+        },
+        {
+          "file": "README.md",
+          "note": "Docs for new features"
+        },
+        {
+          "file": "TICKETS.md",
+          "note": "Ticket note"
+        },
+        {
+          "file": "package.json",
+          "note": "Version bump 0.12.0"
+        },
+        {
+          "file": ".claude-plugin/plugin.json",
+          "note": "Version bump"
+        },
+        {
+          "file": ".claude-plugin/marketplace.json",
+          "note": "Version bump"
+        },
+        {
+          "file": "test/eval-paired.test.ts",
+          "note": "New tests"
+        },
+        {
+          "file": "test/eval-reviewers.test.ts",
+          "note": "New tests"
+        },
+        {
+          "file": "test/eval-subset.test.ts",
+          "note": "New tests"
+        },
+        {
+          "file": "test/judge-cache.test.ts",
+          "note": "New tests"
+        },
+        {
+          "file": "test/record-sources.test.ts",
+          "note": "New tests"
+        },
+        {
+          "file": "test/fixtures/eval-fixture.ts",
+          "note": "New shared test helpers"
+        },
+        {
+          "file": "test/merge.test.ts",
+          "note": "New sources tests"
+        },
+        {
+          "file": "test/eval-baseline.test.ts",
+          "note": "case_costs tests"
+        },
+        {
+          "file": "test/eval-cli.test.ts",
+          "note": "Exclude judge-cache.json from record scans"
+        },
+        {
+          "file": "test/eval-metrics.test.ts",
+          "note": "Add uncached field"
+        },
+        {
+          "file": "test/record.test.ts",
+          "note": "Expect sources"
+        },
+        {
+          "file": "test/run.test.ts",
+          "note": "Expect sources"
+        }
+      ],
+      "summary": "Version 0.12.0 adds measurement tooling for the eval. Run records now name the reviewer pass that raised each finding and each query. Each eval repeat keeps a judge cache, and `--paired`, `--reviewers`, `--passes`, `eval-report` and `eval-subset` are new. `--write-baseline` now writes `case_costs`. The change reworks judge scoring around the cache and threads source tracking through find, verify, merge and the record schema."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: Large feature change touching the run pipeline, record schema, judge scoring and cache keys, and new CLI commands, so it has real logic risk.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/subset.ts",
+            "start_line": 206,
+            "end_line": 206,
+            "category": "convention",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "subset.json is written with a plain writeFile, but the other eval output files use the shared writeFileAtomic helper.",
+            "evidence": "await writeFile(join(to, SUBSET_FILE), `${JSON.stringify(file, null, 2)}\\n`);",
+            "suggested_fix": "Use writeFileAtomic from ./atomic.js.",
+            "explanation": "In this change, judge-cache.ts writes its eval file through writeFileAtomic from ./atomic.js, and subset.ts does not use that helper.",
+            "needs_context": false
+          },
+          {
+            "file": "src/eval/subset.ts",
+            "start_line": 155,
+            "end_line": 155,
+            "category": "convention",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "subset.ts defines its own usd formatter, and report.ts now exports a shared usd helper.",
+            "evidence": "const usd = (value: number | null): string => (value === null ? \"none\" : `$${value.toFixed(4)}`);",
+            "suggested_fix": "Import usd from ./report.js, and handle the null case where the limit is printed.",
+            "explanation": "The change exports usd from report.ts so that paired.ts can use it. subset.ts has a second copy that is the same except for the text it gives for null.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 11991,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 53985,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0054085,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 6,
+              "outputTokens": 1111,
+              "cacheReadInputTokens": 122905,
+              "cacheCreationInputTokens": 54253,
+              "webSearchRequests": 0,
+              "costUSD": 0.480849,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 286,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.4862575
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7696,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 53985,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0054095,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 570,
+              "cacheReadInputTokens": 63682,
+              "cacheCreationInputTokens": 53902,
+              "webSearchRequests": 0,
+              "costUSD": 0.4553684,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 404,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.4607779
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/offline.ts",
+            "start_line": 95,
+            "end_line": 108,
+            "category": "bug",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "The offline report computes paired figures even for repeats that the eval scored without --paired, so the one-pass judge questions have no cached answer and the report marks the repeat not valid.",
+            "evidence": "  if (hasSources(record)) {\n    const p = await pairedRepeat(",
+            "suggested_fix": "Compute the paired figures only when result.options.paired is true. Otherwise leave m.paired undefined, so the repeat is listed as not paired.",
+            "explanation": "Without --paired, the live eval never asked the one-pass questions, so the offline report counts them as uncached no-matches and its paired figures are wrong.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 13355,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 53985,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0054085,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 1232,
+              "cacheReadInputTokens": 5363,
+              "cacheCreationInputTokens": 53494,
+              "webSearchRequests": 0,
+              "costUSD": 0.4536726,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 621,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.45908109999999996
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/offline.ts",
+            "start_line": 95,
+            "end_line": 110,
+            "category": "bug",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The offline uncached count adds the misses of the full scoring and of each one-pass scoring, so one missing judge pair is counted more than once.",
+            "evidence": "    uncached += p.uncached;",
+            "suggested_fix": "Share one set of uncached keys across the scorings of a repeat, or report only the uncached count of the all scoring.",
+            "explanation": "Each scoreRecord call has its own `used` set, so a pair that both the all set and a one-pass set ask about adds to `uncached` in each scoring, and the not-valid line overstates the pair count.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 11368,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 53987,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0054087,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 1018,
+              "cacheReadInputTokens": 5363,
+              "cacheCreationInputTokens": 53496,
+              "webSearchRequests": 0,
+              "costUSD": 0.4494086,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 459,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.4548173
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 9285,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 53973,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0054073,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 698,
+              "cacheReadInputTokens": 63574,
+              "cacheCreationInputTokens": 53936,
+              "webSearchRequests": 0,
+              "costUSD": 0.4581788,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 534,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.4635861
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7283,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 86338,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0086438,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 459,
+              "cacheReadInputTokens": 96723,
+              "cacheCreationInputTokens": 86220,
+              "webSearchRequests": 0,
+              "costUSD": 0.7183006000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 295,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.7269444
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/offline.ts",
+            "start_line": 51,
+            "end_line": 62,
+            "category": "security",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The record name from result.json goes into a file path with no check, so a crafted result.json can make eval-report read a file outside the repeat directory.",
+            "evidence": "  const path = join(dir, name);",
+            "suggested_fix": "Accept the name only when isRecordFileName(name) is true and the name has no path separator.",
+            "explanation": "The `record` field is a free string, so a value such as `../../x` escapes the repeat directory. The file only gets parsed as a record, so the effect is small.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5520,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 53969,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0054069,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 356,
+              "cacheReadInputTokens": 5330,
+              "cacheCreationInputTokens": 53478,
+              "webSearchRequests": 0,
+              "costUSD": 0.43601799999999996,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 85,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.44142489999999995
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4812,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 53979,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0054079,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 404,
+              "cacheReadInputTokens": 5330,
+              "cacheCreationInputTokens": 53488,
+              "webSearchRequests": 0,
+              "costUSD": 0.437058,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 95,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.4424659
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/baseline.ts",
+            "start_line": 39,
+            "end_line": 39,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "No test runs `--write-baseline` and checks that the written baseline holds `case_costs` (R6).",
+            "evidence": "  case_costs: z.record(z.string(), z.number()).optional(),",
+            "suggested_fix": "Add an eval test that runs `--write-baseline` with the fake client and checks `case_costs` in the baseline file against the mean cost of each case.",
+            "explanation": "eval-subset.test.ts only reads a baseline that it writes by hand, so a writer that leaves out `case_costs` still passes every test.",
+            "needs_context": true
+          },
+          {
+            "file": "test/eval-reviewers.test.ts",
+            "start_line": 114,
+            "end_line": 119,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "The budget assertion copies the turn-budget constants, and its comment does not agree with the asserted values.",
+            "evidence": "    expect(budgets).toEqual(Array.from({ length: 4 }, () => [150, 7.5, 1_500_000]));",
+            "suggested_fix": "Assert that every reviewer call has the same overrides as the pass-1 call.",
+            "explanation": "The behaviour to test is that a pass added by `--passes` gets the same budget as pass 1, so the literal values only restate the code.",
+            "needs_context": false
+          },
+          {
+            "file": "test/eval-subset.test.ts",
+            "start_line": 188,
+            "end_line": 198,
+            "category": "test",
+            "severity_estimate": "nit",
+            "confidence": "medium",
+            "claim": "One test checks three different usage errors.",
+            "evidence": "  it(\"exits 2 when no mode or both modes are given\", async () => {",
+            "suggested_fix": "Split it into one test for each usage error, as eval-reviewers.test.ts does with its table of cases.",
+            "explanation": "When the test fails, it does not tell which usage error broke. It also checks `--budget` with no `--repeats`, which its name does not mention.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 13963,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 53991,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0054101,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 1409,
+              "cacheReadInputTokens": 6105,
+              "cacheCreationInputTokens": 53500,
+              "webSearchRequests": 0,
+              "costUSD": 0.457409,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 403,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.4628191
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "src/eval/offline.ts",
+          "start_line": 95,
+          "end_line": 110,
+          "category": "bug",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The offline uncached count adds the misses of the full scoring and of each one-pass scoring, so one missing judge pair is counted more than once.",
+          "evidence": "    uncached += p.uncached;",
+          "suggested_fix": "Share one set of uncached keys across the scorings of a repeat, or report only the uncached count of the all scoring.",
+          "explanation": "Each scoreRecord call has its own `used` set, so a pair that both the all set and a one-pass set ask about adds to `uncached` in each scoring, and the not-valid line overstates the pair count.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "uncached += p.uncached;",
+            "uncached += score.uncached;",
+            "const used = new Set<string>();",
+            "if (first) uncached += 1;"
+          ],
+          "rationale": "Each scoreRecord call has its own `used` set, and pairedRepeat sums `score.uncached` over the one-pass and per-reviewer scopes. The offline code then adds that sum to the all scoring's count, so one uncached pair is counted in each scoring that asks about it. The \"Not valid\" line therefore overstates the pair count. The repeat is still flagged and the figures are unaffected.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "uncached += p.uncached;",
+            "uncached += score.uncached;",
+            "const used = new Set<string>();",
+            "if (first) uncached += 1;"
+          ],
+          "rationale": "Each scoreRecord call has its own `used` set, and pairedRepeat sums `score.uncached` over the one-pass and per-reviewer scopes. The offline code then adds that sum to the all scoring's count, so one uncached pair is counted in each scoring that asks about it. The \"Not valid\" line therefore overstates the pair count. The repeat is still flagged and the figures are unaffected.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "src/eval/subset.ts",
+          "start_line": 206,
+          "end_line": 206,
+          "category": "convention",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "subset.json is written with a plain writeFile, but the other eval output files use the shared writeFileAtomic helper.",
+          "evidence": "await writeFile(join(to, SUBSET_FILE), `${JSON.stringify(file, null, 2)}\\n`);",
+          "suggested_fix": "Use writeFileAtomic from ./atomic.js.",
+          "explanation": "In this change, judge-cache.ts writes its eval file through writeFileAtomic from ./atomic.js, and subset.ts does not use that helper.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "await writeFile(join(to, SUBSET_FILE), `${JSON.stringify(file, null, 2)}\\n`);"
+          ],
+          "rationale": "The finding is literally true: subset.ts uses plain writeFile. But \"the other eval output files use the helper\" is overstated. report.json, baseline.json and the pool files also use plain writeFile. subset.json goes into a brand-new directory, so atomicity gives no real benefit.",
+          "score": 40,
+          "severity": "dont_post"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "await writeFile(join(to, SUBSET_FILE), `${JSON.stringify(file, null, 2)}\\n`);"
+          ],
+          "rationale": "The finding is literally true: subset.ts uses plain writeFile. But \"the other eval output files use the helper\" is overstated. report.json, baseline.json and the pool files also use plain writeFile. subset.json goes into a brand-new directory, so atomicity gives no real benefit.",
+          "score": 40,
+          "severity": "dont_post"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "src/eval/subset.ts",
+          "start_line": 155,
+          "end_line": 155,
+          "category": "convention",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "subset.ts defines its own usd formatter, and report.ts now exports a shared usd helper.",
+          "evidence": "const usd = (value: number | null): string => (value === null ? \"none\" : `$${value.toFixed(4)}`);",
+          "suggested_fix": "Import usd from ./report.js, and handle the null case where the limit is printed.",
+          "explanation": "The change exports usd from report.ts so that paired.ts can use it. subset.ts has a second copy that is the same except for the text it gives for null.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const usd = (value: number | null): string => (value === null ? \"none\" : `$${value.toFixed(4)}`);"
+          ],
+          "rationale": "subset.ts defines a local `usd`, and report.ts exports a near-identical `usd` that returns \"-\" for null where subset.ts returns \"none\". The duplication is real but small, and the different null text looks deliberate.",
+          "score": 85,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const usd = (value: number | null): string => (value === null ? \"none\" : `$${value.toFixed(4)}`);",
+            "export const usd = (value: number | null): string =>\n  value === null ? \"-\" : `$${value.toFixed(4)}`;"
+          ],
+          "rationale": "The new subset.ts copies the exported usd helper from report.ts. The only difference is the text for null (\"none\" instead of \"-\"), so this is a small duplication that is cheap to remove.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const usd = (value: number | null): string => (value === null ? \"none\" : `$${value.toFixed(4)}`);",
+            "export const usd = (value: number | null): string =>\n  value === null ? \"-\" : `$${value.toFixed(4)}`;"
+          ],
+          "rationale": "The new subset.ts copies the exported usd helper from report.ts. The only difference is the text for null (\"none\" instead of \"-\"), so this is a small duplication that is cheap to remove.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "passed": true
+      },
+      {
+        "finding": {
+          "file": "src/eval/offline.ts",
+          "start_line": 95,
+          "end_line": 108,
+          "category": "bug",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "The offline report computes paired figures even for repeats that the eval scored without --paired, so the one-pass judge questions have no cached answer and the report marks the repeat not valid.",
+          "evidence": "  if (hasSources(record)) {\n    const p = await pairedRepeat(",
+          "suggested_fix": "Compute the paired figures only when result.options.paired is true. Otherwise leave m.paired undefined, so the repeat is listed as not paired.",
+          "explanation": "Without --paired, the live eval never asked the one-pass questions, so the offline report counts them as uncached no-matches and its paired figures are wrong.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (hasSources(record)) {\n    const p = await pairedRepeat(",
+            "const score = await scoreRecord(record, c.golden, head, judge, {",
+            "if (ctx.opts.paired === true) {"
+          ],
+          "rationale": "The offline code ignores result.options.paired and always runs pairedRepeat when the record has sources, while the live eval only does so with --paired. For a run without --paired, one-pass pairs that the all-set scoring never asked about (a golden already taken by an earlier finding) have no cached answer. Those pairs count as uncached and the repeat gets a \"Not valid\" line. The effect is limited: figures are still produced and flagged, only some repeats are affected, and reporting paired figures offline from a non-paired run may be intended.",
+          "score": 55,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (hasSources(record)) {\n    const p = await pairedRepeat(",
+            "const score = await scoreRecord(record, c.golden, head, judge, {",
+            "if (ctx.opts.paired === true) {"
+          ],
+          "rationale": "The offline code ignores result.options.paired and always runs pairedRepeat when the record has sources, while the live eval only does so with --paired. For a run without --paired, one-pass pairs that the all-set scoring never asked about (a golden already taken by an earlier finding) have no cached answer. Those pairs count as uncached and the repeat gets a \"Not valid\" line. The effect is limited: figures are still produced and flagged, only some repeats are affected, and reporting paired figures offline from a non-paired run may be intended.",
+          "score": 55,
+          "severity": "suggestion"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "src/eval/offline.ts",
+          "start_line": 51,
+          "end_line": 62,
+          "category": "security",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The record name from result.json goes into a file path with no check, so a crafted result.json can make eval-report read a file outside the repeat directory.",
+          "evidence": "  const path = join(dir, name);",
+          "suggested_fix": "Accept the name only when isRecordFileName(name) is true and the name has no path separator.",
+          "explanation": "The `record` field is a free string, so a value such as `../../x` escapes the repeat directory. The file only gets parsed as a record, so the effect is small.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const path = join(dir, name);",
+            "record: z.string().optional(),"
+          ],
+          "rationale": "The `record` name is an unchecked `z.string()` and goes straight into `join(dir, name)`, so `../` can leave the repeat directory. The file is only parsed as a RunRecord, and the input is the user's own local --out directory, so the real risk is negligible.",
+          "score": 85,
+          "severity": "dont_post"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const path = join(dir, name);",
+            "let name = named;",
+            "record: z.string().optional(),",
+            "const record = await readRecord(dir, result.record);"
+          ],
+          "rationale": "The claim is correct: `result.record` is an unchecked string that goes straight into `join(dir, name)`, so a name like `../x` can point outside the repeat directory. It is not worth posting. The tool writes `result.json` itself into the user's own `--out` directory, and a file read from outside is only parsed against `RecordSchema`. A file that fails the parse gives only an error that names the path, so nothing leaks and nothing is written.",
+          "score": 88,
+          "severity": "dont_post"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const path = join(dir, name);",
+            "let name = named;",
+            "record: z.string().optional(),",
+            "const record = await readRecord(dir, result.record);"
+          ],
+          "rationale": "The claim is correct: `result.record` is an unchecked string that goes straight into `join(dir, name)`, so a name like `../x` can point outside the repeat directory. It is not worth posting. The tool writes `result.json` itself into the user's own `--out` directory, and a file read from outside is only parsed against `RecordSchema`. A file that fails the parse gives only an error that names the path, so nothing leaks and nothing is written.",
+          "score": 88,
+          "severity": "dont_post"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "src/eval/baseline.ts",
+          "start_line": 39,
+          "end_line": 39,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "No test runs `--write-baseline` and checks that the written baseline holds `case_costs` (R6).",
+          "evidence": "  case_costs: z.record(z.string(), z.number()).optional(),",
+          "suggested_fix": "Add an eval test that runs `--write-baseline` with the fake client and checks `case_costs` in the baseline file against the mean cost of each case.",
+          "explanation": "eval-subset.test.ts only reads a baseline that it writes by hand, so a writer that leaves out `case_costs` still passes every test.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "case_costs: z.record(z.string(), z.number()).optional(),",
+            "case_costs: Object.fromEntries("
+          ],
+          "rationale": "test/eval-baseline.test.ts calls writeBaseline and checks `read.case_costs` equals `{ \\\"a-case\\\": 2, \\\"b-case\\\": 0.5 }`. A writer that left out `case_costs` would fail that test. Only a CLI-level check is missing, which is minor.",
+          "score": 12,
+          "severity": "not_real"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "case_costs: Object.fromEntries(",
+            "case_costs: { \"a-case\": 0.1 },",
+            "await writeBaseline(file, built, null, { repeat: 2, tool_version: \"1\" });",
+            "expect(read.case_costs).toEqual({ \"a-case\": 2, \"b-case\": 0.5 });"
+          ],
+          "rationale": "The finding is wrong. test/eval-baseline.test.ts calls writeBaseline and checks `case_costs` with exact equality, and one test confirms it is the mean of the repeats that did not fail. A writer that left out `case_costs` would fail those tests. The CLI `--write-baseline` tests use toMatchObject and don't check this field, but `--write-baseline` writes through the same writeBaseline function, so the field is still covered.",
+          "score": 10,
+          "severity": "not_real"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "case_costs: Object.fromEntries(",
+            "case_costs: { \"a-case\": 0.1 },",
+            "await writeBaseline(file, built, null, { repeat: 2, tool_version: \"1\" });",
+            "expect(read.case_costs).toEqual({ \"a-case\": 2, \"b-case\": 0.5 });"
+          ],
+          "rationale": "The finding is wrong. test/eval-baseline.test.ts calls writeBaseline and checks `case_costs` with exact equality, and one test confirms it is the mean of the repeats that did not fail. A writer that left out `case_costs` would fail those tests. The CLI `--write-baseline` tests use toMatchObject and don't check this field, but `--write-baseline` writes through the same writeBaseline function, so the field is still covered.",
+          "score": 10,
+          "severity": "not_real"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "test/eval-reviewers.test.ts",
+          "start_line": 114,
+          "end_line": 119,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "The budget assertion copies the turn-budget constants, and its comment does not agree with the asserted values.",
+          "evidence": "    expect(budgets).toEqual(Array.from({ length: 4 }, () => [150, 7.5, 1_500_000]));",
+          "suggested_fix": "Assert that every reviewer call has the same overrides as the pass-1 call.",
+          "explanation": "The behaviour to test is that a pass added by `--passes` gets the same budget as pass 1, so the literal values only restate the code.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(budgets).toEqual(Array.from({ length: 4 }, () => [150, 7.5, 1_500_000]));",
+            "// turns, $0.05 per turn and 10 s per turn."
+          ],
+          "rationale": "The comment agrees with the values: 150 turns × $0.05 is 7.5, and 150 × 10 s is 1,500,000 ms. The test does hard-code the numbers instead of comparing every call to the pass-1 budget, but that is a minor style point, not a mismatch.",
+          "score": 12,
+          "severity": "not_real"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(budgets).toEqual(Array.from({ length: 4 }, () => [150, 7.5, 1_500_000]));",
+            "// turns, $0.05 per turn and 10 s per turn."
+          ],
+          "rationale": "The comment agrees with the values: 150 turns × $0.05 is 7.5, and 150 × 10 s is 1,500,000 ms. The test does hard-code the numbers instead of comparing every call to the pass-1 budget, but that is a minor style point, not a mismatch.",
+          "score": 12,
+          "severity": "not_real"
+        },
+        "passed": false
+      },
+      {
+        "finding": {
+          "file": "test/eval-subset.test.ts",
+          "start_line": 188,
+          "end_line": 198,
+          "category": "test",
+          "severity_estimate": "nit",
+          "confidence": "medium",
+          "claim": "One test checks three different usage errors.",
+          "evidence": "  it(\"exits 2 when no mode or both modes are given\", async () => {",
+          "suggested_fix": "Split it into one test for each usage error, as eval-reviewers.test.ts does with its table of cases.",
+          "explanation": "When the test fails, it does not tell which usage error broke. It also checks `--budget` with no `--repeats`, which its name does not mention.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "it(\"exits 2 when no mode or both modes are given\", async () => {",
+            "expect(await subset(...base, \"--budget\", \"4\", \"--to\", to())).toBe(2);"
+          ],
+          "rationale": "The test does bundle three usage-error cases, and the third (--budget without --repeats) is not in its name. Vitest reports the failing assertion's line, so a failure is still easy to locate, and the issue is minor test style.",
+          "score": 80,
+          "severity": "dont_post"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "it(\"exits 2 when no mode or both modes are given\", async () => {",
+            "expect(await subset(...base, \"--to\", to())).toBe(2);",
+            "expect(await subset(...base, \"--budget\", \"4\", \"--to\", to())).toBe(2);"
+          ],
+          "rationale": "The finding is correct: this new test checks three usage errors, and the third one (`--budget` without `--repeats`) isn't in the test name. It is only a test-structure point, though. Vitest names the line of the failing expect, so the case that broke can still be found, and nothing wrong reaches a user.",
+          "score": 90,
+          "severity": "dont_post"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "it(\"exits 2 when no mode or both modes are given\", async () => {",
+            "expect(await subset(...base, \"--to\", to())).toBe(2);",
+            "expect(await subset(...base, \"--budget\", \"4\", \"--to\", to())).toBe(2);"
+          ],
+          "rationale": "The finding is correct: this new test checks three usage errors, and the third one (`--budget` without `--repeats`) isn't in the test name. It is only a test-structure point, though. Vitest names the line of the failing expect, so the case that broke can still be found, and nothing wrong reaches a user.",
+          "score": 90,
+          "severity": "dont_post"
+        },
+        "passed": false
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5907032534,
+      "review_url": "https://github.com/jerridan/pr-review/pull/53#pullrequestreview-5907032534",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 132581631747
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [
+      {
+        "file": "src/eval/offline.ts",
+        "start_line": 95,
+        "end_line": 110,
+        "category": "bug",
+        "severity_estimate": "nit",
+        "confidence": "low",
+        "claim": "The offline uncached count adds the misses of the full scoring and of each one-pass scoring, so one missing judge pair is counted more than once.",
+        "evidence": "    uncached += p.uncached;",
+        "suggested_fix": "Share one set of uncached keys across the scorings of a repeat, or report only the uncached count of the all scoring.",
+        "explanation": "Each scoreRecord call has its own `used` set, so a pair that both the all set and a one-pass set ask about adds to `uncached` in each scoring, and the not-valid line overstates the pair count.",
+        "needs_context": false,
+        "fingerprint": "ff52dff68cc1f8e6",
+        "severity": "suggestion",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "uncached += p.uncached;",
+            "uncached += score.uncached;",
+            "const used = new Set<string>();",
+            "if (first) uncached += 1;"
+          ],
+          "rationale": "Each scoreRecord call has its own `used` set, and pairedRepeat sums `score.uncached` over the one-pass and per-reviewer scopes. The offline code then adds that sum to the all scoring's count, so one uncached pair is counted in each scoring that asks about it. The \"Not valid\" line therefore overstates the pair count. The repeat is still flagged and the figures are unaffected.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "span_text": "const m = metrics(record, score, repeat); let uncached = score.uncached; if (hasSources(record)) { const p = await pairedRepeat( record, c.golden, head, judge, { rawJudge: result.options.raw_judge }, score, ); m.paired = p.paired; uncached += p.uncached; } else { m.paired = null; }"
+      },
+      {
+        "file": "src/eval/subset.ts",
+        "start_line": 155,
+        "end_line": 155,
+        "category": "convention",
+        "severity_estimate": "nit",
+        "confidence": "low",
+        "claim": "subset.ts defines its own usd formatter, and report.ts now exports a shared usd helper.",
+        "evidence": "const usd = (value: number | null): string => (value === null ? \"none\" : `$${value.toFixed(4)}`);",
+        "suggested_fix": "Import usd from ./report.js, and handle the null case where the limit is printed.",
+        "explanation": "The change exports usd from report.ts so that paired.ts can use it. subset.ts has a second copy that is the same except for the text it gives for null.",
+        "needs_context": false,
+        "fingerprint": "27395d2760bae945",
+        "severity": "nit",
+        "score": 92,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const usd = (value: number | null): string => (value === null ? \"none\" : `$${value.toFixed(4)}`);",
+            "export const usd = (value: number | null): string =>\n  value === null ? \"-\" : `$${value.toFixed(4)}`;"
+          ],
+          "rationale": "The new subset.ts copies the exported usd helper from report.ts. The only difference is the text for null (\"none\" instead of \"-\"), so this is a small duplication that is cheap to remove.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "span_text": ""
+      }
+    ],
+    "not_reposted": [],
+    "carried": [
+      {
+        "file": "src/eval/run.ts",
+        "start_line": 99,
+        "end_line": 107,
+        "category": "docs",
+        "severity_estimate": "nit",
+        "confidence": "medium",
+        "claim": "The doc comment of the renamed caseReviewers still describes only the judge-model reviewers. The function now also returns the custom reviewer names and applies the --reviewers filter.",
+        "evidence": " * The reviewers of a case that can run at \"tier\" and that use the judge\n * model.",
+        "suggested_fix": "Describe both returned lists and the --reviewers filter.",
+        "explanation": "The function now returns { judgeModel, custom }, filters by opts.reviewers, and takes the tier from opts, so the comment does not match the code.",
+        "needs_context": false,
+        "fingerprint": "983f39d585c2a6ed",
+        "severity": "nit",
+        "score": 92,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "* The reviewers of a case that can run at \"tier\" and that use the judge\n * model.",
+            "): Promise<{ judgeModel: string[]; custom: string[] }> {",
+            "const only = opts.reviewers ? new Set(opts.reviewers) : null;"
+          ],
+          "rationale": "The doc comment still describes only the judge-model reviewers at \"tier\". The function was renamed and now returns { judgeModel, custom } and filters by opts.reviewers, and the PR did not update the comment.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "span_text": "/** * The reviewers of a case that can run at \"tier\" and that use the judge * model. The run reads the .pr-review/ config from the base commit, so * this check reads it there too. A reviewer that the config disables * does not count. The check does not know the triage categories or the * changed paths, so it counts every reviewer that the tier permits. A * config that does not load gives no reviewer: the run of that case then * fails as a failed repeat. */"
+      }
+    ]
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 11729,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 77275,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0077375,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1723,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 76788,
+            "webSearchRequests": 0,
+            "costUSD": 0.3245122,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.3322497
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7696,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 53985,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0054095,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 570,
+            "cacheReadInputTokens": 63682,
+            "cacheCreationInputTokens": 53902,
+            "webSearchRequests": 0,
+            "costUSD": 0.4553684,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 404,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.4607779
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "model": "claude-opus-5-5",
+        "duration_ms": 9285,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 53973,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0054073,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 698,
+            "cacheReadInputTokens": 63574,
+            "cacheCreationInputTokens": 53936,
+            "webSearchRequests": 0,
+            "costUSD": 0.4581788,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 534,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.4635861
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 11368,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 53987,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0054087,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1018,
+            "cacheReadInputTokens": 5363,
+            "cacheCreationInputTokens": 53496,
+            "webSearchRequests": 0,
+            "costUSD": 0.4494086,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 459,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.4548173
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "model": "claude-opus-5-5",
+        "duration_ms": 11991,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 53985,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0054085,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 1111,
+            "cacheReadInputTokens": 122905,
+            "cacheCreationInputTokens": 54253,
+            "webSearchRequests": 0,
+            "costUSD": 0.480849,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 286,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.4862575
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "model": "claude-opus-5-5",
+        "duration_ms": 13355,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 53985,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0054085,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1232,
+            "cacheReadInputTokens": 5363,
+            "cacheCreationInputTokens": 53494,
+            "webSearchRequests": 0,
+            "costUSD": 0.4536726,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 621,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.45908109999999996
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7283,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 86338,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0086438,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 459,
+            "cacheReadInputTokens": 96723,
+            "cacheCreationInputTokens": 86220,
+            "webSearchRequests": 0,
+            "costUSD": 0.7183006000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 295,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.7269444
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5520,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 53969,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0054069,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 356,
+            "cacheReadInputTokens": 5330,
+            "cacheCreationInputTokens": 53478,
+            "webSearchRequests": 0,
+            "costUSD": 0.43601799999999996,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 85,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.44142489999999995
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "model": "claude-opus-5-5",
+        "duration_ms": 4812,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 53979,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0054079,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 404,
+            "cacheReadInputTokens": 5330,
+            "cacheCreationInputTokens": 53488,
+            "webSearchRequests": 0,
+            "costUSD": 0.437058,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 95,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.4424659
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6791,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11636,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011751,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 633,
+            "cacheReadInputTokens": 35705,
+            "cacheCreationInputTokens": 11847,
+            "webSearchRequests": 0,
+            "costUSD": 0.0573005,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 77,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.058475599999999996
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 7148,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11636,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011736000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 760,
+            "cacheReadInputTokens": 36048,
+            "cacheCreationInputTokens": 12903,
+            "webSearchRequests": 0,
+            "costUSD": 0.0628288,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 82,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0640024
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 11964,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9381,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009476,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 1494,
+            "cacheReadInputTokens": 51140,
+            "cacheCreationInputTokens": 15506,
+            "webSearchRequests": 0,
+            "costUSD": 0.08209400000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 493,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.08304160000000001
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "model": "claude-opus-5-5",
+        "duration_ms": 13963,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 53991,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0054101,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1409,
+            "cacheReadInputTokens": 6105,
+            "cacheCreationInputTokens": 53500,
+            "webSearchRequests": 0,
+            "costUSD": 0.457409,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 403,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.4628191
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6977,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9351,
+            "outputTokens": 17,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009436000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 607,
+            "cacheReadInputTokens": 17598,
+            "cacheCreationInputTokens": 9715,
+            "webSearchRequests": 0,
+            "costUSD": 0.0466978,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 128,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0476414
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7409,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11628,
+            "outputTokens": 223,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012743000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 198,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 751,
+            "cacheReadInputTokens": 35833,
+            "cacheCreationInputTokens": 11917,
+            "webSearchRequests": 0,
+            "costUSD": 0.1175466,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 161,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.11882090000000001
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6457,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8945,
+            "outputTokens": 269,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.001029,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 242,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 712,
+            "cacheReadInputTokens": 17192,
+            "cacheCreationInputTokens": 9767,
+            "webSearchRequests": 0,
+            "costUSD": 0.047915200000000005,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 196,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.04894420000000001
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 4359,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11421,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011521,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 539,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 10934,
+            "webSearchRequests": 0,
+            "costUSD": 0.0495667,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 205,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0507188
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 8976,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7618,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007712999999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 1071,
+            "cacheReadInputTokens": 28999,
+            "cacheCreationInputTokens": 9430,
+            "webSearchRequests": 0,
+            "costUSD": 0.0513419,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 397,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.052113200000000005
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 7680,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9355,
+            "outputTokens": 17,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009440000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 653,
+            "cacheReadInputTokens": 17594,
+            "cacheCreationInputTokens": 9177,
+            "webSearchRequests": 0,
+            "costUSD": 0.0900108,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 152,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0909548
+      },
+      {
+        "role": "verifier",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 24030,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9396,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009491,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 14,
+            "outputTokens": 2936,
+            "cacheReadInputTokens": 145926,
+            "cacheCreationInputTokens": 26503,
+            "webSearchRequests": 0,
+            "costUSD": 0.14999259999999998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 1445,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1509417
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 5815,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11417,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011512,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 625,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 10922,
+            "webSearchRequests": 0,
+            "costUSD": 0.1007574,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 239,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1019086
+      },
+      {
+        "role": "verifier-escalation",
+        "model": "claude-opus-5-5",
+        "duration_ms": 11092,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7610,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007704999999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 1144,
+            "cacheReadInputTokens": 42671,
+            "cacheCreationInputTokens": 12619,
+            "webSearchRequests": 0,
+            "costUSD": 0.13239820000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 264,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1331687
+      }
+    ],
+    "total_cost_usd": 5.7311558,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 40,
+      "gather": 403,
+      "scope": 9,
+      "triage": 12557,
+      "find_verify": 49208,
+      "merge": 7
+    },
+    "errors": []
+  }
+}
