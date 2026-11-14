@@ -20,7 +20,7 @@ export interface QueryRequest {
   userMessage: string;
   schema: z.ZodType;
   cwd: string;
-  overrides?: Partial<Pick<RoleConfig, "model" | "effort">>;
+  overrides?: Partial<Pick<RoleConfig, "model" | "effort" | "maxTurns" | "maxBudgetUsd">>;
   /**
    * The tools of a reviewer. They narrow the read-only set of the role and
    * never widen it. When this is not set, the role gets its full set.
