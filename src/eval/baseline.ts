@@ -13,6 +13,12 @@ export type Baseline = {
   repeat: number;
   written_at: string;
   tool_version: string;
+  /**
+   * The cost per run of each case: the mean review cost of its repeats
+   * that did not fail, with no judge cost. A case with no known cost is
+   * not here. A baseline from before D8 has none.
+   */
+  case_costs?: Record<string, number>;
 };
 
 export type Gate = {
@@ -30,7 +36,22 @@ const BaselineSchema = z.strictObject({
   repeat: z.int().min(1),
   written_at: z.string(),
   tool_version: z.string(),
+  case_costs: z.record(z.string(), z.number()).optional(),
 });
+
+/**
+ * The cost per run of a case: the mean review cost of its repeats that did
+ * not fail and have a cost. The judge cost is not in it. Null when no
+ * repeat has one.
+ */
+export function costPerRun(repeats: { failed: boolean; cost_usd: number | null }[]): number | null {
+  const costs = repeats
+    .filter((r) => !r.failed)
+    .map((r) => r.cost_usd)
+    .filter((c): c is number => c !== null);
+  if (costs.length === 0) return null;
+  return costs.reduce((sum, c) => sum + c, 0) / costs.length;
+}
 
 /** The margin of a baseline that the eval writes when no file exists. */
 const DEFAULT_MARGIN = { recall: 0.05, precision: 0.05 };
@@ -105,6 +126,12 @@ export async function writeBaseline(
     repeat: meta.repeat,
     written_at: new Date().toISOString(),
     tool_version: meta.tool_version,
+    case_costs: Object.fromEntries(
+      report.cases.flatMap((c) => {
+        const cost = costPerRun(c.repeats);
+        return cost === null ? [] : [[c.name, cost]];
+      }),
+    ),
   };
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, `${JSON.stringify(baseline, null, 2)}\n`);

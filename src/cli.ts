@@ -18,6 +18,7 @@ import { registerLabelCommand } from "./eval/label/index.js";
 import { registerPoolCommands } from "./eval/pool/index.js";
 import { runEvalReport } from "./eval/offline.js";
 import { runEval } from "./eval/run.js";
+import { runEvalSubset } from "./eval/subset.js";
 import { explain } from "./explain/index.js";
 import { renderExplainJson, renderExplainTable } from "./explain/format.js";
 import { readFile } from "node:fs/promises";
@@ -132,6 +133,15 @@ function parsePasses(value: string): Record<string, number> {
     passes[match[1] as string] = Number(match[2]);
   }
   return passes;
+}
+
+// Parse an amount in US dollars: a number of 0 or more.
+function parseUsd(value: string): number {
+  const n = Number(value);
+  if (value.trim() === "" || !Number.isFinite(n) || n < 0) {
+    throw new InvalidArgumentError("Give the amount in US dollars as a number of 0 or more.");
+  }
+  return n;
 }
 
 // Parse --github-repo: owner/repo.
@@ -425,6 +435,69 @@ export function createProgram(deps: ProgramDeps): Command {
         process.exitCode = EXIT_FAILURE;
       }
     });
+
+  program
+    .command("eval-subset")
+    .description(
+      "Make a cases directory that leaves out the expensive cases, by the cost per run of each case in an earlier eval.",
+    )
+    .requiredOption("--cases <dir>", "the cases directory")
+    .requiredOption(
+      "--costs <source>",
+      "the costs: the report.json or the --out directory of an eval, or a baseline file with the cost per case",
+    )
+    .option("--max-cost <usd>", "leave out each case whose cost per run is above this", parseUsd)
+    .option(
+      "--budget <usd>",
+      "leave out the most expensive cases until --repeats runs of the rest fit this",
+      parseUsd,
+    )
+    .option("--repeats <n>", "the repeats that the budget must hold, with --budget", parseRepeat)
+    .requiredOption("--to <dir>", "the new cases directory; it must not exist")
+    .action(
+      async (
+        options: {
+          cases: string;
+          costs: string;
+          to: string;
+          maxCost?: number;
+          budget?: number;
+          repeats?: number;
+        },
+        command: Command,
+      ) => {
+        const budget = options.budget !== undefined || options.repeats !== undefined;
+        if ((options.maxCost !== undefined) === budget) {
+          command.error("error: give --max-cost, or give --budget and --repeats", {
+            exitCode: EXIT_USAGE,
+          });
+        }
+        if (budget && (options.budget === undefined || options.repeats === undefined)) {
+          command.error("error: --budget needs --repeats, and --repeats needs --budget", {
+            exitCode: EXIT_USAGE,
+          });
+        }
+        try {
+          process.exitCode = await runEvalSubset({
+            cases: options.cases,
+            costs: options.costs,
+            to: options.to,
+            mode:
+              options.maxCost !== undefined
+                ? { kind: "max-cost", maxCost: options.maxCost }
+                : {
+                    kind: "budget",
+                    budget: options.budget ?? 0,
+                    repeats: options.repeats ?? 1,
+                  },
+          });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          process.stderr.write(`pr-review eval-subset: ${message}\n`);
+          process.exitCode = EXIT_FAILURE;
+        }
+      },
+    );
 
   program
     .command("explain")
