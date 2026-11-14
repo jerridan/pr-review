@@ -69,6 +69,8 @@ interface EvalCliOptions {
   rawJudge?: boolean;
   resume?: boolean;
   paired?: boolean;
+  reviewers?: string[];
+  passes?: Record<string, number>;
 }
 
 // Commander exits with 1 on a usage error. This makes it 2. Help and
@@ -106,6 +108,30 @@ function parseRepeat(value: string): number {
     throw new InvalidArgumentError("Give the repeat count as a positive integer.");
   }
   return n;
+}
+
+// Parse --reviewers: names with commas between them.
+function parseReviewers(value: string): string[] {
+  const names = value.split(",").map((n) => n.trim());
+  if (names.some((n) => n === "")) {
+    throw new InvalidArgumentError("Give the reviewer names with commas between them.");
+  }
+  return [...new Set(names)];
+}
+
+// Parse --passes: name=n pairs with commas between them, n a positive integer.
+function parsePasses(value: string): Record<string, number> {
+  const passes: Record<string, number> = {};
+  for (const part of value.split(",")) {
+    const match = /^\s*([^=\s]+)\s*=\s*([1-9][0-9]*)\s*$/.exec(part);
+    if (!match) {
+      throw new InvalidArgumentError(
+        `Give each pair as name=n, with n a positive integer, not "${part}".`,
+      );
+    }
+    passes[match[1] as string] = Number(match[2]);
+  }
+  return passes;
 }
 
 // Parse --github-repo: owner/repo.
@@ -323,9 +349,31 @@ export function createProgram(deps: ProgramDeps): Command {
       "--paired",
       "also score the findings of pass 1 against all the findings, and report the paired difference",
     )
+    .option(
+      "--reviewers <name,...>",
+      "run only these reviewers; each one still needs the tier and its triggers",
+      parseReviewers,
+    )
+    .option(
+      "--passes <name=n,...>",
+      "set the passes of these reviewers for every run, over the repo config and the frontmatter",
+      parsePasses,
+    )
     .action(async (options: EvalCliOptions, command: Command) => {
       if (options.writeBaseline === true && options.baseline === undefined) {
         command.error("error: --write-baseline needs --baseline", { exitCode: EXIT_USAGE });
+      }
+      const limited = options.reviewers !== undefined || options.passes !== undefined;
+      if (limited && options.baseline !== undefined) {
+        command.error(
+          "error: a run with --reviewers or --passes is not comparable to the baseline, so do not give --baseline or --write-baseline",
+          { exitCode: EXIT_USAGE },
+        );
+      }
+      if (options.passes !== undefined && options.tier === "fast") {
+        command.error("error: --passes does not apply with --tier fast, which runs one pass", {
+          exitCode: EXIT_USAGE,
+        });
       }
       try {
         process.exitCode = await runEval(
@@ -344,6 +392,8 @@ export function createProgram(deps: ProgramDeps): Command {
             rawJudge: options.rawJudge === true,
             resume: options.resume === true,
             paired: options.paired === true,
+            ...(options.reviewers !== undefined ? { reviewers: options.reviewers } : {}),
+            ...(options.passes !== undefined ? { passes: options.passes } : {}),
           },
           deps,
         );
