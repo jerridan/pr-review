@@ -326,6 +326,14 @@ describe("loadRepoConfig: defaults and files", () => {
     expect(config.reviewers["diff-bugs"]).toEqual({ enabled: true, passes: 2 });
   });
 
+  it("accepts max_turns for a reviewer", async () => {
+    const { repo, sha } = await repoWith({
+      ".pr-review/config.yaml": "reviewers:\n  diff-bugs:\n    max_turns: 300\n",
+    });
+    const { config } = await loadRepoConfig(repo, sha);
+    expect(config.reviewers["diff-bugs"]).toEqual({ enabled: true, max_turns: 300 });
+  });
+
   it("treats an empty config.yaml as the defaults and still hashes it", async () => {
     const { repo, sha } = await repoWith({ ".pr-review/config.yaml": "" });
     const loaded = await loadRepoConfig(repo, sha);
@@ -412,6 +420,21 @@ describe("loadRepoConfig: validation errors name the file and the field (R3)", (
       "reviewers.diff-bugs.paths",
     ],
     ["passes of 0", "reviewers:\n  diff-bugs:\n    passes: 0\n", "reviewers.diff-bugs.passes"],
+    [
+      "max_turns of 0",
+      "reviewers:\n  diff-bugs:\n    max_turns: 0\n",
+      "reviewers.diff-bugs.max_turns",
+    ],
+    [
+      "max_turns of 1.5",
+      "reviewers:\n  diff-bugs:\n    max_turns: 1.5\n",
+      "reviewers.diff-bugs.max_turns",
+    ],
+    [
+      "max_turns as a string",
+      "reviewers:\n  diff-bugs:\n    max_turns: x\n",
+      "reviewers.diff-bugs.max_turns",
+    ],
     [
       "a reviewer that does not exist",
       "reviewers:\n  nobody:\n    enabled: false\n",

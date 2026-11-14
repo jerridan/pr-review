@@ -46,8 +46,8 @@ const EXPECTED: Record<
   reviewer: {
     model: "claude-opus-5-5",
     effort: "low",
-    maxTurns: 40,
-    maxBudgetUsd: 2,
+    maxTurns: 150,
+    maxBudgetUsd: 7.5,
     timeoutMs: 600_000,
     tools: "read-only",
     schema: FindingsOutputSchema,
@@ -256,7 +256,7 @@ describe("A13: query options for every role", () => {
     );
     expect(alias.model).toBe("claude-sonnet-5-5");
     expect(alias.effort).toBe("medium");
-    expect(alias.maxTurns).toBe(40);
+    expect(alias.maxTurns).toBe(150);
 
     const exact = buildQueryOptions(
       request("reviewer", { overrides: { model: "claude-opus-4-1" } }),

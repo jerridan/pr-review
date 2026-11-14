@@ -21,7 +21,7 @@ import { FindingsOutputSchema } from "../src/schemas/finding.js";
 import type { TriageBrief } from "../src/schemas/triage.js";
 import type { QueryMeta, QueryOutcome, QueryRequest } from "../src/sdk/client.js";
 import { createFakeSdkClient } from "../src/sdk/fake.js";
-import type { RunOptions } from "../src/sdk/options.js";
+import { buildQueryOptions, type RunOptions } from "../src/sdk/options.js";
 import { createSemaphore } from "../src/semaphore.js";
 
 const STATS = [
@@ -529,6 +529,42 @@ describe("runReviewers (A5)", () => {
     ]);
     expect(await count()).toEqual(await count("full"));
     expect(await count("fast")).toEqual(["diff-bugs:1", "security:1"]);
+  });
+
+  it("sends the turn budget and its dollar cap with every pass of a reviewer", async () => {
+    const budgets = async (config: typeof DEFAULT_REPO_CONFIG) => {
+      const fake = createFakeSdkClient(() => ok([]));
+      await runReviewers(
+        fake,
+        OPTIONS,
+        [
+          { def: def("diff-bugs", 2), trigger: "t" },
+          { def: def("security", 2), trigger: "t" },
+        ],
+        { ...ctx(), config, tier: "full" },
+        () => {},
+      );
+      return fake.calls.map((call) => {
+        const opts = buildQueryOptions(call, OPTIONS);
+        return `${call.reviewerName}:${opts.maxTurns}:${opts.maxBudgetUsd}`;
+      });
+    };
+    expect(await budgets(DEFAULT_REPO_CONFIG)).toEqual([
+      "diff-bugs:150:7.5",
+      "diff-bugs:150:7.5",
+      "security:150:7.5",
+      "security:150:7.5",
+    ]);
+    const deep = {
+      ...DEFAULT_REPO_CONFIG,
+      reviewers: { "diff-bugs": { enabled: true, max_turns: 300 } },
+    };
+    expect(await budgets(deep)).toEqual([
+      "diff-bugs:300:15",
+      "diff-bugs:300:15",
+      "security:150:7.5",
+      "security:150:7.5",
+    ]);
   });
 
   it("marks the reviewer failed when the second pass fails", async () => {
