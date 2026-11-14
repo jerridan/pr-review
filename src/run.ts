@@ -49,6 +49,7 @@ import {
 } from "./reviewers/loader.js";
 import { selectReviewers, skipSelected } from "./reviewers/select.js";
 import type { Finding } from "./schemas/finding.js";
+import { compareSources } from "./schemas/record.js";
 import type {
   FindingSource,
   PostedFinding,
@@ -291,9 +292,7 @@ function recordingClient(
 
 // The sources in a stable order: by reviewer, then by pass.
 function sortedSources(sources: readonly FindingSource[]): FindingSource[] {
-  return [...sources].sort(
-    (a, b) => (a.reviewer < b.reviewer ? -1 : a.reviewer > b.reviewer ? 1 : 0) || a.pass - b.pass,
-  );
+  return [...sources].sort(compareSources);
 }
 
 // The sensitive paths with no text hunk, such as a mode flip or a binary.

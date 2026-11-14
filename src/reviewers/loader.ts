@@ -229,10 +229,17 @@ export function effectiveBudget(
 }
 
 /**
- * The number of passes of a reviewer: 1 at the fast tier, else
+ * The number of passes of a reviewer: 1 at the fast tier, else the value
+ * of the run (--passes of the eval) when "run" names the reviewer, else
  * reviewers.<name>.passes when set, else the frontmatter value.
  */
-export function effectivePasses(def: ReviewerDefinition, config: RepoConfig, tier: Tier): number {
+export function effectivePasses(
+  def: ReviewerDefinition,
+  config: RepoConfig,
+  tier: Tier,
+  run?: ReadonlyMap<string, number>,
+): number {
   if (tier === "fast") return 1;
-  return reviewerEntry(config, def.frontmatter.name)?.passes ?? def.frontmatter.passes;
+  const name = def.frontmatter.name;
+  return run?.get(name) ?? reviewerEntry(config, name)?.passes ?? def.frontmatter.passes;
 }
