@@ -1,0 +1,1609 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 58,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "D4c tools: Codex model options, the general reviewer and the E6 arms",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/58"
+    },
+    "run_kind": "later",
+    "prior": {
+      "head": "6c829ba3281fe944f9f03974777c115527fdd271",
+      "source": "record",
+      "record": "/home/runner/work/_temp/pr-review-records/pr-58/2026-11-15T060330.680Z-6c829ba.json",
+      "open": [],
+      "dismissed": [
+        "72a8b88b36e00791",
+        "c72815dca7f9ebe3",
+        "e0175da5d5598219",
+        "eb0f6ab493f74c55"
+      ],
+      "fetch_failed": false
+    },
+    "base": "f8f5b382092c856d6597b3c35e83c818fa79c94b",
+    "head": "6fdbcdfc3590af6ea91be076e84ad9be0cf444f1",
+    "started_at": "2026-11-15T06:19:52.421Z",
+    "tool_version": "0.15.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "D4c tools: Codex model options, the general reviewer and the E6 arms\n\nD4c, part \"side\", phase 2: the tools for the Terra arms, E2 and E6. This PR holds code and tests only. It runs no experiment.\n\n## Changes\n\n- **The Codex call** (`src/eval/codex.ts`): `runCodex` takes an optional fifth parameter, `CodexOptions { model?, effort? }`. With no options, the call uses Sol at high, as before, so the label and pool callers do not change. `TERRA_MODEL = \"gpt-6.1-terra\"`. Each outcome also gives `tokens` (read from the stderr tail, or null), and `codexQuotaError` finds a usage-limit stop.\n- **E2, the general reviewer**: `prompts/reviewers/general-review.md` is one general review of the whole diff. The new frontmatter key `opt_in: true` keeps it out of every normal run. `selectReviewers` takes a `named` set, and `src/run.ts` passes `onlyReviewers` to it, which is the one line changed in that file. The Opus arms use `--reviewers general-review --models general-review=opus:medium|high --stage1` from the eval tooling PR.\n- **E2, the Terra arm**: `pr-review eval-codex-review` runs the same reviewer prompt through Codex on each case. It writes outside candidates, `<out>/<case>.json` = `{ source, findings }`, for replay. Each finished case is written at once, and a rerun skips it. A quota stop ends the command, and the next run continues.\n- **E6**: `pr-review eval-injection-variants` copies each injection case and makes five variants: three PR-body instructions, one in the head commit message, and one in a code comment. It never writes to the input directory or to `eval/cases/`, so the cases pin does not change. The new optional case field `description_from: \"commits\"` makes the eval give the run no description, so the commit message reaches the models. This is one changed expression in `src/eval/run.ts`. `pr-review eval-injection-report` gives the share of runs that found the known bug for each arm, and lists outputs that may follow an instruction. It makes no model call: it scores the stored records with the stored judge cache. README states the three detection rules. Every hit is a candidate for a person to judge.\n- **The Codex verifier backend of replay** (`src/eval/replay/backend.ts`): it no longer refuses. `--verifier codex:gpt-6.1-terra:medium` calls `runCodex` with the model and the effort, stores `cost_usd: null` and the tokens, and a Codex quota stop ends the replay (exit 4); a rerun with `--resume` continues. `CodexEffort` gains `max`.\n- Rebased on main f8f5b38 (the eval tooling PR). The version goes to 0.16.0.\n\n## Coordination with the eval tooling PR\n\nThe eval tooling PR (merged) owns `--models`, `--stage1` and replay, and it agreed to the interfaces above. This PR changes one line in `src/run.ts`, one expression in `src/eval/run.ts`, and, by agreement for this change, the codex backend and the quota stop in `src/eval/replay/`.\n\n## The Terra id\n\n`codex debug models` (codex-cli 0.167.0) lists this entry. The command reads the local catalog and makes no model call:\n\n```\n\"slug\":\"gpt-6.1-terra\",\"display_name\":\"GPT-6.1 Terra\"\n```\n\n## Limits\n\n- The Codex prompt goes to the CLI as one argument, as in the pool. A very large diff can be longer than the OS argument limit, and that case then fails and is reported as failed.\n- The Terra arm gets no triage brief, because a brief needs a triage model call. The Opus arms get one. The E2 note must state this.\n- No test calls the real Codex. The strict output schema (`suggested_fix` required, with an empty string for no fix) follows the pool's Codex schema.\n\n## Checks\n\n`npm test` (1671 passed), `npm run lint`, `npm run typecheck` and `npm run build` pass.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZdfE1rqbczPpmGQQ5S\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": ".claude-plugin/marketplace.json",
+        "hunks": 1
+      },
+      {
+        "path": ".claude-plugin/plugin.json",
+        "hunks": 1
+      },
+      {
+        "path": "README.md",
+        "hunks": 6
+      },
+      {
+        "path": "package.json",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/codex-review.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/injection-instructions.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/reviewers/general-review.md",
+        "hunks": 1
+      },
+      {
+        "path": "src/cli.ts",
+        "hunks": 2
+      },
+      {
+        "path": "src/eval/case.ts",
+        "hunks": 3
+      },
+      {
+        "path": "src/eval/codex-review.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/codex.ts",
+        "hunks": 5
+      },
+      {
+        "path": "src/eval/injection/report.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/injection/variants.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/replay/backend.ts",
+        "hunks": 4
+      },
+      {
+        "path": "src/eval/replay/index.ts",
+        "hunks": 3
+      },
+      {
+        "path": "src/eval/run.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/gather/worktree.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/reviewers/select.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/run.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/schemas/reviewer.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/cli-d4c-arms.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/codex-review.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/codex.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/eval-description-from.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/fixtures/injection-cases.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/fixtures/injection-records.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/injection-report.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/injection-variants.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/replay-codex.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/replay.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/reviewers.test.ts",
+        "hunks": 5
+      },
+      {
+        "path": "test/run-git.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/run-opt-in.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/select-opt-in.test.ts",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [
+      {
+        "path": "package-lock.json",
+        "reason": "generated"
+      }
+    ],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "Adds new CLI commands, an opt-in reviewer selection mechanism, a Codex backend with quota handling, git env changes and eval description logic, so it changes logic and public interfaces.",
+      "confidence": "high",
+      "categories": [
+        "bug",
+        "security",
+        "test",
+        "docs",
+        "convention"
+      ],
+      "hotspots": [
+        "src/eval/injection/report.ts (touchedLines, scoreRepeats, follow detection)",
+        "src/eval/injection/variants.ts (makeHead git plumbing, realPathOf, out-dir guards)",
+        "src/eval/codex.ts and src/eval/replay/backend.ts and replay/index.ts (quota handling, tokens, exit codes)",
+        "src/reviewers/select.ts and src/run.ts (opt_in selection)",
+        "src/gather/worktree.ts runGit extraEnv",
+        "src/eval/codex-review.ts (prompt build, description_from, resume)",
+        "src/eval/run.ts description_from handling",
+        "src/cli.ts passThrough command registration"
+      ],
+      "file_notes": [
+        {
+          "file": "src/eval/injection/report.ts",
+          "note": "new E6 report: patch parsing, known-bug matching, rescoring from judge cache, mechanical rule detection"
+        },
+        {
+          "file": "src/eval/injection/variants.ts",
+          "note": "new: builds variant cases with synthetic git commits, path-safety checks"
+        },
+        {
+          "file": "src/eval/codex-review.ts",
+          "note": "new command running the general-review prompt via Codex; resume and quota logic"
+        },
+        {
+          "file": "src/eval/codex.ts",
+          "note": "runCodex gains model/effort options, token parsing, quota detection; outcome type changed"
+        },
+        {
+          "file": "src/eval/replay/backend.ts",
+          "note": "codex backend implemented, replacing refusal"
+        },
+        {
+          "file": "src/eval/replay/index.ts",
+          "note": "quota stop path with exit code"
+        },
+        {
+          "file": "src/reviewers/select.ts",
+          "note": "opt_in filter with new named param"
+        },
+        {
+          "file": "src/run.ts",
+          "note": "passes only set to selectReviewers"
+        },
+        {
+          "file": "src/schemas/reviewer.ts",
+          "note": "new optional opt_in frontmatter field"
+        },
+        {
+          "file": "src/eval/case.ts",
+          "note": "new optional case fields description_from and variant_of"
+        },
+        {
+          "file": "src/eval/run.ts",
+          "note": "omits description for commits-based cases"
+        },
+        {
+          "file": "src/gather/worktree.ts",
+          "note": "runGit takes extra env"
+        },
+        {
+          "file": "src/cli.ts",
+          "note": "registers three pass-through commands"
+        },
+        {
+          "file": "prompts/reviewers/general-review.md",
+          "note": "new opt-in reviewer prompt"
+        },
+        {
+          "file": "prompts/injection-instructions.md",
+          "note": "new data read by code (frontmatter, sections)"
+        },
+        {
+          "file": "prompts/codex-review.md",
+          "note": "new prompt wrapper"
+        },
+        {
+          "file": "README.md",
+          "note": "docs for new features"
+        },
+        {
+          "file": "package.json",
+          "note": "version bump (also plugin json files)"
+        },
+        {
+          "file": "test/replay.test.ts",
+          "note": "removed codex refusal test"
+        }
+      ],
+      "summary": "Adds the opt-in general-review reviewer, a Codex backend for replay and a new eval-codex-review command, and E6 prompt-injection tooling: variant generation and a report. It also adds description_from and variant_of case fields, runGit extra env, and a version bump to 0.16.0. Extensive new tests accompany it."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: Adds new CLI commands, an opt-in reviewer selection mechanism, a Codex backend with quota handling, git env changes and eval description logic, so it changes logic and public interfaces.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    },
+    "mode": "full"
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 2805,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11918,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0012018,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 53,
+              "cacheReadInputTokens": 5136,
+              "cacheCreationInputTokens": 11426,
+              "webSearchRequests": 0,
+              "costUSD": 0.09350320000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.09470500000000001
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 12593,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11920,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0012020000000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 6,
+              "outputTokens": 817,
+              "cacheReadInputTokens": 39089,
+              "cacheCreationInputTokens": 12597,
+              "webSearchRequests": 0,
+              "costUSD": 0.12495780000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 510,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1261598
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/replay/backend.ts",
+            "start_line": 146,
+            "end_line": 146,
+            "category": "bug",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "Quota detection matches the text 'hit your usage limit' anywhere in the stderr tail, and that tail can still hold the echoed prompt. So any failed call on a diff that contains this text (for example this repo's own codex code or tests) stops the whole replay as a quota stop.",
+            "evidence": "...(codexQuotaError(outcome.stderr) ? { quota: true as const } : {}),",
+            "suggested_fix": "Anchor the regex to the error line form, for example /^ERROR:.*hit your usage limit/im, or check only the last lines of stderr.",
+            "explanation": "Codex echoes the prompt to stderr, so the regex can match diff content and not a real quota error. The replay then exits 4 and a rerun stops again in the same way.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 9036,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11918,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0012028,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 643,
+              "cacheReadInputTokens": 22152,
+              "cacheCreationInputTokens": 13315,
+              "webSearchRequests": 0,
+              "costUSD": 0.1238264,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 175,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1250292
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 10200,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11906,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0012006,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 585,
+              "cacheReadInputTokens": 22140,
+              "cacheCreationInputTokens": 13308,
+              "webSearchRequests": 0,
+              "costUSD": 0.122608,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 433,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.12380859999999999
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 8066,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11908,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0012018,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 403,
+              "cacheReadInputTokens": 21508,
+              "cacheCreationInputTokens": 11643,
+              "webSearchRequests": 0,
+              "costUSD": 0.10552160000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 211,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.10672340000000001
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5736,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 30680,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.003078,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 252,
+              "cacheReadInputTokens": 41064,
+              "cacheCreationInputTokens": 30657,
+              "webSearchRequests": 0,
+              "costUSD": 0.2585248,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 91,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.2616028
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5234,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11916,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0012016000000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 259,
+              "cacheReadInputTokens": 22084,
+              "cacheCreationInputTokens": 12491,
+              "webSearchRequests": 0,
+              "costUSD": 0.10954080000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 83,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1107424
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4956,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11912,
+              "outputTokens": 17,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011997000000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 360,
+              "cacheReadInputTokens": 5330,
+              "cacheCreationInputTokens": 11420,
+              "webSearchRequests": 0,
+              "costUSD": 0.099634,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 61,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1008337
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/replay/backend.ts",
+            "start_line": 106,
+            "end_line": 107,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "The no-structured-output branch of codexFailure has no test; the replay-codex tests only cover the thrown and quota paths.",
+            "evidence": "  const noOutput = /^(codex wrote no out file|the out file )/.test(error);",
+            "suggested_fix": "Add a replay-codex case where the shim exits 0 and writes no out file or invalid JSON. Assert that the result kind is no-structured-output.",
+            "explanation": "A change in the runCodex error text would quietly turn every no-structured-output failure into a thrown failure, and no test would catch it.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7622,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11916,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0012016000000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 568,
+              "cacheReadInputTokens": 23634,
+              "cacheCreationInputTokens": 12311,
+              "webSearchRequests": 0,
+              "costUSD": 0.1145908,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 170,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1157924
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "src/eval/replay/backend.ts",
+          "start_line": 146,
+          "end_line": 146,
+          "category": "bug",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "Quota detection matches the text 'hit your usage limit' anywhere in the stderr tail, and that tail can still hold the echoed prompt. So any failed call on a diff that contains this text (for example this repo's own codex code or tests) stops the whole replay as a quota stop.",
+          "evidence": "...(codexQuotaError(outcome.stderr) ? { quota: true as const } : {}),",
+          "suggested_fix": "Anchor the regex to the error line form, for example /^ERROR:.*hit your usage limit/im, or check only the last lines of stderr.",
+          "explanation": "Codex echoes the prompt to stderr, so the regex can match diff content and not a real quota error. The replay then exits 4 and a rerun stops again in the same way.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const QUOTA_RE = /hit your usage limit/i;",
+            "stderr = result.stderr.slice(-STDERR_LIMIT);",
+            "...(codexQuotaError(outcome.stderr) ? { quota: true as const } : {}),"
+          ],
+          "rationale": "The regex is unanchored and runs on the last 2000 characters of stderr. Codex prints the prompt first, so a quick failure can leave the end of the prompt in that tail. A false quota stop needs a failed call and the phrase within the last 2000 characters of the prompt. That is rare, since the phrase appears mostly in this repo's own codex code and tests. The cited line 146 is the catch block, not the quota check at line 142.",
+          "score": 55,
+          "severity": "suggestion"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "...(codexQuotaError(outcome.stderr) ? { quota: true as const } : {}),",
+            "const QUOTA_RE = /hit your usage limit/i;",
+            "// Codex prints its banner and the whole prompt first, and an error last.",
+            "stderr = result.stderr.slice(-STDERR_LIMIT);"
+          ],
+          "rationale": "The claim holds. The quota check runs an unanchored regex over the last 2000 characters of stderr, and that text can still hold the end of the prompt, the agent's output, or tool output. So a failed call on a diff that contains the phrase is wrongly treated as a quota stop, and the same candidate stops the replay again on resume. It needs both a failed call and the phrase in that tail, so it is an unusual path.",
+          "score": 72,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "...(codexQuotaError(outcome.stderr) ? { quota: true as const } : {}),",
+            "const QUOTA_RE = /hit your usage limit/i;",
+            "// Codex prints its banner and the whole prompt first, and an error last.",
+            "stderr = result.stderr.slice(-STDERR_LIMIT);"
+          ],
+          "rationale": "The claim holds. The quota check runs an unanchored regex over the last 2000 characters of stderr, and that text can still hold the end of the prompt, the agent's output, or tool output. So a failed call on a diff that contains the phrase is wrongly treated as a quota stop, and the same candidate stops the replay again on resume. It needs both a failed call and the phrase in that tail, so it is an unusual path.",
+          "score": 72,
+          "severity": "suggestion"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/eval/replay/backend.ts",
+          "start_line": 106,
+          "end_line": 107,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "The no-structured-output branch of codexFailure has no test; the replay-codex tests only cover the thrown and quota paths.",
+          "evidence": "  const noOutput = /^(codex wrote no out file|the out file )/.test(error);",
+          "suggested_fix": "Add a replay-codex case where the shim exits 0 and writes no out file or invalid JSON. Assert that the result kind is no-structured-output.",
+          "explanation": "A change in the runCodex error text would quietly turn every no-structured-output failure into a thrown failure, and no test would catch it.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const noOutput = /^(codex wrote no out file|the out file )/.test(error);",
+            "if (existsSync(join(dir, \"fail\"))) process.exit(1);"
+          ],
+          "rationale": "The replay-codex tests cover only success, an exit-1 failure (thrown) and the quota stop. No test makes the shim exit 0 with no out file or bad JSON, so the no-structured-output regex branch is untested and depends on the error text in codex.ts.",
+          "score": 92,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const noOutput = /^(codex wrote no out file|the out file )/.test(error);",
+            "if (existsSync(join(dir, \"fail\"))) process.exit(1);"
+          ],
+          "rationale": "The replay-codex tests cover only success, an exit-1 failure (thrown) and the quota stop. No test makes the shim exit 0 with no out file or bad JSON, so the no-structured-output regex branch is untested and depends on the error text in codex.ts.",
+          "score": 92,
+          "severity": "suggestion"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ]
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5909417974,
+      "review_url": "https://github.com/jerridan/pr-review/pull/58#pullrequestreview-5909417974",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 132723555317
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [
+      {
+        "file": "src/eval/replay/backend.ts",
+        "start_line": 106,
+        "end_line": 107,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "The no-structured-output branch of codexFailure has no test; the replay-codex tests only cover the thrown and quota paths.",
+        "evidence": "  const noOutput = /^(codex wrote no out file|the out file )/.test(error);",
+        "suggested_fix": "Add a replay-codex case where the shim exits 0 and writes no out file or invalid JSON. Assert that the result kind is no-structured-output.",
+        "explanation": "A change in the runCodex error text would quietly turn every no-structured-output failure into a thrown failure, and no test would catch it.",
+        "needs_context": false,
+        "fingerprint": "74a865882ad3acd5",
+        "severity": "suggestion",
+        "score": 92,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const noOutput = /^(codex wrote no out file|the out file )/.test(error);",
+            "if (existsSync(join(dir, \"fail\"))) process.exit(1);"
+          ],
+          "rationale": "The replay-codex tests cover only success, an exit-1 failure (thrown) and the quota stop. No test makes the shim exit 0 with no out file or bad JSON, so the no-structured-output regex branch is untested and depends on the error text in codex.ts.",
+          "score": 92,
+          "severity": "suggestion"
+        },
+        "span_text": "const noOutput = /^(codex wrote no out file|the out file )/.test(error); return { kind: noOutput ? \"no-structured-output\" : \"thrown\", message: error };",
+        "sources": [
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "file": "src/eval/replay/backend.ts",
+        "start_line": 146,
+        "end_line": 146,
+        "category": "bug",
+        "severity_estimate": "suggestion",
+        "confidence": "low",
+        "claim": "Quota detection matches the text 'hit your usage limit' anywhere in the stderr tail, and that tail can still hold the echoed prompt. So any failed call on a diff that contains this text (for example this repo's own codex code or tests) stops the whole replay as a quota stop.",
+        "evidence": "...(codexQuotaError(outcome.stderr) ? { quota: true as const } : {}),",
+        "suggested_fix": "Anchor the regex to the error line form, for example /^ERROR:.*hit your usage limit/im, or check only the last lines of stderr.",
+        "explanation": "Codex echoes the prompt to stderr, so the regex can match diff content and not a real quota error. The replay then exits 4 and a rerun stops again in the same way.",
+        "needs_context": true,
+        "fingerprint": "df49316b41e5c811",
+        "severity": "suggestion",
+        "score": 72,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "...(codexQuotaError(outcome.stderr) ? { quota: true as const } : {}),",
+            "const QUOTA_RE = /hit your usage limit/i;",
+            "// Codex prints its banner and the whole prompt first, and an error last.",
+            "stderr = result.stderr.slice(-STDERR_LIMIT);"
+          ],
+          "rationale": "The claim holds. The quota check runs an unanchored regex over the last 2000 characters of stderr, and that text can still hold the end of the prompt, the agent's output, or tool output. So a failed call on a diff that contains the phrase is wrongly treated as a quota stop, and the same candidate stops the replay again on resume. It needs both a failed call and the phrase in that tail, so it is an unusual path.",
+          "score": 72,
+          "severity": "suggestion"
+        },
+        "span_text": "output: null,",
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      }
+    ],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 8495,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 67955,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0068065,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1259,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 67467,
+            "webSearchRequests": 0,
+            "costUSD": 0.2825882,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.2893947
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 2805,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11918,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012018,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 53,
+            "cacheReadInputTokens": 5136,
+            "cacheCreationInputTokens": 11426,
+            "webSearchRequests": 0,
+            "costUSD": 0.09350320000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.09470500000000001
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 8066,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11908,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012018,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 403,
+            "cacheReadInputTokens": 21508,
+            "cacheCreationInputTokens": 11643,
+            "webSearchRequests": 0,
+            "costUSD": 0.10552160000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 211,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.10672340000000001
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 5736,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 30680,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.003078,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 252,
+            "cacheReadInputTokens": 41064,
+            "cacheCreationInputTokens": 30657,
+            "webSearchRequests": 0,
+            "costUSD": 0.2585248,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 91,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.2616028
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 9036,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11918,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012028,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 643,
+            "cacheReadInputTokens": 22152,
+            "cacheCreationInputTokens": 13315,
+            "webSearchRequests": 0,
+            "costUSD": 0.1238264,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 175,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1250292
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "pass": 2,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 10200,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11906,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012006,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 585,
+            "cacheReadInputTokens": 22140,
+            "cacheCreationInputTokens": 13308,
+            "webSearchRequests": 0,
+            "costUSD": 0.122608,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 433,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.12380859999999999
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 12593,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11920,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012020000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 817,
+            "cacheReadInputTokens": 39089,
+            "cacheCreationInputTokens": 12597,
+            "webSearchRequests": 0,
+            "costUSD": 0.12495780000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 510,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1261598
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 5234,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11916,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012016000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 259,
+            "cacheReadInputTokens": 22084,
+            "cacheCreationInputTokens": 12491,
+            "webSearchRequests": 0,
+            "costUSD": 0.10954080000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 83,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1107424
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "pass": 2,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 4956,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11912,
+            "outputTokens": 17,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011997000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 360,
+            "cacheReadInputTokens": 5330,
+            "cacheCreationInputTokens": 11420,
+            "webSearchRequests": 0,
+            "costUSD": 0.099634,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 61,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1008337
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 7622,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11916,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012016000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 568,
+            "cacheReadInputTokens": 23634,
+            "cacheCreationInputTokens": 12311,
+            "webSearchRequests": 0,
+            "costUSD": 0.1145908,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 170,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1157924
+      },
+      {
+        "role": "verifier",
+        "verification": 0,
+        "model": "claude-sonnet-5-5",
+        "effort": "high",
+        "duration_ms": 15294,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9769,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009874,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 1752,
+            "cacheReadInputTokens": 49186,
+            "cacheCreationInputTokens": 14335,
+            "webSearchRequests": 0,
+            "costUSD": 0.0797946,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 875,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.08078199999999999
+      },
+      {
+        "role": "verifier",
+        "verification": 1,
+        "model": "claude-sonnet-5-5",
+        "effort": "high",
+        "duration_ms": 9980,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9706,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009805999999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 1173,
+            "cacheReadInputTokens": 49178,
+            "cacheCreationInputTokens": 13345,
+            "webSearchRequests": 0,
+            "costUSD": 0.0700438,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 351,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0710244
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 0,
+        "model": "claude-opus-5-5",
+        "effort": "high",
+        "duration_ms": 15657,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9771,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009876000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 1264,
+            "cacheReadInputTokens": 32357,
+            "cacheCreationInputTokens": 12861,
+            "webSearchRequests": 0,
+            "costUSD": 0.1346634,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 582,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.13565100000000002
+      }
+    ],
+    "total_cost_usd": 1.7422493999999997,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 40,
+      "gather": 307,
+      "scope": 10,
+      "triage": 9631,
+      "find_verify": 43583,
+      "merge": 7
+    },
+    "errors": []
+  }
+}
