@@ -21,10 +21,18 @@ const GIT_CONFIG = [
 // These variables point git at another repo, so remove them.
 const GIT_REDIRECT_VARS = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR"];
 
-/** Run one git command in "repo" and return its stdout. */
-export async function runGit(repo: string, args: string[]): Promise<string> {
-  const env: NodeJS.ProcessEnv = { ...process.env, GIT_PAGER: "cat", GIT_TERMINAL_PROMPT: "0" };
-  for (const name of GIT_REDIRECT_VARS) delete env[name];
+/**
+ * Run one git command in "repo" and return its stdout. "extraEnv" adds
+ * variables to the environment of the command, for example GIT_INDEX_FILE.
+ */
+export async function runGit(
+  repo: string,
+  args: string[],
+  extraEnv: Record<string, string> = {},
+): Promise<string> {
+  const base: NodeJS.ProcessEnv = { ...process.env, GIT_PAGER: "cat", GIT_TERMINAL_PROMPT: "0" };
+  for (const name of GIT_REDIRECT_VARS) delete base[name];
+  const env = { ...base, ...extraEnv };
   try {
     const { stdout } = await execFileAsync("git", ["-C", repo, ...GIT_CONFIG, ...args], {
       env,
