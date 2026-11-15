@@ -173,6 +173,22 @@ describe("pr-review eval-codex-review", () => {
     expect(prompt).toContain("No triage brief is available for this change.");
   }, 60_000);
 
+  it("builds the description from the commit messages for a case with description_from commits", async () => {
+    const file = join(cases, "case-a", "case.json");
+    const meta = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
+    writeFileSync(file, JSON.stringify({ ...meta, description_from: "commits" }));
+    try {
+      plan({ default: { findings: [] } });
+      await run();
+      // case-a runs first, and its title is not in the prompt, so no marker matches.
+      const prompt = calls()[0]?.at(-1) ?? "";
+      expect(prompt).toContain("Head: add average, move format helpers, bump lockfile, add CI");
+      expect(prompt).not.toContain("The body of the change.");
+    } finally {
+      writeFileSync(file, JSON.stringify(meta));
+    }
+  }, 60_000);
+
   it("skips a finished case on a rerun, and runs it again with --force", async () => {
     plan({ default: { findings: [] } });
     await run();
