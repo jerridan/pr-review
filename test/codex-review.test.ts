@@ -137,7 +137,12 @@ describe("pr-review eval-codex-review", () => {
         findings: [withoutFix],
       });
     }
-    expect(readdirSync(out).sort()).toEqual(["case-a.json", "case-b.json", "case-c.json"]);
+    expect(readdirSync(out).sort()).toEqual([
+      "case-a.json",
+      "case-b.json",
+      "case-c.json",
+      "tokens.json",
+    ]);
   }, 60_000);
 
   it("keeps a suggested fix that is not empty", async () => {
@@ -220,7 +225,7 @@ describe("pr-review eval-codex-review", () => {
   it("fails the case when a finding fails the finding schema", async () => {
     plan({ default: { findings: [{ ...FINDING, category: "style" }] } });
     expect(await run()).toBe(1);
-    expect(existsSync(out) ? readdirSync(out) : []).toEqual([]);
+    expect(existsSync(out) ? readdirSync(out).filter((n) => n !== "tokens.json") : []).toEqual([]);
   }, 60_000);
 
   it("stops at a quota error before the next case, and keeps the finished cases", async () => {
@@ -231,12 +236,17 @@ describe("pr-review eval-codex-review", () => {
     });
     expect(await run()).toBe(1);
     expect(calls()).toHaveLength(2);
-    expect(readdirSync(out)).toEqual(["case-a.json"]);
+    expect(readdirSync(out).sort()).toEqual(["case-a.json", "tokens.json"]);
     expect(output.stderr).toMatch(/quota is out/i);
     // A rerun continues with the cases that have no file.
     plan({ default: { findings: [] } });
     expect(await run()).toBe(0);
-    expect(readdirSync(out).sort()).toEqual(["case-a.json", "case-b.json", "case-c.json"]);
+    expect(readdirSync(out).sort()).toEqual([
+      "case-a.json",
+      "case-b.json",
+      "case-c.json",
+      "tokens.json",
+    ]);
   }, 60_000);
 
   it("prints the sum of the tokens", async () => {

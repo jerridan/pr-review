@@ -2,7 +2,7 @@
 // through Codex on each case of a cases directory, and write the findings as
 // outside candidates, one file per case. The prompt texts are in prompts/.
 // The command reads no credential. Codex finds its own login.
-import { mkdtemp, mkdir, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
@@ -171,9 +171,32 @@ async function reviewCase(c: Case, options: CodexReviewOptions): Promise<CaseRes
   }
 }
 
+const TOKENS_FILE = "tokens.json";
+
+// The tokens of each case. A missing or unreadable file gives no entries.
+async function readTokens(out: string): Promise<Record<string, number | null>> {
+  try {
+    const raw: unknown = JSON.parse(await readFile(join(out, TOKENS_FILE), "utf8"));
+    const parsed = z.record(z.string(), z.number().nullable()).safeParse(raw);
+    return parsed.success ? parsed.data : {};
+  } catch {
+    return {};
+  }
+}
+
+async function writeTokens(out: string, tokens: Record<string, number | null>): Promise<void> {
+  const temp = join(out, `.${TOKENS_FILE}.tmp`);
+  await writeFile(temp, `${JSON.stringify(tokens, null, 2)}\n`);
+  await rename(temp, join(out, TOKENS_FILE));
+}
+
 async function finished(out: string): Promise<Set<string>> {
   try {
-    return new Set((await readdir(out)).filter((n) => n.endsWith(".json") && !n.startsWith(".")));
+    return new Set(
+      (await readdir(out)).filter(
+        (n) => n.endsWith(".json") && !n.startsWith(".") && n !== TOKENS_FILE,
+      ),
+    );
   } catch {
     return new Set();
   }
@@ -205,6 +228,7 @@ export async function codexReviewCommand(args: string[]): Promise<number> {
   let failed = 0;
   let tokens = 0;
   let quotaOut = false;
+  const perCase = await readTokens(options.out);
   for (const c of cases) {
     if (!options.force && have.has(`${c.name}.json`)) {
       skipped += 1;
@@ -212,6 +236,9 @@ export async function codexReviewCommand(args: string[]): Promise<number> {
     }
     const result = await reviewCase(c, options);
     tokens += result.tokens ?? 0;
+    process.stdout.write(`case ${c.name}: ${result.kind} tokens ${result.tokens ?? "unknown"}\n`);
+    perCase[c.name] = result.tokens;
+    await writeTokens(options.out, perCase);
     if (result.kind === "done") {
       done += 1;
       continue;

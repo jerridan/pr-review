@@ -1075,6 +1075,8 @@ For each case, the command clones the case at its head, as the eval does. It bui
 
 The command writes `<out>/<case name>.json` with `{ "source": "<source>", "findings": [ ... ] }`. Each finding has the fields of a reviewer finding. A finding that fails the finding schema fails the case. The command does not filter by evidence or by line range. The replay does that.
 
+The command prints one line per case, `case <name>: <done|failed|quota> tokens <n|unknown>`, before the summary. It also writes `<out>/tokens.json`, an object from case name to token count (a number, or `null` when unknown). A rerun adds its cases to the file and keeps the other entries.
+
 **Resume rule.** The command writes each finished case at once, to a temp file and then by rename. A rerun with the same `--out` directory skips each case whose file exists, unless `--force` is set. A failed case writes no file. The command prints the case and the error, and goes on with the next case. A rerun does the cases that have no file.
 
 **Quota stop.** When Codex stops on a usage limit, the command stops at once. It prints that the quota is out and exits with 1. The finished cases stay. Run the command again later to continue.
