@@ -1,0 +1,615 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 55,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Give each D4c experiment a method, a budget and a decision rule",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/55"
+    },
+    "run_kind": "later",
+    "prior": {
+      "head": "9c95e4bff385f9c81539d891b5aa72ba4dfeba3b",
+      "source": "record",
+      "record": "/home/runner/work/_temp/pr-review-records/pr-55/2026-11-15T024754.847Z-9c95e4b.json",
+      "open": [],
+      "dismissed": [],
+      "fetch_failed": false
+    },
+    "base": "ca403bc3646370ae73802d6d1682980de43f9756",
+    "head": "d4518ca16bf8e459344ae9d3d409b0602410970e",
+    "started_at": "2026-11-15T02:51:48.724Z",
+    "tool_version": "0.13.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Give each D4c experiment a method, a budget and a decision rule\n\nThis PR changes the D4c entry of `TICKETS.md`. It changes no code.\n\n## Why\n\nThe D4c entry gave one line for each of six experiments, with no method and no decision rule. D4b and D8 showed what that costs: a paid run that could not be stopped and continued, an estimate that the first two cases broke, and a decision rule that could not fail. The principal also asked for wider questions.\n\n## What changes\n\n**Rules for every experiment.** A paid probe of two cases before a full run. A test that the decision rule can give each of its results. One paid run at a time. Records under the crew record root. No experiment has a budget: a run takes the plan windows that it needs, and each note reports its spend.\n\n**Shared parts.** One reference run of the full pipeline with stored records (S1), a replay tool that verifies stored candidates again (S2), size groups of the cases (S3), and an eval option for the model and the effort of the reviewers (S4).\n\n**The experiments:**\n\n- **E1**: the model and the effort of every reviewer. Arms: Opus low (today), Opus medium, Sonnet medium, Sonnet high, on all 28 cases. One run of an arm measures all seven reviewers.\n- **E2**: the specialist set against one Opus reviewer at medium, one at high, and one Terra reviewer at high effort. It reports by PR size and looks for the size where the specialists become better. It uses all 28 cases, with a second table by case source.\n- **E3**: the model and the effort of the first verifier. Arms: Sonnet high (today), Sonnet medium, Opus low, Terra medium, on the same stored candidates. Opus medium runs only if Opus low passes. The note reports truth and severity apart.\n- **E3b**: where the severity label comes from. One verifier call for truth and severity, as today, against a verifier for truth and a separate severity step, for each finding or for each PR.\n- **E4, E5, E6**: the score scale, the cap, and a prompt injection. Each has a method and a rule.\n- **E7**: the five follow-ups that name D4c. The S1 records answer two of them with no model call, among them the passes of diff-bugs and security.\n\n**Second-family models.** Each Codex arm states its reasoning effort. This round uses Terra; the Sol arms are for a later round.\n\n## What a reviewer must check\n\n- **E1 and the noise between runs.** Two arms of E1 are two runs, so they are not paired. The entry requires the note to report the noise of one pass and to claim no smaller difference.\n- **E3b and the goldens.** The severity labels of the goldens came from the labeler, which is Opus with a Sol judge. A severity step on Opus can agree with those labels for that reason. The note must state this limit.\n- **The numbers in the rules** (two times the cost, 0.05, 90% intervals) follow the D8 rule.\n\n## Verification\n\n`npm test` (1503 tests), `npm run lint`, `npm run typecheck` and `npm run build` pass.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZeE9g8BLHRTtXEThp4\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": "TICKETS.md",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "fast",
+      "reason": "The change only rewrites the D4c experiment plan in TICKETS.md, a planning document that no code reads, but it sets decision rules and numbers that a light read can check for consistency.",
+      "confidence": "medium",
+      "categories": [
+        "docs"
+      ],
+      "hotspots": [
+        "TICKETS.md: D4c 'Rules for every experiment' (the no-budget rule against the earlier cost-rule text)",
+        "TICKETS.md: E1 decision rules (cheaper and dearer setting, bootstrap interval)",
+        "TICKETS.md: E3 and E3b rules and the 28-of-30 agreement check",
+        "TICKETS.md: E5 rule for the cap on non-blocking findings (issue 23)",
+        "TICKETS.md: 'Order' section and the cost estimates"
+      ],
+      "file_notes": [
+        {
+          "file": "TICKETS.md",
+          "note": "Docs only. D4c is expanded from a six-bullet list into shared rules, shared parts S1–S4, experiments E1–E7, an order and cost estimates. It drops the old per-experiment budget rule and removes the 'D8 cost rules' sentence. Check the internal references: D8, D7, issue 23, `eval-report --by-pass` and `docs/design/severity-policy.md`."
+        }
+      ],
+      "summary": "The change replaces the short D4c 'first experiments' list in TICKETS.md with a detailed plan. The plan has shared rules (probe first, no dollar budget, one paid run at a time, Codex quota use), four shared tooling parts (S1–S4) and experiments E1–E7. Each experiment has arms, a decision rule and an order of work. No code or configuration changes."
+    },
+    "tier": "fast",
+    "tier_reason": "Triage: The change only rewrites the D4c experiment plan in TICKETS.md, a planning document that no code reads, but it sets decision rules and numbers that a light read can check for consistency.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= fast; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= fast; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 2991,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 8724,
+              "outputTokens": 26,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0008854000000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 87,
+              "cacheReadInputTokens": 5136,
+              "cacheCreationInputTokens": 8233,
+              "webSearchRequests": 0,
+              "costUSD": 0.06863920000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0695246
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "TICKETS.md",
+            "start_line": 151,
+            "end_line": 153,
+            "category": "other",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "In E1, the S1 records count as the first arm, but S1 runs before E7 at the current pass defaults, and the other arms use the pass defaults that E7 leaves. The arms are then not comparable.",
+            "evidence": "- Passes: run E7 first. Each arm uses the pass defaults that E7 leaves, so a reviewer that E7 moves to one pass runs one pass in every arm.",
+            "suggested_fix": "State that the S1 figures use only the first pass for a reviewer that E7 moves to one pass.",
+            "explanation": "S1 has two passes of diff-bugs and security. If E7 moves either reviewer to one pass, the baseline arm keeps two passes, and its recall and cost are inflated against the new arms.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 9068,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 8720,
+              "outputTokens": 25,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0008845000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 804,
+              "cacheReadInputTokens": 5363,
+              "cacheCreationInputTokens": 8229,
+              "webSearchRequests": 0,
+              "costUSD": 0.0829926,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 448,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0838771
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "TICKETS.md",
+          "start_line": 151,
+          "end_line": 153,
+          "category": "other",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "In E1, the S1 records count as the first arm, but S1 runs before E7 at the current pass defaults, and the other arms use the pass defaults that E7 leaves. The arms are then not comparable.",
+          "evidence": "- Passes: run E7 first. Each arm uses the pass defaults that E7 leaves, so a reviewer that E7 moves to one pass runs one pass in every arm.",
+          "suggested_fix": "State that the S1 figures use only the first pass for a reviewer that E7 moves to one pass.",
+          "explanation": "S1 has two passes of diff-bugs and security. If E7 moves either reviewer to one pass, the baseline arm keeps two passes, and its recall and cost are inflated against the new arms.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "Opus 5.5 low (S1, no new cost)",
+            "Passes: run E7 first. Each arm uses the pass defaults that E7 leaves, so a reviewer that E7 moves to one pass runs one pass in every arm.",
+            "It also gives the two-pass figures of diff-bugs and security that D8 could not give."
+          ],
+          "rationale": "S1 records hold two passes of diff-bugs and security, and the E1 text says the first arm is the S1 records yet every arm runs one pass if E7 moves a reviewer. The text never says to cut the S1 records to pass 1, so the arms can differ in passes. A reader can probably derive this from the per-pass record fields, so it is a small gap in the spec.",
+          "score": 62,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- Cases: all 28. The S1 records are the first arm.",
+            "- Passes: run E7 first. Each arm uses the pass defaults that E7 leaves, so a reviewer that E7 moves to one pass runs one pass in every arm.",
+            "- S1, the reference run. One repeat of the full pipeline at the current defaults on the 28 pinned cases, with stored records.",
+            "3. S1, the reference run, then E7 from its records.",
+            "- The passes of diff-bugs and security. Run `eval-report --by-pass` on the S1 records, and apply the D8 rule to the two reviewers. A reviewer that fails the rule goes to one pass."
+          ],
+          "rationale": "The plan runs S1 at the current defaults, where diff-bugs and security have two passes, before E7. It then uses the S1 records as E1's first arm, but says every arm runs one pass for any reviewer that E7 moves to one pass. Nothing says to keep only the pass-1 findings and cost from S1, so the baseline arm would not match the new arms.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- Cases: all 28. The S1 records are the first arm.",
+            "- Passes: run E7 first. Each arm uses the pass defaults that E7 leaves, so a reviewer that E7 moves to one pass runs one pass in every arm.",
+            "- S1, the reference run. One repeat of the full pipeline at the current defaults on the 28 pinned cases, with stored records.",
+            "3. S1, the reference run, then E7 from its records.",
+            "- The passes of diff-bugs and security. Run `eval-report --by-pass` on the S1 records, and apply the D8 rule to the two reviewers. A reviewer that fails the rule goes to one pass."
+          ],
+          "rationale": "The plan runs S1 at the current defaults, where diff-bugs and security have two passes, before E7. It then uses the S1 records as E1's first arm, but says every arm runs one pass for any reviewer that E7 moves to one pass. Nothing says to keep only the pass-1 findings and cost from S1, so the baseline arm would not match the new arms.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "diff-bugs"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5908744329,
+      "review_url": "https://github.com/jerridan/pr-review/pull/55#pullrequestreview-5908744329",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 132677034075
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [
+      {
+        "file": "TICKETS.md",
+        "start_line": 151,
+        "end_line": 153,
+        "category": "other",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "In E1, the S1 records count as the first arm, but S1 runs before E7 at the current pass defaults, and the other arms use the pass defaults that E7 leaves. The arms are then not comparable.",
+        "evidence": "- Passes: run E7 first. Each arm uses the pass defaults that E7 leaves, so a reviewer that E7 moves to one pass runs one pass in every arm.",
+        "suggested_fix": "State that the S1 figures use only the first pass for a reviewer that E7 moves to one pass.",
+        "explanation": "S1 has two passes of diff-bugs and security. If E7 moves either reviewer to one pass, the baseline arm keeps two passes, and its recall and cost are inflated against the new arms.",
+        "needs_context": false,
+        "fingerprint": "445f61349573dddb",
+        "severity": "suggestion",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- Cases: all 28. The S1 records are the first arm.",
+            "- Passes: run E7 first. Each arm uses the pass defaults that E7 leaves, so a reviewer that E7 moves to one pass runs one pass in every arm.",
+            "- S1, the reference run. One repeat of the full pipeline at the current defaults on the 28 pinned cases, with stored records.",
+            "3. S1, the reference run, then E7 from its records.",
+            "- The passes of diff-bugs and security. Run `eval-report --by-pass` on the S1 records, and apply the D8 rule to the two reviewers. A reviewer that fails the rule goes to one pass."
+          ],
+          "rationale": "The plan runs S1 at the current defaults, where diff-bugs and security have two passes, before E7. It then uses the S1 records as E1's first arm, but says every arm runs one pass for any reviewer that E7 moves to one pass. Nothing says to keep only the pass-1 findings and cost from S1, so the baseline arm would not match the new arms.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "span_text": "- Cases: all 28. The S1 records are the first arm. The D8 measurement records hold two more passes of history and of tests at Opus 5.5 low on the same cases; use them as more samples of the first arm for those two reviewers. - Passes: run E7 first. Each arm uses the pass defaults that E7 leaves, so a reviewer that E7 moves to one pass runs one pass in every arm. - Two stages. Stage 1 runs the reviewers of each new arm with no verifier, and matches the raw candidates to the goldens. A golden that an arm did not raise cannot be posted by it, so stage 1 is sufficient to reject a setting that raises fewer posted-label goldens than the current one, less the noise of one pass, for no lower cost. Stage 2 sends to the verifier, through S2, only the candidates of the reviewer and arm pairs that stage 1 did not reject.",
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      }
+    ],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 7093,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7134,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007259,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 904,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 6647,
+            "webSearchRequests": 0,
+            "costUSD": 0.035758200000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 211,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.036484100000000005
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 2991,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8724,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0008854000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 87,
+            "cacheReadInputTokens": 5136,
+            "cacheCreationInputTokens": 8233,
+            "webSearchRequests": 0,
+            "costUSD": 0.06863920000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0695246
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 9068,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8720,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0008845000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 804,
+            "cacheReadInputTokens": 5363,
+            "cacheCreationInputTokens": 8229,
+            "webSearchRequests": 0,
+            "costUSD": 0.0829926,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 448,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0838771
+      },
+      {
+        "role": "verifier",
+        "verification": 0,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6862,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 26422,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0026537,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 901,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 30302,
+            "webSearchRequests": 0,
+            "costUSD": 0.130222,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 479,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1328757
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 0,
+        "model": "claude-opus-5-5",
+        "duration_ms": 8419,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 26418,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0026538,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 770,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 30290,
+            "webSearchRequests": 0,
+            "costUSD": 0.257728,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 240,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.2603818
+      }
+    ],
+    "total_cost_usd": 0.5831433,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 36,
+      "gather": 35,
+      "scope": 3,
+      "triage": 8020,
+      "find_verify": 26422,
+      "merge": 2
+    },
+    "errors": []
+  }
+}
