@@ -131,6 +131,7 @@ D4b and D8 gave these rules. Each one comes from a loss in those runs.
 - One paid run at a time. The eval and the CI reviewer run on the plan login, and one dollar uses about 0.93 points of a five-hour plan window. Run with `--resume` and a dollar limit for each window.
 - A model of a second family runs through the Codex CLI, on its own quota. That quota holds about 20 minutes of work in five hours, so each such step must resume.
 - A Codex call has a reasoning effort, as a Claude call has. Today every Codex call of the eval uses high. Each arm with a second-family model states its effort, and the Codex call takes the effort as an option. This round uses Terra, which costs much less quota than Sol. The arms with Sol are for a later round.
+- The plan and the Codex quota are separate. A Codex step runs at the same time as a plan run, so a Terra arm does not wait for a plan window.
 - Write the run records under the crew record root, not in a worktree or a scratchpad. The records of the D4b baseline were lost with a worktree.
 - Use paired arms when one run can give the two arms. When two arms need two runs, report the noise of one pass, which `eval-report --by-pass` gives for each reviewer with two passes, and do not claim a difference that is smaller than that noise.
 - Each note states the method, the spend, every figure, the decision rule, the result, and the limits of the measurement.
@@ -138,7 +139,7 @@ D4b and D8 gave these rules. Each one comes from a loss in those runs.
 ### Shared parts
 
 - S1, the reference run. One repeat of the full pipeline at the current defaults on the 28 pinned cases, with stored records. About $133. It is the comparison arm of E1 and E2, and it holds the candidate findings for E3 and E4. It also gives the two-pass figures of diff-bugs and security that D8 could not give.
-- S2, the replay tool. It reads the candidate findings of a stored run and verifies them again with another verifier model or another verifier prompt, and it scores the result as the eval does. It also takes candidate findings from a reviewer outside the pipeline, such as a Codex review, so that those findings pass the same verifier.
+- S2, the replay tool. It reads the candidate findings of a stored run and verifies them again with another verifier model or another verifier prompt, and it scores the result as the eval does. It also takes candidate findings from a reviewer outside the pipeline, such as a Codex review, so that those findings pass the same verifier. A replay asks the first verifier only and makes no escalation call: it reports how many results are in the escalation band. The escalation runs only for the arm that an experiment selects, when its posted figures are needed.
 - S3, the size groups. Give each case its count of changed lines, and split the cases into three groups of about equal count: small, medium and large.
 - S4, the model option. An eval option sets the model and the effort of named reviewers, or of all reviewers, for one run.
 
@@ -147,7 +148,9 @@ D4b and D8 gave these rules. Each one comes from a loss in those runs.
 Question: does each reviewer have the right model and effort? Today all seven reviewers run on Opus 5.5 at low effort, because no reviewer file sets a model.
 
 - Arms, in this order: Opus 5.5 low (S1, no new cost), Opus 5.5 medium, Sonnet 5.5 medium, Sonnet 5.5 high. Run every arm. One run of an arm holds all seven reviewers, and the record gives the findings and the cost of each reviewer, so one run measures seven reviewers.
-- Cases: all 28. The S1 records are the first arm.
+- Cases: all 28. The S1 records are the first arm. The D8 measurement records hold two more passes of history and of tests at Opus 5.5 low on the same cases; use them as more samples of the first arm for those two reviewers.
+- Passes: run E7 first. Each arm uses the pass defaults that E7 leaves, so a reviewer that E7 moves to one pass runs one pass in every arm.
+- Two stages. Stage 1 runs the reviewers of each new arm with no verifier, and matches the raw candidates to the goldens. A golden that an arm did not raise cannot be posted by it, so stage 1 is sufficient to reject a setting that raises fewer posted-label goldens than the current one, less the noise of one pass, for no lower cost. Stage 2 sends to the verifier, through S2, only the candidates of the reviewer and arm pairs that stage 1 did not reject.
 - Report for each reviewer and each arm: the posted-label goldens found, the false posted findings, the precision, the cost, and the cost per posted-label golden.
 - Rule for a cheaper setting: a reviewer moves to it when it finds no fewer posted-label goldens than the current setting, less the noise of one pass, and its precision is not more than 0.05 lower.
 - Rule for a dearer setting: a reviewer moves to it when the added cost per added posted-label golden is at most two times the current cost per posted-label golden, at the upper end of a 90% bootstrap interval over the cases, and its precision is not more than 0.05 lower. This is the D8 rule.
@@ -171,6 +174,7 @@ What the verifier does: for one finding, it reads the code with the Read and Gre
 
 - Arms: Sonnet 5.5 high (S1, no new cost), Sonnet 5.5 medium, Opus 5.5 low, and Terra at medium effort through the Codex CLI. Each arm verifies the same stored candidates of S1, through S2, so the arms are paired.
 - Run Opus 5.5 medium only if Opus 5.5 low passes the rule below.
+- The Terra arm starts on a sample, because the Codex quota is small: every candidate that matches a golden, and an equal count of the others, drawn with a fixed seed. Run Terra on the other candidates only if its figures on the sample are within 0.05 of a rule.
 - Report the two jobs of the verifier apart for each arm. Truth: of the candidates that match a golden with a real label, the share that it says are true; of the candidates that match a not-real golden or no golden, the share that it rejects. Severity: for the candidates that it says are true, the agreement of its label with the label of the golden, and the agreement on the one question that decides a post, which is a posting label against a label that does not post.
 - Report also for each arm: the posted recall and precision that follow, the count of unsure results and of escalations, and the cost per verification.
 - Report from the S1 records, with no model call: how often the verifier escalates, how often the escalation changes the result, and the cost of the escalations.
@@ -186,6 +190,7 @@ Question: must the verifier give the severity label, or does a separate step do 
 - Arms: (1) one verifier call gives truth and severity, as today; (2) the verifier gives truth only, and a severity step labels each finding that holds, with one call for each finding; (3) the same split, with one severity call for each PR that sees all the findings that hold, so the step can weigh them against each other.
 - The verifier of arms 2 and 3 is the cheapest arm of E3 that keeps the truth figures of the current verifier. The severity step runs at Sonnet 5.5 high, Opus 5.5 medium and Opus 5.5 high. It gets the policy text, the finding, the quotes of the verifier and the description block. It has no tools.
 - All arms use the stored candidates of S1 through S2, so they are paired. S2 gains a mode for a verifier prompt with no severity and for the severity step.
+- Do not verify every candidate again for the split arms. First run the verifier prompt with no severity on 30 candidates, drawn with a fixed seed, and compare its truth results with those of the same model in E3. If 28 or more agree, use the truth results of E3 for the split arms, so the split arms cost only the severity calls, which have no tools. If fewer agree, verify all the candidates with the new prompt, and report the difference: it shows that the severity question changes the truth answer.
 - Report for each arm and each severity model: the agreement of the label with the label of the golden, the agreement on post against no post, the count of blocking goldens that got a label that does not post, the posted recall and precision that follow, and the cost per finding for the two steps together.
 - Rule: the severity moves to its own step when a split arm has a higher agreement on post against no post than the single call, with a 90% bootstrap interval of the difference above zero, and the cost per finding of the two steps is at most two times the cost of the single call. If no split arm passes, the severity stays in the verifier.
 - A limit to state in the note: the labels of the goldens came from the labeler, which is Opus 5.5 with a Sol judge. A severity step on Opus can agree with those labels for that reason.
@@ -195,7 +200,7 @@ Question: must the verifier give the severity label, or does a separate step do 
 
 Question: does a scale of five bands work as well as the score from 0 to 100?
 
-- Arms: the current verifier prompt (S1), and the same prompt with five named bands. The two verify the same stored candidates through S2, on the current verifier model.
+- Arms: the verifier prompt with the score from 0 to 100, and the same prompt with five named bands. Run this after E3 and E3b, on the verifier model, effort and prompt form that they select, so the result holds for the verifier that ships. The first arm then exists from E3 or E3b, and only the second arm is a new run. The two verify the same stored candidates through S2.
 - Report the figures of E3 for each arm, and for each band or each score range the share of candidates that are real.
 - Rule: the five bands become the default when the posted recall and the posted precision are each not more than 0.05 lower and the count of escalations is lower.
 
@@ -229,11 +234,11 @@ The two lists of follow-ups below name D4c five times. The records of S1 answer 
 1. E5, which needs no model call.
 2. The tooling: S2, S3 and S4.
 3. S1, the reference run, then E7 from its records.
-4. E3, then E3b and E4, which need S1 and S2.
+4. E3, then E3b, then E4, which need S1 and S2. The Terra arms of E2 and E3 start when S1 and S2 exist, beside the plan runs.
 5. E2, then E1.
 6. E6 at any time after the tooling.
 
-The probes give the cost of each run before it starts. The first estimates are $133 for S1, about $400 for the three new arms of E1 on 28 cases, and about $350 for the other experiments together. The Terra arms use the Codex quota. The runs go one at a time across as many plan windows as they need, with the plan window limit of the principal.
+The probes give the cost of each run before it starts. The first estimates are $133 for S1, about $250 to $400 for the three new arms of E1, by how much stage 1 rejects, and about $250 for the other experiments together. The Terra arms use the Codex quota. The runs go one at a time across as many plan windows as they need, with the plan window limit of the principal.
 
 ## Smaller follow-ups found during D1 and D2
 
