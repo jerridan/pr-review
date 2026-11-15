@@ -6,7 +6,7 @@ triggers:
   paths: []
   categories: []
   min_tier: fast
-passes: 2
+passes: 1
 threshold: 80
 ---
 You review one code change for bugs. Your evidence is the diff and the files of the head commit. The working directory is a checkout of the head commit. You can read files with the Read, Grep and Glob tools.
