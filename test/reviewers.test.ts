@@ -336,7 +336,7 @@ describe("model overrides from frontmatter", () => {
       env,
     );
     expect(verifier.model).toBe("claude-sonnet-5-5");
-    expect(verifier.effort).toBe("high");
+    expect(verifier.effort).toBe("medium");
     expect(ROLE_DEFAULTS.reviewer.model).toBe("claude-opus-5-5");
   });
 });
