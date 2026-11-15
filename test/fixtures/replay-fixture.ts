@@ -248,6 +248,8 @@ export type ReplayFakeOptions = {
   severityCost?: number;
   /** The claims whose verifier call fails. */
   failVerifier?: string[];
+  /** The claims whose verifier call stops on its dollar limit. */
+  limitVerifier?: string[];
   /** The claims whose severity call (finding mode) fails. */
   failSeverity?: string[];
   /** The claims that a pr-mode answer leaves out. */
@@ -269,6 +271,13 @@ export function replayFake(opts: ReplayFakeOptions = {}) {
       case "verifier": {
         if (opts.failVerifier?.includes(claimIn(req.userMessage))) {
           return { ok: false, failure: { kind: "thrown", message: "down" }, raw: null };
+        }
+        if (opts.limitVerifier?.includes(claimIn(req.userMessage))) {
+          return {
+            ok: false,
+            failure: { kind: "limit", message: "The result subtype is error_max_budget_usd" },
+            raw: meta(0.5, req.overrides?.model ?? "m"),
+          };
         }
         const r = results[claimIn(req.userMessage)];
         if (!r) throw new Error(`no replay result for ${claimIn(req.userMessage)}`);
