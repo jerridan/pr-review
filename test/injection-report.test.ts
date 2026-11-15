@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Case } from "../src/eval/case.js";
@@ -164,6 +164,64 @@ describe("pr-review eval-injection-report", () => {
 
   it("states that every hit is a candidate for a person", () => {
     expect(stdout).toMatch(/candidate/i);
+  });
+});
+
+describe("pr-review eval-injection-report errors", () => {
+  // A cases directory with one plain injection case, and an empty runs directory.
+  const setup = (name: string) => {
+    const input = makeInjectionCases([{ name, file: "src/mean.ts" }]);
+    const root = tempDir("injection-report-errors", made);
+    made.push(join(input.dir, ".."));
+    return { input, runs: join(root, "runs"), jsonFile: join(root, "r.json") };
+  };
+  const runReport = (s: ReturnType<typeof setup>) =>
+    captured(() =>
+      injectionReportCommand(["--runs", s.runs, "--cases", s.input.dir, "--json", s.jsonFile]),
+    );
+
+  it("counts a repeat whose record file is missing as unknown, and exits 0", async () => {
+    const s = setup("inj-m");
+    writeRun(s.runs, "inj-m", 1, makeRecord([found()]));
+    rmSync(join(s.runs, "inj-m", "1", "2026-10-16T120000.000Z-abcdef0.json"));
+    expect(await runReport(s)).toBe(0);
+    const json = JSON.parse(readFileSync(s.jsonFile, "utf8")) as Report;
+    expect(json.arms.find((a) => a.arm === "plain")).toMatchObject({ runs: 1, unknown: 1 });
+  });
+
+  it("exits 1 and names the case and the repeat when a record is not valid JSON", async () => {
+    const s = setup("inj-b");
+    writeRun(s.runs, "inj-b", 1, makeRecord([found()]));
+    writeFileSync(join(s.runs, "inj-b", "1", "2026-10-16T120000.000Z-abcdef0.json"), "{ nope");
+    expect(await runReport(s)).toBe(1);
+    expect(output.stderr).toContain("inj-b");
+    expect(output.stderr).toContain("repeat 1");
+  });
+
+  it("exits 1 once, with one message, when the clone of a case fails for every repeat", async () => {
+    const s = setup("inj-c");
+    writeRun(s.runs, "inj-c", 1, makeRecord([found()]));
+    writeRun(s.runs, "inj-c", 2, makeRecord([found()]));
+    writeFileSync(join(s.input.dir, "inj-c", "repo.bundle"), "not a bundle");
+    expect(await runReport(s)).toBe(1);
+    expect(output.stderr).toContain("inj-c");
+    expect(output.stderr).toContain("repeat 1");
+    expect(output.stderr).not.toContain("repeat 2");
+    expect(output.stderr.match(/cannot clone/g)).toHaveLength(1);
+  });
+
+  it("exits 1 and names the case when no golden fits the injection patch", async () => {
+    const s = setup("inj-g");
+    writeRun(s.runs, "inj-g", 1, makeRecord([found()]));
+    const goldenFile = join(s.input.dir, "inj-g", "golden.json");
+    const golden = JSON.parse(readFileSync(goldenFile, "utf8")) as {
+      findings: { start_line: number; end_line: number }[];
+    };
+    for (const g of golden.findings) Object.assign(g, { start_line: 1, end_line: 1 });
+    writeFileSync(goldenFile, JSON.stringify(golden));
+    expect(await runReport(s)).toBe(1);
+    expect(output.stderr).toContain("inj-g");
+    expect(output.stderr).toContain("no golden holds a line that injection.patch touches");
   });
 });
 
