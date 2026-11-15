@@ -263,6 +263,82 @@ function checkRanges(result: VerifierResult): QueryFailure | null {
   return null;
 }
 
+/** The decision of a first verifier result, as verifyFinding takes it. */
+export type FirstDecision = {
+  passed: boolean;
+  rejected?: string;
+  unsure?: UnsureCause;
+  /** True for a verified pre-existing finding (see Verification). */
+  pre_existing: boolean;
+  /**
+   * True when verifyFinding asks the escalation verifier next: the result
+   * is in scope, and its score is in the middle band or the finding needs
+   * context. The other fields then give the decision of the first result
+   * alone.
+   */
+  escalates: boolean;
+};
+
+/**
+ * The decision of a first verifier result with no escalation: the scope
+ * gate, the outcome rule, the threshold and the quote check. "headText" is
+ * the head file of the finding, or null. verifyFinding uses it for every
+ * first result, so a replay of the same first result gets the same
+ * decision.
+ */
+export function decideFirst(
+  first: VerifierResult | QueryFailure,
+  finding: Finding,
+  headText: string | null,
+  config: VerifyConfig,
+): FirstDecision {
+  if (isQueryFailure(first)) {
+    // A limit stop gives the unsure result at once, with no escalation.
+    return { passed: false, ...limitStop(first), pre_existing: false, escalates: false };
+  }
+  const { threshold, bandLow, bandHigh } = config;
+  // The scope gate comes before the score, and an out-of-scope finding
+  // does not escalate. A real issue with a real quote that the change did
+  // not bring is a pre-existing finding. Its severity must post.
+  if (!first.in_scope) {
+    const settled = settle(first);
+    const preExisting =
+      settled === null &&
+      isPostedSeverity(first.severity) &&
+      first.score >= threshold &&
+      quoteMatches(first.quotes, headText);
+    return { passed: false, ...settled, pre_existing: preExisting, escalates: false };
+  }
+  const inBand = first.score >= bandLow && first.score <= bandHigh;
+  return {
+    ...decideResult(first, headText, threshold),
+    pre_existing: false,
+    escalates: inBand || finding.needs_context,
+  };
+}
+
+// The verifier must quote the code that supports the claim. A result that
+// passes on the model's own fields fails when no quote is real. "agreed" is
+// true when the first and the escalated results both say that the claim
+// holds. Then a score below the threshold does not stop the finding (R2).
+function decideResult(
+  r: VerifierResult,
+  headText: string | null,
+  threshold: number,
+  agreed = false,
+): Decision {
+  const settled = settle(r);
+  if (settled !== null) return settled;
+  if (!(r.in_scope && (agreed || r.score >= threshold))) return { passed: false };
+  if (!quoteMatches(r.quotes, headText)) {
+    return {
+      passed: false,
+      rejected: "No quote of the verifier is in the head file of the finding.",
+    };
+  }
+  return { passed: true };
+}
+
 export async function verifyFinding(
   client: SdkClient,
   options: RunOptions,
@@ -309,47 +385,10 @@ export async function verifyFinding(
     }
   };
 
-  const { threshold, bandLow, bandHigh } = ctx.config;
-  // The verifier must quote the code that supports the claim. A result
-  // that passes on the model's own fields fails when no quote is real.
-  // "agreed" is true when the first and the escalated results both say
-  // that the claim holds. Then a score below the threshold does not stop
-  // the finding (R2).
-  const decide = (r: VerifierResult, agreed = false): Decision => {
-    const settled = settle(r);
-    if (settled !== null) return settled;
-    if (!(r.in_scope && (agreed || r.score >= threshold))) return { passed: false };
-    if (!quoteMatches(r.quotes, headText)) {
-      return {
-        passed: false,
-        rejected: "No quote of the verifier is in the head file of the finding.",
-      };
-    }
-    return { passed: true };
-  };
-
   const first = await ask("verifier");
-  if (isQueryFailure(first)) {
-    // A limit stop gives the unsure result at once, with no escalation.
-    return { first, final: null, passed: false, ...limitStop(first), pre_existing: false };
-  }
-  // The scope gate comes before the score, and an out-of-scope finding
-  // does not escalate. A real issue with a real quote that the change did
-  // not bring is a pre-existing finding. Its severity must post.
-  if (!first.in_scope) {
-    const settled = settle(first);
-    const preExisting =
-      settled === null &&
-      isPostedSeverity(first.severity) &&
-      first.score >= threshold &&
-      quoteMatches(first.quotes, headText);
-    return { first, final: first, passed: false, ...settled, pre_existing: preExisting };
-  }
-
-  const inBand = first.score >= bandLow && first.score <= bandHigh;
-  if (!inBand && !finding.needs_context) {
-    return { first, final: first, ...decide(first), pre_existing: false };
-  }
+  const { escalates, ...decision } = decideFirst(first, finding, headText, ctx.config);
+  if (isQueryFailure(first)) return { first, final: null, ...decision };
+  if (!escalates) return { first, final: first, ...decision };
 
   const escalated = await ask("verifier-escalation");
   // The second check did not occur, so the finding has no final result
@@ -370,7 +409,7 @@ export async function verifyFinding(
     first,
     escalated,
     final: escalated,
-    ...decide(escalated, agreed),
+    ...decideResult(escalated, headText, ctx.config.threshold, agreed),
     pre_existing: false,
   };
 }
