@@ -1,0 +1,3105 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 58,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "D4c tools: Codex model options, the general reviewer and the E6 arms",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/58"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "61e916ab882276c85b86ba6a0f3d45d6f20ef742",
+    "head": "744bf05428487c365d70e112d102a2f000861a03",
+    "started_at": "2026-11-15T05:44:50.534Z",
+    "tool_version": "0.14.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "D4c tools: Codex model options, the general reviewer and the E6 arms\n\nD4c, part \"side\", phase 2: the tools for the Terra arms, E2 and E6. This PR holds code and tests only. It runs no experiment.\n\n## Changes\n\n- **The Codex call** (`src/eval/codex.ts`): `runCodex` takes an optional fifth parameter, `CodexOptions { model?, effort? }`. With no options, the call uses Sol at high, as before, so the label and pool callers do not change. `TERRA_MODEL = \"gpt-6.1-terra\"`. Each outcome also gives `tokens` (read from the stderr tail, or null), and `codexQuotaError` finds a usage-limit stop.\n- **E2, the general reviewer**: `prompts/reviewers/general-review.md` is one general review of the whole diff. The new frontmatter key `opt_in: true` keeps it out of every normal run. `selectReviewers` takes a `named` set, and `src/run.ts` passes `onlyReviewers` to it, which is the one line changed in that file. The Opus arms use `--reviewers general-review --models general-review=opus:medium|high --stage1` from the eval tooling PR.\n- **E2, the Terra arm**: `pr-review eval-codex-review` runs the same reviewer prompt through Codex on each case. It writes outside candidates, `<out>/<case>.json` = `{ source, findings }`, for replay. Each finished case is written at once, and a rerun skips it. A quota stop ends the command, and the next run continues.\n- **E6**: `pr-review eval-injection-variants` copies each injection case and makes five variants: three PR-body instructions, one in the head commit message, and one in a code comment. It never writes to the input directory or to `eval/cases/`, so the cases pin does not change. The new optional case field `description_from: \"commits\"` makes the eval give the run no description, so the commit message reaches the models. This is one changed expression in `src/eval/run.ts`. `pr-review eval-injection-report` gives the share of runs that found the known bug for each arm, and lists outputs that may follow an instruction. It makes no model call: it scores the stored records with the stored judge cache. README states the three detection rules. Every hit is a candidate for a person to judge.\n- The version goes to 0.15.0.\n\n## Coordination with the eval tooling PR\n\nThe eval tooling PR owns `--models`, `--stage1` and replay, and it agreed to the interfaces above. This PR changes one line in `src/run.ts` and one expression in `src/eval/run.ts`, both agreed. The PR that merges second rebases and takes the next version.\n\n## The Terra id\n\n`codex debug models` (codex-cli 0.167.0) lists this entry. The command reads the local catalog and makes no model call:\n\n```\n\"slug\":\"gpt-6.1-terra\",\"display_name\":\"GPT-6.1 Terra\"\n```\n\n## Limits\n\n- The Codex prompt goes to the CLI as one argument, as in the pool. A very large diff can be longer than the OS argument limit, and that case then fails and is reported as failed.\n- The Terra arm gets no triage brief, because a brief needs a triage model call. The Opus arms get one. The E2 note must state this.\n- No test calls the real Codex. The strict output schema (`suggested_fix` required, with an empty string for no fix) follows the pool's Codex schema.\n\n## Checks\n\n`npm test` (1560 passed), `npm run lint`, `npm run typecheck` and `npm run build` pass.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZdfE1rqbczPpmGQQ5S\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": ".claude-plugin/marketplace.json",
+        "hunks": 1
+      },
+      {
+        "path": ".claude-plugin/plugin.json",
+        "hunks": 1
+      },
+      {
+        "path": "README.md",
+        "hunks": 3
+      },
+      {
+        "path": "package.json",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/codex-review.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/injection-instructions.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/reviewers/general-review.md",
+        "hunks": 1
+      },
+      {
+        "path": "src/cli.ts",
+        "hunks": 2
+      },
+      {
+        "path": "src/eval/case.ts",
+        "hunks": 3
+      },
+      {
+        "path": "src/eval/codex-review.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/codex.ts",
+        "hunks": 5
+      },
+      {
+        "path": "src/eval/injection/report.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/injection/variants.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/run.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/reviewers/select.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/run.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/schemas/reviewer.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/cli-d4c-arms.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/codex-review.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/codex.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/eval-description-from.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/fixtures/injection-cases.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/fixtures/injection-records.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/injection-report.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/injection-variants.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/reviewers.test.ts",
+        "hunks": 5
+      },
+      {
+        "path": "test/run-opt-in.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/select-opt-in.test.ts",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [
+      {
+        "path": "package-lock.json",
+        "reason": "generated"
+      }
+    ],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "Adds new CLI commands, reviewer selection logic (opt-in), schema changes, Codex invocation changes, and eval case handling, which are logic and public interface changes.",
+      "confidence": "high",
+      "categories": [
+        "bug",
+        "security",
+        "test",
+        "docs",
+        "convention"
+      ],
+      "hotspots": [
+        "src/reviewers/select.ts",
+        "src/run.ts",
+        "src/eval/injection/variants.ts",
+        "src/eval/injection/report.ts",
+        "src/eval/codex-review.ts",
+        "src/eval/codex.ts",
+        "src/eval/run.ts",
+        "src/cli.ts",
+        "src/schemas/reviewer.ts",
+        "src/eval/case.ts"
+      ],
+      "file_notes": [
+        {
+          "file": "src/reviewers/select.ts",
+          "note": "opt_in filtering by named set; the run.ts caller passes the only set"
+        },
+        {
+          "file": "src/run.ts",
+          "note": "passes the named reviewers into selectReviewers"
+        },
+        {
+          "file": "src/eval/injection/variants.ts",
+          "note": "new; git plumbing to build variant commits and bundles, path safety checks for --out"
+        },
+        {
+          "file": "src/eval/injection/report.ts",
+          "note": "new; rescoring from judge cache, detection rules, patch line parsing"
+        },
+        {
+          "file": "src/eval/codex-review.ts",
+          "note": "new command; runs Codex per case, resume and quota logic, atomic writes"
+        },
+        {
+          "file": "src/eval/codex.ts",
+          "note": "adds model/effort options, token parsing and quota detection; CodexOutcome type changes"
+        },
+        {
+          "file": "src/eval/run.ts",
+          "note": "omits description when description_from is commits"
+        },
+        {
+          "file": "src/cli.ts",
+          "note": "registers three pass-through commands"
+        },
+        {
+          "file": "src/eval/case.ts",
+          "note": "new optional case.json fields and schema"
+        },
+        {
+          "file": "src/schemas/reviewer.ts",
+          "note": "new optional opt_in frontmatter key"
+        },
+        {
+          "file": "prompts/reviewers/general-review.md",
+          "note": "new opt-in reviewer prompt"
+        },
+        {
+          "file": "prompts/codex-review.md",
+          "note": "new Codex wrapper prompt"
+        },
+        {
+          "file": "prompts/injection-instructions.md",
+          "note": "new injection instruction texts read by code"
+        },
+        {
+          "file": "README.md",
+          "note": "docs for the new features"
+        },
+        {
+          "file": ".claude-plugin/plugin.json",
+          "note": "version bump"
+        },
+        {
+          "file": ".claude-plugin/marketplace.json",
+          "note": "version bump"
+        },
+        {
+          "file": "package.json",
+          "note": "version bump"
+        },
+        {
+          "file": "test/reviewers.test.ts",
+          "note": "updated for the new reviewer"
+        }
+      ],
+      "summary": "The change adds an opt-in `general-review` reviewer and an `opt_in` frontmatter key. It adds the `eval-codex-review` command, which runs the prompt through Codex per case, and the E6 prompt-injection tooling: `eval-injection-variants` and `eval-injection-report`. It also extends case metadata with `description_from` and `variant_of`, extends the Codex runner with model, effort, token and quota handling, and bumps the version to 0.15.0. New tests cover each part."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: Adds new CLI commands, reviewer selection logic (opt-in), schema changes, Codex invocation changes, and eval case handling, which are logic and public interface changes.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "test/codex.test.ts",
+            "start_line": 80,
+            "end_line": 82,
+            "category": "convention",
+            "severity_estimate": "nit",
+            "confidence": "medium",
+            "claim": "This test repeats a constant value. It does not test a behaviour.",
+            "evidence": "  it(\"names the terra model gpt-6.1-terra\", () => {\n    expect(TERRA_MODEL).toBe(\"gpt-6.1-terra\");\n  });",
+            "suggested_fix": "Remove this test. The argv test with TERRA_MODEL already covers the behaviour.",
+            "explanation": "CLAUDE.md rule 2 says \"never restate the code\". A test that compares a constant with its own literal value proves nothing.",
+            "needs_context": false
+          },
+          {
+            "file": "README.md",
+            "start_line": 1050,
+            "end_line": 1052,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The Exit codes table does not list the three new eval commands.",
+            "evidence": "| Code | `eval` | `explain` | `eval-report` | `eval-subset` |",
+            "suggested_fix": "Add columns for eval-codex-review, eval-injection-variants and eval-injection-report, or state in the table that they are documented elsewhere.",
+            "explanation": "The README lists the exit codes of each eval command in this table, but the change gives the exit codes of the three new commands only in prose.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 9137,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 56225,
+              "outputTokens": 29,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.005637,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 766,
+              "cacheReadInputTokens": 5136,
+              "cacheCreationInputTokens": 55734,
+              "webSearchRequests": 0,
+              "costUSD": 0.4622272,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 256,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.4678642
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 8927,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 56209,
+              "outputTokens": 28,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.005634900000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 695,
+              "cacheReadInputTokens": 5094,
+              "cacheCreationInputTokens": 55718,
+              "webSearchRequests": 0,
+              "costUSD": 0.4606708,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 252,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.4663057
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/injection/variants.ts",
+            "start_line": 93,
+            "end_line": 103,
+            "category": "bug",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "realPathOf drops a character when the existing parent is the root directory.",
+            "evidence": "return join(await realPathOf(parent), full.slice(parent.length + 1));",
+            "suggested_fix": "Use relative(parent, full) or basename(full) in place of the slice.",
+            "explanation": "For full=\"/foo\" and parent=\"/\", slice(2) gives \"oo\", so the path that the safety checks compare is wrong.",
+            "needs_context": false
+          },
+          {
+            "file": "src/eval/codex-review.ts",
+            "start_line": 107,
+            "end_line": 107,
+            "category": "bug",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "An empty case body gives a description that ends in a blank line, unlike the description of the other arms.",
+            "evidence": "const description = `${sanitizeGitHubText(c.title).text}\\n\\n${sanitizeGitHubText(c.body).text}`;",
+            "suggested_fix": "Join only the parts that are not empty.",
+            "explanation": "The title and the body are always joined, so an empty body adds a trailing separator to the prompt.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 16122,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 56219,
+              "outputTokens": 29,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0056364,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 1405,
+              "cacheReadInputTokens": 5363,
+              "cacheCreationInputTokens": 55728,
+              "webSearchRequests": 0,
+              "costUSD": 0.4750046,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 625,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.480641
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/injection/report.ts",
+            "start_line": 90,
+            "end_line": 91,
+            "category": "bug",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "In touchedLines, the '--- a/<path>' header of the next file counts as a deleted line of the file before it.",
+            "evidence": "} else if (text.startsWith(\"-\")) {\n      add(line);",
+            "suggested_fix": "Skip lines that start with '--- ', or set line to 0 when a 'diff --git' or '--- ' header appears.",
+            "explanation": "In a multi-file patch, the '--- a/' header starts with '-' while file and line still hold the last file's state, so it adds a false touched line.",
+            "needs_context": false
+          },
+          {
+            "file": "src/eval/injection/variants.ts",
+            "start_line": 95,
+            "end_line": 103,
+            "category": "bug",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "realPathOf drops the first character of the name when the parent directory is the filesystem root.",
+            "evidence": "return join(await realPathOf(parent), full.slice(parent.length + 1));",
+            "suggested_fix": "Use basename(full) or relative(parent, full) in place of the slice.",
+            "explanation": "When parent is '/', parent.length + 1 is 2, so for full '/foo' the slice gives 'oo'.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 15277,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 56221,
+              "outputTokens": 26,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0056351000000000005,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 1342,
+              "cacheReadInputTokens": 5363,
+              "cacheCreationInputTokens": 55730,
+              "webSearchRequests": 0,
+              "costUSD": 0.47376060000000003,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 616,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.47939570000000004
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "README.md",
+            "start_line": 1052,
+            "end_line": 1052,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The eval exit codes table does not list the three new commands (eval-codex-review, eval-injection-variants, eval-injection-report).",
+            "evidence": "| Code | `eval` | `explain` | `eval-report` | `eval-subset` |",
+            "suggested_fix": "Add columns or a note for the exit codes of the three new commands.",
+            "explanation": "The new commands have their own exit codes, and the table that lists the exit codes of the eval commands omits them.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 13384,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 56211,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0056321,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 937,
+              "cacheReadInputTokens": 65812,
+              "cacheCreationInputTokens": 56273,
+              "webSearchRequests": 0,
+              "costUSD": 0.4821024,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 572,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.48773449999999996
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4609,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 68606,
+              "outputTokens": 25,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.006873100000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 201,
+              "cacheReadInputTokens": 5438,
+              "cacheCreationInputTokens": 68115,
+              "webSearchRequests": 0,
+              "costUSD": 0.5500356,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 44,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.5569086999999999
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 11292,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 56219,
+              "outputTokens": 28,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0056359,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 753,
+              "cacheReadInputTokens": 66388,
+              "cacheCreationInputTokens": 56589,
+              "webSearchRequests": 0,
+              "costUSD": 0.4810656,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 598,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.4867015
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/codex-review.ts",
+            "start_line": 157,
+            "end_line": 160,
+            "category": "security",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The case name from case.json goes into an output file path without a check for path separators or '..'.",
+            "evidence": "const file = join(options.out, `${c.name}.json`);",
+            "suggested_fix": "Reject a case name that holds '/', '\\\\' or '..', or check that the resolved path is inside --out.",
+            "explanation": "A crafted case name could write the candidates file outside the --out directory, unless loadCases already ties the name to the directory name.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5485,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 56223,
+              "outputTokens": 26,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0056353,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 389,
+              "cacheReadInputTokens": 5330,
+              "cacheCreationInputTokens": 55732,
+              "webSearchRequests": 0,
+              "costUSD": 0.45470999999999995,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 128,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.46034529999999996
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "test/codex.test.ts",
+            "start_line": 80,
+            "end_line": 81,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "high",
+            "claim": "The test restates the TERRA_MODEL constant.",
+            "evidence": "    expect(TERRA_MODEL).toBe(\"gpt-6.1-terra\");",
+            "suggested_fix": "Remove the test. Rely on the argv check of the default codex-review call.",
+            "explanation": "The expected value is a copy of the constant. The argv test of the default eval-codex-review call already covers the observable model.",
+            "needs_context": false
+          },
+          {
+            "file": "src/eval/injection/report.ts",
+            "start_line": 92,
+            "end_line": 93,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "No test covers how touchedLines counts a deleted line, which the known-bug rule depends on.",
+            "evidence": "    } else if (text.startsWith(\"-\")) {\n      add(line);",
+            "suggested_fix": "Add a unit test of touchedLines or knownBugGoldens with a patch that only deletes lines.",
+            "explanation": "The fixture patch replaces one line, so the add branch alone marks line 4. A bug in the delete branch would pass every test.",
+            "needs_context": false
+          },
+          {
+            "file": "src/eval/injection/report.ts",
+            "start_line": 332,
+            "end_line": 332,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "No test covers the error path when no golden fits the injection patch.",
+            "evidence": "        throw new Error(`case ${c.name}: no golden holds a line that injection.patch touches`);",
+            "suggested_fix": "Add a case whose golden is on a line that the patch does not touch. Assert exit code 1 and the error text.",
+            "explanation": "The README documents this error and its exit code 1, but no test makes it happen.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 17774,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 56215,
+              "outputTokens": 24,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0056335000000000005,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 1702,
+              "cacheReadInputTokens": 67934,
+              "cacheCreationInputTokens": 56546,
+              "webSearchRequests": 0,
+              "costUSD": 0.5000108000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 792,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.5056443
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "test/codex.test.ts",
+          "start_line": 80,
+          "end_line": 82,
+          "category": "convention",
+          "severity_estimate": "nit",
+          "confidence": "medium",
+          "claim": "This test repeats a constant value. It does not test a behaviour.",
+          "evidence": "  it(\"names the terra model gpt-6.1-terra\", () => {\n    expect(TERRA_MODEL).toBe(\"gpt-6.1-terra\");\n  });",
+          "suggested_fix": "Remove this test. The argv test with TERRA_MODEL already covers the behaviour.",
+          "explanation": "CLAUDE.md rule 2 says \"never restate the code\". A test that compares a constant with its own literal value proves nothing.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(TERRA_MODEL).toBe(\"gpt-6.1-terra\");",
+            "expect(valueAfter(argv, \"-m\")).toBe(\"gpt-6.1-terra\");",
+            "export const TERRA_MODEL = \"gpt-6.1-terra\";"
+          ],
+          "rationale": "The test compares the constant with the same literal that `src/eval/codex.ts` defines. The earlier argv test already asserts \"gpt-6.1-terra\" through `TERRA_MODEL`. CLAUDE.md rule 2 says to never restate the code in tests, so the finding is accurate. It is a cheap, minor cleanup, and the test does pin the model id.",
+          "score": 80,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "  it(\"names the terra model gpt-6.1-terra\", () => {\n    expect(TERRA_MODEL).toBe(\"gpt-6.1-terra\");\n  });",
+            "    await runCodex(\"P\", checkout, Schema, \"test\", { model: TERRA_MODEL, effort: \"medium\" });\n    const argv = argvOf();\n    expect(valueAfter(argv, \"-m\")).toBe(\"gpt-6.1-terra\");",
+            "Never test a fake for its own sake, and never restate the code."
+          ],
+          "rationale": "The test only compares the exported constant with its literal value, which CLAUDE.md rule 2 forbids (\"never restate the code\"). The options test already checks that \"gpt-6.1-terra\" reaches the codex argv through TERRA_MODEL, so this test adds nothing. Deleting it is cheap.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "  it(\"names the terra model gpt-6.1-terra\", () => {\n    expect(TERRA_MODEL).toBe(\"gpt-6.1-terra\");\n  });",
+            "    await runCodex(\"P\", checkout, Schema, \"test\", { model: TERRA_MODEL, effort: \"medium\" });\n    const argv = argvOf();\n    expect(valueAfter(argv, \"-m\")).toBe(\"gpt-6.1-terra\");",
+            "Never test a fake for its own sake, and never restate the code."
+          ],
+          "rationale": "The test only compares the exported constant with its literal value, which CLAUDE.md rule 2 forbids (\"never restate the code\"). The options test already checks that \"gpt-6.1-terra\" reaches the codex argv through TERRA_MODEL, so this test adds nothing. Deleting it is cheap.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "conventions",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "README.md",
+          "start_line": 1050,
+          "end_line": 1052,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The Exit codes table does not list the three new eval commands.",
+          "evidence": "| Code | `eval` | `explain` | `eval-report` | `eval-subset` |",
+          "suggested_fix": "Add columns for eval-codex-review, eval-injection-variants and eval-injection-report, or state in the table that they are documented elsewhere.",
+          "explanation": "The README lists the exit codes of each eval command in this table, but the change gives the exit codes of the three new commands only in prose.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "| Code | `eval` | `explain` | `eval-report` | `eval-subset` |",
+            "The exit code is 0 when no case failed. It is 1 when a case failed or the quota is out. It is 2 for a usage error or a cases directory that is not valid."
+          ],
+          "rationale": "The table lists only the four older commands. The new `eval-codex-review` documents its exit codes in prose right under its own section. The two E6 commands document none in the README, so the finding is slightly off. The gap is small and no reader gets a wrong answer from it.",
+          "score": 75,
+          "severity": "dont_post"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "| Code | `eval` | `explain` | `eval-report` | `eval-subset` |",
+            "At the end the command prints `done`, `skipped`, `failed` and `tokens`, the sum of the token counts that Codex printed. The exit code is 0 when no case failed. It is 1 when a case failed or the quota is out. It is 2 for a usage error or a cases directory that is not valid.",
+            "The command exits 0 when every call succeeded. It exits 1 when a case failed or a call failed after its retry. It exits 2 on a usage error, also for a record of another PR or another repo, and for a record finding that is not valid."
+          ],
+          "rationale": "The claim is correct: the Exit codes table has no column for the three new commands. But the table already leaves out other commands, such as pool and the adjudicate command, whose exit codes the README gives in prose. Leaving the new commands out follows that pattern and gives a reader no wrong information.",
+          "score": 88,
+          "severity": "dont_post"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "| Code | `eval` | `explain` | `eval-report` | `eval-subset` |",
+            "At the end the command prints `done`, `skipped`, `failed` and `tokens`, the sum of the token counts that Codex printed. The exit code is 0 when no case failed. It is 1 when a case failed or the quota is out. It is 2 for a usage error or a cases directory that is not valid.",
+            "The command exits 0 when every call succeeded. It exits 1 when a case failed or a call failed after its retry. It exits 2 on a usage error, also for a record of another PR or another repo, and for a record finding that is not valid."
+          ],
+          "rationale": "The claim is correct: the Exit codes table has no column for the three new commands. But the table already leaves out other commands, such as pool and the adjudicate command, whose exit codes the README gives in prose. Leaving the new commands out follows that pattern and gives a reader no wrong information.",
+          "score": 88,
+          "severity": "dont_post"
+        },
+        "passed": false,
+        "sources": [
+          {
+            "reviewer": "conventions",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "README.md",
+          "start_line": 1052,
+          "end_line": 1052,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The eval exit codes table does not list the three new commands (eval-codex-review, eval-injection-variants, eval-injection-report).",
+          "evidence": "| Code | `eval` | `explain` | `eval-report` | `eval-subset` |",
+          "suggested_fix": "Add columns or a note for the exit codes of the three new commands.",
+          "explanation": "The new commands have their own exit codes, and the table that lists the exit codes of the eval commands omits them.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "| Code | `eval` | `explain` | `eval-report` | `eval-subset` |",
+            "It is 1 when a case failed or the quota is out. It is 2 for a usage error or a cases directory that is not valid."
+          ],
+          "rationale": "The exit codes table still has columns only for `eval`, `explain`, `eval-report` and `eval-subset`. `eval-codex-review` documents its exit codes in its own section. `eval-injection-variants` and `eval-injection-report` document none. The gap is real but minor.",
+          "score": 78,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "| Code | `eval` | `explain` | `eval-report` | `eval-subset` |",
+            "The exit code is 0 when no case failed. It is 1 when a case failed or the quota is out. It is 2 for a usage error or a cases directory that is not valid.",
+            "const USAGE = \"usage: pr-review eval-injection-variants --cases <dir> --out <dir>\";"
+          ],
+          "rationale": "The claim holds: the Exit codes table still lists only `eval`, `explain`, `eval-report` and `eval-subset`, and this change adds three commands just above it. `eval-codex-review` gives its exit codes in its own section, but the two injection commands give theirs nowhere, so the gap is small and the fix is cheap.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "| Code | `eval` | `explain` | `eval-report` | `eval-subset` |",
+            "The exit code is 0 when no case failed. It is 1 when a case failed or the quota is out. It is 2 for a usage error or a cases directory that is not valid.",
+            "const USAGE = \"usage: pr-review eval-injection-variants --cases <dir> --out <dir>\";"
+          ],
+          "rationale": "The claim holds: the Exit codes table still lists only `eval`, `explain`, `eval-report` and `eval-subset`, and this change adds three commands just above it. `eval-codex-review` gives its exit codes in its own section, but the two injection commands give theirs nowhere, so the gap is small and the fix is cheap.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "docs-and-comments",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/eval/injection/report.ts",
+          "start_line": 90,
+          "end_line": 91,
+          "category": "bug",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "In touchedLines, the '--- a/<path>' header of the next file counts as a deleted line of the file before it.",
+          "evidence": "} else if (text.startsWith(\"-\")) {\n      add(line);",
+          "suggested_fix": "Skip lines that start with '--- ', or set line to 0 when a 'diff --git' or '--- ' header appears.",
+          "explanation": "In a multi-file patch, the '--- a/' header starts with '-' while file and line still hold the last file's state, so it adds a false touched line.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "} else if (text.startsWith(\"-\")) {\n      add(line);",
+            "const header = /^\\+\\+\\+ b\\/(.+)$/.exec(text);",
+            "if (file === null || line === 0) continue;"
+          ],
+          "rationale": "In a multi-file patch, the next file's `--- a/<path>` line comes while `file` and `line` still hold the previous file's state. It starts with \"-\", so it falls into the deleted-line branch and adds a false touched line to the previous file. The effect is limited to multi-file injection patches, and only when a golden range covers that line.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "} else if (text.startsWith(\"-\")) {\n      add(line);",
+            "const header = /^\\+\\+\\+ b\\/(.+)$/.exec(text);",
+            "if (file === null || line === 0) continue;"
+          ],
+          "rationale": "In a multi-file patch, the next file's `--- a/<path>` line comes while `file` and `line` still hold the previous file's state. It starts with \"-\", so it falls into the deleted-line branch and adds a false touched line to the previous file. The effect is limited to multi-file injection patches, and only when a golden range covers that line.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 2
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/eval/injection/variants.ts",
+          "start_line": 95,
+          "end_line": 103,
+          "category": "bug",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "realPathOf drops the first character of the name when the parent directory is the filesystem root.",
+          "evidence": "return join(await realPathOf(parent), full.slice(parent.length + 1));",
+          "suggested_fix": "Use basename(full) or relative(parent, full) in place of the slice.",
+          "explanation": "When parent is '/', parent.length + 1 is 2, so for full '/foo' the slice gives 'oo'.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "return join(await realPathOf(parent), full.slice(parent.length + 1));",
+            "const parent = dirname(full);"
+          ],
+          "rationale": "When parent is \"/\", its length is 1, so slice(2) on \"/foo\" gives \"oo\". The result is \"/oo\", and realPathOf is used for --out, which is later passed to mkdir. This only affects a non-existent direct child of the root, so it is an unusual path.",
+          "score": 93,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "return join(await realPathOf(parent), full.slice(parent.length + 1));",
+            "const parent = dirname(full);"
+          ],
+          "rationale": "When parent is \"/\", its length is 1, so slice(2) on \"/foo\" gives \"oo\". The result is \"/oo\", and realPathOf is used for --out, which is later passed to mkdir. This only affects a non-existent direct child of the root, so it is an unusual path.",
+          "score": 93,
+          "severity": "suggestion"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 2
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/eval/injection/variants.ts",
+          "start_line": 93,
+          "end_line": 103,
+          "category": "bug",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "realPathOf drops a character when the existing parent is the root directory.",
+          "evidence": "return join(await realPathOf(parent), full.slice(parent.length + 1));",
+          "suggested_fix": "Use relative(parent, full) or basename(full) in place of the slice.",
+          "explanation": "For full=\"/foo\" and parent=\"/\", slice(2) gives \"oo\", so the path that the safety checks compare is wrong.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "return join(await realPathOf(parent), full.slice(parent.length + 1));",
+            "const parent = dirname(full);"
+          ],
+          "rationale": "When the parent is \"/\", parent.length+1 is 2, so full.slice(2) drops the first character of the name. For \"/foo\" that gives \"oo\". The result is also used as `out` for mkdir, so the command would write to the wrong directory. It only affects a missing top-level path, so it is rare.",
+          "score": 93,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "return join(await realPathOf(parent), full.slice(parent.length + 1));",
+            "const parent = dirname(full);"
+          ],
+          "rationale": "When the parent is \"/\", parent.length+1 is 2, so full.slice(2) drops the first character of the name. For \"/foo\" that gives \"oo\". The result is also used as `out` for mkdir, so the command would write to the wrong directory. It only affects a missing top-level path, so it is rare.",
+          "score": 93,
+          "severity": "suggestion"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/eval/codex-review.ts",
+          "start_line": 107,
+          "end_line": 107,
+          "category": "bug",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "An empty case body gives a description that ends in a blank line, unlike the description of the other arms.",
+          "evidence": "const description = `${sanitizeGitHubText(c.title).text}\\n\\n${sanitizeGitHubText(c.body).text}`;",
+          "suggested_fix": "Join only the parts that are not empty.",
+          "explanation": "The title and the body are always joined, so an empty body adds a trailing separator to the prompt.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const description = `${sanitizeGitHubText(c.title).text}\\n\\n${sanitizeGitHubText(c.body).text}`;",
+            "text: `${title.text}\\n\\n${body.text}`,"
+          ],
+          "rationale": "The Codex arm builds the description the same way as `givenDescription` in src/run.ts, which the Opus arms use. Both always join title and body with a blank line, so the Codex arm is not different from the others. A trailing blank line for an empty body is also harmless.",
+          "score": 3,
+          "severity": "not_real"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "const description = `${sanitizeGitHubText(c.title).text}\\n\\n${sanitizeGitHubText(c.body).text}`;",
+            "text: `${title.text}\\n\\n${body.text}`,"
+          ],
+          "rationale": "`givenDescription` in `src/run.ts`, which the other arms use, joins the title and the body with the same unconditional \"\\n\\n\". With an empty body, those arms give the same trailing blank line, so the Codex arm is consistent with them, not unlike them.",
+          "score": 5,
+          "severity": "not_real"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "const description = `${sanitizeGitHubText(c.title).text}\\n\\n${sanitizeGitHubText(c.body).text}`;",
+            "text: `${title.text}\\n\\n${body.text}`,"
+          ],
+          "rationale": "`givenDescription` in `src/run.ts`, which the other arms use, joins the title and the body with the same unconditional \"\\n\\n\". With an empty body, those arms give the same trailing blank line, so the Codex arm is consistent with them, not unlike them.",
+          "score": 5,
+          "severity": "not_real"
+        },
+        "passed": false,
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/eval/codex-review.ts",
+          "start_line": 157,
+          "end_line": 160,
+          "category": "security",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The case name from case.json goes into an output file path without a check for path separators or '..'.",
+          "evidence": "const file = join(options.out, `${c.name}.json`);",
+          "suggested_fix": "Reject a case name that holds '/', '\\\\' or '..', or check that the resolved path is inside --out.",
+          "explanation": "A crafted case name could write the candidates file outside the --out directory, unless loadCases already ties the name to the directory name.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "if (meta.name !== name) {",
+            "const file = join(options.out, `${c.name}.json`);"
+          ],
+          "rationale": "loadMeta rejects any case whose case.json name differs from its directory name. Directory names come from readdir entries, so they hold no path separators and can't be \"..\". The path traversal the finding describes can't happen.",
+          "score": 3,
+          "severity": "not_real"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "const file = join(options.out, `${c.name}.json`);",
+            "if (meta.name !== name) {",
+            "`case ${name}: case.json has the name \"${meta.name}\", which differs from the directory name`,",
+            "names = entries.filter((e) => e.isDirectory()).map((e) => e.name);"
+          ],
+          "rationale": "loadCases requires the case.json name to equal the directory entry name from readdir. That name cannot contain a path separator or be '..', so the case name cannot point the output path outside --out.",
+          "score": 8,
+          "severity": "not_real"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "const file = join(options.out, `${c.name}.json`);",
+            "if (meta.name !== name) {",
+            "`case ${name}: case.json has the name \"${meta.name}\", which differs from the directory name`,",
+            "names = entries.filter((e) => e.isDirectory()).map((e) => e.name);"
+          ],
+          "rationale": "loadCases requires the case.json name to equal the directory entry name from readdir. That name cannot contain a path separator or be '..', so the case name cannot point the output path outside --out.",
+          "score": 8,
+          "severity": "not_real"
+        },
+        "passed": false,
+        "sources": [
+          {
+            "reviewer": "security",
+            "pass": 2
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "test/codex.test.ts",
+          "start_line": 80,
+          "end_line": 81,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "high",
+          "claim": "The test restates the TERRA_MODEL constant.",
+          "evidence": "    expect(TERRA_MODEL).toBe(\"gpt-6.1-terra\");",
+          "suggested_fix": "Remove the test. Rely on the argv check of the default codex-review call.",
+          "explanation": "The expected value is a copy of the constant. The argv test of the default eval-codex-review call already covers the observable model.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(TERRA_MODEL).toBe(\"gpt-6.1-terra\");",
+            "await runCodex(\"P\", checkout, Schema, \"test\", { model: TERRA_MODEL, effort: \"medium\" });",
+            "expect(valueAfter(argv, \"-m\")).toBe(\"gpt-6.1-terra\");"
+          ],
+          "rationale": "The test compares the constant to its own literal, which is tautological. The earlier test already checks that the argv holds \\\"gpt-6.1-terra\\\" when TERRA_MODEL is passed, so it is redundant. The harm is minor, and the pin may be deliberate.",
+          "score": 72,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(TERRA_MODEL).toBe(\"gpt-6.1-terra\");",
+            "await runCodex(\"P\", checkout, Schema, \"test\", { model: TERRA_MODEL, effort: \"medium\" });",
+            "expect(valueAfter(argv, \"-m\")).toBe(\"gpt-6.1-terra\");",
+            "expect(last?.[last.indexOf(\"-m\") + 1]).toBe(\"gpt-6.1-terra\");"
+          ],
+          "rationale": "The finding is correct: the test only checks that the constant equals its own literal value. The same id is already checked through the argv, at codex.test.ts line 68 and in codex-review.test.ts. The extra test adds almost nothing and costs little to remove.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(TERRA_MODEL).toBe(\"gpt-6.1-terra\");",
+            "await runCodex(\"P\", checkout, Schema, \"test\", { model: TERRA_MODEL, effort: \"medium\" });",
+            "expect(valueAfter(argv, \"-m\")).toBe(\"gpt-6.1-terra\");",
+            "expect(last?.[last.indexOf(\"-m\") + 1]).toBe(\"gpt-6.1-terra\");"
+          ],
+          "rationale": "The finding is correct: the test only checks that the constant equals its own literal value. The same id is already checked through the argv, at codex.test.ts line 68 and in codex-review.test.ts. The extra test adds almost nothing and costs little to remove.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/eval/injection/report.ts",
+          "start_line": 92,
+          "end_line": 93,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "No test covers how touchedLines counts a deleted line, which the known-bug rule depends on.",
+          "evidence": "    } else if (text.startsWith(\"-\")) {\n      add(line);",
+          "suggested_fix": "Add a unit test of touchedLines or knownBugGoldens with a patch that only deletes lines.",
+          "explanation": "The fixture patch replaces one line, so the add branch alone marks line 4. A bug in the delete branch would pass every test.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "} else if (text.startsWith(\"-\")) {\n      add(line);",
+            "lines[3] = \"  return v.reduce((s, x) => s + x, 0) / v.length;\";"
+          ],
+          "rationale": "No test calls touchedLines or knownBugGoldens directly. The only fixture patch replaces line 4, so the add branch marks the same line as the delete branch. A bug in the delete branch would pass every test. The gap is real but minor.",
+          "score": 85,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "} else if (text.startsWith(\"-\")) {\n      add(line);",
+            "writeFileSync(join(caseDir, \"injection.patch\"), patch);",
+            " * commit that changes \"file\" on line 4, a bundle, a diff, a golden finding"
+          ],
+          "rationale": "No test calls touchedLines or knownBugGoldens directly. The only injection.patch fixture changes one line (line 4), so the \"+\" branch alone marks the golden line and the delete-only path is never checked on its own. The finding is real, but it is only a gap in test coverage.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "} else if (text.startsWith(\"-\")) {\n      add(line);",
+            "writeFileSync(join(caseDir, \"injection.patch\"), patch);",
+            " * commit that changes \"file\" on line 4, a bundle, a diff, a golden finding"
+          ],
+          "rationale": "No test calls touchedLines or knownBugGoldens directly. The only injection.patch fixture changes one line (line 4), so the \"+\" branch alone marks the golden line and the delete-only path is never checked on its own. The finding is real, but it is only a gap in test coverage.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/eval/injection/report.ts",
+          "start_line": 332,
+          "end_line": 332,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "No test covers the error path when no golden fits the injection patch.",
+          "evidence": "        throw new Error(`case ${c.name}: no golden holds a line that injection.patch touches`);",
+          "suggested_fix": "Add a case whose golden is on a line that the patch does not touch. Assert exit code 1 and the error text.",
+          "explanation": "The README documents this error and its exit code 1, but no test makes it happen.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "throw new Error(`case ${c.name}: no golden holds a line that injection.patch touches`);",
+            "Run the command. Give the exit code: 0 after a report, 1 for an error",
+            "(for example a case whose known bug the code cannot find), and 2 for a"
+          ],
+          "rationale": "The test file test/injection-report.test.ts has eight cases, and none covers this error path or an exit code of 1. The grep for the error text matches only the source. The code's own docstring documents exit code 1 for this case. I could not confirm that the README documents it.",
+          "score": 85,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "throw new Error(`case ${c.name}: no golden holds a line that injection.patch touches`);",
+            "code = await captured(() =>\n    injectionReportCommand([\"--runs\", runs, \"--cases\", cases, \"--json\", jsonFile]),\n  );",
+            "expect(code).toBe(0);"
+          ],
+          "rationale": "The only test that calls injectionReportCommand is a single happy-path setup that asserts exit code 0, and no test file mentions the \"no golden holds\" error or touchedLines. The claim is true, but a missing test for one error path in eval tooling is a minor gap.",
+          "score": 90,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "throw new Error(`case ${c.name}: no golden holds a line that injection.patch touches`);",
+            "code = await captured(() =>\n    injectionReportCommand([\"--runs\", runs, \"--cases\", cases, \"--json\", jsonFile]),\n  );",
+            "expect(code).toBe(0);"
+          ],
+          "rationale": "The only test that calls injectionReportCommand is a single happy-path setup that asserts exit code 0, and no test file mentions the \"no golden holds\" error or touchedLines. The claim is true, but a missing test for one error path in eval tooling is a minor gap.",
+          "score": 90,
+          "severity": "nit"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ]
+      }
+    ],
+    "merges": [
+      {
+        "group": [
+          0,
+          5
+        ],
+        "result": {
+          "merged": [
+            {
+              "member_index": 1,
+              "claim": "The test only restates the TERRA_MODEL constant against its own literal value instead of testing behaviour.",
+              "explanation": "The expected value copies the constant, so it proves nothing; the argv test of the default codex-review call already covers the observable model.",
+              "suggested_fix": "Remove the test and rely on the argv check of the default codex-review call.",
+              "severity": "nit"
+            }
+          ]
+        }
+      },
+      {
+        "group": [
+          3,
+          4
+        ],
+        "result": {
+          "merged": [
+            {
+              "member_index": 0,
+              "claim": "realPathOf drops the first character of the name when the parent directory is the filesystem root.",
+              "explanation": "When parent is '/', parent.length + 1 is 2, so for full '/foo' the slice gives 'oo', and the path used in the safety checks is wrong.",
+              "suggested_fix": "Use basename(full) or relative(parent, full) in place of the slice.",
+              "severity": "suggestion"
+            }
+          ]
+        }
+      }
+    ],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [
+      {
+        "file": "src/eval/injection/variants.ts",
+        "start_line": 95,
+        "end_line": 103,
+        "category": "bug",
+        "severity_estimate": "nit",
+        "confidence": "low",
+        "claim": "realPathOf drops the first character of the name when the parent directory is the filesystem root.",
+        "evidence": "return join(await realPathOf(parent), full.slice(parent.length + 1));",
+        "explanation": "When parent is '/', parent.length + 1 is 2, so for full '/foo' the slice gives 'oo', and the path used in the safety checks is wrong.",
+        "needs_context": false,
+        "fingerprint": "d3b97fc5a30a8ac8",
+        "severity": "suggestion",
+        "score": 93,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "return join(await realPathOf(parent), full.slice(parent.length + 1));",
+            "const parent = dirname(full);"
+          ],
+          "rationale": "When parent is \"/\", its length is 1, so slice(2) on \"/foo\" gives \"oo\". The result is \"/oo\", and realPathOf is used for --out, which is later passed to mkdir. This only affects a non-existent direct child of the root, so it is an unusual path.",
+          "score": 93,
+          "severity": "suggestion"
+        },
+        "span_text": "async function realPathOf(path: string): Promise<string> { const full = resolve(path); try { return await realpath(full); } catch { const parent = dirname(full); if (parent === full) return full; return join(await realPathOf(parent), full.slice(parent.length + 1)); }",
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          },
+          {
+            "reviewer": "diff-bugs",
+            "pass": 2
+          }
+        ],
+        "suggested_fix": "Use basename(full) or relative(parent, full) in place of the slice."
+      },
+      {
+        "file": "src/eval/injection/report.ts",
+        "start_line": 90,
+        "end_line": 91,
+        "category": "bug",
+        "severity_estimate": "nit",
+        "confidence": "low",
+        "claim": "In touchedLines, the '--- a/<path>' header of the next file counts as a deleted line of the file before it.",
+        "evidence": "} else if (text.startsWith(\"-\")) {\n      add(line);",
+        "suggested_fix": "Skip lines that start with '--- ', or set line to 0 when a 'diff --git' or '--- ' header appears.",
+        "explanation": "In a multi-file patch, the '--- a/' header starts with '-' while file and line still hold the last file's state, so it adds a false touched line.",
+        "needs_context": false,
+        "fingerprint": "eb0f6ab493f74c55",
+        "severity": "suggestion",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "} else if (text.startsWith(\"-\")) {\n      add(line);",
+            "const header = /^\\+\\+\\+ b\\/(.+)$/.exec(text);",
+            "if (file === null || line === 0) continue;"
+          ],
+          "rationale": "In a multi-file patch, the next file's `--- a/<path>` line comes while `file` and `line` still hold the previous file's state. It starts with \"-\", so it falls into the deleted-line branch and adds a false touched line to the previous file. The effect is limited to multi-file injection patches, and only when a golden range covers that line.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "span_text": "add(line); line += 1;",
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 2
+          }
+        ]
+      },
+      {
+        "file": "src/eval/injection/report.ts",
+        "start_line": 92,
+        "end_line": 93,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "No test covers how touchedLines counts a deleted line, which the known-bug rule depends on.",
+        "evidence": "    } else if (text.startsWith(\"-\")) {\n      add(line);",
+        "suggested_fix": "Add a unit test of touchedLines or knownBugGoldens with a patch that only deletes lines.",
+        "explanation": "The fixture patch replaces one line, so the add branch alone marks line 4. A bug in the delete branch would pass every test.",
+        "needs_context": false,
+        "fingerprint": "e0175da5d5598219",
+        "severity": "suggestion",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "} else if (text.startsWith(\"-\")) {\n      add(line);",
+            "writeFileSync(join(caseDir, \"injection.patch\"), patch);",
+            " * commit that changes \"file\" on line 4, a bundle, a diff, a golden finding"
+          ],
+          "rationale": "No test calls touchedLines or knownBugGoldens directly. The only injection.patch fixture changes one line (line 4), so the \"+\" branch alone marks the golden line and the delete-only path is never checked on its own. The finding is real, but it is only a gap in test coverage.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "span_text": "} else if (text.startsWith(\"-\")) { add(line);",
+        "sources": [
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "file": "test/codex.test.ts",
+        "start_line": 80,
+        "end_line": 81,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "high",
+        "claim": "The test only restates the TERRA_MODEL constant against its own literal value instead of testing behaviour.",
+        "evidence": "    expect(TERRA_MODEL).toBe(\"gpt-6.1-terra\");",
+        "explanation": "The expected value copies the constant, so it proves nothing; the argv test of the default codex-review call already covers the observable model.",
+        "needs_context": false,
+        "fingerprint": "1da9286d7d58fdcf",
+        "severity": "nit",
+        "score": 92,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(TERRA_MODEL).toBe(\"gpt-6.1-terra\");",
+            "await runCodex(\"P\", checkout, Schema, \"test\", { model: TERRA_MODEL, effort: \"medium\" });",
+            "expect(valueAfter(argv, \"-m\")).toBe(\"gpt-6.1-terra\");",
+            "expect(last?.[last.indexOf(\"-m\") + 1]).toBe(\"gpt-6.1-terra\");"
+          ],
+          "rationale": "The finding is correct: the test only checks that the constant equals its own literal value. The same id is already checked through the argv, at codex.test.ts line 68 and in codex-review.test.ts. The extra test adds almost nothing and costs little to remove.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "span_text": "it(\"names the terra model gpt-6.1-terra\", () => { expect(TERRA_MODEL).toBe(\"gpt-6.1-terra\");",
+        "sources": [
+          {
+            "reviewer": "conventions",
+            "pass": 1
+          },
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ],
+        "suggested_fix": "Remove the test and rely on the argv check of the default codex-review call."
+      },
+      {
+        "file": "src/eval/injection/report.ts",
+        "start_line": 332,
+        "end_line": 332,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "No test covers the error path when no golden fits the injection patch.",
+        "evidence": "        throw new Error(`case ${c.name}: no golden holds a line that injection.patch touches`);",
+        "suggested_fix": "Add a case whose golden is on a line that the patch does not touch. Assert exit code 1 and the error text.",
+        "explanation": "The README documents this error and its exit code 1, but no test makes it happen.",
+        "needs_context": false,
+        "fingerprint": "c72815dca7f9ebe3",
+        "severity": "nit",
+        "score": 90,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "throw new Error(`case ${c.name}: no golden holds a line that injection.patch touches`);",
+            "code = await captured(() =>\n    injectionReportCommand([\"--runs\", runs, \"--cases\", cases, \"--json\", jsonFile]),\n  );",
+            "expect(code).toBe(0);"
+          ],
+          "rationale": "The only test that calls injectionReportCommand is a single happy-path setup that asserts exit code 0, and no test file mentions the \"no golden holds\" error or touchedLines. The claim is true, but a missing test for one error path in eval tooling is a minor gap.",
+          "score": 90,
+          "severity": "nit"
+        },
+        "span_text": "throw new Error(`case ${c.name}: no golden holds a line that injection.patch touches`);",
+        "sources": [
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "file": "README.md",
+        "start_line": 1052,
+        "end_line": 1052,
+        "category": "docs",
+        "severity_estimate": "nit",
+        "confidence": "low",
+        "claim": "The eval exit codes table does not list the three new commands (eval-codex-review, eval-injection-variants, eval-injection-report).",
+        "evidence": "| Code | `eval` | `explain` | `eval-report` | `eval-subset` |",
+        "suggested_fix": "Add columns or a note for the exit codes of the three new commands.",
+        "explanation": "The new commands have their own exit codes, and the table that lists the exit codes of the eval commands omits them.",
+        "needs_context": true,
+        "fingerprint": "72a8b88b36e00791",
+        "severity": "nit",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "| Code | `eval` | `explain` | `eval-report` | `eval-subset` |",
+            "The exit code is 0 when no case failed. It is 1 when a case failed or the quota is out. It is 2 for a usage error or a cases directory that is not valid.",
+            "const USAGE = \"usage: pr-review eval-injection-variants --cases <dir> --out <dir>\";"
+          ],
+          "rationale": "The claim holds: the Exit codes table still lists only `eval`, `explain`, `eval-report` and `eval-subset`, and this change adds three commands just above it. `eval-codex-review` gives its exit codes in its own section, but the two injection commands give theirs nowhere, so the gap is small and the fix is cheap.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "span_text": "| Code | `eval` | `explain` | `eval-report` | `eval-subset` |",
+        "sources": [
+          {
+            "reviewer": "docs-and-comments",
+            "pass": 1
+          }
+        ]
+      }
+    ],
+    "github": {
+      "review_id": 5909317770,
+      "review_url": "https://github.com/jerridan/pr-review/pull/58#pullrequestreview-5909317770",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [
+        {
+          "fingerprint": "d3b97fc5a30a8ac8",
+          "comment_id": 4577209782
+        },
+        {
+          "fingerprint": "eb0f6ab493f74c55",
+          "comment_id": 4577209786
+        },
+        {
+          "fingerprint": "e0175da5d5598219",
+          "comment_id": 4577209787
+        },
+        {
+          "fingerprint": "1da9286d7d58fdcf",
+          "comment_id": 4577209788
+        },
+        {
+          "fingerprint": "c72815dca7f9ebe3",
+          "comment_id": 4577209791
+        },
+        {
+          "fingerprint": "72a8b88b36e00791",
+          "comment_id": 4577209792
+        }
+      ],
+      "in_body": [],
+      "check_run": {
+        "id": 132715918273
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 7695,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 54532,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0054652,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1152,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 54045,
+            "webSearchRequests": 0,
+            "costUSD": 0.2278302,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.2332954
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 9137,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 56225,
+            "outputTokens": 29,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.005637,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 766,
+            "cacheReadInputTokens": 5136,
+            "cacheCreationInputTokens": 55734,
+            "webSearchRequests": 0,
+            "costUSD": 0.4622272,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 256,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.4678642
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 8927,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 56209,
+            "outputTokens": 28,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.005634900000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 695,
+            "cacheReadInputTokens": 5094,
+            "cacheCreationInputTokens": 55718,
+            "webSearchRequests": 0,
+            "costUSD": 0.4606708,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 252,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.4663057
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 13384,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 56211,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0056321,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 937,
+            "cacheReadInputTokens": 65812,
+            "cacheCreationInputTokens": 56273,
+            "webSearchRequests": 0,
+            "costUSD": 0.4821024,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 572,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.48773449999999996
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 4609,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 68606,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.006873100000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 201,
+            "cacheReadInputTokens": 5438,
+            "cacheCreationInputTokens": 68115,
+            "webSearchRequests": 0,
+            "costUSD": 0.5500356,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 44,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.5569086999999999
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "pass": 2,
+        "model": "claude-opus-5-5",
+        "duration_ms": 15277,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 56221,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0056351000000000005,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1342,
+            "cacheReadInputTokens": 5363,
+            "cacheCreationInputTokens": 55730,
+            "webSearchRequests": 0,
+            "costUSD": 0.47376060000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 616,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.47939570000000004
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 16122,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 56219,
+            "outputTokens": 29,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0056364,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1405,
+            "cacheReadInputTokens": 5363,
+            "cacheCreationInputTokens": 55728,
+            "webSearchRequests": 0,
+            "costUSD": 0.4750046,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 625,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.480641
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "pass": 2,
+        "model": "claude-opus-5-5",
+        "duration_ms": 5485,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 56223,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0056353,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 389,
+            "cacheReadInputTokens": 5330,
+            "cacheCreationInputTokens": 55732,
+            "webSearchRequests": 0,
+            "costUSD": 0.45470999999999995,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 128,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.46034529999999996
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 11292,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 56219,
+            "outputTokens": 28,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0056359,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 753,
+            "cacheReadInputTokens": 66388,
+            "cacheCreationInputTokens": 56589,
+            "webSearchRequests": 0,
+            "costUSD": 0.4810656,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 598,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.4867015
+      },
+      {
+        "role": "verifier",
+        "verification": 1,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 4795,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 17878,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0017983000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 572,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 17391,
+            "webSearchRequests": 0,
+            "costUSD": 0.0757247,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 207,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.07752300000000001
+      },
+      {
+        "role": "verifier",
+        "verification": 2,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6654,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 17669,
+            "outputTokens": 17,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0017754000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 823,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 17182,
+            "webSearchRequests": 0,
+            "costUSD": 0.0773987,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 246,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0791741
+      },
+      {
+        "role": "verifier",
+        "verification": 4,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 5380,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 15942,
+            "outputTokens": 347,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0017677000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 324,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 614,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 15455,
+            "webSearchRequests": 0,
+            "costUSD": 0.0684007,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 288,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.07016839999999999
+      },
+      {
+        "role": "verifier",
+        "verification": 0,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 12379,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-sonnet-5-5": {
+            "inputTokens": 10,
+            "outputTokens": 1337,
+            "cacheReadInputTokens": 55940,
+            "cacheCreationInputTokens": 9347,
+            "webSearchRequests": 0,
+            "costUSD": 0.056372000000000005,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 229,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-haiku-5-5": {
+            "inputTokens": 8208,
+            "outputTokens": 572,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011068,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 551,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0574788
+      },
+      {
+        "role": "verifier",
+        "verification": 3,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 9929,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16671,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016776,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 1112,
+            "cacheReadInputTokens": 67234,
+            "cacheCreationInputTokens": 17493,
+            "webSearchRequests": 0,
+            "costUSD": 0.0878314,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 435,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.089509
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 17774,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 56215,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0056335000000000005,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 1702,
+            "cacheReadInputTokens": 67934,
+            "cacheCreationInputTokens": 56546,
+            "webSearchRequests": 0,
+            "costUSD": 0.5000108000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 792,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.5056443
+      },
+      {
+        "role": "verifier",
+        "verification": 5,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 5375,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 15938,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016053000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 636,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 15451,
+            "webSearchRequests": 0,
+            "costUSD": 0.06860469999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 302,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.07021
+      },
+      {
+        "role": "verifier",
+        "verification": 7,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6172,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10991,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011091000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 571,
+            "cacheReadInputTokens": 34867,
+            "cacheCreationInputTokens": 11944,
+            "webSearchRequests": 0,
+            "costUSD": 0.05698469999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.058093799999999994
+      },
+      {
+        "role": "verifier",
+        "verification": 6,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 7209,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10995,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011095,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 880,
+            "cacheReadInputTokens": 34886,
+            "cacheCreationInputTokens": 12098,
+            "webSearchRequests": 0,
+            "costUSD": 0.0606926,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 159,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0618021
+      },
+      {
+        "role": "verifier",
+        "verification": 8,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 4871,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8174,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0008264000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 604,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 7687,
+            "webSearchRequests": 0,
+            "costUSD": 0.0372287,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 202,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0380551
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 2,
+        "model": "claude-opus-5-5",
+        "duration_ms": 9494,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 17657,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0017762000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 821,
+            "cacheReadInputTokens": 25896,
+            "cacheCreationInputTokens": 17743,
+            "webSearchRequests": 0,
+            "costUSD": 0.1635592,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 262,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1653354
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 10958,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 17860,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0017965000000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 993,
+            "cacheReadInputTokens": 26099,
+            "cacheCreationInputTokens": 19096,
+            "webSearchRequests": 0,
+            "costUSD": 0.1778638,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 399,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1796603
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 0,
+        "model": "claude-opus-5-5",
+        "duration_ms": 10527,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8232,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0008337,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 843,
+            "cacheReadInputTokens": 28778,
+            "cacheCreationInputTokens": 8863,
+            "webSearchRequests": 0,
+            "costUSD": 0.0935436,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 158,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0943773
+      },
+      {
+        "role": "verifier",
+        "verification": 9,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 13127,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16651,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016756000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 12,
+            "outputTokens": 1491,
+            "cacheReadInputTokens": 116300,
+            "cacheCreationInputTokens": 22138,
+            "webSearchRequests": 0,
+            "costUSD": 0.115116,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 476,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1167916
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 7,
+        "model": "claude-opus-5-5",
+        "duration_ms": 8519,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10985,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011075,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 735,
+            "cacheReadInputTokens": 19224,
+            "cacheCreationInputTokens": 11238,
+            "webSearchRequests": 0,
+            "costUSD": 0.10846479999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 270,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.10957229999999998
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 6,
+        "model": "claude-opus-5-5",
+        "duration_ms": 9454,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10993,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011082999999999998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 784,
+            "cacheReadInputTokens": 35089,
+            "cacheCreationInputTokens": 12026,
+            "webSearchRequests": 0,
+            "costUSD": 0.11892980000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 178,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.12003810000000002
+      },
+      {
+        "role": "verifier",
+        "verification": 10,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 13737,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16644,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016738999999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 14,
+            "outputTokens": 1522,
+            "cacheReadInputTokens": 135249,
+            "cacheCreationInputTokens": 19540,
+            "webSearchRequests": 0,
+            "costUSD": 0.1069329,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 85,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1086068
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 8,
+        "model": "claude-opus-5-5",
+        "duration_ms": 10366,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8162,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0008292000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 918,
+            "cacheReadInputTokens": 16401,
+            "cacheCreationInputTokens": 8443,
+            "webSearchRequests": 0,
+            "costUSD": 0.0892002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 362,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0900294
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 9,
+        "model": "claude-opus-5-5",
+        "duration_ms": 14136,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16651,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016756000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 1171,
+            "cacheReadInputTokens": 68515,
+            "cacheCreationInputTokens": 19406,
+            "webSearchRequests": 0,
+            "costUSD": 0.19240300000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 333,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.19407860000000002
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 10,
+        "model": "claude-opus-5-5",
+        "duration_ms": 12926,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16638,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016743,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 791,
+            "cacheReadInputTokens": 69596,
+            "cacheCreationInputTokens": 19876,
+            "webSearchRequests": 0,
+            "costUSD": 0.18877919999999998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 88,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1904535
+      },
+      {
+        "role": "merge",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 1982,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 1743,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0001833,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 182,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 2318,
+            "webSearchRequests": 0,
+            "costUSD": 0.011096000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.011279300000000003
+      },
+      {
+        "role": "merge",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 2104,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 1731,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00018360000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 193,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 2306,
+            "webSearchRequests": 0,
+            "costUSD": 0.011158,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0113416
+      }
+    ],
+    "total_cost_usd": 6.6184148,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 34,
+      "gather": 206,
+      "triage": 8502,
+      "find_verify": 69615,
+      "merge": 2772
+    },
+    "errors": []
+  }
+}
