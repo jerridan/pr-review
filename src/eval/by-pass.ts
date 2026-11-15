@@ -13,7 +13,7 @@ import {
   resamples,
 } from "./bootstrap.js";
 import type { GoldenFinding } from "./case.js";
-import { keepsAny, setRecord, VERIFIER_ROLES, type Keep } from "./paired.js";
+import { keptQueryCost, setRecord, type Keep } from "./paired.js";
 import { columns, ratio, usd } from "./report.js";
 import { scoreRecord, type ScoreJudge } from "./score.js";
 
@@ -40,6 +40,8 @@ export type PassSet = {
   raw_goldens: number;
   /** The judge questions with no cached answer. Each counts as no match. */
   uncached: number;
+  /** The judge answers "unknown": a failed query. Each counts as no match. */
+  unknown: number;
 };
 
 /** The three sets of one scope, and what only one pass has. */
@@ -94,11 +96,14 @@ export type ByPassScope = {
     information_only: boolean;
     /**
      * (b): R = added cost per added golden over one-pass cost per golden.
-     * Null for an unbounded R: no added golden, or no one-pass golden.
+     * Null for an unbounded R. "value_cause" names the cause of a null
+     * value, and "unbounded_causes" counts the causes over the resamples.
      */
     ratio: {
       value: number | null;
+      value_cause: Unbounded | null;
       unbounded_resamples: number;
+      unbounded_causes: Record<UnboundedKey, number>;
       limit: number;
       passed: boolean;
     } & Interval;
@@ -116,8 +121,11 @@ export type ByPassScope = {
 /** The by-pass section of an offline report. */
 export type ByPassSection = {
   bootstrap: { seed: number; resamples: number; level: number };
-  /** The repeats with no by-pass figures, with the reason. */
-  missing: { case: string; repeat: number; reason: string }[];
+  /**
+   * The repeats with no by-pass figures, with the reason. An entry with a
+   * reviewer leaves the case out of that reviewer's scope only.
+   */
+  missing: { case: string; repeat: number; reviewer?: string; reason: string }[];
   /** The judge queries of --ask-missing. Null without it. */
   ask_missing: { questions: number; cost_usd: number } | null;
   repeats: { repeat: number; scopes: ByPassScope[] }[];
@@ -134,27 +142,18 @@ export const COST_RULE =
   "of each verification with a source in the set. Triage, merge and the other run-wide queries " +
   "are in no set.";
 
-/** The reviewers of a record that ran two passes or more, in name order. */
-export function multiPassReviewers(record: RunRecord): string[] {
-  return [...new Set(record.stages.reviewers.filter((r) => r.pass >= 2).map((r) => r.name))].sort();
-}
+/** The causes of an unbounded R. Each is above any limit. */
+export type Unbounded = "no one-pass golden" | "no one-pass cost" | "no added golden";
+type UnboundedKey = "no_one_pass_golden" | "no_one_pass_cost" | "no_added_golden";
+const UNBOUNDED_KEYS: Record<Unbounded, UnboundedKey> = {
+  "no one-pass golden": "no_one_pass_golden",
+  "no one-pass cost": "no_one_pass_cost",
+  "no added golden": "no_added_golden",
+};
 
 // The sources of a scope: one reviewer, or every reviewer in "multi".
 function inScope(scope: string | null, multi: Set<string>): Keep {
   return scope === null ? (s) => multi.has(s.reviewer) : (s) => s.reviewer === scope;
-}
-
-function setCost(record: RunRecord, keep: Keep): number {
-  const verifications = record.stages.verifications;
-  return record.cost.queries.reduce((sum, q) => {
-    const kept =
-      q.role === "reviewer" && q.pass !== undefined
-        ? keep({ reviewer: q.reviewer ?? "", pass: q.pass })
-        : VERIFIER_ROLES.has(q.role) && q.verification !== undefined
-          ? keepsAny(verifications[q.verification]?.sources, keep)
-          : false;
-    return kept ? sum + (q.cost_usd ?? 0) : sum;
-  }, 0);
 }
 
 type Scored = {
@@ -209,9 +208,10 @@ export async function byPassRecord(
         posted: posted.length,
         false_posted: posted.length - s.matched.length,
         precision: posted.length === 0 ? null : s.matched.length / posted.length,
-        cost_usd: setCost(record, keep),
+        cost_usd: keptQueryCost(record, keep),
         raw_goldens: s.raw.matched.length,
         uncached: s.uncached,
+        unknown: s.judgeUnknown,
       },
       goldens: new Set(s.matched.map((m) => m.golden)),
       falseSources,
@@ -258,6 +258,7 @@ function sumSets(sets: PassSet[]): PassSet {
     cost_usd: sum((s) => s.cost_usd),
     raw_goldens: sum((s) => s.raw_goldens),
     uncached: sum((s) => s.uncached),
+    unknown: sum((s) => s.unknown),
   };
 }
 
@@ -271,10 +272,10 @@ function addedOf(row: ByPassRow): Added {
   };
 }
 
-// R of some rows, from their sums. Infinity when the summed added goldens
-// are at most zero or the one-pass goldens or cost are zero: such a ratio
-// is above any limit.
-function ratioOf(rows: ByPassRow[]): number {
+// R of some rows, from their sums, or the cause of an unbounded R: no
+// one-pass golden, a one-pass cost of zero (no cost data), or summed added
+// goldens of zero or below. Such a ratio is above any limit.
+function ratioOf(rows: ByPassRow[]): number | Unbounded {
   let addedGoldens = 0;
   let addedCost = 0;
   let oneGoldens = 0;
@@ -286,7 +287,9 @@ function ratioOf(rows: ByPassRow[]): number {
     oneGoldens += meanOf(row.pass_1.goldens, row.pass_2.goldens);
     oneCost += meanOf(row.pass_1.cost_usd, row.pass_2.cost_usd);
   }
-  if (addedGoldens <= TOLERANCE || oneGoldens <= TOLERANCE || oneCost <= 0) return Infinity;
+  if (oneGoldens <= TOLERANCE) return "no one-pass golden";
+  if (oneCost <= 0) return "no one-pass cost";
+  if (addedGoldens <= TOLERANCE) return "no added golden";
   return addedCost / addedGoldens / (oneCost / oneGoldens);
 }
 
@@ -299,11 +302,13 @@ const diff = (a: number | null, b: number | null): number | null =>
 /**
  * The figures and the decision of one scope, from the rows of its cases.
  * The bootstrap draws the cases with replacement, with the fixed seed and
- * count of bootstrap.ts.
+ * count of bootstrap.ts. Give "draws" to share one set of draws between
+ * the scopes of a repeat; it must hold indices below rows.length.
  */
 export function summarizeScope(
   reviewer: string | null,
   rows: ({ case: string } & ByPassRow)[],
+  draws: number[][] = resamples(rows.length),
 ): ByPassScope {
   const cases: ByPassCase[] = rows.map((r) => ({ ...r, ...addedOf(r) }));
   const totalRow: ByPassRow = {
@@ -328,11 +333,19 @@ export function summarizeScope(
     cost_per_golden: oneGoldens === 0 ? null : oneCost / oneGoldens,
   };
 
-  const draws = resamples(rows.length);
   const means = draws.map(
     (d) => d.reduce((t, i) => t + (cases[i]?.added_goldens ?? 0), 0) / d.length,
   );
-  const ratios = draws.map((d) => ratioOf(d.map((i) => rows[i] as ByPassRow)));
+  const drawn = draws.map((d) => ratioOf(d.map((i) => rows[i] as ByPassRow)));
+  const causes: Record<UnboundedKey, number> = {
+    no_added_golden: 0,
+    no_one_pass_golden: 0,
+    no_one_pass_cost: 0,
+  };
+  for (const r of drawn) if (typeof r === "string") causes[UNBOUNDED_KEYS[r]] += 1;
+  // An unbounded R sorts above every number.
+  const ratios = drawn.map((r) => (typeof r === "string" ? Infinity : r));
+  const point = rows.length === 0 ? null : ratioOf(rows);
   const goldensInterval = percentileInterval(means);
   const ratioInterval = percentileInterval(ratios);
   const upper = finite(ratioInterval.upper);
@@ -369,10 +382,12 @@ export function summarizeScope(
     decision: {
       information_only: reviewer === null,
       ratio: {
-        value: rows.length === 0 ? null : finite(ratioOf(rows)),
+        value: typeof point === "number" ? point : null,
+        value_cause: typeof point === "string" ? point : null,
         lower: finite(ratioInterval.lower),
         upper,
         unbounded_resamples: ratios.filter((r) => !Number.isFinite(r)).length,
+        unbounded_causes: causes,
         limit: RATIO_LIMIT,
         passed: ratioPassed,
       },
@@ -422,7 +437,8 @@ export function renderByPass(section: ByPassSection): string[] {
     COST_RULE,
   ];
   for (const m of section.missing) {
-    lines.push(`No by-pass figures: ${m.case} repeat ${m.repeat}: ${m.reason}`);
+    const scope = m.reviewer === undefined ? "" : ` (scope of reviewer ${m.reviewer})`;
+    lines.push(`No by-pass figures: ${m.case} repeat ${m.repeat}${scope}: ${m.reason}`);
   }
   if (section.ask_missing !== null) {
     const a = section.ask_missing;
@@ -486,14 +502,18 @@ export function renderByPass(section: ByPassSection): string[] {
       const o = scope.one_pass;
       const a = scope.added;
       const d = scope.decision;
+      const u = d.ratio.unbounded_causes;
       lines.push(
         `Unanswered judge questions: pass 1 ${t.pass_1.uncached}, pass 2 ${t.pass_2.uncached}, both ${t.both.uncached} (each counts as no match).`,
+        `Unknown judge answers: pass 1 ${t.pass_1.unknown}, pass 2 ${t.pass_2.unknown}, both ${t.both.unknown} (each counts as no match).`,
         `One pass: goldens ${count(o.goldens)}, precision ${ratio(o.precision)}, cost ${usd(o.cost_usd)}, cost per golden ${usd(o.cost_per_golden)}.`,
         `Noise of one pass (pass 1 less pass 2): goldens ${signed(scope.noise.goldens, count)}, false ${signed(scope.noise.false_posted, count)}, precision ${signed(scope.noise.precision, (v) => v.toFixed(3))}.`,
         `Added by both: goldens ${count(a.goldens)}, false ${count(a.false_posted)}, cost ${usd(a.cost_usd)}, cost per added golden ${usd(a.cost_per_golden)}.`,
         `Added goldens per case: ${ratio(a.goldens_per_case.mean)} (interval ${end(a.goldens_per_case.lower, (v) => v.toFixed(3))} to ${end(a.goldens_per_case.upper, (v) => v.toFixed(3))}), information only.`,
-        `(b) R ${end(d.ratio.value, (v) => v.toFixed(3))} (interval ${end(d.ratio.lower, (v) => v.toFixed(3))} to ${end(d.ratio.upper, (v) => v.toFixed(3))}; ` +
-          `${d.ratio.unbounded_resamples} resamples with no added golden or no one-pass golden), limit ${d.ratio.limit}: ${passFail(d.ratio.passed)}.`,
+        `(b) R ${d.ratio.value_cause === null ? end(d.ratio.value, (v) => v.toFixed(3)) : `unbounded (${d.ratio.value_cause})`} ` +
+          `(interval ${end(d.ratio.lower, (v) => v.toFixed(3))} to ${end(d.ratio.upper, (v) => v.toFixed(3))}; ` +
+          `${d.ratio.unbounded_resamples} unbounded resamples: no added golden ${u.no_added_golden}, no one-pass golden ${u.no_one_pass_golden}, ` +
+          `no one-pass cost ${u.no_one_pass_cost}), limit ${d.ratio.limit}: ${passFail(d.ratio.passed)}.`,
         `(c) precision of both ${ratio(d.precision.both)}, limit ${ratio(d.precision.limit)} (one pass ${ratio(d.precision.one_pass)} less ${PRECISION_MARGIN}): ${passFail(d.precision.passed)}.`,
         `Result${d.information_only ? " (information only)" : ""}: ${d.result}.`,
       );

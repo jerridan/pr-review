@@ -5,8 +5,9 @@
 // answers come from the cache file of each repeat. A question with no
 // cached answer counts as no match, and the report says so. With
 // --by-pass, it adds the by-pass section (by-pass.ts). With --ask-missing,
-// the judge answers the by-pass questions that have no cached answer, and
-// those answers go into the cache file of the repeat.
+// the judge first answers the by-pass questions that have no answer or a
+// failed one, and those answers go into the cache file of the repeat. The
+// report then scores every section from the cache, so all agree.
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -14,10 +15,10 @@ import { EXIT_OK, EXIT_USAGE } from "../cli.js";
 import { isRecordFileName } from "../record/write.js";
 import { RecordSchema, type RunRecord } from "../schemas/record.js";
 import type { SdkClient } from "../sdk/client.js";
+import { resamples } from "./bootstrap.js";
 import {
   byPassRecord,
   emptySection,
-  multiPassReviewers,
   renderByPass,
   summarizeScope,
   type ByPassRow,
@@ -34,6 +35,7 @@ import {
 import { failedMetrics, metrics, type RepeatMetrics } from "./metrics.js";
 import {
   hasSources,
+  multiPassReviewers,
   NO_SOURCES,
   notValidLines,
   pairedRepeat,
@@ -50,8 +52,10 @@ export type EvalReportOptions = {
   format: "table" | "json";
   /** Add the by-pass section. */
   byPass?: boolean;
-  /** Let the judge answer the by-pass questions with no cached answer. Needs byPass. */
+  /** Let the judge answer the by-pass questions with no answer or a failed one. Needs byPass. */
   askMissing?: boolean;
+  /** Keep ANTHROPIC_API_KEY and the other provider variables for the judge of --ask-missing. */
+  allowApiKey?: boolean;
 };
 
 function messageOf(err: unknown): string {
@@ -110,12 +114,14 @@ type Scored = { metrics: RepeatMetrics; uncached: number; kept?: Kept };
 // Score one repeat again from its record and its judge cache. A repeat
 // that failed in the eval keeps its metrics. "checkout" is a clone of the
 // case: the key of each judge answer holds the head lines and the diff
-// that the judge saw, so the scoring reads them as the eval did.
+// that the judge saw, so the scoring reads them as the eval did. With
+// "keep", the result holds what the by-pass scoring needs.
 async function scoreRepeat(
   c: Case,
   dir: string,
   repeat: number,
   checkout: () => Promise<string>,
+  keep: boolean,
 ): Promise<Scored> {
   const result = await readResult(join(dir, "result.json"), repeat);
   if (result === null) {
@@ -140,14 +146,15 @@ async function scoreRepeat(
   let uncached = score.uncached;
   let kept: Kept | undefined;
   if (hasSources(record)) {
-    kept = {
-      record,
-      head,
-      cache,
-      cachePath,
-      judgeModel: result.options.judge_model,
-      rawJudge: result.options.raw_judge,
-    };
+    if (keep)
+      kept = {
+        record,
+        head,
+        cache,
+        cachePath,
+        judgeModel: result.options.judge_model,
+        rawJudge: result.options.raw_judge,
+      };
     const p = await pairedRepeat(
       record,
       c.golden,
@@ -166,17 +173,37 @@ async function scoreRepeat(
 
 type ByPassInput = { case: Case; repeat: number; kept: Kept };
 
+// Why the by-pass scoring leaves a case out of the scope of "reviewer":
+// the reviewer needs an "ok" entry of pass 1 and of pass 2. Null when the
+// case is in the scope.
+function leftOut(record: RunRecord, reviewer: string): string | null {
+  const entries = record.stages.reviewers.filter((r) => r.name === reviewer);
+  if (entries.length === 0) return "did not run";
+  for (const pass of [1, 2]) {
+    const entry = entries.find((r) => r.pass === pass);
+    if (entry === undefined) return `no pass ${pass}`;
+    if (entry.status !== "ok") return `pass ${pass} failed`;
+  }
+  return null;
+}
+
 /**
  * The by-pass section of the kept repeats. The scopes of a repeat are the
  * reviewers that ran two passes in one of its records, and every such
- * reviewer together. With "client", the judge answers each question with
- * no cached answer, and the cache file of the repeat gets the new answers.
- * A cached answer, also "unknown", gets no new query.
+ * reviewer together. A reviewer that ran more than two passes in a case
+ * has no scope in that repeat. A case is in the scope of a reviewer only
+ * when the reviewer has an "ok" pass 1 and pass 2 there; the scope of
+ * every reviewer holds, in each case, the reviewers that are in their own
+ * scope. "missing" gets each case that a scope leaves out, with the reason.
+ * With "client", the judge answers each question with no answer or a
+ * failed one, once per record, and the cache file of the repeat gets the
+ * new answers.
  */
 async function byPassSection(
   inputs: ByPassInput[],
   missing: ByPassSection["missing"],
   client: SdkClient | null,
+  allowApiKey: boolean,
 ): Promise<ByPassSection> {
   let questions = 0;
   let costUsd = 0;
@@ -185,35 +212,74 @@ async function byPassSection(
   for (const repeat of numbers) {
     const ours = inputs.filter((i) => i.repeat === repeat);
     const multi = [...new Set(ours.flatMap((i) => multiPassReviewers(i.kept.record)))].sort();
-    const scopes = [null, ...multi];
-    const rows: ({ case: string } & ByPassRow)[][] = scopes.map(() => []);
+    const over = new Set<string>();
     for (const { case: c, kept } of ours) {
+      for (const name of multi) {
+        const passes = kept.record.stages.reviewers
+          .filter((r) => r.name === name)
+          .map((r) => r.pass);
+        const most = Math.max(0, ...passes);
+        if (most > 2) {
+          over.add(name);
+          missing.push({ case: c.name, repeat, reviewer: name, reason: `ran ${most} passes` });
+        }
+      }
+    }
+    const reviewers = multi.filter((name) => !over.has(name));
+    const scopes: (string | null)[] = reviewers.length === 0 ? [] : [null, ...reviewers];
+    const rows = new Map<string | null, ({ case: string } & ByPassRow)[]>(
+      scopes.map((scope) => [scope, []]),
+    );
+    for (const { case: c, kept } of ours) {
+      const inScope: string[] = [];
+      for (const name of reviewers) {
+        const reason = leftOut(kept.record, name);
+        if (reason === null) inScope.push(name);
+        else missing.push({ case: c.name, repeat, reviewer: name, reason });
+      }
+      if (inScope.length === 0) continue;
       const judge: ScoreJudge = {
         client,
         model: kept.judgeModel,
-        options: { allowApiKey: false, env: client === null ? {} : process.env },
+        options: { allowApiKey, env: client === null ? {} : process.env },
         cache: kept.cache,
-        // Every cached key counts as asked, so a cached "unknown" gets no
-        // new query: the client answers the missing questions only.
-        asked: new Set(kept.cache.keys()),
+        // One set for the record: a failed answer gets one new query, not
+        // one per scope.
+        asked: new Set(),
       };
+      const caseScopes = [null, ...inScope];
       const scored = await byPassRecord(
         kept.record,
         c.golden,
         kept.head,
         judge,
-        scopes,
-        multi,
+        caseScopes,
+        inScope,
         kept.rawJudge,
       );
-      scored.rows.forEach((row, i) => rows[i]?.push({ case: c.name, ...row }));
+      scored.rows.forEach((row, i) =>
+        rows.get(caseScopes[i] ?? null)?.push({ case: c.name, ...row }),
+      );
       questions += scored.judgeCalls;
       costUsd += scored.judgeCostUsd;
       if (scored.judgeCalls > 0) await writeJudgeCache(kept.cachePath, kept.cache);
     }
+    // One set of draws for each case count, shared by the scopes.
+    const draws = new Map<number, number[][]>();
+    const drawsFor = (n: number): number[][] => {
+      let d = draws.get(n);
+      if (d === undefined) {
+        d = resamples(n);
+        draws.set(n, d);
+      }
+      return d;
+    };
     repeats.push({
       repeat,
-      scopes: scopes.map((scope, i) => summarizeScope(scope, rows[i] ?? [])),
+      scopes: scopes.map((scope) => {
+        const scopeRows = rows.get(scope) ?? [];
+        return summarizeScope(scope, scopeRows, drawsFor(scopeRows.length));
+      }),
     });
   }
   return {
@@ -222,9 +288,58 @@ async function byPassSection(
   };
 }
 
+type Collected = {
+  results: { name: string; repeats: RepeatMetrics[] }[];
+  uncached: PairedSection["uncached"];
+  inputs: ByPassInput[];
+  missing: ByPassSection["missing"];
+};
+
+// Score every repeat in "out". With "keep", collect what the by-pass
+// scoring needs. With "quiet", print no error: a second pass prints them.
+async function collect(
+  cases: Case[],
+  out: string,
+  checkoutOf: (c: Case) => () => Promise<string>,
+  keep: boolean,
+  quiet: boolean,
+): Promise<Collected> {
+  const collected: Collected = { results: [], uncached: [], inputs: [], missing: [] };
+  for (const c of cases) {
+    const caseDir = join(out, c.name);
+    const repeats: RepeatMetrics[] = [];
+    for (const repeat of await repeatNumbers(caseDir)) {
+      const dir = join(caseDir, String(repeat));
+      try {
+        const scored = await scoreRepeat(c, dir, repeat, checkoutOf(c), keep);
+        repeats.push(scored.metrics);
+        if (scored.uncached > 0) {
+          collected.uncached.push({ case: c.name, repeat, pairs: scored.uncached });
+        }
+        if (scored.kept) collected.inputs.push({ case: c, repeat, kept: scored.kept });
+        else
+          collected.missing.push({
+            case: c.name,
+            repeat,
+            reason: scored.metrics.failed ? "failed repeat" : NO_SOURCES,
+          });
+      } catch (err) {
+        repeats.push(failedMetrics(repeat, messageOf(err), 0));
+        collected.missing.push({ case: c.name, repeat, reason: "failed repeat" });
+        if (!quiet) say(`case ${c.name}, repeat ${repeat}: ${messageOf(err)}`);
+      }
+    }
+    if (repeats.length > 0) collected.results.push({ name: c.name, repeats });
+  }
+  return collected;
+}
+
 /**
  * Print the report of the records in the --out directory: the normal
- * metrics and the paired section. Give 0, or 2 for an invalid case.
+ * metrics and the paired section, and with --by-pass the by-pass section.
+ * With --ask-missing, the judge first answers the by-pass questions with
+ * no answer or a failed one, and judge-cache.json of each repeat gets the
+ * answers; every section then reads them. Give 0, or 2 for an invalid case.
  */
 export async function runEvalReport(
   opts: EvalReportOptions,
@@ -239,48 +354,39 @@ export async function runEvalReport(
     return EXIT_USAGE;
   }
   const out = resolve(opts.out);
-  const results: { name: string; repeats: RepeatMetrics[] }[] = [];
-  const uncached: PairedSection["uncached"] = [];
-  const byPassInputs: ByPassInput[] = [];
-  const byPassMissing: ByPassSection["missing"] = [];
+  const byPassOn = opts.byPass === true;
   let byPass: ByPassSection | null = null;
+  let collected: Collected;
   const tmp = await mkdtemp(join(tmpdir(), "pr-review-eval-report-"));
   try {
-    for (const c of cases) {
-      const caseDir = join(out, c.name);
-      const repeats: RepeatMetrics[] = [];
-      // The case is cloned once, at its first repeat that needs a score.
-      let clone: Promise<string> | null = null;
-      const checkout = (): Promise<string> => (clone ??= cloneCase(c, join(tmp, c.name)));
-      for (const repeat of await repeatNumbers(caseDir)) {
-        const dir = join(caseDir, String(repeat));
-        try {
-          const scored = await scoreRepeat(c, dir, repeat, checkout);
-          repeats.push(scored.metrics);
-          if (scored.uncached > 0) uncached.push({ case: c.name, repeat, pairs: scored.uncached });
-          if (scored.kept) byPassInputs.push({ case: c, repeat, kept: scored.kept });
-          else
-            byPassMissing.push({
-              case: c.name,
-              repeat,
-              reason: scored.metrics.failed ? "failed repeat" : NO_SOURCES,
-            });
-        } catch (err) {
-          repeats.push(failedMetrics(repeat, messageOf(err), 0));
-          byPassMissing.push({ case: c.name, repeat, reason: "failed repeat" });
-          say(`case ${c.name}, repeat ${repeat}: ${messageOf(err)}`);
-        }
+    // Each case is cloned once, at its first repeat that needs a score.
+    const clones = new Map<string, Promise<string>>();
+    const checkoutOf = (c: Case) => (): Promise<string> => {
+      let clone = clones.get(c.name);
+      if (clone === undefined) {
+        clone = cloneCase(c, join(tmp, c.name));
+        clones.set(c.name, clone);
       }
-      if (repeats.length > 0) results.push({ name: c.name, repeats });
+      return clone;
+    };
+    let asked: ByPassSection["ask_missing"] = null;
+    if (byPassOn && opts.askMissing === true) {
+      const first = await collect(cases, out, checkoutOf, true, true);
+      const client = await clientOf();
+      const section = await byPassSection(first.inputs, [], client, opts.allowApiKey === true);
+      asked = section.ask_missing;
     }
-    if (opts.byPass === true) {
-      const client = opts.askMissing === true ? await clientOf() : null;
-      byPass = await byPassSection(byPassInputs, byPassMissing, client);
+    collected = await collect(cases, out, checkoutOf, byPassOn, false);
+    if (byPassOn) {
+      byPass = await byPassSection(collected.inputs, collected.missing, null, false);
+      byPass.ask_missing = asked;
     }
   } finally {
     await rm(tmp, { recursive: true, force: true });
   }
-  const report = buildReport(results, null, await casesRef(opts.cases), { uncached });
+  const report = buildReport(collected.results, null, await casesRef(opts.cases), {
+    uncached: collected.uncached,
+  });
   if (byPass !== null) report.by_pass = byPass;
   const notValid = notValidLines(report.paired as PairedSection);
   if (opts.format === "json") {

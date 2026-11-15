@@ -144,22 +144,43 @@ export function setRecord(record: RunRecord, keep: Keep): RunRecord {
   };
 }
 
-// The run cost less the reviewer queries of the passes that the set
-// leaves out, and less the verifier queries of each verification that
-// none of its sources keeps.
+type Query = RunRecord["cost"]["queries"][number];
+
+/**
+ * Whether a query belongs to a set. A reviewer query belongs when the set
+ * keeps its pass. A verifier or escalation query belongs when the set keeps
+ * a source of its verification. Every other query serves the whole run:
+ * null.
+ */
+export function querySet(record: RunRecord, q: Query, keep: Keep): boolean | null {
+  if (q.role === "reviewer" && q.pass !== undefined) {
+    return keep({ reviewer: q.reviewer ?? "", pass: q.pass });
+  }
+  if (VERIFIER_ROLES.has(q.role) && q.verification !== undefined) {
+    return keepsAny(record.stages.verifications[q.verification]?.sources, keep);
+  }
+  return null;
+}
+
+/** The sum of the known costs of the queries that belong to the set. */
+export function keptQueryCost(record: RunRecord, keep: Keep): number {
+  return record.cost.queries.reduce(
+    (sum, q) => (querySet(record, q, keep) === true ? sum + (q.cost_usd ?? 0) : sum),
+    0,
+  );
+}
+
+/** The reviewers of a record with an entry of pass 2 or later, in name order. */
+export function multiPassReviewers(record: RunRecord): string[] {
+  return [...new Set(record.stages.reviewers.filter((r) => r.pass >= 2).map((r) => r.name))].sort();
+}
+
+// The run cost less the queries that belong to a pass or a verification
+// that the set leaves out. The run-wide queries stay.
 function setCost(record: RunRecord, keep: Keep): number | null {
   const total = record.cost.total_cost_usd;
   if (total === null) return null;
-  const verifications = record.stages.verifications;
-  const left = record.cost.queries.filter((q) => {
-    if (q.role === "reviewer" && q.pass !== undefined) {
-      return !keep({ reviewer: q.reviewer ?? "", pass: q.pass });
-    }
-    if (VERIFIER_ROLES.has(q.role) && q.verification !== undefined) {
-      return !keepsAny(verifications[q.verification]?.sources, keep);
-    }
-    return false;
-  });
+  const left = record.cost.queries.filter((q) => querySet(record, q, keep) === false);
   return left.reduce((sum, q) => sum - (q.cost_usd ?? 0), total);
 }
 
@@ -237,9 +258,7 @@ export async function pairedRepeat(
     };
   };
 
-  const multi = [
-    ...new Set(record.stages.reviewers.filter((r) => r.pass >= 2).map((r) => r.name)),
-  ].sort();
+  const multi = multiPassReviewers(record);
   const onePass = await scope(null);
   const reviewers: Record<string, ScopeFigures> = {};
   for (const name of multi) reviewers[name] = await scope(name);
