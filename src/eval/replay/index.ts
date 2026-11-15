@@ -71,7 +71,14 @@ import {
   type Dropped,
   type SampleKind,
 } from "./candidates.js";
-import { caseFigures, labelOf, sumFigures, type Figures, type PostedFigures } from "./figures.js";
+import {
+  caseFigures,
+  isCapped,
+  labelOf,
+  sumFigures,
+  type Figures,
+  type PostedFigures,
+} from "./figures.js";
 import { loadForm, type LoadedForm, type PromptForm } from "./forms.js";
 import {
   labelCase,
@@ -399,6 +406,11 @@ async function replay(opts: ReplayOptions, clientOf: () => Promise<SdkClient>): 
       "--arm stored needs --from and takes no --candidates: an external candidate has no stored result",
     );
   }
+  if (opts.arm.kind === "stored" && opts.verifierCap !== undefined) {
+    throw new ReplayUsageError(
+      "--verifier-cap needs --verifier: the stored arm makes no verifier call",
+    );
+  }
   const version = toolVersion();
   const arm = armText(opts.arm, opts.verifierCap);
   const options: RunOptions = { allowApiKey: opts.allowApiKey, env: process.env };
@@ -628,7 +640,10 @@ async function replay(opts: ReplayOptions, clientOf: () => Promise<SdkClient>): 
         // A resume keeps a verifier result that did not fail, and a label of
         // the step that did not fail. It runs every other call again, as
         // eval --resume runs a failed repeat again.
-        if (old && (opts.arm.kind === "stored" || !isQueryFailure(old.result))) {
+        if (
+          old &&
+          (opts.arm.kind === "stored" || !isQueryFailure(old.result) || isCapped(old.result))
+        ) {
           done.set(
             entryKey(c),
             make(state, c, {
@@ -760,7 +775,8 @@ async function replay(opts: ReplayOptions, clientOf: () => Promise<SdkClient>): 
       for (const c of state.candidates) {
         const e = done.get(entryKey(c));
         const verifier =
-          e === undefined || (opts.arm.kind === "verifier" && isQueryFailure(e.result));
+          e === undefined ||
+          (opts.arm.kind === "verifier" && isQueryFailure(e.result) && !isCapped(e.result));
         const severity = spec !== undefined && holds(e) && !labeled(e);
         if (verifier || severity) remaining += 1;
       }

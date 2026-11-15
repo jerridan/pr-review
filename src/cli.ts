@@ -17,6 +17,8 @@ import {
   EFFORTS,
   JUDGE_DEFAULTS,
   ROLE_DEFAULTS,
+  SEVERITY_FINDING_DEFAULTS,
+  SEVERITY_PR_DEFAULTS,
   resolveModel,
   type Effort,
 } from "./config/models.js";
@@ -254,23 +256,22 @@ function parseSeed(value: string): number {
   return Number(value);
 }
 
-// Parse an amount in US dollars: a number of 0 or more.
-function parseUsd(value: string): number {
-  const n = Number(value);
-  if (value.trim() === "" || !Number.isFinite(n) || n < 0) {
-    throw new InvalidArgumentError("Give the amount in US dollars as a number of 0 or more.");
-  }
-  return n;
+// Make the parser of an amount in US dollars: a number of 0 or more, or above 0.
+// Commander gives the previous value as the second argument, so the lower
+// bound is a parameter of the factory and not of the parser.
+function usdParser(positive: boolean): (value: string) => number {
+  return (value) => {
+    const n = Number(value);
+    if (value.trim() === "" || !Number.isFinite(n) || n < 0 || (positive && n === 0)) {
+      throw new InvalidArgumentError(
+        `Give the amount in US dollars as a number ${positive ? "above 0" : "of 0 or more"}.`,
+      );
+    }
+    return n;
+  };
 }
-
-// Parse --verifier-cap: a number above 0.
-function parseCap(value: string): number {
-  const n = Number(value);
-  if (value.trim() === "" || !Number.isFinite(n) || n <= 0) {
-    throw new InvalidArgumentError("Give the cap in US dollars as a number above 0.");
-  }
-  return n;
-}
+const parseUsd = usdParser(false);
+const parsePositiveUsd = usdParser(true);
 
 // Parse --github-repo: owner/repo.
 function parseSlug(value: string): string {
@@ -727,13 +728,15 @@ export function createProgram(deps: ProgramDeps): Command {
       "--max-cost <usd>",
       "start no new call when the calls of this invocation cost this many US dollars or more; " +
         "the calls in flight run to their end, so the spend can pass the limit by at most the " +
-        "concurrency times the largest dollar cap of one call (the larger of --verifier-cap and the severity cap: $1 with --severity pr, else $0.50)",
+        `concurrency times the largest dollar cap of one call: the verifier cap (--verifier-cap, default $${ROLE_DEFAULTS.verifier.maxBudgetUsd}), ` +
+        `the severity cap ($${SEVERITY_PR_DEFAULTS.maxBudgetUsd} with --severity pr, $${SEVERITY_FINDING_DEFAULTS.maxBudgetUsd} with --severity finding) ` +
+        `and the judge cap ($${JUDGE_DEFAULTS.maxBudgetUsd})`,
       parseUsd,
     )
     .option(
       "--verifier-cap <usd>",
       "the dollar cap of one verifier call of the arm, a positive number (default: the cap of the verifier role); the codex backend has no dollar cap and ignores it",
-      parseCap,
+      parsePositiveUsd,
     )
     .option(
       "--judge-cache <dir>",

@@ -181,8 +181,10 @@ export function createSdkClient(run: QueryFn = query): SdkClient {
           resolve(TIMED_OUT);
         }, timeoutMs);
       });
+      // The last result message of the stream. The catch below reads it when
+      // the SDK throws after it gave a result.
+      let last: SDKResultMessage | undefined;
       const consume = async (): Promise<SDKResultMessage | undefined> => {
-        let last: SDKResultMessage | undefined;
         for await (const message of run({
           prompt: req.userMessage,
           options: { ...(sdkOptions as Options), abortController: controller },
@@ -205,6 +207,11 @@ export function createSdkClient(run: QueryFn = query): SdkClient {
         }
         result = winner;
       } catch (err) {
+        // A result of a limit stop wins over the error text: it has the cost
+        // and does not depend on the wording of the SDK.
+        if (last && LIMIT_SUBTYPES.has(last.subtype)) {
+          return classifyResult<T>(last, model, req.schema);
+        }
         return { ok: false, failure: thrownFailure(err), raw: null };
       } finally {
         clearTimeout(timer);
