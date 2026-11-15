@@ -99,6 +99,12 @@ export type SkippedReviewer = {
 /** A custom reviewer, and whether the run gave it Bash. */
 export type CustomReviewerEntry = { name: string; bash_granted: boolean; reason: string | null };
 
+/** The mode of a run: a normal run, or a stage 1 run with no verifier. */
+export type RunMode = "full" | "stage1";
+
+/** One finding that a stage 1 run would send to the verifier. */
+export type StageCandidate = { finding: Finding; reviewer: string; sources: FindingSource[] };
+
 export type Verdict = "skipped" | "incomplete" | "would request changes" | "would approve";
 
 /** The prior state of a later or fresh run, as the record holds it (R8). */
@@ -179,6 +185,12 @@ export type RunRecord = {
       tools_ignored: string[];
     }[];
     models: Record<Role, { model: string; effort: Effort }>;
+    /**
+     * "stage1" for a run that sends no finding to the verifier, the
+     * escalation or the merge (eval --stage1). A normal run writes "full".
+     * A record from before D4c has none, and absent means "full".
+     */
+    mode?: RunMode;
   };
   stages: {
     reviewers: {
@@ -206,6 +218,12 @@ export type RunRecord = {
        */
       sources?: FindingSource[];
     }[];
+    /**
+     * The findings that a stage 1 run would send to the verifier, in the
+     * order of the dedupe of the run, each with its reviewer and with every
+     * reviewer pass that raised it. Only a stage 1 run writes it.
+     */
+    candidates?: StageCandidate[];
     merges: { group: number[]; result: MergeOutput | QueryFailure; rejected?: string }[];
     capped: PostedFinding[];
     /** The verified findings that a suppression rule removed before the merge groups formed. */
@@ -260,6 +278,12 @@ export type RunRecord = {
        */
       verification?: number;
       model: string;
+      /**
+       * The effort of the call, after the repo config and the models of the
+       * run. A record from before D4c has none: its reader takes the effort
+       * from identity.models and identity.selected_reviewers.
+       */
+      effort?: Effort;
       duration_ms: number;
       stop_reason: string | null;
       subtype: string;
@@ -405,6 +429,7 @@ const IdentitySchema = z.strictObject({
     }),
   ),
   models: z.record(roleEnum, z.strictObject({ model: z.string(), effort: effortEnum })),
+  mode: z.enum(["full", "stage1"]).optional(),
 });
 
 const StagesSchema = z.strictObject({
@@ -436,6 +461,15 @@ const StagesSchema = z.strictObject({
       sources: z.array(FindingSourceSchema).optional(),
     }),
   ),
+  candidates: z
+    .array(
+      z.strictObject({
+        finding: FindingSchema,
+        reviewer: z.string(),
+        sources: z.array(FindingSourceSchema),
+      }),
+    )
+    .optional(),
   merges: z.array(
     z.strictObject({
       group: z.array(integer()),
@@ -494,6 +528,7 @@ const CostSchema = z.strictObject({
       pass: integer().optional(),
       verification: integer().optional(),
       model: z.string(),
+      effort: effortEnum.optional(),
       duration_ms: z.number(),
       stop_reason: z.string().nullable(),
       subtype: z.string(),

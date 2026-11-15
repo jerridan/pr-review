@@ -7,6 +7,7 @@ import {
   ROLE_DEFAULTS,
   ROLES,
   isEvalRole,
+  roleConfig,
   resolveModel,
   type Effort,
   type QueryRole,
@@ -46,6 +47,7 @@ import {
   loadBuiltinReviewers,
   reviewerTools,
   type ReviewerDefinition,
+  type RunModels,
 } from "./reviewers/loader.js";
 import { selectReviewers, skipSelected } from "./reviewers/select.js";
 import type { Finding } from "./schemas/finding.js";
@@ -57,6 +59,7 @@ import type {
   QueryFailure,
   RunRecord,
   SkippedReviewer,
+  StageCandidate,
 } from "./schemas/record.js";
 import type { TriageBrief } from "./schemas/triage.js";
 import { isPostedSeverity, type VerifierResult } from "./schemas/verifier.js";
@@ -130,6 +133,18 @@ export interface RunInput {
    * the config and the frontmatter. The fast tier still runs one pass.
    */
   passes?: ReadonlyMap<string, number>;
+  /**
+   * The model and the effort of reviewers for this run (--models of the
+   * eval). They win over the repo config and the frontmatter. They do not
+   * change the other roles.
+   */
+  models?: RunModels;
+  /**
+   * True for a stage 1 run (eval --stage1): triage and the reviewers run,
+   * and no finding goes to the verifier, the escalation or the merge. The
+   * record then holds the candidates in stages.candidates.
+   */
+  stage1?: boolean;
   client?: SdkClient;
   now?: () => Date;
 }
@@ -170,18 +185,19 @@ export function roleModels(config: RepoConfig): Record<Role, { model: string; ef
 
 /**
  * The record entry of each selected reviewer, with the model and effort
- * that its queries use after the repo config, the frontmatter and the role
- * default, and the tools of its frontmatter that the run did not grant.
+ * that its queries use after the models of the run, the repo config, the
+ * frontmatter and the role default, and the tools of its frontmatter that the run did not grant.
  */
 export function describeSelected(
   selected: { def: ReviewerDefinition; trigger: string }[],
   config: RepoConfig,
   authorWriteAccess = false,
+  models?: RunModels,
 ): RunRecord["identity"]["selected_reviewers"] {
   return selected.map((s) => ({
     name: s.def.frontmatter.name,
     trigger: s.trigger,
-    ...effectiveModel(s.def, config),
+    ...effectiveModel(s.def, config, models),
     tools_ignored: reviewerTools(s.def, authorWriteAccess).ignored,
   }));
 }
@@ -274,6 +290,8 @@ function recordingClient(
         ...(req.reviewerName !== undefined ? { reviewer: req.reviewerName } : {}),
         ...tag,
         model: raw?.model ?? resolveModel(req.overrides?.model ?? ROLE_DEFAULTS[role].model),
+        // The effort of the call, by the rule of buildQueryOptions.
+        effort: req.overrides?.effort ?? roleConfig(role).effort,
         duration_ms: raw?.durationMs ?? Math.round(performance.now() - start),
         stop_reason: raw?.stopReason ?? null,
         subtype,
@@ -690,7 +708,15 @@ export async function runReview(input: RunInput): Promise<RunResult> {
       // pass can add a source after the verification starts, so the record
       // reads each list only after every pass returned.
       const sourceLists: FindingSource[][] = [];
+      // A stage 1 run keeps each finding with its reviewer and its sources
+      // list, in the order of onFinding, and verifies nothing.
+      const stage1 = input.stage1 === true;
+      const kept: StageCandidate[] = [];
       const onFinding = (finding: Finding, reviewer: string, sources: FindingSource[]): void => {
+        if (stage1) {
+          kept.push({ finding, reviewer, sources });
+          return;
+        }
         const verifyConfig = verifyConfigFor(
           thresholds.get(reviewer) ?? config.thresholds.default,
           config,
@@ -732,6 +758,7 @@ export async function runReview(input: RunInput): Promise<RunResult> {
       };
       let runs: ReviewerRun[] = [];
       let verifications: VerificationEntry[] = [];
+      let stageCandidates: StageCandidate[] = [];
       let suppressed: { finding: Finding; reviewer: string; rule: Suppression }[] = [];
       let merged: Awaited<ReturnType<typeof mergeFindings>> = {
         posted: [],
@@ -761,6 +788,7 @@ export async function runReview(input: RunInput): Promise<RunResult> {
                   ceilingSkipped.push({ name, reason: "token ceiling", pass }),
                 clientForPass: (pass) => client.tagged({ pass }),
                 ...(input.passes ? { passes: input.passes } : {}),
+                ...(input.models ? { models: input.models } : {}),
               },
               onFinding,
             );
@@ -770,6 +798,7 @@ export async function runReview(input: RunInput): Promise<RunResult> {
             throw err;
           }
           // Every pass returned, so each sources list is complete.
+          stageCandidates = kept.map((c) => ({ ...c, sources: sortedSources(c.sources) }));
           const settled = await settleAll(pending);
           return {
             runs: found,
@@ -798,14 +827,17 @@ export async function runReview(input: RunInput): Promise<RunResult> {
           config.suppressions,
         );
         suppressed = applied.suppressed;
-        merged = await timed("merge", () =>
-          mergeFindings(client, options, applied.kept, {
-            cwd,
-            totalHunks: scoped.totalHunks,
-            semaphore,
-            caps: config.caps,
-          }),
-        );
+        // A stage 1 run verifies nothing, so it has nothing to merge.
+        if (!stage1) {
+          merged = await timed("merge", () =>
+            mergeFindings(client, options, applied.kept, {
+              cwd,
+              totalHunks: scoped.totalHunks,
+              semaphore,
+              caps: config.caps,
+            }),
+          );
+        }
       } catch (err) {
         // A run that posts keeps going: it writes a record with the error and
         // posts a failure review (R5a). Any other run fails here.
@@ -973,12 +1005,14 @@ export async function runReview(input: RunInput): Promise<RunResult> {
           triage: brief,
           tier: decision.tier,
           tier_reason: decision.reason,
-          selected_reviewers: describeSelected(selected, config, authorWriteAccess),
+          selected_reviewers: describeSelected(selected, config, authorWriteAccess, input.models),
           models: roleModels(config),
+          mode: stage1 ? "stage1" : "full",
         },
         stages: {
           reviewers: runs,
           verifications,
+          ...(stage1 ? { candidates: stageCandidates } : {}),
           merges: merged.merges,
           capped: merged.capped,
           suppressed: suppressed.map(({ finding, reviewer, rule }) => ({

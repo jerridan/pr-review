@@ -3,6 +3,7 @@
 import type { Gate } from "./baseline.js";
 import type { RepeatMetrics } from "./metrics.js";
 import type { ByPassSection } from "./by-pass.js";
+import { renderByReviewer, type ByReviewerSection } from "./by-reviewer.js";
 import { buildPaired, renderPaired, type PairedSection } from "./paired.js";
 
 export type Spread = { mean: number | null; min: number | null; max: number | null };
@@ -48,6 +49,13 @@ export type Report = {
   paired?: PairedSection;
   /** Pass 1, pass 2 and both, of each reviewer with two passes. Offline with --by-pass only. */
   by_pass?: ByPassSection;
+  /**
+   * "stage1" for an eval with --stage1. Such a run posts no finding, so its
+   * posted recall and precision are none. Absent for any other eval.
+   */
+  mode?: "stage1";
+  /** The figures of each reviewer. Present for an eval with --stage1, and offline with --by-reviewer. */
+  by_reviewer?: ByReviewerSection;
 };
 
 /** The mean of the values that are not null. A mean of no value is null. */
@@ -208,6 +216,15 @@ export function renderTable(report: Report, baselineCasesRef: string | null = nu
     "cost per PR: in each case table, cost is the cost of the review run and judge cost is the cost of the judge, for that PR.",
     "",
   ];
+  // A stage 1 run posts nothing, so its posted figures are none, not 0.
+  const stage1 = report.mode === "stage1";
+  const posted = (value: number | null): string => (stage1 ? "none" : ratio(value));
+  if (stage1) {
+    lines.push(
+      "Posted recall and precision: none. A stage 1 run sends no finding to the verifier, so it posts no finding.",
+      "",
+    );
+  }
   const header = [
     "repeat",
     "raw recall",
@@ -229,9 +246,9 @@ export function renderTable(report: Report, baselineCasesRef: string | null = nu
           : [
               String(r.repeat),
               ratio(r.raw_recall),
-              ratio(r.recall),
-              ratio(r.precision),
-              ratio(r.adjudicated_precision),
+              posted(r.recall),
+              posted(r.precision),
+              posted(r.adjudicated_precision),
               String(r.posted),
               dropsText(r.drops),
               usd(r.cost_usd),
@@ -248,13 +265,13 @@ export function renderTable(report: Report, baselineCasesRef: string | null = nu
     ...columns([
       ["metric", "mean", "min", "max"],
       ["raw recall", ratio(a.raw_recall.mean), ratio(a.raw_recall.min), ratio(a.raw_recall.max)],
-      ["recall", ratio(a.recall.mean), ratio(a.recall.min), ratio(a.recall.max)],
-      ["precision", ratio(a.precision.mean), ratio(a.precision.min), ratio(a.precision.max)],
+      ["recall", posted(a.recall.mean), posted(a.recall.min), posted(a.recall.max)],
+      ["precision", posted(a.precision.mean), posted(a.precision.min), posted(a.precision.max)],
       [
         "adj precision",
-        ratio(a.adjudicated_precision.mean),
-        ratio(a.adjudicated_precision.min),
-        ratio(a.adjudicated_precision.max),
+        posted(a.adjudicated_precision.mean),
+        posted(a.adjudicated_precision.min),
+        posted(a.adjudicated_precision.max),
       ],
       [
         "findings per case",
@@ -299,5 +316,6 @@ export function renderTable(report: Report, baselineCasesRef: string | null = nu
       (mismatch ? `; the baseline has ${baselineCasesRef}` : ""),
   );
   if (report.paired) lines.push(...renderPaired(report.paired));
+  if (report.by_reviewer) lines.push(...renderByReviewer(report.by_reviewer));
   return `${lines.join("\n")}\n`;
 }

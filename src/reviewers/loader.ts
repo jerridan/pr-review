@@ -189,17 +189,41 @@ export function effectiveThreshold(def: ReviewerDefinition, config: RepoConfig):
   return Math.max(def.frontmatter.threshold, config.thresholds.default);
 }
 
+/** A model, as a pinned ID, and an effort. */
+export type ModelPick = { model: string; effort: Effort };
+
+/** The target of --models that applies to every reviewer of a run. */
+export const ALL_REVIEWERS = "all";
+
 /**
- * The model, as a pinned ID, and the effort of a reviewer's queries. Each
- * comes from reviewers.<name> when set, then models.reviewer when set,
- * then the frontmatter when it sets one, then ROLE_DEFAULTS.reviewer. The
- * model and the effort resolve apart.
+ * The model and the effort of reviewers for one run (--models of the
+ * eval). The key is a reviewer name or ALL_REVIEWERS. A reviewer name
+ * wins over ALL_REVIEWERS.
+ */
+export type RunModels = Readonly<Record<string, ModelPick>>;
+
+/**
+ * The model, as a pinned ID, and the effort of a reviewer's queries. The
+ * value of the run ("run") wins over all others. Else each comes from
+ * reviewers.<name> when set, then models.reviewer when set, then the
+ * frontmatter when it sets one, then ROLE_DEFAULTS.reviewer. The model and
+ * the effort resolve apart.
  */
 export function effectiveModel(
   def: ReviewerDefinition,
   config: RepoConfig,
+  run?: RunModels,
 ): { model: string; effort: Effort } {
-  const own = reviewerEntry(config, def.frontmatter.name);
+  const name = def.frontmatter.name;
+  if (run !== undefined) {
+    const pick = Object.hasOwn(run, name)
+      ? run[name]
+      : Object.hasOwn(run, ALL_REVIEWERS)
+        ? run[ALL_REVIEWERS]
+        : undefined;
+    if (pick !== undefined) return { model: pick.model, effort: pick.effort };
+  }
+  const own = reviewerEntry(config, name);
   const role = config.models.reviewer;
   return {
     model: resolveModel(

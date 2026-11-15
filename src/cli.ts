@@ -4,7 +4,7 @@
 // --format github asked for, 2 on a usage error. Exit codes of eval: 0 when
 // the gate passed or did not run, 1 for a failed repeat or a run error, 2
 // for a usage error, an invalid case or a configuration error, 3 when the
-// gate failed. Exit codes of explain: 0 on success, 2 for a usage error or
+// gate failed, 4 when --max-cost stopped the eval. Exit codes of explain: 0 on success, 2 for a usage error or
 // a file that is missing, is not JSON, or is not a run record. Exit codes
 // of label: 0 when every call succeeded, 1 when a case checkout failed or a
 // call failed after its retry, 2 on a usage error. The exit codes of pool
@@ -13,11 +13,12 @@ import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { Command, CommanderError, InvalidArgumentError, Option } from "commander";
 import { z } from "zod";
-import { JUDGE_DEFAULTS, ROLE_DEFAULTS, resolveModel } from "./config/models.js";
+import { EFFORTS, JUDGE_DEFAULTS, ROLE_DEFAULTS, resolveModel } from "./config/models.js";
 import { registerLabelCommand } from "./eval/label/index.js";
 import { registerPoolCommands } from "./eval/pool/index.js";
 import { runEvalReport } from "./eval/offline.js";
 import { runEval } from "./eval/run.js";
+import { runEvalSizes } from "./eval/sizes.js";
 import { runEvalSubset } from "./eval/subset.js";
 import { explain } from "./explain/index.js";
 import { renderExplainJson, renderExplainTable } from "./explain/format.js";
@@ -27,6 +28,7 @@ import type { GitHubClient } from "./github/client.js";
 import { formatJson } from "./output/json.js";
 import { formatTable } from "./output/table.js";
 import { loadPrompt } from "./prompts/load.js";
+import type { ModelPick, RunModels } from "./reviewers/loader.js";
 import { runReview } from "./run.js";
 import type { SdkClient } from "./sdk/client.js";
 
@@ -35,6 +37,8 @@ export const EXIT_FAILURE = 1;
 export const EXIT_USAGE = 2;
 /** The eval gate failed. */
 export const EXIT_GATE = 3;
+/** A dollar limit (--max-cost) stopped the command before all of its work. */
+export const EXIT_STOPPED = 4;
 
 /** The trivial schema of the smoke query. */
 export const SmokeOutputSchema = z.strictObject({ ok: z.boolean(), word: z.string() });
@@ -72,6 +76,9 @@ interface EvalCliOptions {
   paired?: boolean;
   reviewers?: string[];
   passes?: Record<string, number>;
+  models?: RunModels;
+  maxCost?: number;
+  stage1?: boolean;
 }
 
 interface EvalReportCliOptions {
@@ -79,6 +86,7 @@ interface EvalReportCliOptions {
   out: string;
   format: "table" | "json";
   byPass?: boolean;
+  byReviewer?: boolean;
   askMissing?: boolean;
   allowApiKey?: boolean;
 }
@@ -142,6 +150,36 @@ function parsePasses(value: string): Record<string, number> {
     passes[match[1] as string] = Number(match[2]);
   }
   return passes;
+}
+
+// Parse --models: target=model:effort parts with commas between them. The
+// target is a reviewer name or "all". The model is an alias or an exact ID.
+function parseModels(value: string): RunModels {
+  const models: Record<string, ModelPick> = {};
+  for (const part of value.split(",")) {
+    const match = /^\s*([^=\s]+)\s*=\s*([^:\s]+)\s*:\s*([^:\s]+)\s*$/.exec(part);
+    if (!match) {
+      throw new InvalidArgumentError(`Give each part as target=model:effort, not "${part}".`);
+    }
+    const [, target, alias, effort] = match as unknown as [string, string, string, string];
+    let model: string;
+    try {
+      model = resolveModel(alias);
+    } catch (err) {
+      throw new InvalidArgumentError(err instanceof Error ? err.message : String(err));
+    }
+    const known = EFFORTS.find((e) => e === effort.toLowerCase());
+    if (known === undefined) {
+      throw new InvalidArgumentError(
+        `Unknown effort "${effort}" in "${part.trim()}". Use ${EFFORTS.join(", ")}.`,
+      );
+    }
+    if (Object.hasOwn(models, target)) {
+      throw new InvalidArgumentError(`The target "${target}" is in --models more than once.`);
+    }
+    models[target] = { model, effort: known };
+  }
+  return models;
 }
 
 // Parse an amount in US dollars: a number of 0 or more.
@@ -378,14 +416,41 @@ export function createProgram(deps: ProgramDeps): Command {
       "set the passes of these reviewers for every run, over the repo config and the frontmatter",
       parsePasses,
     )
+    .option(
+      "--models <spec>",
+      "target=model:effort pairs with commas between them; set the model and effort of reviewers " +
+        "for every run, over the repo config and the frontmatter; a target is a reviewer name " +
+        'or "all", and a name wins over "all"',
+      parseModels,
+    )
+    .option(
+      "--max-cost <usd>",
+      "start no new repeat when the repeats of this invocation, with their judge queries, cost " +
+        "this many US dollars or more; a repeat that runs at the limit runs to its end, so the " +
+        "spend can pass the limit by at most one repeat; --resume continues",
+      parseUsd,
+    )
+    .option(
+      "--stage1",
+      "run triage and the reviewers only: send no finding to the verifier, the escalation or the merge, score the raw candidates with the raw judge, and report the figures of each reviewer",
+    )
     .action(async (options: EvalCliOptions, command: Command) => {
       if (options.writeBaseline === true && options.baseline === undefined) {
         command.error("error: --write-baseline needs --baseline", { exitCode: EXIT_USAGE });
       }
-      const limited = options.reviewers !== undefined || options.passes !== undefined;
+      if (options.stage1 === true && (options.paired === true || options.baseline !== undefined)) {
+        command.error(
+          "error: --stage1 posts no finding, so do not give --paired, --baseline or --write-baseline",
+          { exitCode: EXIT_USAGE },
+        );
+      }
+      const limited =
+        options.reviewers !== undefined ||
+        options.passes !== undefined ||
+        options.models !== undefined;
       if (limited && options.baseline !== undefined) {
         command.error(
-          "error: a run with --reviewers or --passes is not comparable to the baseline, so do not give --baseline or --write-baseline",
+          "error: a run with --reviewers, --passes or --models is not comparable to the baseline, so do not give --baseline or --write-baseline",
           { exitCode: EXIT_USAGE },
         );
       }
@@ -413,6 +478,9 @@ export function createProgram(deps: ProgramDeps): Command {
             paired: options.paired === true,
             ...(options.reviewers !== undefined ? { reviewers: options.reviewers } : {}),
             ...(options.passes !== undefined ? { passes: options.passes } : {}),
+            ...(options.models !== undefined ? { models: options.models } : {}),
+            ...(options.maxCost !== undefined ? { maxCost: options.maxCost } : {}),
+            ...(options.stage1 === true ? { stage1: true } : {}),
           },
           deps,
         );
@@ -440,16 +508,22 @@ export function createProgram(deps: ProgramDeps): Command {
       "add the by-pass section: pass 1, pass 2 and both, of each reviewer with two passes",
     )
     .option(
+      "--by-reviewer",
+      "add the by-reviewer section: the raw candidates of each reviewer and of all reviewers, matched with the raw judge, with the cost of the reviewer queries",
+    )
+    .option(
       "--ask-missing",
-      "with --by-pass, ask the judge the by-pass questions that have no answer or a failed one, and cache the answers",
+      "with --by-pass or --by-reviewer, ask the judge the questions of those sections that have no answer or a failed one, and cache the answers",
     )
     .option(
       "--allow-api-key",
       "with --ask-missing, keep ANTHROPIC_API_KEY and the other provider variables in the SDK environment of the judge",
     )
     .action(async (options: EvalReportCliOptions, command: Command) => {
-      if (options.askMissing === true && options.byPass !== true) {
-        command.error("error: --ask-missing needs --by-pass", { exitCode: EXIT_USAGE });
+      if (options.askMissing === true && options.byPass !== true && options.byReviewer !== true) {
+        command.error("error: --ask-missing needs --by-pass or --by-reviewer", {
+          exitCode: EXIT_USAGE,
+        });
       }
       try {
         process.exitCode = await runEvalReport(options, () => clientFrom(deps));
@@ -522,6 +596,27 @@ export function createProgram(deps: ProgramDeps): Command {
         }
       },
     );
+
+  program
+    .command("eval-sizes")
+    .description(
+      "Count the changed lines of each case from its diff.patch, and split the cases into three size groups, with no model call and no clone.",
+    )
+    .requiredOption("--cases <dir>", "the cases directory")
+    .addOption(
+      new Option("--format <format>", "the format of the output on stdout")
+        .choices(["table", "json"])
+        .default("table"),
+    )
+    .action(async (options: { cases: string; format: "table" | "json" }) => {
+      try {
+        process.exitCode = await runEvalSizes(options);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        process.stderr.write(`pr-review eval-sizes: ${message}\n`);
+        process.exitCode = EXIT_FAILURE;
+      }
+    });
 
   program
     .command("explain")
