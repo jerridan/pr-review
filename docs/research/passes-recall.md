@@ -22,7 +22,7 @@ The two passes of one reviewer have the same inputs and run in parallel, so they
 
 The one-pass arm is the mean of the pass 1 set and the pass 2 set. The difference between pass 1 and pass 2 is the noise of one pass.
 
-`pr-review eval-report --by-pass` made the figures from the stored records and the judge answers of the run, with no model call. Two judge questions of the single-pass sets had no stored answer, because the live scoring of all findings never needed them. `--ask-missing` asked the two, for $0.02. The figures below have no unanswered question.
+`pr-review eval-report --by-pass` made the figures from the stored records and the judge answers of the run, with no model call. Two judge questions of the single-pass sets had no stored answer, because the live scoring of all findings never needed them. `--ask-missing` asked the two, for $0.02. The figures below have no unanswered question and no failed ("unknown") judge answer, and every case has an ok pass 1 and pass 2 for both reviewers.
 
 Definitions:
 
