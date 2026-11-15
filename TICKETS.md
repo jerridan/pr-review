@@ -184,6 +184,7 @@ What the verifier does: for one finding, it reads the code with the Read and Gre
 - Rule for a cheaper arm: it becomes the verifier when its posted recall and its posted precision are each not more than 0.05 below those of the current verifier, and its cost per verification is lower.
 - Rule for a dearer arm: it becomes the verifier when its posted precision is not lower than that of the current verifier, its posted recall is higher with a 90% bootstrap interval of the difference above zero, and its cost per verification is at most two times the current cost.
 - A verifier of a second family needs the Codex CLI in CI. If Terra passes a rule, the note reports that, and the principal decides.
+- Done 2026-11-15, at 0.18.0: Sonnet 5.5 at medium effort passes the rule for a cheaper arm (posted recall 0.032 lower, posted precision 0.011 higher, 0.62 times the cost for each verification) and becomes the first verifier. Opus 5.5 low fails both rules, so Opus 5.5 medium did not run. Terra medium fails both rules on its sample. The pipeline with its escalation has a posted recall of 0.536 against 0.496 for the first verifier alone; whether to keep the escalation is a design question for the principal. `docs/research/e3-verifier-model.md` holds every figure.
 
 ### E3b: where the severity label comes from
 

@@ -93,7 +93,7 @@ export const ROLE_DEFAULTS: Record<Role, RoleConfig> = {
   },
   verifier: {
     model: MODEL_IDS.sonnet,
-    effort: "high",
+    effort: "medium",
     maxTurns: 25,
     maxBudgetUsd: 1,
     timeoutMs: 300_000,

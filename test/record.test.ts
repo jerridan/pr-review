@@ -530,7 +530,7 @@ describe("the record parts", () => {
     expect(id.models).toEqual({
       triage: { model: "claude-sonnet-5-5", effort: "medium" },
       reviewer: { model: "claude-opus-5-5", effort: "low" },
-      verifier: { model: "claude-sonnet-5-5", effort: "high" },
+      verifier: { model: "claude-sonnet-5-5", effort: "medium" },
       "verifier-escalation": { model: "claude-opus-5-5", effort: "high" },
       merge: { model: "claude-sonnet-5-5", effort: "medium" },
       smoke: { model: "claude-sonnet-5-5", effort: "low" },

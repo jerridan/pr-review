@@ -54,7 +54,7 @@ const EXPECTED: Record<
   },
   verifier: {
     model: "claude-sonnet-5-5",
-    effort: "high",
+    effort: "medium",
     maxTurns: 25,
     maxBudgetUsd: 1,
     timeoutMs: 300_000,
