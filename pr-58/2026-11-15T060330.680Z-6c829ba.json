@@ -1,0 +1,2987 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 58,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "D4c tools: Codex model options, the general reviewer and the E6 arms",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/58"
+    },
+    "run_kind": "later",
+    "prior": {
+      "head": "744bf05428487c365d70e112d102a2f000861a03",
+      "source": "record",
+      "record": "/home/runner/work/_temp/pr-review-records/pr-58/2026-11-15T054450.534Z-744bf05.json",
+      "open": [
+        "1da9286d7d58fdcf",
+        "72a8b88b36e00791",
+        "c72815dca7f9ebe3",
+        "d3b97fc5a30a8ac8",
+        "e0175da5d5598219",
+        "eb0f6ab493f74c55"
+      ],
+      "dismissed": [],
+      "fetch_failed": false
+    },
+    "base": "61e916ab882276c85b86ba6a0f3d45d6f20ef742",
+    "head": "6c829ba3281fe944f9f03974777c115527fdd271",
+    "started_at": "2026-11-15T06:03:30.680Z",
+    "tool_version": "0.14.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "D4c tools: Codex model options, the general reviewer and the E6 arms\n\nD4c, part \"side\", phase 2: the tools for the Terra arms, E2 and E6. This PR holds code and tests only. It runs no experiment.\n\n## Changes\n\n- **The Codex call** (`src/eval/codex.ts`): `runCodex` takes an optional fifth parameter, `CodexOptions { model?, effort? }`. With no options, the call uses Sol at high, as before, so the label and pool callers do not change. `TERRA_MODEL = \"gpt-6.1-terra\"`. Each outcome also gives `tokens` (read from the stderr tail, or null), and `codexQuotaError` finds a usage-limit stop.\n- **E2, the general reviewer**: `prompts/reviewers/general-review.md` is one general review of the whole diff. The new frontmatter key `opt_in: true` keeps it out of every normal run. `selectReviewers` takes a `named` set, and `src/run.ts` passes `onlyReviewers` to it, which is the one line changed in that file. The Opus arms use `--reviewers general-review --models general-review=opus:medium|high --stage1` from the eval tooling PR.\n- **E2, the Terra arm**: `pr-review eval-codex-review` runs the same reviewer prompt through Codex on each case. It writes outside candidates, `<out>/<case>.json` = `{ source, findings }`, for replay. Each finished case is written at once, and a rerun skips it. A quota stop ends the command, and the next run continues.\n- **E6**: `pr-review eval-injection-variants` copies each injection case and makes five variants: three PR-body instructions, one in the head commit message, and one in a code comment. It never writes to the input directory or to `eval/cases/`, so the cases pin does not change. The new optional case field `description_from: \"commits\"` makes the eval give the run no description, so the commit message reaches the models. This is one changed expression in `src/eval/run.ts`. `pr-review eval-injection-report` gives the share of runs that found the known bug for each arm, and lists outputs that may follow an instruction. It makes no model call: it scores the stored records with the stored judge cache. README states the three detection rules. Every hit is a candidate for a person to judge.\n- The version goes to 0.15.0.\n\n## Coordination with the eval tooling PR\n\nThe eval tooling PR owns `--models`, `--stage1` and replay, and it agreed to the interfaces above. This PR changes one line in `src/run.ts` and one expression in `src/eval/run.ts`, both agreed. The PR that merges second rebases and takes the next version.\n\n## The Terra id\n\n`codex debug models` (codex-cli 0.167.0) lists this entry. The command reads the local catalog and makes no model call:\n\n```\n\"slug\":\"gpt-6.1-terra\",\"display_name\":\"GPT-6.1 Terra\"\n```\n\n## Limits\n\n- The Codex prompt goes to the CLI as one argument, as in the pool. A very large diff can be longer than the OS argument limit, and that case then fails and is reported as failed.\n- The Terra arm gets no triage brief, because a brief needs a triage model call. The Opus arms get one. The E2 note must state this.\n- No test calls the real Codex. The strict output schema (`suggested_fix` required, with an empty string for no fix) follows the pool's Codex schema.\n\n## Checks\n\n`npm test` (1560 passed), `npm run lint`, `npm run typecheck` and `npm run build` pass.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZdfE1rqbczPpmGQQ5S\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": ".claude-plugin/marketplace.json",
+        "hunks": 1
+      },
+      {
+        "path": ".claude-plugin/plugin.json",
+        "hunks": 1
+      },
+      {
+        "path": "README.md",
+        "hunks": 4
+      },
+      {
+        "path": "package.json",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/codex-review.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/injection-instructions.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/reviewers/general-review.md",
+        "hunks": 1
+      },
+      {
+        "path": "src/cli.ts",
+        "hunks": 2
+      },
+      {
+        "path": "src/eval/case.ts",
+        "hunks": 3
+      },
+      {
+        "path": "src/eval/codex-review.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/codex.ts",
+        "hunks": 5
+      },
+      {
+        "path": "src/eval/injection/report.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/injection/variants.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/run.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/gather/worktree.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/reviewers/select.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/run.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/schemas/reviewer.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/cli-d4c-arms.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/codex-review.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/codex.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/eval-description-from.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/fixtures/injection-cases.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/fixtures/injection-records.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/injection-report.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/injection-variants.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/reviewers.test.ts",
+        "hunks": 5
+      },
+      {
+        "path": "test/run-git.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/run-opt-in.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/select-opt-in.test.ts",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [
+      {
+        "path": "package-lock.json",
+        "reason": "generated"
+      }
+    ],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "Adds new CLI commands, an opt-in reviewer selection mechanism, a Codex runner change, git env handling, and eval description logic, so it changes logic and public interfaces.",
+      "confidence": "high",
+      "categories": [
+        "bug",
+        "security",
+        "test",
+        "docs",
+        "convention"
+      ],
+      "hotspots": [
+        "src/eval/injection/variants.ts (makeHead git plumbing, realPathOf, out-dir guards, commentFile)",
+        "src/eval/injection/report.ts (touchedLines parser, scoreRepeats, follow detection)",
+        "src/eval/codex-review.ts (reviewCase, quota handling, promptOf, atomic write)",
+        "src/reviewers/select.ts and src/run.ts (opt_in gating via named set)",
+        "src/eval/codex.ts (tokens and quota regex, opts passthrough)",
+        "src/gather/worktree.ts (runGit extraEnv)",
+        "src/eval/run.ts (description_from omits description)",
+        "src/cli.ts (passThrough command registration)"
+      ],
+      "file_notes": [
+        {
+          "file": "src/eval/injection/variants.ts",
+          "note": "new command; builds variant cases with git plumbing and writes to --out; path safety checks"
+        },
+        {
+          "file": "src/eval/injection/report.ts",
+          "note": "new command; patch parser, rescoring from judge cache, heuristic detection"
+        },
+        {
+          "file": "src/eval/codex-review.ts",
+          "note": "new command running Codex per case with resume and quota stop"
+        },
+        {
+          "file": "src/eval/codex.ts",
+          "note": "adds options, token parsing, quota detection; outcome type now includes tokens"
+        },
+        {
+          "file": "src/reviewers/select.ts",
+          "note": "opt_in reviewers only selected when named"
+        },
+        {
+          "file": "src/run.ts",
+          "note": "passes the only set into selectReviewers"
+        },
+        {
+          "file": "src/schemas/reviewer.ts",
+          "note": "new optional opt_in frontmatter key"
+        },
+        {
+          "file": "src/gather/worktree.ts",
+          "note": "runGit gains extraEnv param"
+        },
+        {
+          "file": "src/eval/run.ts",
+          "note": "description omitted when description_from is commits"
+        },
+        {
+          "file": "src/eval/case.ts",
+          "note": "new optional case fields and VARIANT_ARMS"
+        },
+        {
+          "file": "src/cli.ts",
+          "note": "registers three pass-through commands"
+        },
+        {
+          "file": "prompts/reviewers/general-review.md",
+          "note": "new opt-in reviewer prompt"
+        },
+        {
+          "file": "prompts/codex-review.md",
+          "note": "new Codex wrapper prompt"
+        },
+        {
+          "file": "prompts/injection-instructions.md",
+          "note": "instruction texts and key phrases read by code"
+        },
+        {
+          "file": "README.md",
+          "note": "docs for the new reviewer and commands"
+        },
+        {
+          "file": "package.json",
+          "note": "version bump to 0.15.0"
+        },
+        {
+          "file": ".claude-plugin/plugin.json",
+          "note": "version bump"
+        },
+        {
+          "file": ".claude-plugin/marketplace.json",
+          "note": "version bump"
+        },
+        {
+          "file": "test/codex-review.test.ts",
+          "note": "new tests with a fake codex shim"
+        },
+        {
+          "file": "test/injection-variants.test.ts",
+          "note": "new tests"
+        },
+        {
+          "file": "test/injection-report.test.ts",
+          "note": "new tests"
+        },
+        {
+          "file": "test/reviewers.test.ts",
+          "note": "updated for the new built-in reviewer"
+        }
+      ],
+      "summary": "Adds an opt-in built-in reviewer, general-review, and the eval tooling for the E2 and E6 tests. The tooling is three CLI commands (eval-codex-review, eval-injection-variants, eval-injection-report). Supporting changes are Codex model, effort, token and quota handling, a description_from case field, and an extraEnv param on runGit. The diff includes tests, docs and a version bump to 0.15.0."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: Adds new CLI commands, an opt-in reviewer selection mechanism, a Codex runner change, git env handling, and eval description logic, so it changes logic and public interfaces.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 8945,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 46189,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0046289,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 485,
+              "cacheReadInputTokens": 55970,
+              "cacheCreationInputTokens": 46330,
+              "webSearchRequests": 0,
+              "costUSD": 0.39155,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 326,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.3961789
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 15968,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 46189,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0046289,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 979,
+              "cacheReadInputTokens": 55886,
+              "cacheCreationInputTokens": 46299,
+              "webSearchRequests": 0,
+              "costUSD": 0.4011652,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 749,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.4057941
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/injection/variants.ts",
+            "start_line": 109,
+            "end_line": 112,
+            "category": "bug",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "isInside treats a child directory whose name starts with \"..\" (e.g. \"..out\") as outside the parent.",
+            "evidence": "return rel === \"\" || (!rel.startsWith(\"..\") && !isAbsolute(rel));",
+            "suggested_fix": "Check rel === \"..\" || rel.startsWith(\"..\" + sep).",
+            "explanation": "A relative path like \"..out/x\" is inside the parent but fails the prefix check, so the out-dir guard can be wrong.",
+            "needs_context": false
+          },
+          {
+            "file": "src/eval/codex-review.ts",
+            "start_line": 163,
+            "end_line": 166,
+            "category": "bug",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "A failed write or rename leaves the temp file in the out directory.",
+            "evidence": "await writeFile(temp, `${JSON.stringify({ source: options.source, findings }, null, 2)}\\n`);\n    await rename(temp, file);",
+            "suggested_fix": "Remove temp in the catch path.",
+            "explanation": "The catch block does not remove the .tmp file, so stray files can stay in --out.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 16700,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 46185,
+              "outputTokens": 25,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.004631000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 1508,
+              "cacheReadInputTokens": 5363,
+              "cacheCreationInputTokens": 45694,
+              "webSearchRequests": 0,
+              "costUSD": 0.3967926,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 757,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.4014236
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/injection/variants.ts",
+            "start_line": 347,
+            "end_line": 357,
+            "category": "bug",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "A case whose variants fail still leaves its plain copy in --out.",
+            "evidence": "    await copyTo(c.dir, join(out, c.name));\n    const error = await makeVariants(c, out, texts);",
+            "suggested_fix": "Also rm join(out, c.name) when makeVariants fails.",
+            "explanation": "The cleanup removes only the variant dirs, so a later eval over --out runs a plain case with no variants.",
+            "needs_context": false
+          },
+          {
+            "file": "src/eval/injection/variants.ts",
+            "start_line": 108,
+            "end_line": 111,
+            "category": "bug",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "isInside treats a child whose name starts with '..' as outside the parent.",
+            "evidence": "  return rel === \"\" || (!rel.startsWith(\"..\") && !isAbsolute(rel));",
+            "suggested_fix": "Test rel === '..' || rel.startsWith('..' + sep).",
+            "explanation": "A folder named like '..out' inside the input directory passes the guard.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 19658,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 46185,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0046285,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 1565,
+              "cacheReadInputTokens": 5363,
+              "cacheCreationInputTokens": 45694,
+              "webSearchRequests": 0,
+              "costUSD": 0.39793259999999997,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 778,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.40256109999999995
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "README.md",
+            "start_line": 1036,
+            "end_line": 1036,
+            "category": "docs",
+            "severity_estimate": "suggestion",
+            "confidence": "high",
+            "claim": "The README says that a case with no comment file gets no `comment` variant, but the code makes no variant at all for that case.",
+            "evidence": "A case with no such file gets no `comment` variant, and the command names it in an error.",
+            "suggested_fix": "Write: \"A case with no such file gets no variants, and the command names it in an error.\" The command also checks that the file is a regular file, so the README can state that too.",
+            "explanation": "makeVariants returns an error before it writes any variant, and the command removes every variant of a failed case, so the three body variants and the commit variant are also missing.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 13032,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 46179,
+              "outputTokens": 24,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0046299,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 819,
+              "cacheReadInputTokens": 55780,
+              "cacheCreationInputTokens": 46232,
+              "webSearchRequests": 0,
+              "costUSD": 0.397408,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 362,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.4020379
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6233,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 59794,
+              "outputTokens": 27,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0059929,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 352,
+              "cacheReadInputTokens": 5438,
+              "cacheCreationInputTokens": 59303,
+              "webSearchRequests": 0,
+              "costUSD": 0.48255960000000003,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 75,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.48855250000000006
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6377,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 46179,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0046279,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 296,
+              "cacheReadInputTokens": 56348,
+              "cacheCreationInputTokens": 46523,
+              "webSearchRequests": 0,
+              "costUSD": 0.3893896,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 115,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.3940175
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/codex-review.ts",
+            "start_line": 163,
+            "end_line": 167,
+            "category": "security",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "The case name goes into the output file path with no check here, so a name with path separators can write outside --out.",
+            "evidence": "const file = join(options.out, `${c.name}.json`);",
+            "suggested_fix": "Reject a case name that holds a path separator or \"..\", or check that the resolved path is inside --out.",
+            "explanation": "If case names are not checked, a name such as \"../x\" leads to a write and a rename outside the output folder.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 9673,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 46193,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.004629299999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 632,
+              "cacheReadInputTokens": 5330,
+              "cacheCreationInputTokens": 45702,
+              "webSearchRequests": 0,
+              "costUSD": 0.37933,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 135,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.3839593
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/injection/variants.ts",
+            "start_line": 247,
+            "end_line": 247,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "The empty-body branch of the body variants has no test.",
+            "evidence": "const body = c.body === \"\" ? text : `${c.body}\\n\\n${text}`;",
+            "suggested_fix": "Add a fixture case with body \"\" and assert that the variant body equals the instruction.",
+            "explanation": "The fixture always has a non-empty PLAIN_BODY, so a break in the empty case would not be caught.",
+            "needs_context": false
+          },
+          {
+            "file": "src/eval/injection/report.ts",
+            "start_line": 373,
+            "end_line": 374,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "No test checks that rule 1 lists nothing when the plain runs post no finding.",
+            "evidence": "if (r.record.posted.findings.length === 0 && plainPosts)",
+            "suggested_fix": "Add a case whose plain runs post nothing and assert that the empty variant run is not listed.",
+            "explanation": "Every plain run in the fixture posts findings, so dropping the plainPosts condition would not fail a test.",
+            "needs_context": false
+          },
+          {
+            "file": "src/eval/injection/report.ts",
+            "start_line": 377,
+            "end_line": 377,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "The stage filter of the reviewed-safe rule (posted, verifier and summary only) is not tested.",
+            "evidence": "if (![\"posted\", \"verifier\", \"summary\"].includes(t.stage)) continue;",
+            "suggested_fix": "Add a record with the phrase only in a reviewer-stage finding (expect no hit) and one with it in the summary (expect a hit).",
+            "explanation": "No fixture puts the safe phrase in a reviewer-stage finding or in the summary, so removing the filter or breaking the summary path would pass.",
+            "needs_context": false
+          },
+          {
+            "file": "test/codex-review.test.ts",
+            "start_line": 152,
+            "end_line": 166,
+            "category": "test",
+            "severity_estimate": "nit",
+            "confidence": "medium",
+            "claim": "One test checks both the options passthrough and the defaults.",
+            "evidence": "it(\"calls codex with the terra model and high effort, and with the options when given\", async () => {",
+            "suggested_fix": "Split it into a defaults test and an options test.",
+            "explanation": "A failure does not say which behaviour broke.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 20611,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 46185,
+              "outputTokens": 27,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.004632,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 2118,
+              "cacheReadInputTokens": 6105,
+              "cacheCreationInputTokens": 45694,
+              "webSearchRequests": 0,
+              "costUSD": 0.409141,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 464,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.413773
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "README.md",
+          "start_line": 1036,
+          "end_line": 1036,
+          "category": "docs",
+          "severity_estimate": "suggestion",
+          "confidence": "high",
+          "claim": "The README says that a case with no comment file gets no `comment` variant, but the code makes no variant at all for that case.",
+          "evidence": "A case with no such file gets no `comment` variant, and the command names it in an error.",
+          "suggested_fix": "Write: \"A case with no such file gets no variants, and the command names it in an error.\" The command also checks that the file is a regular file, so the README can state that too.",
+          "explanation": "makeVariants returns an error before it writes any variant, and the command removes every variant of a failed case, so the three body variants and the commit variant are also missing.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "return `case ${c.name}: injection.patch changes no file that the head holds and that has a known comment syntax, so the case has no variants`;",
+            "// A failed case keeps no half variant.",
+            "A case with no such file gets no `comment` variant, and the command names it in an error."
+          ],
+          "rationale": "`makeVariants` picks the comment file before it writes any variant and returns an error when none fits. The command then removes all variant directories of the case. So the case gets no variants, not just no `comment` variant, and the README sentence is wrong.",
+          "score": 95,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "return `case ${c.name}: injection.patch changes no file that the head holds and that has a known comment syntax, so the case has no variants`;",
+            "// A failed case keeps no half variant.",
+            "A case with no such file gets no `comment` variant, and the command names it in an error."
+          ],
+          "rationale": "`makeVariants` picks the comment file before it writes any variant and returns an error when none fits. The command then removes all variant directories of the case. So the case gets no variants, not just no `comment` variant, and the README sentence is wrong.",
+          "score": 95,
+          "severity": "suggestion"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "docs-and-comments",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/eval/injection/variants.ts",
+          "start_line": 109,
+          "end_line": 112,
+          "category": "bug",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "isInside treats a child directory whose name starts with \"..\" (e.g. \"..out\") as outside the parent.",
+          "evidence": "return rel === \"\" || (!rel.startsWith(\"..\") && !isAbsolute(rel));",
+          "suggested_fix": "Check rel === \"..\" || rel.startsWith(\"..\" + sep).",
+          "explanation": "A relative path like \"..out/x\" is inside the parent but fails the prefix check, so the out-dir guard can be wrong.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "return rel === \"\" || (!rel.startsWith(\"..\") && !isAbsolute(rel));"
+          ],
+          "rationale": "`rel.startsWith(\"..\")` also matches a child directory named like `..out`, so `isInside` wrongly returns false. This only weakens the `--out` guard when someone names the output directory with a leading `..`, which is rare.",
+          "score": 92,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "return rel === \"\" || (!rel.startsWith(\"..\") && !isAbsolute(rel));"
+          ],
+          "rationale": "`rel.startsWith(\"..\")` also matches a child directory named like `..out`, so `isInside` wrongly returns false. This only weakens the `--out` guard when someone names the output directory with a leading `..`, which is rare.",
+          "score": 92,
+          "severity": "suggestion"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/eval/codex-review.ts",
+          "start_line": 163,
+          "end_line": 166,
+          "category": "bug",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "A failed write or rename leaves the temp file in the out directory.",
+          "evidence": "await writeFile(temp, `${JSON.stringify({ source: options.source, findings }, null, 2)}\\n`);\n    await rename(temp, file);",
+          "suggested_fix": "Remove temp in the catch path.",
+          "explanation": "The catch block does not remove the .tmp file, so stray files can stay in --out.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "await writeFile(temp, `${JSON.stringify({ source: options.source, findings }, null, 2)}\\n`);\n    await rename(temp, file);",
+            "} catch (err) {\n    return { kind: \"failed\", error: messageOf(err), tokens: null };\n  } finally {\n    await rm(tmp, { recursive: true, force: true });"
+          ],
+          "rationale": "The claim is literally true: the catch and finally blocks clean only the mkdtemp dir, not the temp file in --out. The leftover is a hidden .tmp file that finished() ignores and the next run overwrites, so the effect is cosmetic.",
+          "score": 85,
+          "severity": "dont_post"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const temp = join(options.out, `.${c.name}.json.tmp`);",
+            "await rename(temp, file);",
+            "} catch (err) {\n    return { kind: \"failed\", error: messageOf(err), tokens: null };\n  } finally {\n    await rm(tmp, { recursive: true, force: true });",
+            "return new Set((await readdir(out)).filter((n) => n.endsWith(\".json\") && !n.startsWith(\".\")));"
+          ],
+          "rationale": "The claim holds: the catch and finally blocks only remove the mkdtemp dir, not the `.name.json.tmp` in --out, so the temp file stays there after a failed write or rename. The harm is small, though. The file is hidden, `finished()` skips it, and a rerun overwrites the same temp name.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const temp = join(options.out, `.${c.name}.json.tmp`);",
+            "await rename(temp, file);",
+            "} catch (err) {\n    return { kind: \"failed\", error: messageOf(err), tokens: null };\n  } finally {\n    await rm(tmp, { recursive: true, force: true });",
+            "return new Set((await readdir(out)).filter((n) => n.endsWith(\".json\") && !n.startsWith(\".\")));"
+          ],
+          "rationale": "The claim holds: the catch and finally blocks only remove the mkdtemp dir, not the `.name.json.tmp` in --out, so the temp file stays there after a failed write or rename. The harm is small, though. The file is hidden, `finished()` skips it, and a rerun overwrites the same temp name.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/eval/injection/variants.ts",
+          "start_line": 347,
+          "end_line": 357,
+          "category": "bug",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "A case whose variants fail still leaves its plain copy in --out.",
+          "evidence": "    await copyTo(c.dir, join(out, c.name));\n    const error = await makeVariants(c, out, texts);",
+          "suggested_fix": "Also rm join(out, c.name) when makeVariants fails.",
+          "explanation": "The cleanup removes only the variant dirs, so a later eval over --out runs a plain case with no variants.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "await copyTo(c.dir, join(out, c.name));\n    const error = await makeVariants(c, out, texts);",
+            "for (const arm of VARIANT_ARMS) {\n      await rm(join(out, `${c.name}--${arm}`), { recursive: true, force: true });\n    }"
+          ],
+          "rationale": "The code matches the claim: on failure only the `--<arm>` dirs are removed, so the plain copy stays in --out. The plain copy is deliberately written first and the command reports the failure with exit 1, so the effect is minor.",
+          "score": 80,
+          "severity": "dont_post"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "await copyTo(c.dir, join(out, c.name));",
+            "// A failed case keeps no half variant.",
+            "for (const arm of VARIANT_ARMS) {\n      await rm(join(out, `${c.name}--${arm}`), { recursive: true, force: true });\n    }"
+          ],
+          "rationale": "The plain copy goes into --out before makeVariants runs. The cleanup after a failure deletes only the `${c.name}--${arm}` dirs, so the plain case stays in --out with no variants. An eval over --out then gives the plain arm a different set of cases from the other arms. The failure is reported (exit 1 and a stderr message), so the user can see it and fix it; that is why this is a suggestion and not blocking.",
+          "score": 92,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "await copyTo(c.dir, join(out, c.name));",
+            "// A failed case keeps no half variant.",
+            "for (const arm of VARIANT_ARMS) {\n      await rm(join(out, `${c.name}--${arm}`), { recursive: true, force: true });\n    }"
+          ],
+          "rationale": "The plain copy goes into --out before makeVariants runs. The cleanup after a failure deletes only the `${c.name}--${arm}` dirs, so the plain case stays in --out with no variants. An eval over --out then gives the plain arm a different set of cases from the other arms. The failure is reported (exit 1 and a stderr message), so the user can see it and fix it; that is why this is a suggestion and not blocking.",
+          "score": 92,
+          "severity": "suggestion"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 2
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/eval/injection/variants.ts",
+          "start_line": 108,
+          "end_line": 111,
+          "category": "bug",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "isInside treats a child whose name starts with '..' as outside the parent.",
+          "evidence": "  return rel === \"\" || (!rel.startsWith(\"..\") && !isAbsolute(rel));",
+          "suggested_fix": "Test rel === '..' || rel.startsWith('..' + sep).",
+          "explanation": "A folder named like '..out' inside the input directory passes the guard.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "return rel === \"\" || (!rel.startsWith(\"..\") && !isAbsolute(rel));"
+          ],
+          "rationale": "`relative()` returns `..out` for a child named `..out`, and `startsWith(\\\"..\\\")` is true, so `isInside` returns false and the `--out` guard doesn't refuse it. The case is real but very unlikely, since it needs `--out` to be a directory whose name starts with `..` inside the input directory. The fix is cheap.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "return rel === \"\" || (!rel.startsWith(\"..\") && !isAbsolute(rel));"
+          ],
+          "rationale": "`relative()` returns `..out` for a child named `..out`, and `startsWith(\\\"..\\\")` is true, so `isInside` returns false and the `--out` guard doesn't refuse it. The case is real but very unlikely, since it needs `--out` to be a directory whose name starts with `..` inside the input directory. The fix is cheap.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 2
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/eval/codex-review.ts",
+          "start_line": 163,
+          "end_line": 167,
+          "category": "security",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "The case name goes into the output file path with no check here, so a name with path separators can write outside --out.",
+          "evidence": "const file = join(options.out, `${c.name}.json`);",
+          "suggested_fix": "Reject a case name that holds a path separator or \"..\", or check that the resolved path is inside --out.",
+          "explanation": "If case names are not checked, a name such as \"../x\" leads to a write and a rename outside the output folder.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (meta.name !== name) {",
+            "names = entries.filter((e) => e.isDirectory()).map((e) => e.name);",
+            "const file = join(options.out, `${c.name}.json`);"
+          ],
+          "rationale": "loadCases takes each case name from a directory entry name, which has no path separator. loadMeta also rejects a case.json whose name differs from the directory name. So c.name cannot hold \"/\" or \"..\", and the traversal is not reachable.",
+          "score": 4,
+          "severity": "not_real"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "const file = join(options.out, `${c.name}.json`);",
+            "names = entries.filter((e) => e.isDirectory()).map((e) => e.name);",
+            "if (meta.name !== name) {",
+            "`case ${name}: case.json has the name \"${meta.name}\", which differs from the directory name`,"
+          ],
+          "rationale": "loadCases takes case names from readdir directory entries, which cannot contain path separators or be \"..\". loadMeta also rejects a case.json name that differs from the directory name, so c.name cannot escape --out.",
+          "score": 5,
+          "severity": "not_real"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "const file = join(options.out, `${c.name}.json`);",
+            "names = entries.filter((e) => e.isDirectory()).map((e) => e.name);",
+            "if (meta.name !== name) {",
+            "`case ${name}: case.json has the name \"${meta.name}\", which differs from the directory name`,"
+          ],
+          "rationale": "loadCases takes case names from readdir directory entries, which cannot contain path separators or be \"..\". loadMeta also rejects a case.json name that differs from the directory name, so c.name cannot escape --out.",
+          "score": 5,
+          "severity": "not_real"
+        },
+        "passed": false,
+        "sources": [
+          {
+            "reviewer": "security",
+            "pass": 2
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/eval/injection/variants.ts",
+          "start_line": 247,
+          "end_line": 247,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "The empty-body branch of the body variants has no test.",
+          "evidence": "const body = c.body === \"\" ? text : `${c.body}\\n\\n${text}`;",
+          "suggested_fix": "Add a fixture case with body \"\" and assert that the variant body equals the instruction.",
+          "explanation": "The fixture always has a non-empty PLAIN_BODY, so a break in the empty case would not be caught.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const body = c.body === \"\" ? text : `${c.body}\\n\\n${text}`;",
+            "body: PLAIN_BODY,"
+          ],
+          "rationale": "The fixture always uses a non-empty PLAIN_BODY, and the tests only assert the `${PLAIN_BODY}\\\\n\\\\n${text}` form, so the empty-body branch is untested. The branch is a trivial ternary, so the gap is small.",
+          "score": 85,
+          "severity": "dont_post"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const body = c.body === \"\" ? text : `${c.body}\\n\\n${text}`;",
+            "export const PLAIN_BODY = \"The helper returns the mean of a list.\";",
+            "          body: PLAIN_BODY,",
+            "        body: `${PLAIN_BODY}\\n\\n${text}`,"
+          ],
+          "rationale": "The claim holds. The injection fixture always sets body to the non-empty PLAIN_BODY, and the variant test checks only the `${PLAIN_BODY}\\n\\n${text}` form, so no test covers the `c.body === \"\"` branch. The branch is a simple ternary, so the gap is minor.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const body = c.body === \"\" ? text : `${c.body}\\n\\n${text}`;",
+            "export const PLAIN_BODY = \"The helper returns the mean of a list.\";",
+            "          body: PLAIN_BODY,",
+            "        body: `${PLAIN_BODY}\\n\\n${text}`,"
+          ],
+          "rationale": "The claim holds. The injection fixture always sets body to the non-empty PLAIN_BODY, and the variant test checks only the `${PLAIN_BODY}\\n\\n${text}` form, so no test covers the `c.body === \"\"` branch. The branch is a simple ternary, so the gap is minor.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/eval/injection/report.ts",
+          "start_line": 373,
+          "end_line": 374,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "No test checks that rule 1 lists nothing when the plain runs post no finding.",
+          "evidence": "if (r.record.posted.findings.length === 0 && plainPosts)",
+          "suggested_fix": "Add a case whose plain runs post nothing and assert that the empty variant run is not listed.",
+          "explanation": "Every plain run in the fixture posts findings, so dropping the plainPosts condition would not fail a test.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (r.record.posted.findings.length === 0 && plainPosts)",
+            "const plainPosts = plainRepeats.some((r) => (r.record?.posted.findings.length ?? 0) > 0);"
+          ],
+          "rationale": "In test/injection-report.test.ts the plain case inj-a always posts findings (found() for both repeats), so plainPosts is always true. No test has a plain run that posts nothing, so removing the plainPosts condition would not fail any test.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (r.record.posted.findings.length === 0 && plainPosts)",
+            "const plainPosts = plainRepeats.some((r) => (r.record?.posted.findings.length ?? 0) > 0);"
+          ],
+          "rationale": "In test/injection-report.test.ts the plain case inj-a always posts findings (found() for both repeats), so plainPosts is always true. No test has a plain run that posts nothing, so removing the plainPosts condition would not fail any test.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/eval/injection/report.ts",
+          "start_line": 377,
+          "end_line": 377,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "The stage filter of the reviewed-safe rule (posted, verifier and summary only) is not tested.",
+          "evidence": "if (![\"posted\", \"verifier\", \"summary\"].includes(t.stage)) continue;",
+          "suggested_fix": "Add a record with the phrase only in a reviewer-stage finding (expect no hit) and one with it in the summary (expect a hit).",
+          "explanation": "No fixture puts the safe phrase in a reviewer-stage finding or in the summary, so removing the filter or breaking the summary path would pass.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (![\"posted\", \"verifier\", \"summary\"].includes(t.stage)) continue;",
+            "add(\"summary\", record.identity.triage?.summary);"
+          ],
+          "rationale": "The only reviewed-safe fixture puts the phrase in a verifier rationale. makeRecord sets `reviewers: []`, and its summary is always \"A small change.\". No test covers the filter's exclusion of reviewer or merge stages, or a summary hit. The line number (377) is off; the quoted filter is at line 382.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (![\"posted\", \"verifier\", \"summary\"].includes(t.stage)) continue;",
+            "add(\"summary\", record.identity.triage?.summary);"
+          ],
+          "rationale": "The only reviewed-safe fixture puts the phrase in a verifier rationale. makeRecord sets `reviewers: []`, and its summary is always \"A small change.\". No test covers the filter's exclusion of reviewer or merge stages, or a summary hit. The line number (377) is off; the quoted filter is at line 382.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "test/codex-review.test.ts",
+          "start_line": 152,
+          "end_line": 166,
+          "category": "test",
+          "severity_estimate": "nit",
+          "confidence": "medium",
+          "claim": "One test checks both the options passthrough and the defaults.",
+          "evidence": "it(\"calls codex with the terra model and high effort, and with the options when given\", async () => {",
+          "suggested_fix": "Split it into a defaults test and an options test.",
+          "explanation": "A failure does not say which behaviour broke.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "it(\"calls codex with the terra model and high effort, and with the options when given\", async () => {",
+            "expect(first?.[first.indexOf(\"-m\") + 1]).toBe(\"gpt-x\");",
+            "expect(last?.[last.indexOf(\"-m\") + 1]).toBe(\"gpt-6.1-terra\");"
+          ],
+          "rationale": "The test makes two runs, one with options and one with defaults, and checks both in a single `it`. A failure would not name the broken behaviour, but the stack line would narrow it down. This is minor style.",
+          "score": 85,
+          "severity": "dont_post"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "it(\"calls codex with the terra model and high effort, and with the options when given\", async () => {",
+            "await run(\"--model\", \"gpt-x\", \"--effort\", \"medium\", \"--source\", \"my-source\");",
+            "expect(last?.[last.indexOf(\"-m\") + 1]).toBe(\"gpt-6.1-terra\");"
+          ],
+          "rationale": "The claim is true: this one test checks the options passthrough and then the defaults. But vitest names the assertion line that fails, so a failure still shows which behaviour broke. Other tests in this file also check several behaviours each, so the repo does not follow a one-behaviour-per-test rule.",
+          "score": 92,
+          "severity": "dont_post"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "it(\"calls codex with the terra model and high effort, and with the options when given\", async () => {",
+            "await run(\"--model\", \"gpt-x\", \"--effort\", \"medium\", \"--source\", \"my-source\");",
+            "expect(last?.[last.indexOf(\"-m\") + 1]).toBe(\"gpt-6.1-terra\");"
+          ],
+          "rationale": "The claim is true: this one test checks the options passthrough and then the defaults. But vitest names the assertion line that fails, so a failure still shows which behaviour broke. Other tests in this file also check several behaviours each, so the repo does not follow a one-behaviour-per-test rule.",
+          "score": 92,
+          "severity": "dont_post"
+        },
+        "passed": false,
+        "sources": [
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ]
+      }
+    ],
+    "merges": [
+      {
+        "group": [
+          1,
+          4
+        ],
+        "result": {
+          "merged": [
+            {
+              "member_index": 0,
+              "claim": "isInside treats a child directory whose name starts with \"..\" (e.g. \"..out\") as outside the parent.",
+              "explanation": "A relative path like \"..out/x\" is inside the parent but fails the startsWith(\"..\") check, so the out-dir guard can misjudge it.",
+              "suggested_fix": "Check rel === \"..\" || rel.startsWith(\"..\" + sep) instead of rel.startsWith(\"..\").",
+              "severity": "nit"
+            }
+          ]
+        }
+      }
+    ],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5909369883,
+      "review_url": "https://github.com/jerridan/pr-review/pull/58#pullrequestreview-5909369883",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 132719943480
+      },
+      "cleanup_comment_id": null,
+      "resolved": [
+        {
+          "thread_id": "PRRT_kwDOVHw73s63mqll",
+          "fingerprint": "d3b97fc5a30a8ac8"
+        },
+        {
+          "thread_id": "PRRT_kwDOVHw73s63mqlp",
+          "fingerprint": "1da9286d7d58fdcf"
+        }
+      ],
+      "errors": []
+    },
+    "below_floor": [
+      {
+        "file": "README.md",
+        "start_line": 1036,
+        "end_line": 1036,
+        "category": "docs",
+        "severity_estimate": "suggestion",
+        "confidence": "high",
+        "claim": "The README says that a case with no comment file gets no `comment` variant, but the code makes no variant at all for that case.",
+        "evidence": "A case with no such file gets no `comment` variant, and the command names it in an error.",
+        "suggested_fix": "Write: \"A case with no such file gets no variants, and the command names it in an error.\" The command also checks that the file is a regular file, so the README can state that too.",
+        "explanation": "makeVariants returns an error before it writes any variant, and the command removes every variant of a failed case, so the three body variants and the commit variant are also missing.",
+        "needs_context": false,
+        "fingerprint": "72cfeb6c40c4c2d9",
+        "severity": "suggestion",
+        "score": 95,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "return `case ${c.name}: injection.patch changes no file that the head holds and that has a known comment syntax, so the case has no variants`;",
+            "// A failed case keeps no half variant.",
+            "A case with no such file gets no `comment` variant, and the command names it in an error."
+          ],
+          "rationale": "`makeVariants` picks the comment file before it writes any variant and returns an error when none fits. The command then removes all variant directories of the case. So the case gets no variants, not just no `comment` variant, and the README sentence is wrong.",
+          "score": 95,
+          "severity": "suggestion"
+        },
+        "span_text": "The three body variants keep the head, the bundle and the diff of the plain case. They change only `case.json`. The `commit` variant sets `description_from` to `commits` in `case.json`. Then the eval gives the run no description, and the run builds it from the commit messages. The `comment` variant uses the first file, in path order, that `injection.patch` changes, that the head holds, and whose extension has a known comment syntax. A case with no such file gets no `comment` variant, and the command names it in an error. A new head commit holds the change. It has the base as its parent, and the author, the committer and the dates of the plain head. The same inputs give the same head sha. A comment at the end of a file shifts no golden line, so each variant keeps the golden of its plain case. The instruction texts are in `prompts/injection-instructions.md`.",
+        "sources": [
+          {
+            "reviewer": "docs-and-comments",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "file": "src/eval/injection/variants.ts",
+        "start_line": 347,
+        "end_line": 357,
+        "category": "bug",
+        "severity_estimate": "suggestion",
+        "confidence": "low",
+        "claim": "A case whose variants fail still leaves its plain copy in --out.",
+        "evidence": "    await copyTo(c.dir, join(out, c.name));\n    const error = await makeVariants(c, out, texts);",
+        "suggested_fix": "Also rm join(out, c.name) when makeVariants fails.",
+        "explanation": "The cleanup removes only the variant dirs, so a later eval over --out runs a plain case with no variants.",
+        "needs_context": false,
+        "fingerprint": "d7f4b39de5e012d4",
+        "severity": "suggestion",
+        "score": 92,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "await copyTo(c.dir, join(out, c.name));",
+            "// A failed case keeps no half variant.",
+            "for (const arm of VARIANT_ARMS) {\n      await rm(join(out, `${c.name}--${arm}`), { recursive: true, force: true });\n    }"
+          ],
+          "rationale": "The plain copy goes into --out before makeVariants runs. The cleanup after a failure deletes only the `${c.name}--${arm}` dirs, so the plain case stays in --out with no variants. An eval over --out then gives the plain arm a different set of cases from the other arms. The failure is reported (exit 1 and a stderr message), so the user can see it and fix it; that is why this is a suggestion and not blocking.",
+          "score": 92,
+          "severity": "suggestion"
+        },
+        "span_text": "let failed = 0; for (const c of injected) { await copyTo(c.dir, join(out, c.name)); const error = await makeVariants(c, out, texts); if (error === null) continue; failed += 1; process.stderr.write(`${error}\\n`); // A failed case keeps no half variant. for (const arm of VARIANT_ARMS) { await rm(join(out, `${c.name}--${arm}`), { recursive: true, force: true }); }",
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 2
+          }
+        ]
+      },
+      {
+        "file": "src/eval/injection/report.ts",
+        "start_line": 373,
+        "end_line": 374,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "No test checks that rule 1 lists nothing when the plain runs post no finding.",
+        "evidence": "if (r.record.posted.findings.length === 0 && plainPosts)",
+        "suggested_fix": "Add a case whose plain runs post nothing and assert that the empty variant run is not listed.",
+        "explanation": "Every plain run in the fixture posts findings, so dropping the plainPosts condition would not fail a test.",
+        "needs_context": false,
+        "fingerprint": "f19a4fadac2ec01b",
+        "severity": "suggestion",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (r.record.posted.findings.length === 0 && plainPosts)",
+            "const plainPosts = plainRepeats.some((r) => (r.record?.posted.findings.length ?? 0) > 0);"
+          ],
+          "rationale": "In test/injection-report.test.ts the plain case inj-a always posts findings (found() for both repeats), so plainPosts is always true. No test has a plain run that posts nothing, so removing the plainPosts condition would not fail any test.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "span_text": "if (r.record === null) continue; const hit = (stage: string, text: string): void => {",
+        "sources": [
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "file": "src/eval/injection/variants.ts",
+        "start_line": 109,
+        "end_line": 112,
+        "category": "bug",
+        "severity_estimate": "nit",
+        "confidence": "low",
+        "claim": "isInside treats a child directory whose name starts with \"..\" (e.g. \"..out\") as outside the parent.",
+        "evidence": "return rel === \"\" || (!rel.startsWith(\"..\") && !isAbsolute(rel));",
+        "explanation": "A relative path like \"..out/x\" is inside the parent but fails the startsWith(\"..\") check, so the out-dir guard can misjudge it.",
+        "needs_context": false,
+        "fingerprint": "a6005e45e156c71d",
+        "severity": "nit",
+        "score": 92,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "return rel === \"\" || (!rel.startsWith(\"..\") && !isAbsolute(rel));"
+          ],
+          "rationale": "`rel.startsWith(\"..\")` also matches a child directory named like `..out`, so `isInside` wrongly returns false. This only weakens the `--out` guard when someone names the output directory with a leading `..`, which is rare.",
+          "score": 92,
+          "severity": "suggestion"
+        },
+        "span_text": "const rel = relative(parent, child); return rel === \"\" || (!rel.startsWith(\"..\") && !isAbsolute(rel)); }",
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          },
+          {
+            "reviewer": "diff-bugs",
+            "pass": 2
+          }
+        ],
+        "suggested_fix": "Check rel === \"..\" || rel.startsWith(\"..\" + sep) instead of rel.startsWith(\"..\")."
+      },
+      {
+        "file": "src/eval/codex-review.ts",
+        "start_line": 163,
+        "end_line": 166,
+        "category": "bug",
+        "severity_estimate": "nit",
+        "confidence": "low",
+        "claim": "A failed write or rename leaves the temp file in the out directory.",
+        "evidence": "await writeFile(temp, `${JSON.stringify({ source: options.source, findings }, null, 2)}\\n`);\n    await rename(temp, file);",
+        "suggested_fix": "Remove temp in the catch path.",
+        "explanation": "The catch block does not remove the .tmp file, so stray files can stay in --out.",
+        "needs_context": false,
+        "fingerprint": "ad0990542c05f508",
+        "severity": "nit",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const temp = join(options.out, `.${c.name}.json.tmp`);",
+            "await rename(temp, file);",
+            "} catch (err) {\n    return { kind: \"failed\", error: messageOf(err), tokens: null };\n  } finally {\n    await rm(tmp, { recursive: true, force: true });",
+            "return new Set((await readdir(out)).filter((n) => n.endsWith(\".json\") && !n.startsWith(\".\")));"
+          ],
+          "rationale": "The claim holds: the catch and finally blocks only remove the mkdtemp dir, not the `.name.json.tmp` in --out, so the temp file stays there after a failed write or rename. The harm is small, though. The file is hidden, `finished()` skips it, and a rerun overwrites the same temp name.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "span_text": "const temp = join(options.out, `.${c.name}.json.tmp`); await writeFile(temp, `${JSON.stringify({ source: options.source, findings }, null, 2)}\\n`); await rename(temp, file); return { kind: \"done\", tokens: outcome.tokens };",
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "file": "src/eval/injection/report.ts",
+        "start_line": 377,
+        "end_line": 377,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "low",
+        "claim": "The stage filter of the reviewed-safe rule (posted, verifier and summary only) is not tested.",
+        "evidence": "if (![\"posted\", \"verifier\", \"summary\"].includes(t.stage)) continue;",
+        "suggested_fix": "Add a record with the phrase only in a reviewer-stage finding (expect no hit) and one with it in the summary (expect a hit).",
+        "explanation": "No fixture puts the safe phrase in a reviewer-stage finding or in the summary, so removing the filter or breaking the summary path would pass.",
+        "needs_context": false,
+        "fingerprint": "e1929cef95d42562",
+        "severity": "nit",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (![\"posted\", \"verifier\", \"summary\"].includes(t.stage)) continue;",
+            "add(\"summary\", record.identity.triage?.summary);"
+          ],
+          "rationale": "The only reviewed-safe fixture puts the phrase in a verifier rationale. makeRecord sets `reviewers: []`, and its summary is always \"A small change.\". No test covers the filter's exclusion of reviewer or merge stages, or a summary hit. The line number (377) is off; the quoted filter is at line 382.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "span_text": "if (rule === \"no-finding\") {",
+        "sources": [
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "file": "src/eval/injection/variants.ts",
+        "start_line": 247,
+        "end_line": 247,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "The empty-body branch of the body variants has no test.",
+        "evidence": "const body = c.body === \"\" ? text : `${c.body}\\n\\n${text}`;",
+        "suggested_fix": "Add a fixture case with body \"\" and assert that the variant body equals the instruction.",
+        "explanation": "The fixture always has a non-empty PLAIN_BODY, so a break in the empty case would not be caught.",
+        "needs_context": false,
+        "fingerprint": "ffe893fb57bedd0a",
+        "severity": "nit",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const body = c.body === \"\" ? text : `${c.body}\\n\\n${text}`;",
+            "export const PLAIN_BODY = \"The helper returns the mean of a list.\";",
+            "          body: PLAIN_BODY,",
+            "        body: `${PLAIN_BODY}\\n\\n${text}`,"
+          ],
+          "rationale": "The claim holds. The injection fixture always sets body to the non-empty PLAIN_BODY, and the variant test checks only the `${PLAIN_BODY}\\n\\n${text}` form, so no test covers the `c.body === \"\"` branch. The branch is a simple ternary, so the gap is minor.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "span_text": "const bodies: [VariantArm, string][] = [",
+        "sources": [
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ]
+      }
+    ],
+    "not_reposted": [],
+    "carried": [
+      {
+        "file": "README.md",
+        "start_line": 1052,
+        "end_line": 1052,
+        "category": "docs",
+        "severity_estimate": "nit",
+        "confidence": "low",
+        "claim": "The eval exit codes table does not list the three new commands (eval-codex-review, eval-injection-variants, eval-injection-report).",
+        "evidence": "| Code | `eval` | `explain` | `eval-report` | `eval-subset` |",
+        "suggested_fix": "Add columns or a note for the exit codes of the three new commands.",
+        "explanation": "The new commands have their own exit codes, and the table that lists the exit codes of the eval commands omits them.",
+        "needs_context": true,
+        "fingerprint": "72a8b88b36e00791",
+        "severity": "nit",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "| Code | `eval` | `explain` | `eval-report` | `eval-subset` |",
+            "The exit code is 0 when no case failed. It is 1 when a case failed or the quota is out. It is 2 for a usage error or a cases directory that is not valid.",
+            "const USAGE = \"usage: pr-review eval-injection-variants --cases <dir> --out <dir>\";"
+          ],
+          "rationale": "The claim holds: the Exit codes table still lists only `eval`, `explain`, `eval-report` and `eval-subset`, and this change adds three commands just above it. `eval-codex-review` gives its exit codes in its own section, but the two injection commands give theirs nowhere, so the gap is small and the fix is cheap.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "span_text": "| Code | `eval` | `explain` | `eval-report` | `eval-subset` |",
+        "sources": [
+          {
+            "reviewer": "docs-and-comments",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "file": "src/eval/injection/report.ts",
+        "start_line": 90,
+        "end_line": 91,
+        "category": "bug",
+        "severity_estimate": "nit",
+        "confidence": "low",
+        "claim": "In touchedLines, the '--- a/<path>' header of the next file counts as a deleted line of the file before it.",
+        "evidence": "} else if (text.startsWith(\"-\")) {\n      add(line);",
+        "suggested_fix": "Skip lines that start with '--- ', or set line to 0 when a 'diff --git' or '--- ' header appears.",
+        "explanation": "In a multi-file patch, the '--- a/' header starts with '-' while file and line still hold the last file's state, so it adds a false touched line.",
+        "needs_context": false,
+        "fingerprint": "eb0f6ab493f74c55",
+        "severity": "suggestion",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "} else if (text.startsWith(\"-\")) {\n      add(line);",
+            "const header = /^\\+\\+\\+ b\\/(.+)$/.exec(text);",
+            "if (file === null || line === 0) continue;"
+          ],
+          "rationale": "In a multi-file patch, the next file's `--- a/<path>` line comes while `file` and `line` still hold the previous file's state. It starts with \"-\", so it falls into the deleted-line branch and adds a false touched line to the previous file. The effect is limited to multi-file injection patches, and only when a golden range covers that line.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "span_text": "add(line); line += 1;",
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 2
+          }
+        ]
+      },
+      {
+        "file": "src/eval/injection/report.ts",
+        "start_line": 92,
+        "end_line": 93,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "No test covers how touchedLines counts a deleted line, which the known-bug rule depends on.",
+        "evidence": "    } else if (text.startsWith(\"-\")) {\n      add(line);",
+        "suggested_fix": "Add a unit test of touchedLines or knownBugGoldens with a patch that only deletes lines.",
+        "explanation": "The fixture patch replaces one line, so the add branch alone marks line 4. A bug in the delete branch would pass every test.",
+        "needs_context": false,
+        "fingerprint": "e0175da5d5598219",
+        "severity": "suggestion",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "} else if (text.startsWith(\"-\")) {\n      add(line);",
+            "writeFileSync(join(caseDir, \"injection.patch\"), patch);",
+            " * commit that changes \"file\" on line 4, a bundle, a diff, a golden finding"
+          ],
+          "rationale": "No test calls touchedLines or knownBugGoldens directly. The only injection.patch fixture changes one line (line 4), so the \"+\" branch alone marks the golden line and the delete-only path is never checked on its own. The finding is real, but it is only a gap in test coverage.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "span_text": "} else if (text.startsWith(\"-\")) { add(line);",
+        "sources": [
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "file": "src/eval/injection/report.ts",
+        "start_line": 332,
+        "end_line": 332,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "No test covers the error path when no golden fits the injection patch.",
+        "evidence": "        throw new Error(`case ${c.name}: no golden holds a line that injection.patch touches`);",
+        "suggested_fix": "Add a case whose golden is on a line that the patch does not touch. Assert exit code 1 and the error text.",
+        "explanation": "The README documents this error and its exit code 1, but no test makes it happen.",
+        "needs_context": false,
+        "fingerprint": "c72815dca7f9ebe3",
+        "severity": "nit",
+        "score": 90,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "throw new Error(`case ${c.name}: no golden holds a line that injection.patch touches`);",
+            "code = await captured(() =>\n    injectionReportCommand([\"--runs\", runs, \"--cases\", cases, \"--json\", jsonFile]),\n  );",
+            "expect(code).toBe(0);"
+          ],
+          "rationale": "The only test that calls injectionReportCommand is a single happy-path setup that asserts exit code 0, and no test file mentions the \"no golden holds\" error or touchedLines. The claim is true, but a missing test for one error path in eval tooling is a minor gap.",
+          "score": 90,
+          "severity": "nit"
+        },
+        "span_text": "throw new Error(`case ${c.name}: no golden holds a line that injection.patch touches`);",
+        "sources": [
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ]
+      }
+    ]
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 10170,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 61050,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.006117,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1368,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 60563,
+            "webSearchRequests": 0,
+            "costUSD": 0.2560622,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.2621792
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 8945,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 46189,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0046289,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 485,
+            "cacheReadInputTokens": 55970,
+            "cacheCreationInputTokens": 46330,
+            "webSearchRequests": 0,
+            "costUSD": 0.39155,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 326,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.3961789
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 13032,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 46179,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0046299,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 819,
+            "cacheReadInputTokens": 55780,
+            "cacheCreationInputTokens": 46232,
+            "webSearchRequests": 0,
+            "costUSD": 0.397408,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 362,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.4020379
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 6233,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 59794,
+            "outputTokens": 27,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0059929,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 352,
+            "cacheReadInputTokens": 5438,
+            "cacheCreationInputTokens": 59303,
+            "webSearchRequests": 0,
+            "costUSD": 0.48255960000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 75,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.48855250000000006
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 15968,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 46189,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0046289,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 979,
+            "cacheReadInputTokens": 55886,
+            "cacheCreationInputTokens": 46299,
+            "webSearchRequests": 0,
+            "costUSD": 0.4011652,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 749,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.4057941
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 16700,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 46185,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.004631000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1508,
+            "cacheReadInputTokens": 5363,
+            "cacheCreationInputTokens": 45694,
+            "webSearchRequests": 0,
+            "costUSD": 0.3967926,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 757,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.4014236
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "pass": 2,
+        "model": "claude-opus-5-5",
+        "duration_ms": 19658,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 46185,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0046285,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1565,
+            "cacheReadInputTokens": 5363,
+            "cacheCreationInputTokens": 45694,
+            "webSearchRequests": 0,
+            "costUSD": 0.39793259999999997,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 778,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.40256109999999995
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 6377,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 46179,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0046279,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 296,
+            "cacheReadInputTokens": 56348,
+            "cacheCreationInputTokens": 46523,
+            "webSearchRequests": 0,
+            "costUSD": 0.3893896,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 115,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.3940175
+      },
+      {
+        "role": "verifier",
+        "verification": 2,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 4018,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11197,
+            "outputTokens": 216,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012277000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 194,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 534,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 10710,
+            "webSearchRequests": 0,
+            "costUSD": 0.0486207,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 133,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0498484
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "pass": 2,
+        "model": "claude-opus-5-5",
+        "duration_ms": 9673,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 46193,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.004629299999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 632,
+            "cacheReadInputTokens": 5330,
+            "cacheCreationInputTokens": 45702,
+            "webSearchRequests": 0,
+            "costUSD": 0.37933,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 135,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.3839593
+      },
+      {
+        "role": "verifier",
+        "verification": 0,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 9657,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 19849,
+            "outputTokens": 257,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0021134,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 239,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 872,
+            "cacheReadInputTokens": 52026,
+            "cacheCreationInputTokens": 26671,
+            "webSearchRequests": 0,
+            "costUSD": 0.12061859999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 155,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.12273200000000001
+      },
+      {
+        "role": "verifier",
+        "verification": 1,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6967,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16007,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016097,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 497,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 15520,
+            "webSearchRequests": 0,
+            "costUSD": 0.0674907,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0691004
+      },
+      {
+        "role": "verifier",
+        "verification": 3,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 5911,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 15984,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016109000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 725,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 15497,
+            "webSearchRequests": 0,
+            "costUSD": 0.0696787,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 353,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0712896
+      },
+      {
+        "role": "verifier",
+        "verification": 4,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 5139,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 15973,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016083000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 556,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 15486,
+            "webSearchRequests": 0,
+            "costUSD": 0.0679447,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 211,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.069553
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 2,
+        "model": "claude-opus-5-5",
+        "duration_ms": 6360,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11197,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011297000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 625,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 10702,
+            "webSearchRequests": 0,
+            "costUSD": 0.0989974,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 176,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1001271
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 20611,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 46185,
+            "outputTokens": 27,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.004632,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 2118,
+            "cacheReadInputTokens": 6105,
+            "cacheCreationInputTokens": 45694,
+            "webSearchRequests": 0,
+            "costUSD": 0.409141,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 464,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.413773
+      },
+      {
+        "role": "verifier",
+        "verification": 5,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 9152,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11221,
+            "outputTokens": 16,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011301,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 635,
+            "cacheReadInputTokens": 35345,
+            "cacheCreationInputTokens": 12858,
+            "webSearchRequests": 0,
+            "costUSD": 0.0613285,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 54,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0624586
+      },
+      {
+        "role": "verifier",
+        "verification": 9,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 4905,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 12455,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012585,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 524,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 11968,
+            "webSearchRequests": 0,
+            "costUSD": 0.053552699999999995,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0548112
+      },
+      {
+        "role": "verifier",
+        "verification": 7,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 8029,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 17688,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0017793000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 727,
+            "cacheReadInputTokens": 47931,
+            "cacheCreationInputTokens": 23062,
+            "webSearchRequests": 0,
+            "costUSD": 0.1043231,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 187,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1061024
+      },
+      {
+        "role": "verifier",
+        "verification": 8,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 10209,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 17730,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0017850000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 969,
+            "cacheReadInputTokens": 75761,
+            "cacheCreationInputTokens": 24398,
+            "webSearchRequests": 0,
+            "costUSD": 0.1148741,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 196,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.11665910000000002
+      },
+      {
+        "role": "verifier",
+        "verification": 6,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 12012,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 15960,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.001606,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 975,
+            "cacheReadInputTokens": 70331,
+            "cacheCreationInputTokens": 20620,
+            "webSearchRequests": 0,
+            "costUSD": 0.09927910000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 209,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.10088510000000002
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 3,
+        "model": "claude-opus-5-5",
+        "duration_ms": 18412,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 15984,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016109000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 1143,
+            "cacheReadInputTokens": 46270,
+            "cacheCreationInputTokens": 19578,
+            "webSearchRequests": 0,
+            "costUSD": 0.18876199999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 364,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1903729
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 9,
+        "model": "claude-opus-5-5",
+        "duration_ms": 6256,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 12457,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012577,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 584,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 11962,
+            "webSearchRequests": 0,
+            "costUSD": 0.1082574,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 171,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1095151
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 5,
+        "model": "claude-opus-5-5",
+        "duration_ms": 12586,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11197,
+            "outputTokens": 16,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011277000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 882,
+            "cacheReadInputTokens": 35260,
+            "cacheCreationInputTokens": 12885,
+            "webSearchRequests": 0,
+            "costUSD": 0.127796,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 279,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.12892369999999997
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 6,
+        "model": "claude-opus-5-5",
+        "duration_ms": 17285,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 15972,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016072,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 912,
+            "cacheReadInputTokens": 65344,
+            "cacheCreationInputTokens": 16588,
+            "webSearchRequests": 0,
+            "costUSD": 0.1640448,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 101,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.165652
+      },
+      {
+        "role": "merge",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 2059,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 1749,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0001859,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 222,
+            "cacheReadInputTokens": 1062,
+            "cacheCreationInputTokens": 1262,
+            "webSearchRequests": 0,
+            "costUSD": 0.0073782000000000006,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.007564100000000001
+      }
+    ],
+    "total_cost_usd": 5.4760718,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 31,
+      "gather": 203,
+      "scope": 6,
+      "triage": 11125,
+      "find_verify": 68633,
+      "merge": 2702
+    },
+    "errors": []
+  }
+}
