@@ -22,6 +22,9 @@ import {
 } from "./config/models.js";
 import { registerLabelCommand } from "./eval/label/index.js";
 import { registerPoolCommands } from "./eval/pool/index.js";
+import { codexReviewCommand } from "./eval/codex-review.js";
+import { injectionReportCommand } from "./eval/injection/report.js";
+import { injectionVariantsCommand } from "./eval/injection/variants.js";
 import { runEvalReport } from "./eval/offline.js";
 import { runEval } from "./eval/run.js";
 import { runEvalSizes } from "./eval/sizes.js";
@@ -840,6 +843,38 @@ export function createProgram(deps: ProgramDeps): Command {
 
   registerLabelCommand(program, deps);
   registerPoolCommands(program, deps);
+
+  // The D4c tools of the Terra and E6 arms. Each command parses its own
+  // options, so commander passes every argument through unchanged.
+  const passThrough: [string, string, (args: string[]) => Promise<number>][] = [
+    [
+      "eval-codex-review",
+      "Run the general-review prompt through Codex on each case, and write outside candidates.",
+      codexReviewCommand,
+    ],
+    [
+      "eval-injection-variants",
+      "Make the E6 variant cases of each injection case.",
+      injectionVariantsCommand,
+    ],
+    [
+      "eval-injection-report",
+      "Report the E6 runs: the share that found the known bug, and the outputs that may follow an instruction.",
+      injectionReportCommand,
+    ],
+  ];
+  for (const [name, description, run] of passThrough) {
+    program
+      .command(name)
+      .description(description)
+      .helpOption(false)
+      .allowUnknownOption()
+      .allowExcessArguments()
+      .argument("[args...]")
+      .action(async (args: string[]) => {
+        process.exitCode = await run(args);
+      });
+  }
 
   return program;
 }
