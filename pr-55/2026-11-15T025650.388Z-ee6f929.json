@@ -1,0 +1,514 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 55,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Give each D4c experiment a method, a budget and a decision rule",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/55"
+    },
+    "run_kind": "later",
+    "prior": {
+      "head": "d4518ca16bf8e459344ae9d3d409b0602410970e",
+      "source": "record",
+      "record": "/home/runner/work/_temp/pr-review-records/pr-55/2026-11-15T025148.724Z-d4518ca.json",
+      "open": [],
+      "dismissed": [],
+      "fetch_failed": false
+    },
+    "base": "ca403bc3646370ae73802d6d1682980de43f9756",
+    "head": "ee6f929d88606f4dd16fe830ed8ec58f0009dce7",
+    "started_at": "2026-11-15T02:56:50.388Z",
+    "tool_version": "0.13.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Give each D4c experiment a method, a budget and a decision rule\n\nThis PR changes the D4c entry of `TICKETS.md`. It changes no code.\n\n## Why\n\nThe D4c entry gave one line for each of six experiments, with no method and no decision rule. D4b and D8 showed what that costs: a paid run that could not be stopped and continued, an estimate that the first two cases broke, and a decision rule that could not fail. The principal also asked for wider questions.\n\n## What changes\n\n**Rules for every experiment.** A paid probe of two cases before a full run. A test that the decision rule can give each of its results. One paid run at a time. Records under the crew record root. No experiment has a budget: a run takes the plan windows that it needs, and each note reports its spend.\n\n**Shared parts.** One reference run of the full pipeline with stored records (S1), a replay tool that verifies stored candidates again (S2), size groups of the cases (S3), and an eval option for the model and the effort of the reviewers (S4).\n\n**The experiments:**\n\n- **E1**: the model and the effort of every reviewer. Arms: Opus low (today), Opus medium, Sonnet medium, Sonnet high, on all 28 cases. One run of an arm measures all seven reviewers. Two more arms, Haiku at medium and at high, run the three light reviewers only.\n- **E2**: the specialist set against one Opus reviewer at medium, one at high, and one Terra reviewer at high effort. It reports by PR size and looks for the size where the specialists become better. It uses all 28 cases, with a second table by case source.\n- **E3**: the model and the effort of the first verifier. Arms: Sonnet high (today), Sonnet medium, Opus low, Terra medium, on the same stored candidates. Opus medium runs only if Opus low passes. The note reports truth and severity apart.\n- **E3b**: where the severity label comes from. One verifier call for truth and severity, as today, against a verifier for truth and a separate severity step, for each finding or for each PR.\n- **E4, E5, E6**: the score scale, the cap, and a prompt injection. Each has a method and a rule.\n- **E7**: the five follow-ups that name D4c. The S1 records answer two of them with no model call, among them the passes of diff-bugs and security.\n\n**Lower cost with the same results.**\n\n- E1 has two stages: the reviewers run with no verifier first, and only the reviewer and arm pairs that the raw candidates do not reject go to the verifier.\n- A replay makes no escalation call. The escalation runs only for the arm that an experiment selects.\n- E3b uses the truth results of E3, after a check on 30 candidates.\n- E4 runs last, on the verifier that E3 and E3b select.\n- The Terra verifier arm starts on a sample, and Codex steps run beside plan runs.\n- The D8 records give more samples of the first arm of E1, and E7 runs before E1 so that E1 uses the pass defaults that E7 leaves.\n\n**Second-family models.** Each Codex arm states its reasoning effort. This round uses Terra; the Sol arms are for a later round.\n\n## What a reviewer must check\n\n- **E1 and the noise between runs.** Two arms of E1 are two runs, so they are not paired. The entry requires the note to report the noise of one pass and to claim no smaller difference.\n- **E3b and the goldens.** The severity labels of the goldens came from the labeler, which is Opus with a Sol judge. A severity step on Opus can agree with those labels for that reason. The note must state this limit.\n- **The numbers in the rules** (two times the cost, 0.05, 90% intervals) follow the D8 rule.\n\n## Verification\n\n`npm test` (1503 tests), `npm run lint`, `npm run typecheck` and `npm run build` pass.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZeE9g8BLHRTtXEThp4\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": "TICKETS.md",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "fast",
+      "reason": "The change only edits a planning document (TICKETS.md) that no code reads, so it cannot cause a runtime bug, but its decision rules and figures are substantive and deserve a light check.",
+      "confidence": "medium",
+      "categories": [
+        "docs"
+      ],
+      "hotspots": [
+        "TICKETS.md: D4c 'Rules for every experiment' (the no-budget rule contradicts the old budget rule)",
+        "TICKETS.md: E1 and E3 decision rules (the thresholds and the bootstrap wording should be consistent)",
+        "TICKETS.md: 'Order' section and the cost estimates (should match the dependencies between S1, S2, E7, E3, E3b, E4)"
+      ],
+      "file_notes": [
+        {
+          "file": "TICKETS.md",
+          "note": "Documentation only. It rewrites the D4c ticket into shared rules, shared tooling parts S1-S4, and experiments E1-E7 with decision rules and run order. It adds no code."
+        }
+      ],
+      "summary": "The change rewrites the D4c \"First experiments\" ticket in TICKETS.md. It replaces a short bullet list with shared rules (probe first, no budget, one paid run at a time, Codex quota), shared tooling parts S1-S4, and detailed experiments E1-E7, each with arms, decision rules and limits. It also adds a run order and cost estimates. No code or configuration changes."
+    },
+    "tier": "fast",
+    "tier_reason": "Triage: The change only edits a planning document (TICKETS.md) that no code reads, so it cannot cause a runtime bug, but its decision rules and figures are substantive and deserve a light check.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= fast; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= fast; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 2809,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 9120,
+              "outputTokens": 23,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0009235000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 85,
+              "cacheReadInputTokens": 5136,
+              "cacheCreationInputTokens": 8629,
+              "webSearchRequests": 0,
+              "costUSD": 0.0717672,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0726907
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "TICKETS.md",
+            "start_line": 178,
+            "end_line": 178,
+            "category": "bug",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "The Terra sample takes every candidate that matches a golden plus an equal count of the others, so its precision and recall are biased, and the E3 rules cannot be applied to them directly.",
+            "evidence": "every candidate that matches a golden, and an equal count of the others, drawn with a fixed seed. Run Terra on the other candidates only if its figures on the sample are within 0.05 of a rule.",
+            "suggested_fix": "Compare Terra with the current verifier on the same sample, or reweight the sample figures to the full set, and name the rule that applies.",
+            "explanation": "The sample has a different share of real candidates than the full set, so the 0.05 test would compare figures from two different populations, and the ticket does not say which rule applies.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 10328,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 9122,
+              "outputTokens": 27,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0009257,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 822,
+              "cacheReadInputTokens": 19357,
+              "cacheCreationInputTokens": 9249,
+              "webSearchRequests": 0,
+              "costUSD": 0.0943194,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 361,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0952451
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "TICKETS.md",
+          "start_line": 178,
+          "end_line": 178,
+          "category": "bug",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "The Terra sample takes every candidate that matches a golden plus an equal count of the others, so its precision and recall are biased, and the E3 rules cannot be applied to them directly.",
+          "evidence": "every candidate that matches a golden, and an equal count of the others, drawn with a fixed seed. Run Terra on the other candidates only if its figures on the sample are within 0.05 of a rule.",
+          "suggested_fix": "Compare Terra with the current verifier on the same sample, or reweight the sample figures to the full set, and name the rule that applies.",
+          "explanation": "The sample has a different share of real candidates than the full set, so the 0.05 test would compare figures from two different populations, and the ticket does not say which rule applies.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "The Terra arm starts on a sample, because the Codex quota is small: every candidate that matches a golden, and an equal count of the others, drawn with a fixed seed. Run Terra on the other candidates only if its figures on the sample are within 0.05 of a rule."
+          ],
+          "rationale": "The sample over-represents golden-matching candidates, so sample precision is biased, and \"within 0.05 of a rule\" does not say which rule or which baseline applies. Recall is not biased, because every golden-matching candidate is included. The stored S1 records allow a same-sample comparison with the current verifier, so this is a minor wording gap.",
+          "score": 45,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "The Terra arm starts on a sample, because the Codex quota is small: every candidate that matches a golden, and an equal count of the others, drawn with a fixed seed. Run Terra on the other candidates only if its figures on the sample are within 0.05 of a rule."
+          ],
+          "rationale": "The sample over-represents golden-matching candidates, so sample precision is biased, and \"within 0.05 of a rule\" does not say which rule or which baseline applies. Recall is not biased, because every golden-matching candidate is included. The stored S1 records allow a same-sample comparison with the current verifier, so this is a minor wording gap.",
+          "score": 45,
+          "severity": "nit"
+        },
+        "passed": false,
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "diff-bugs"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5908759985,
+      "review_url": "https://github.com/jerridan/pr-review/pull/55#pullrequestreview-5908759985",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 132678127809
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 4550,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7289,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007419000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 596,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 6802,
+            "webSearchRequests": 0,
+            "costUSD": 0.0332982,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0340401
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 2809,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9120,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009235000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 85,
+            "cacheReadInputTokens": 5136,
+            "cacheCreationInputTokens": 8629,
+            "webSearchRequests": 0,
+            "costUSD": 0.0717672,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0726907
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 10328,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9122,
+            "outputTokens": 27,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009257,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 822,
+            "cacheReadInputTokens": 19357,
+            "cacheCreationInputTokens": 9249,
+            "webSearchRequests": 0,
+            "costUSD": 0.0943194,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 361,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0952451
+      },
+      {
+        "role": "verifier",
+        "verification": 0,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 12972,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 27013,
+            "outputTokens": 27,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0027148000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 1724,
+            "cacheReadInputTokens": 8734,
+            "cacheCreationInputTokens": 53079,
+            "webSearchRequests": 0,
+            "costUSD": 0.23043740000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 908,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.2331522
+      }
+    ],
+    "total_cost_usd": 0.4351281,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 39,
+      "gather": 38,
+      "scope": 3,
+      "triage": 5516,
+      "find_verify": 24553,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
