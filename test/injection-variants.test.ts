@@ -1,10 +1,15 @@
-import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, readlinkSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { loadCases } from "../src/eval/case.js";
 import { cloneCase } from "../src/eval/checkout.js";
-import { injectionInstructions, injectionVariantsCommand } from "../src/eval/injection/variants.js";
+import {
+  injectionInstructions,
+  injectionVariantsCommand,
+  realPathOf,
+} from "../src/eval/injection/variants.js";
 import {
   BUG_LINE,
   PLAIN_BODY,
@@ -15,6 +20,7 @@ import {
 } from "./fixtures/injection-cases.js";
 import { captureOutput, output, tempDir, cleanup } from "./fixtures/eval-fixture.js";
 
+const PACKAGE_ROOT = fileURLToPath(new URL("..", import.meta.url));
 const made: string[] = [];
 let input: ReturnType<typeof makeInjectionCases>;
 let out = "";
@@ -152,14 +158,47 @@ describe("pr-review eval-injection-variants", () => {
     expect(hashTree(input.dir)).toBe(inputHash);
   });
 
-  it("fails before any write when --out is inside eval/cases under the working directory", async () => {
-    const cwd = tempDir("variants-cwd", made);
-    mkdirSync(join(cwd, "eval", "cases"), { recursive: true });
-    vi.spyOn(process, "cwd").mockReturnValue(cwd);
-    const target = join(cwd, "eval", "cases", "new");
+  it("fails before any write when --out is inside eval/cases of the package, from any working directory", async () => {
+    const elsewhere = tempDir("variants-cwd", made);
+    vi.spyOn(process, "cwd").mockReturnValue(elsewhere);
+    const target = join(PACKAGE_ROOT, "eval", "cases", "pr-review-variants-test-new");
     expect(await injectionVariantsCommand(["--cases", input.dir, "--out", target])).not.toBe(0);
     expect(existsSync(target)).toBe(false);
   });
+
+  it("gives the real path of a path whose parent is the filesystem root", async () => {
+    expect(await realPathOf("/pr-review-no-such-dir/child")).toBe("/pr-review-no-such-dir/child");
+    expect(await realPathOf("/pr-review-no-such-dir")).toBe("/pr-review-no-such-dir");
+  });
+
+  it("puts the comment in a regular file, not in a symlink that sorts first", async () => {
+    const link = makeInjectionCases([
+      { name: "inj-link", file: "src/mean.ts", symlink: "a-link.ts" },
+    ]);
+    made.push(join(link.dir, ".."));
+    const target = join(tempDir("variants-link", made), "out");
+    expect(await injectionVariantsCommand(["--cases", link.dir, "--out", target])).toBe(0);
+    const variant = (await loadCases(target)).find((c) => c.name === "inj-link--comment");
+    if (!variant) throw new Error("missing case");
+    const checkout = await cloneCase(variant, join(tempDir("variants-clone", made), "repo"));
+    expect(git(checkout, "ls-tree", variant.head, "--", "a-link.ts")).toMatch(/^120000 /);
+    expect(readlinkSync(join(checkout, "a-link.ts"))).toBe("src/mean.ts");
+    const file = readFileSync(join(checkout, "src/mean.ts"), "utf8");
+    expect(file.trimEnd().split("\n").at(-1)).toBe(`// ${instructions.reviewedSafe}`);
+  }, 60_000);
+
+  it("keeps the CRLF line ending of the file in the comment variant", async () => {
+    const crlf = makeInjectionCases([{ name: "inj-crlf", file: "src/mean.ts", crlf: true }]);
+    made.push(join(crlf.dir, ".."));
+    const target = join(tempDir("variants-crlf", made), "out");
+    expect(await injectionVariantsCommand(["--cases", crlf.dir, "--out", target])).toBe(0);
+    const variant = (await loadCases(target)).find((c) => c.name === "inj-crlf--comment");
+    if (!variant) throw new Error("missing case");
+    const checkout = await cloneCase(variant, join(tempDir("variants-clone", made), "repo"));
+    const file = readFileSync(join(checkout, "src/mean.ts"), "utf8");
+    expect(file.endsWith(`// ${instructions.reviewedSafe}\r\n`)).toBe(true);
+    expect(/(?<!\r)\n/.test(file)).toBe(false);
+  }, 60_000);
 
   it("fails before any write when the input holds no injection case", async () => {
     const only = makeInjectionCases([{ name: "only-pr", file: "src/mean.ts", source: "pr" }]);

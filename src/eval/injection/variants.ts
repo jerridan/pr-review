@@ -3,18 +3,20 @@
 // the head commit message. One puts it in a code comment. The command makes
 // no model call. The texts of the instructions are in
 // prompts/injection-instructions.md.
-import { execFile } from "node:child_process";
 import { cp, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { promisify } from "node:util";
 import { runGit } from "../../gather/worktree.js";
 import { loadPrompt } from "../../prompts/load.js";
 import { CaseError, loadCases, VARIANT_ARMS, type Case, type VariantArm } from "../case.js";
 import { cloneCase } from "../checkout.js";
 
-const execFileAsync = promisify(execFile);
+// This file is at src/eval/injection/ and at dist/eval/injection/. In both
+// cases the package root is three levels up. The prompt loader finds
+// prompts/ in the same way.
+const PINNED_CASES_DIR = fileURLToPath(new URL("../../../eval/cases", import.meta.url));
 
 /** The texts and the key phrases of prompts/injection-instructions.md. */
 export type InjectionInstructions = {
@@ -92,14 +94,14 @@ function messageOf(err: unknown): string {
 
 // The real path of "path", also when the path does not exist yet: the
 // longest existing part is resolved, and the rest is added back.
-async function realPathOf(path: string): Promise<string> {
+export async function realPathOf(path: string): Promise<string> {
   const full = resolve(path);
   try {
     return await realpath(full);
   } catch {
     const parent = dirname(full);
     if (parent === full) return full;
-    return join(await realPathOf(parent), full.slice(parent.length + 1));
+    return join(await realPathOf(parent), relative(parent, full));
   }
 }
 
@@ -115,30 +117,23 @@ function patchFiles(patch: string): string[] {
   return [...files].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 }
 
-async function gitEnv(repo: string, args: string[], env: Record<string, string>): Promise<string> {
-  const base: NodeJS.ProcessEnv = { ...process.env, GIT_TERMINAL_PROMPT: "0" };
-  for (const name of ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR"]) {
-    delete base[name];
-  }
-  const { stdout } = await execFileAsync(
-    "git",
-    ["-C", repo, "-c", "commit.gpgsign=false", ...args],
-    { env: { ...base, ...env }, encoding: "utf8", maxBuffer: 512 * 1024 * 1024 },
-  );
-  return stdout;
+// The git modes of a regular file. A symlink (120000) or a submodule
+// (160000) is not a file that can hold a comment.
+const REGULAR_MODES = ["100644", "100755"];
+
+// The git mode of "file" in the head, or null when the head has no such path.
+async function modeOf(checkout: string, head: string, file: string): Promise<string | null> {
+  const listed = await runGit(checkout, ["ls-tree", head, "--", file]);
+  return listed === "" ? null : (listed.split(" ")[0] ?? null);
 }
 
-// The first file of the injection patch that the head holds and that has a
-// known comment syntax. Null when there is none.
+// The first file of the injection patch that the head holds as a regular
+// file and that has a known comment syntax. Null when there is none.
 async function commentFile(checkout: string, c: Case, patch: string): Promise<string | null> {
   for (const file of patchFiles(patch)) {
     if (COMMENT_SYNTAX[extname(file).toLowerCase()] === undefined) continue;
-    try {
-      await runGit(checkout, ["cat-file", "-e", `${c.head}:${file}`]);
-      return file;
-    } catch {
-      continue;
-    }
+    const mode = await modeOf(checkout, c.head, file);
+    if (mode !== null && REGULAR_MODES.includes(mode)) return file;
   }
   return null;
 }
@@ -171,21 +166,22 @@ async function makeHead(
   if (change !== null) {
     const index = join(scratch, "index");
     const env = { GIT_INDEX_FILE: index };
-    await gitEnv(checkout, ["read-tree", c.head], env);
-    const listed = await runGit(checkout, ["ls-tree", c.head, "--", change.file]);
-    const mode = listed.split(" ")[0] ?? "100644";
+    await runGit(checkout, ["read-tree", c.head], env);
+    const mode = (await modeOf(checkout, c.head, change.file)) ?? "100644";
     const old = await runGit(checkout, ["show", `${c.head}:${change.file}`]);
+    // The new line has the line ending of the file: CRLF stays CRLF.
+    const eol = old.includes("\r\n") ? "\r\n" : "\n";
     const blobFile = join(scratch, "blob");
-    await writeFile(blobFile, `${old.endsWith("\n") ? old : `${old}\n`}${change.text}\n`);
-    const blob = (await gitEnv(checkout, ["hash-object", "-w", blobFile], {})).trim();
-    await gitEnv(checkout, ["update-index", "--cacheinfo", `${mode},${blob},${change.file}`], env);
-    tree = (await gitEnv(checkout, ["write-tree"], env)).trim();
+    await writeFile(blobFile, `${old.endsWith("\n") ? old : `${old}${eol}`}${change.text}${eol}`);
+    const blob = (await runGit(checkout, ["hash-object", "-w", blobFile])).trim();
+    await runGit(checkout, ["update-index", "--cacheinfo", `${mode},${blob},${change.file}`], env);
+    tree = (await runGit(checkout, ["write-tree"], env)).trim();
   }
   const messageFile = join(scratch, "message");
   await writeFile(messageFile, `${message}\n`);
-  const sha = await gitEnv(
+  const sha = await runGit(
     checkout,
-    ["commit-tree", tree, "-p", c.base, "-F", messageFile],
+    ["-c", "commit.gpgsign=false", "commit-tree", tree, "-p", c.base, "-F", messageFile],
     identity,
   );
   return sha.trim();
@@ -323,7 +319,7 @@ export async function injectionVariantsCommand(args: string[]): Promise<number> 
   }
   const input = await realPathOf(values.cases);
   const out = await realPathOf(values.out);
-  const pinned = await realPathOf(join(process.cwd(), "eval", "cases"));
+  const pinned = await realPathOf(PINNED_CASES_DIR);
   if (isInside(out, input)) {
     process.stderr.write(`--out is inside the input directory ${input}. Nothing was written.\n`);
     return 2;
