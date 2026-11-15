@@ -214,8 +214,8 @@ describe("pr-review explain on a review with one finding of each outcome (R10.5,
           if (m.includes("CLAIM-PREEXISTING")) {
             return verdict({ in_scope: false, introduced_by_pr: false });
           }
-          if (m.includes("CLAIM-SUGGEST-A")) return verdict({ score: 92, severity: "suggestion" });
-          if (m.includes("CLAIM-SUGGEST-B")) return verdict({ score: 91, severity: "suggestion" });
+          if (m.includes("CLAIM-SUGGEST-A")) return verdict({ score: 92, severity: "nit" });
+          if (m.includes("CLAIM-SUGGEST-B")) return verdict({ score: 91, severity: "nit" });
           return verdict({});
         }
         case "merge":
@@ -279,7 +279,7 @@ describe("pr-review explain on a review with one finding of each outcome (R10.5,
       "dropped",
       "suppressed by rule SUPPRESS-RULE: CI speed is out of scope",
     );
-    expectRow("CLAIM-SUGGEST-A", "post", "kept", "posted as suggestion");
+    expectRow("CLAIM-SUGGEST-A", "post", "kept", "posted as nit");
     expectRow("CLAIM-SUGGEST-B", "cap", "dropped", "capped: over the non-blocking cap");
     expectRow("CLAIM-PREEXISTING", "scope", "dropped", "pre-existing: out of scope");
 
@@ -305,7 +305,7 @@ describe("pr-review explain on a review with one finding of each outcome (R10.5,
       end_line: 5,
       category: "convention",
       evidence: "runs-on: ubuntu-latest",
-      severity: "suggestion",
+      severity: "nit",
     });
     expect(typeof suggest?.fingerprint).toBe("string");
   });
