@@ -818,7 +818,7 @@ The paired scoring asks the judge about the pairs of each one-pass set that the 
 
 ### The by-pass report
 
-`pr-review eval-report --by-pass --cases <dir> --out <dir> [--ask-missing [--allow-api-key]] [--format table|json]` adds the by-pass section (`by_pass` in the JSON output). The section treats the two passes of one reviewer as two independent samples of one pass. Use it on the records of an eval with `--paired`.
+`pr-review eval-report --by-pass --cases <dir> --out <dir> [--ask-missing [--allow-api-key]] [--format table|json]` adds the by-pass section (`by_pass` in the JSON output). The section treats the two passes of one reviewer as two independent samples of one pass. Use it on the records of an eval with `--paired` and with two passes of the reviewers to measure. Since 0.17.0, every built-in reviewer runs one pass by default, so give them with `--passes`, for example `--passes diff-bugs=2,security=2`.
 
 | Flag | Meaning |
 |------|---------|
