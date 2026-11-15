@@ -67,11 +67,11 @@ function loadError(path: string): ReviewerLoadError {
 const BUILTINS: { name: string; minTier: "fast" | "full"; passes: number }[] = [
   { name: "conventions", minTier: "fast", passes: 1 },
   { name: "description-drift", minTier: "full", passes: 1 },
-  { name: "diff-bugs", minTier: "fast", passes: 2 },
+  { name: "diff-bugs", minTier: "fast", passes: 1 },
   { name: "docs-and-comments", minTier: "full", passes: 1 },
   { name: "general-review", minTier: "fast", passes: 1 },
   { name: "history", minTier: "full", passes: 1 },
-  { name: "security", minTier: "full", passes: 2 },
+  { name: "security", minTier: "full", passes: 1 },
   { name: "tests", minTier: "full", passes: 1 },
 ];
 

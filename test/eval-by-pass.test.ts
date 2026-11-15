@@ -188,6 +188,13 @@ async function evalRun(
         "--paired",
         "--reviewers",
         reviewers,
+        // The frontmatter gives one pass, so the test sets two itself.
+        "--passes",
+        reviewers
+          .split(",")
+          .filter((n) => n === "diff-bugs" || n === "security")
+          .map((n) => `${n}=2`)
+          .join(","),
         "--format",
         "json",
         ...extra,

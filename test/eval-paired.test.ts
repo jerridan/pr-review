@@ -184,6 +184,8 @@ async function evalPaired(): Promise<{
         "--repeat",
         "2",
         "--paired",
+        "--passes",
+        "diff-bugs=2,security=2",
         "--format",
         "json",
       ]),
@@ -206,6 +208,8 @@ async function evalInto(out: string, ...extra: string[]): Promise<number> {
       cases,
       "--out",
       out,
+      "--passes",
+      "diff-bugs=2,security=2",
       ...extra,
     ]),
   );

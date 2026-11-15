@@ -1317,7 +1317,9 @@ describe("the seven built-in reviewers in a run (R1, R6)", () => {
     record.stages.reviewers.filter((r) => r.name === name).map((r) => r.pass);
 
   it("selects all seven at tier full, with two passes for diff-bugs and security", async () => {
-    const f = await fixtureWith(null);
+    const f = await fixtureWith(
+      "reviewers:\n  diff-bugs:\n    passes: 2\n  security:\n    passes: 2\n",
+    );
     const { record } = await review(f, "seven-full", "full");
     expect(record.identity.selected_reviewers.map((r) => r.name).sort()).toEqual(SEVEN);
     expect([...record.posted.coverage.reviewers_ran].sort()).toEqual(SEVEN);
@@ -1379,7 +1381,7 @@ describe("the seven built-in reviewers in a run (R1, R6)", () => {
     const others = SEVEN.filter((n) => n !== "diff-bugs")
       .map((n) => `  ${n}:\n    enabled: false\n`)
       .join("");
-    const f = await fixtureWith(`reviewers:\n${others}`);
+    const f = await fixtureWith(`reviewers:\n${others}  diff-bugs:\n    passes: 2\n`);
     const { record, fake } = await review(f, "seven-dedupe", "full");
     expect(record.stages.reviewers.map((r) => [r.name, r.pass, r.findings.length])).toEqual([
       ["diff-bugs", 1, 1],
@@ -1582,7 +1584,8 @@ describe("the token ceiling (R8)", () => {
     "tests",
   ]
     .map((n) => `  ${n}:\n    enabled: false\n`)
-    .join("");
+    .join("")
+    .concat("  diff-bugs:\n    passes: 2\n");
 
   // 300 + 200 + 50 + 50 = 600 tokens for each reviewer query.
   const USAGE = {
