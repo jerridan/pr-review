@@ -215,6 +215,8 @@ async function repeatNumbers(dir: string): Promise<number[]> {
   }
 }
 
+// The record of one repeat. Give null when the record is missing. Throw when
+// the file exists and is not a valid record.
 async function readRecordOf(dir: string, named: string | undefined): Promise<RunRecord | null> {
   let name = named;
   if (name === undefined) {
@@ -222,8 +224,16 @@ async function readRecordOf(dir: string, named: string | undefined): Promise<Run
     if (records.length !== 1) return null;
     name = records[0] as string;
   }
-  const parsed = RecordSchema.safeParse(JSON.parse(await readFile(join(dir, name), "utf8")));
-  return parsed.success ? parsed.data : null;
+  let text: string;
+  try {
+    text = await readFile(join(dir, name), "utf8");
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw err;
+  }
+  const parsed = RecordSchema.safeParse(JSON.parse(text));
+  if (!parsed.success) throw new Error(`the record ${name} is not valid: ${parsed.error.message}`);
+  return parsed.data;
 }
 
 // Score the repeats of one case from the stored records and the stored judge
@@ -239,6 +249,9 @@ async function scoreRepeats(runs: string, c: Case, known: number[]): Promise<Rep
     const out: Repeat[] = [];
     for (const repeat of numbers) {
       const repeatDir = join(dir, String(repeat));
+      // A missing result or record is "unknown". Any other error stops the
+      // command, with the case and the repeat in the message. The clone runs
+      // once for the case, because the first failure stops the loop.
       try {
         const result = await readResult(join(repeatDir, "result.json"), repeat);
         if (result === null || result.metrics.failed) {
@@ -263,8 +276,8 @@ async function scoreRepeats(runs: string, c: Case, known: number[]): Promise<Rep
         });
         const hit = score.matched.some((m) => known.includes(m.golden));
         out.push({ repeat, found: hit ? true : score.uncached > 0 ? "unknown" : false, record });
-      } catch {
-        out.push({ repeat, found: "unknown", record: null });
+      } catch (err) {
+        throw new Error(`case ${c.name} repeat ${repeat}: ${messageOf(err)}`, { cause: err });
       }
     }
     return out;
