@@ -3,7 +3,12 @@
 // fake for the replay verifier.
 import { join } from "node:path";
 import type { GoldenFinding } from "../../src/eval/case.js";
-import type { QueryMeta, QueryOutcome, QueryRequest } from "../../src/sdk/client.js";
+import {
+  classifyResult,
+  type QueryMeta,
+  type QueryOutcome,
+  type QueryRequest,
+} from "../../src/sdk/client.js";
 import { createFakeSdkClient } from "../../src/sdk/fake.js";
 import { captured, casesFrom, exitCodeOf, makeTemplate, output, tempDir } from "./eval-fixture.js";
 import { createProgram } from "../../src/cli.js";
@@ -273,11 +278,17 @@ export function replayFake(opts: ReplayFakeOptions = {}) {
           return { ok: false, failure: { kind: "thrown", message: "down" }, raw: null };
         }
         if (opts.limitVerifier?.includes(claimIn(req.userMessage))) {
-          return {
-            ok: false,
-            failure: { kind: "limit", message: "The result subtype is error_max_budget_usd" },
-            raw: meta(0.5, req.overrides?.model ?? "m"),
-          };
+          // The real client classifies a result with this subtype, and keeps its cost.
+          return classifyResult(
+            {
+              subtype: "error_max_budget_usd",
+              duration_ms: 3,
+              stop_reason: null,
+              total_cost_usd: 0.7,
+            },
+            req.overrides?.model ?? "m",
+            req.schema,
+          );
         }
         const r = results[claimIn(req.userMessage)];
         if (!r) throw new Error(`no replay result for ${claimIn(req.userMessage)}`);
