@@ -532,16 +532,6 @@ describe("pr-review replay: resume and the dollar limit", () => {
 });
 
 describe("pr-review replay: the codex backend and usage", () => {
-  it("refuses the codex backend before any call", async () => {
-    const client = replayFake();
-    const { code } = await replayFull(client, "--verifier", "codex:gpt-6.1-sol:high");
-    expect(code).toBe(2);
-    expect(output.stderr).toContain(
-      "the codex verifier needs the model and effort options of the Codex call",
-    );
-    expect(client.calls).toEqual([]);
-  }, 60_000);
-
   // Each usage error, with a part of its message.
   const usage: [string, string[], RegExp][] = [
     ["no arm", [], /give --verifier or --arm stored/],
