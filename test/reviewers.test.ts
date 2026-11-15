@@ -69,6 +69,7 @@ const BUILTINS: { name: string; minTier: "fast" | "full"; passes: number }[] = [
   { name: "description-drift", minTier: "full", passes: 1 },
   { name: "diff-bugs", minTier: "fast", passes: 2 },
   { name: "docs-and-comments", minTier: "full", passes: 1 },
+  { name: "general-review", minTier: "fast", passes: 1 },
   { name: "history", minTier: "full", passes: 1 },
   { name: "security", minTier: "full", passes: 2 },
   { name: "tests", minTier: "full", passes: 1 },
@@ -93,7 +94,7 @@ function section(body: string, heading: string): string {
 }
 
 describe("built-in reviewers (A4, R1)", () => {
-  it("loads the seven reviewers, in file name order", () => {
+  it("loads the built-in reviewers, in file name order", () => {
     expect(loadBuiltinReviewers().map((d) => d.frontmatter.name)).toEqual(
       BUILTINS.map((b) => b.name),
     );
@@ -111,6 +112,7 @@ describe("built-in reviewers (A4, R1)", () => {
           passes,
           threshold: 80,
           trusted: false,
+          ...(name === "general-review" ? { opt_in: true } : {}),
         });
         expect(def.frontmatter.description.trim()).not.toBe("");
         expect(def.source).toBe("builtin");
@@ -197,8 +199,8 @@ describe("built-in reviewers (A4, R1)", () => {
     expect(plan("history")).toMatch(/blame/i);
   });
 
-  it("tells only diff-bugs, history, tests and security to read each changed file in full (D7)", () => {
-    const readers = new Set(["diff-bugs", "history", "tests", "security"]);
+  it("tells only diff-bugs, general-review, history, tests and security to read each changed file in full (D7)", () => {
+    const readers = new Set(["diff-bugs", "general-review", "history", "tests", "security"]);
     const all = loadBuiltinReviewers().map((d) => d.frontmatter.name);
     expect(all).toEqual(expect.arrayContaining([...readers]));
     for (const name of all) {
@@ -569,14 +571,14 @@ describe("selectReviewers", () => {
     expect(skipSelected([], { config, description: "" })).toEqual({ run: [], skipped: [] });
   });
 
-  it("selects conventions and diff-bugs at the fast tier, and all seven at the full tier", () => {
+  it("selects conventions and diff-bugs at the fast tier, and all seven at the full tier, with no opt-in reviewer", () => {
     const builtins = loadBuiltinReviewers();
     expect(names(selectReviewers(builtins, "fast", ["src/stats.ts"], []))).toEqual([
       "conventions",
       "diff-bugs",
     ]);
     expect(names(selectReviewers(builtins, "full", ["src/stats.ts"], []))).toEqual(
-      BUILTINS.map((b) => b.name),
+      BUILTINS.map((b) => b.name).filter((name) => name !== "general-review"),
     );
   });
 });
