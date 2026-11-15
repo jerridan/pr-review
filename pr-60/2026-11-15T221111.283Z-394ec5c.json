@@ -1,0 +1,1176 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 60,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Set the first verifier to Sonnet 5.5 at medium effort by D4c E3",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/60"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "03a87ee5d71ceca5a1aacc2c0fee670d090beb64",
+    "head": "394ec5ccf1e73f90c95bc941ddafe75cdb5ff5fa",
+    "started_at": "2026-11-15T22:11:11.283Z",
+    "tool_version": "0.17.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Set the first verifier to Sonnet 5.5 at medium effort by D4c E3\n\n## Summary\n\nE3 of D4c: the model and the effort of the first verifier. Version 0.18.0.\n\n- **The first verifier goes to Sonnet 5.5 at medium effort** (`ROLE_DEFAULTS.verifier.effort` changes from high to medium). On the 239 stored candidates of S1, it passes the rule for a cheaper arm. Its posted recall is 0.032 lower (90% interval -0.064 to 0.000), its posted precision is 0.011 higher, and it costs 0.62 times as much for each verification ($0.103 against $0.167).\n- **Opus 5.5 low fails both rules**: 1.09 times the cost, precision 0.023 lower, recall 0.032 lower. So Opus 5.5 medium did not run.\n- **Terra medium fails both rules** on its sample (the figures come from another session).\n- **The escalation:** the pipeline with its escalation has a posted recall of 0.536, against 0.496 for the first verifier alone, at 2.2 times the cost. The note gives this as a design question and does not change it.\n- The note `docs/research/e3-verifier-model.md` holds the method, the rules on made-up figures, every figure, the spend and the limits. The design doc and the model research note now name medium effort. E3 is marked done in TICKETS.md.\n\n## Spend\n\nThe paid runs cost $69.05: Sonnet 5.5 medium $24.84, Opus 5.5 low $43.66, and the judge $0.55. Every arm ran through `pr-review replay` on a frozen build of 03a87ee, with one shared judge cache. No call of any arm reached its cap.\n\n## Test plan\n\n- [x] `npm test` (1697 tests), `npm run lint`, `npm run typecheck`, `npm run build`\n- [x] `scripts/check-version-bump.sh 03a87ee HEAD` gives 0.17.0 to 0.18.0\n- [x] Three tests that state the default effort of the verifier now state medium\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZg7V9Qr9viaw1dTW3s\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": ".claude-plugin/marketplace.json",
+        "hunks": 1
+      },
+      {
+        "path": ".claude-plugin/plugin.json",
+        "hunks": 1
+      },
+      {
+        "path": "TICKETS.md",
+        "hunks": 1
+      },
+      {
+        "path": "docs/design/high-level-design.md",
+        "hunks": 3
+      },
+      {
+        "path": "docs/research/claude-5-5-models.md",
+        "hunks": 1
+      },
+      {
+        "path": "docs/research/e3-verifier-model.md",
+        "hunks": 1
+      },
+      {
+        "path": "package.json",
+        "hunks": 1
+      },
+      {
+        "path": "src/config/models.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/record.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/reviewers.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/sdk-options.test.ts",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [
+      {
+        "path": "package-lock.json",
+        "reason": "generated"
+      }
+    ],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "The change alters the default verifier effort from high to medium in ROLE_DEFAULTS, which changes runtime behavior of the review pipeline, along with a version bump.",
+      "confidence": "medium",
+      "categories": [
+        "bug",
+        "test",
+        "docs",
+        "other"
+      ],
+      "hotspots": [
+        "src/config/models.ts",
+        "test/sdk-options.test.ts",
+        "test/record.test.ts",
+        "test/reviewers.test.ts"
+      ],
+      "file_notes": [
+        {
+          "file": "src/config/models.ts",
+          "note": "Verifier default effort changed from high to medium. This is the only production logic change."
+        },
+        {
+          "file": "test/record.test.ts",
+          "note": "Expected verifier effort updated to medium."
+        },
+        {
+          "file": "test/reviewers.test.ts",
+          "note": "Expected verifier effort updated to medium."
+        },
+        {
+          "file": "test/sdk-options.test.ts",
+          "note": "Expected verifier effort updated to medium."
+        },
+        {
+          "file": "package.json",
+          "note": "Version bump to 0.18.0. Check that it matches the plugin manifests."
+        },
+        {
+          "file": ".claude-plugin/plugin.json",
+          "note": "Version bump to 0.18.0."
+        },
+        {
+          "file": ".claude-plugin/marketplace.json",
+          "note": "Version bump to 0.18.0."
+        },
+        {
+          "file": "docs/research/e3-verifier-model.md",
+          "note": "New research note with the E3 results. Check that its figures agree with TICKETS.md."
+        },
+        {
+          "file": "docs/design/high-level-design.md",
+          "note": "Verifier effort text updated to medium in 3 places."
+        },
+        {
+          "file": "docs/research/claude-5-5-models.md",
+          "note": "Design effect text updated for the medium effort."
+        },
+        {
+          "file": "TICKETS.md",
+          "note": "Added a done note for E3."
+        }
+      ],
+      "summary": "The change makes Sonnet 5.5 at medium effort the default first verifier, in place of high effort. This follows the E3 replay results, which the change records in a new research note. It bumps the version to 0.18.0, updates the design docs and tickets to match, and updates three tests that assert the default effort."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: The change alters the default verifier effort from high to medium in ROLE_DEFAULTS, which changes runtime behavior of the review pipeline, along with a version bump.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    },
+    "mode": "full"
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1299,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 53,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 12485,
+              "webSearchRequests": 0,
+              "costUSD": 0.10155979999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.10155979999999999
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1474,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 10898,
+              "outputTokens": 19,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0010992999999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 66,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 12441,
+              "webSearchRequests": 0,
+              "costUSD": 0.10146780000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.10256710000000001
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5384,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 10912,
+              "outputTokens": 19,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011007,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 402,
+              "cacheReadInputTokens": 18842,
+              "cacheCreationInputTokens": 13442,
+              "webSearchRequests": 0,
+              "costUSD": 0.11936039999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 211,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.12046109999999999
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "README.md",
+            "start_line": 448,
+            "end_line": 448,
+            "category": "docs",
+            "severity_estimate": "suggestion",
+            "confidence": "high",
+            "claim": "The README still says that the verifier defaults to high effort, but the change sets the default to medium.",
+            "evidence": "`sonnet` with `high` for verifier",
+            "suggested_fix": "Change it to \"`sonnet` with `medium` for verifier\".",
+            "explanation": "ROLE_DEFAULTS.verifier.effort is now \"medium\".",
+            "needs_context": false
+          },
+          {
+            "file": "TICKETS.md",
+            "start_line": 174,
+            "end_line": 174,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The E3 ticket still says that the verifier today runs at high effort.",
+            "evidence": "Today the verifier is Sonnet 5.5 at high effort.",
+            "suggested_fix": "Add that this was the state before E3, or mark the sentence as history.",
+            "explanation": "After the change, the default verifier effort is medium.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5566,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 10920,
+              "outputTokens": 19,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011014999999999998,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 554,
+              "cacheReadInputTokens": 18533,
+              "cacheCreationInputTokens": 15169,
+              "webSearchRequests": 0,
+              "costUSD": 0.13615460000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.13725610000000002
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 3344,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 18995,
+              "outputTokens": 19,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.001909,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 303,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 20882,
+              "webSearchRequests": 0,
+              "costUSD": 0.1737358,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 20,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1756448
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1333,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 10916,
+              "outputTokens": 18,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011006,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 53,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 12695,
+              "webSearchRequests": 0,
+              "costUSD": 0.10323979999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.10434039999999999
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4935,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 10900,
+              "outputTokens": 27,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011035,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 369,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 13454,
+              "webSearchRequests": 0,
+              "costUSD": 0.1156318,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 47,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1167353
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "README.md",
+          "start_line": 448,
+          "end_line": 448,
+          "category": "docs",
+          "severity_estimate": "suggestion",
+          "confidence": "high",
+          "claim": "The README still says that the verifier defaults to high effort, but the change sets the default to medium.",
+          "evidence": "`sonnet` with `high` for verifier",
+          "suggested_fix": "Change it to \"`sonnet` with `medium` for verifier\".",
+          "explanation": "ROLE_DEFAULTS.verifier.effort is now \"medium\".",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "effort: \"medium\",\n    maxTurns: 25,",
+            "`sonnet` with `high` for verifier"
+          ],
+          "rationale": "src/config/models.ts sets the verifier default effort to medium. README line 448 still says `sonnet` with `high` for verifier, and the PR left it unchanged, so the doc is now stale.",
+          "score": 93,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "effort: \"medium\",\n    maxTurns: 25,",
+            "`sonnet` with `high` for verifier"
+          ],
+          "rationale": "src/config/models.ts sets the verifier default effort to medium. README line 448 still says `sonnet` with `high` for verifier, and the PR left it unchanged, so the doc is now stale.",
+          "score": 93,
+          "severity": "suggestion"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "docs-and-comments",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "TICKETS.md",
+          "start_line": 174,
+          "end_line": 174,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The E3 ticket still says that the verifier today runs at high effort.",
+          "evidence": "Today the verifier is Sonnet 5.5 at high effort.",
+          "suggested_fix": "Add that this was the state before E3, or mark the sentence as history.",
+          "explanation": "After the change, the default verifier effort is medium.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": false,
+          "claim_holds": true,
+          "introduced_by_pr": false,
+          "quotes": [
+            "Question: which model and effort verify best for their cost? Today the verifier is Sonnet 5.5 at high effort.",
+            "- Done 2026-11-15, at 0.18.0: Sonnet 5.5 at medium effort passes the rule for a cheaper arm"
+          ],
+          "rationale": "Line 174 still says \\\"Today the verifier is Sonnet 5.5 at high effort\\\", which is now outdated. But the line is the question as first written, and the ticket's own convention is to record outcomes in \\\"Done\\\" lines. The PR adds exactly such a line directly below it, so the finding is not worth posting.",
+          "score": 80,
+          "severity": "dont_post"
+        },
+        "final": {
+          "in_scope": false,
+          "claim_holds": true,
+          "introduced_by_pr": false,
+          "quotes": [
+            "Question: which model and effort verify best for their cost? Today the verifier is Sonnet 5.5 at high effort.",
+            "- Done 2026-11-15, at 0.18.0: Sonnet 5.5 at medium effort passes the rule for a cheaper arm"
+          ],
+          "rationale": "Line 174 still says \\\"Today the verifier is Sonnet 5.5 at high effort\\\", which is now outdated. But the line is the question as first written, and the ticket's own convention is to record outcomes in \\\"Done\\\" lines. The PR adds exactly such a line directly below it, so the finding is not worth posting.",
+          "score": 80,
+          "severity": "dont_post"
+        },
+        "passed": false,
+        "sources": [
+          {
+            "reviewer": "docs-and-comments",
+            "pass": 1
+          }
+        ]
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [
+      {
+        "file": "README.md",
+        "start_line": 448,
+        "end_line": 448,
+        "category": "docs",
+        "severity_estimate": "suggestion",
+        "confidence": "high",
+        "claim": "The README still says that the verifier defaults to high effort, but the change sets the default to medium.",
+        "evidence": "`sonnet` with `high` for verifier",
+        "suggested_fix": "Change it to \"`sonnet` with `medium` for verifier\".",
+        "explanation": "ROLE_DEFAULTS.verifier.effort is now \"medium\".",
+        "needs_context": false,
+        "fingerprint": "3ebf111bf521c06f",
+        "severity": "suggestion",
+        "score": 93,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "effort: \"medium\",\n    maxTurns: 25,",
+            "`sonnet` with `high` for verifier"
+          ],
+          "rationale": "src/config/models.ts sets the verifier default effort to medium. README line 448 still says `sonnet` with `high` for verifier, and the PR left it unchanged, so the doc is now stale.",
+          "score": 93,
+          "severity": "suggestion"
+        },
+        "span_text": "- **Roles.** The roles of `models.<role>` are `triage`, `reviewer`, `verifier`, `verifier-escalation` and `merge`. The defaults are `sonnet` with `medium` for triage, `opus` with `low` for reviewer, `sonnet` with `high` for verifier, `opus` with `high` for verifier-escalation, and `sonnet` with `medium` for merge. A `models.<role>` object can give `model` alone, `effort` alone, or both.",
+        "sources": [
+          {
+            "reviewer": "docs-and-comments",
+            "pass": 1
+          }
+        ]
+      }
+    ],
+    "github": {
+      "review_id": 5913186852,
+      "review_url": "https://github.com/jerridan/pr-review/pull/60#pullrequestreview-5913186852",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [
+        "3ebf111bf521c06f"
+      ],
+      "check_run": {
+        "id": 132977004464
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 5715,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9813,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009918000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 803,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 9325,
+            "webSearchRequests": 0,
+            "costUSD": 0.0454602,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.046452
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 1299,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 53,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 12485,
+            "webSearchRequests": 0,
+            "costUSD": 0.10155979999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.10155979999999999
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 1474,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10898,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0010992999999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 66,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 12441,
+            "webSearchRequests": 0,
+            "costUSD": 0.10146780000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.10256710000000001
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 3344,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 18995,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.001909,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 303,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 20882,
+            "webSearchRequests": 0,
+            "costUSD": 0.1737358,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 20,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1756448
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 1333,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10916,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011006,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 53,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 12695,
+            "webSearchRequests": 0,
+            "costUSD": 0.10323979999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.10434039999999999
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 5384,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10912,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011007,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 402,
+            "cacheReadInputTokens": 18842,
+            "cacheCreationInputTokens": 13442,
+            "webSearchRequests": 0,
+            "costUSD": 0.11936039999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 211,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.12046109999999999
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 5566,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10920,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011014999999999998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 554,
+            "cacheReadInputTokens": 18533,
+            "cacheCreationInputTokens": 15169,
+            "webSearchRequests": 0,
+            "costUSD": 0.13615460000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.13725610000000002
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 4935,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10900,
+            "outputTokens": 27,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011035,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 369,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 13454,
+            "webSearchRequests": 0,
+            "costUSD": 0.1156318,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 47,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1167353
+      },
+      {
+        "role": "verifier",
+        "verification": 0,
+        "model": "claude-sonnet-5-5",
+        "effort": "high",
+        "duration_ms": 4261,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 12939,
+            "outputTokens": 16,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0013019000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 482,
+            "cacheReadInputTokens": 16814,
+            "cacheCreationInputTokens": 17725,
+            "webSearchRequests": 0,
+            "costUSD": 0.07740939999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.07871129999999998
+      },
+      {
+        "role": "verifier",
+        "verification": 1,
+        "model": "claude-sonnet-5-5",
+        "effort": "high",
+        "duration_ms": 5482,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 21667,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0021782,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 670,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 25542,
+            "webSearchRequests": 0,
+            "costUSD": 0.108872,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 280,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1110502
+      }
+    ],
+    "total_cost_usd": 1.0947780999999999,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 52,
+      "gather": 222,
+      "triage": 6757,
+      "find_verify": 13414,
+      "merge": 2
+    },
+    "errors": []
+  }
+}
