@@ -241,47 +241,14 @@ function rawCandidates(record: RunRecord): Finding[] {
   return out;
 }
 
-/**
- * Score "record" against "golden". The posted findings and the raw
- * candidates each get their own matching. In one matching, each finding
- * and each golden finding is in at most one match. The pairs go in the
- * order of the findings, then of the golden findings. The posted goldens
- * go first: all exact matches, then the judge. The posted findings that
- * are still free then go to the not-real goldens in the same two steps. So
- * a posted golden wins over a not-real golden. The raw candidates go to
- * the posted goldens only, because raw recall counts nothing else. The
- * raw candidates are many, so by default the raw matching sends no judge
- * query. It takes the exact matches, and an ambiguous pair only when the
- * posted pass already got "yes" for the same judge text and golden. With
- * "rawJudge" on, it also asks the judge. The judge gets one query for each
- * ambiguous pair in which neither finding has a match yet. Only the answer
- * "yes" is a match. A failed query counts as "unknown". The two matchings
- * share the judge answers: a pair with the same judge text and the same
- * golden gets one query only. With "extras"
- * on, each posted finding that matches no golden then gets one query of
- * the extras judge. Extras are off by default. An unknown answer of the
- * extras judge counts in "extras.unknown", not in "judgeUnknown". With
- * a cache in "judge", a cached answer sends no query, and each new answer
- * goes into the cache. The key of an answer holds the judge model, the
- * system prompt, the message template and each block text, so a change of
- * what the judge sees misses the cache. A cached "unknown" goes to the
- * judge again when a client is given. With no client, a question with no
- * cached answer counts as no match and in "uncached".
- */
-export async function scoreRecord(
-  record: RunRecord,
-  golden: GoldenFinding[],
-  headDir: string,
-  judge: ScoreJudge,
-  opts: { extras?: boolean; rawJudge?: boolean } = {},
-): Promise<ScoreResult> {
+// The judge of one scoring: the cache, the counts, and the match of a list
+// of findings to the goldens. scoreRecord and scoreFindings share it.
+function judgeSession(golden: GoldenFinding[], headDir: string, judge: ScoreJudge) {
   const postedGolden = golden.map(isPostedGolden);
   const client = judge.client;
 
-  let judgeCalls = 0;
-  let judgeUnknown = 0;
-  let judgeCostUsd = 0;
-  let uncached = 0;
+  // The counts of the questions of every matching of the session.
+  const stats = { judgeCalls: 0, judgeUnknown: 0, judgeCostUsd: 0, uncached: 0 };
   let prompt: JudgePrompt | null = null;
   const fileLines = new Map<string, string[] | null>();
   const linesOf = (file: string): string[] | null => {
@@ -304,7 +271,7 @@ export async function scoreRecord(
     schema: z.ZodType<T>,
     pick: (output: T) => A,
   ): Promise<A | "unknown"> => {
-    judgeCalls += 1;
+    stats.judgeCalls += 1;
     try {
       const outcome = await queryClient.query<T>(
         {
@@ -317,7 +284,7 @@ export async function scoreRecord(
         },
         judge.options,
       );
-      judgeCostUsd += outcome.raw?.costUsd ?? 0;
+      stats.judgeCostUsd += outcome.raw?.costUsd ?? 0;
       return outcome.ok ? pick(outcome.output) : "unknown";
     } catch {
       return "unknown";
@@ -379,10 +346,10 @@ export async function scoreRecord(
       answers.set(key, answer);
     }
     if (answer === undefined) {
-      if (first) uncached += 1;
+      if (first) stats.uncached += 1;
       return null;
     }
-    if (first && answer === "unknown") judgeUnknown += 1;
+    if (first && answer === "unknown") stats.judgeUnknown += 1;
     return answer;
   };
 
@@ -431,6 +398,83 @@ export async function scoreRecord(
     }
     return { matched, notRealMatches, taken };
   };
+
+  return { postedGolden, client, stats, answers, asked, needsQuery, queryJudge, linesOf, matchAll };
+}
+
+/** The posted match of a list of findings: the result of scoreFindings. */
+export type FindingsScore = {
+  /** The matches to posted goldens. "posted" is an index into the findings. */
+  matched: Match[];
+  /** The findings that match a not-real golden. */
+  notRealMatches: number;
+  /** The goldens with blocking, suggestion or nit. */
+  postedGoldenCount: number;
+  judgeCalls: number;
+  judgeUnknown: number;
+  judgeCostUsd: number;
+  /** The questions with no cached answer in a scoring with no judge client. */
+  uncached: number;
+};
+
+/**
+ * Score a list of findings against the goldens with the posted match of
+ * scoreRecord: the posted goldens first, then the not-real goldens, each
+ * with the exact pairs first and then the judge on the ambiguous pairs.
+ * The judge and its cache work as in scoreRecord.
+ */
+export async function scoreFindings(
+  findings: Finding[],
+  golden: GoldenFinding[],
+  headDir: string,
+  judge: ScoreJudge,
+): Promise<FindingsScore> {
+  const session = judgeSession(golden, headDir, judge);
+  const result = await session.matchAll(findings, true, true);
+  return {
+    matched: result.matched,
+    notRealMatches: result.notRealMatches,
+    postedGoldenCount: session.postedGolden.filter(Boolean).length,
+    ...session.stats,
+  };
+}
+
+/**
+ * Score "record" against "golden". The posted findings and the raw
+ * candidates each get their own matching. In one matching, each finding
+ * and each golden finding is in at most one match. The pairs go in the
+ * order of the findings, then of the golden findings. The posted goldens
+ * go first: all exact matches, then the judge. The posted findings that
+ * are still free then go to the not-real goldens in the same two steps. So
+ * a posted golden wins over a not-real golden. The raw candidates go to
+ * the posted goldens only, because raw recall counts nothing else. The
+ * raw candidates are many, so by default the raw matching sends no judge
+ * query. It takes the exact matches, and an ambiguous pair only when the
+ * posted pass already got "yes" for the same judge text and golden. With
+ * "rawJudge" on, it also asks the judge. The judge gets one query for each
+ * ambiguous pair in which neither finding has a match yet. Only the answer
+ * "yes" is a match. A failed query counts as "unknown". The two matchings
+ * share the judge answers: a pair with the same judge text and the same
+ * golden gets one query only. With "extras"
+ * on, each posted finding that matches no golden then gets one query of
+ * the extras judge. Extras are off by default. An unknown answer of the
+ * extras judge counts in "extras.unknown", not in "judgeUnknown". With
+ * a cache in "judge", a cached answer sends no query, and each new answer
+ * goes into the cache. The key of an answer holds the judge model, the
+ * system prompt, the message template and each block text, so a change of
+ * what the judge sees misses the cache. A cached "unknown" goes to the
+ * judge again when a client is given. With no client, a question with no
+ * cached answer counts as no match and in "uncached".
+ */
+export async function scoreRecord(
+  record: RunRecord,
+  golden: GoldenFinding[],
+  headDir: string,
+  judge: ScoreJudge,
+  opts: { extras?: boolean; rawJudge?: boolean } = {},
+): Promise<ScoreResult> {
+  const { postedGolden, client, stats, answers, asked, needsQuery, queryJudge, linesOf, matchAll } =
+    judgeSession(golden, headDir, judge);
 
   const posted = record.posted.findings;
   const fromPosted = await matchAll(posted, true, true);
@@ -501,7 +545,7 @@ export async function scoreRecord(
         answers.set(key, answer);
       }
       if (answer === undefined) {
-        uncached += 1;
+        stats.uncached += 1;
         continue;
       }
       judged += 1;
@@ -514,9 +558,9 @@ export async function scoreRecord(
   const same = matched.filter((m) => posted[m.posted]?.severity === golden[m.golden]?.severity);
   return {
     matched,
-    judgeCalls,
-    judgeUnknown,
-    judgeCostUsd,
+    judgeCalls: stats.judgeCalls,
+    judgeUnknown: stats.judgeUnknown,
+    judgeCostUsd: stats.judgeCostUsd,
     severityAgreement: { same: same.length, matched: matched.length },
     notRealMatches: fromPosted.notRealMatches,
     postedGoldenCount: postedGolden.filter(Boolean).length,
@@ -525,6 +569,6 @@ export async function scoreRecord(
       candidates: candidates.length,
     },
     extras: { enabled, judged, accepted, unknown: extrasUnknown },
-    uncached,
+    uncached: stats.uncached,
   };
 }

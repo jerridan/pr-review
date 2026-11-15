@@ -3,7 +3,7 @@
 // A replay asks no escalation verifier and no merge, and applies no cap, so
 // its posted figures compare only with other replays. "--arm stored" is the
 // comparison arm: the stored first results, with no verifier call.
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -16,13 +16,14 @@ import { diffSections } from "../../gather/diff.js";
 import { gather, type GatherResult } from "../../gather/index.js";
 import { sanitizeGitHubText } from "../../github/sanitize.js";
 import { isRecordFileName } from "../../record/write.js";
+import { toolVersion } from "../../run.js";
 import {
   effectiveThreshold,
   loadBuiltinReviewers,
   type ReviewerDefinition,
 } from "../../reviewers/loader.js";
-import type { Finding } from "../../schemas/finding.js";
 import { RecordSchema, type QueryFailure, type RunRecord } from "../../schemas/record.js";
+import type { JudgeAnswer } from "../judge-cache.js";
 import {
   ResultsFileSchema,
   type ReplayEntry,
@@ -37,6 +38,7 @@ import { createSemaphore } from "../../semaphore.js";
 import {
   buildVerifierMessage,
   decideFirst,
+  isQueryFailure,
   verifyConfigFor,
   type VerifyConfig,
 } from "../../verify/index.js";
@@ -51,7 +53,7 @@ import {
 } from "../judge-cache.js";
 import { columns, ratio, usd } from "../report.js";
 import { readResult } from "../run.js";
-import { scoreRecord, type ScoreJudge } from "../score.js";
+import { scoreFindings, type ScoreJudge } from "../score.js";
 import { backendFor, type VerifierBackend, type VerifierSpec } from "./backend.js";
 import {
   candidateId,
@@ -117,7 +119,7 @@ export type ReplayReport = {
   sample: {
     kind: string;
     seed: number;
-    candidates: { case: string; repeat: number | "external"; key: string }[];
+    candidates: { case: string; repeat: number | "external"; reviewer: string; key: string }[];
   };
   scopes: { source: string | null; cases: ({ case: string } & Figures)[]; total: Figures }[];
   /** The escalation figures of the stored records (E3). Only the stored arm has them. */
@@ -125,25 +127,28 @@ export type ReplayReport = {
     cases: { case: string; escalated: number; changed: number; cost_usd: number }[];
     total: { escalated: number; changed: number; cost_usd: number };
   } | null;
-  judge: { calls: number; cost_usd: number };
-  cost: { total_usd: number; tokens: number };
-  /** The candidates with no finished result: the limit stopped them. */
+  /**
+   * "uncached": the judge questions with no answer, because the cost limit
+   * refused them. Each counts as no match, so the figures are partial.
+   */
+  judge: { calls: number; cost_usd: number; uncached: number };
+  /**
+   * "total_usd" is the spend of this invocation. "stored_usd" is the cost of
+   * the stored calls of the original run (the first verifier and the
+   * escalation) that the stored arm reads: it is not spend of this run.
+   * Null for a verifier arm.
+   */
+  cost: { total_usd: number; stored_usd: number | null; tokens: number };
+  /**
+   * The candidates that a resume would still call: no verifier result, a
+   * failed one, or no label of the current severity step.
+   */
   remaining: number;
   stopped: boolean;
 };
 
 function say(message: string): void {
   process.stderr.write(`pr-review replay: ${message}\n`);
-}
-
-function toolVersion(): string {
-  // This file is at src/eval/replay/index.ts and dist/eval/replay/index.js.
-  const pkg = JSON.parse(
-    readFileSync(new URL("../../../package.json", import.meta.url), "utf8"),
-  ) as {
-    version?: string;
-  };
-  return pkg.version ?? "0.0.0";
 }
 
 const armText = (arm: ReplayArm): string =>
@@ -155,6 +160,8 @@ const armText = (arm: ReplayArm): string =>
 class Spend {
   spent = 0;
   stopped = false;
+  /** The calls that the limit refused. */
+  refused = 0;
   constructor(private readonly limit: number | undefined) {}
   /** True when a new call can start. After the first false, it stays false. */
   canStart(): boolean {
@@ -173,7 +180,10 @@ class Stopped extends Error {}
 function spendClient(inner: SdkClient, spend: Spend): SdkClient {
   return {
     async query<T>(req: QueryRequest, options: RunOptions): Promise<QueryOutcome<T>> {
-      if (!spend.canStart()) throw new Stopped("the cost limit stopped the replay");
+      if (!spend.canStart()) {
+        spend.refused += 1;
+        throw new Stopped("the cost limit stopped the replay");
+      }
       const outcome = await inner.query<T>(req, options);
       spend.add(outcome.raw?.costUsd);
       return outcome;
@@ -181,43 +191,49 @@ function spendClient(inner: SdkClient, spend: Spend): SdkClient {
   };
 }
 
-// A record of findings for scoreRecord: only the posted findings count.
-// scoreRecord reads the posted findings and the reviewer entries; extras
-// are off, so it reads nothing else.
-function scoringView(findings: Finding[], severity: (i: number) => string): RunRecord {
-  return {
-    posted: { findings: findings.map((f, i) => ({ ...f, severity: severity(i) })) },
-    stages: { reviewers: [] },
-    identity: {},
-  } as unknown as RunRecord;
-}
+// The golden match of every label: each golden goes to scoreFindings as a
+// posted golden. The judge does not see the label of a golden, so the
+// cache keys are those of the eval.
+
+/** The counts of the judge of a replay. */
+type JudgeCounts = { calls: number; costUsd: number; uncached: number };
 
 /**
- * Match each finding to a golden of any label, one to one: exact pairs
- * first, then the judge on the ambiguous pairs, as scoreRecord does. The
- * judge does not see the label of a golden, so each golden goes to the
- * match as a posted golden, and the cache keys are those of the eval.
+ * Run one scoring with the judge of a case. After a stop, the judge gets no
+ * client: it reads the cache only, and a question with no answer counts as
+ * uncached. A question that the limit refused during the scoring adds no
+ * "unknown" answer to the cache, and counts as uncached too.
  */
-async function matchGoldens(
-  findings: Finding[],
-  golden: GoldenFinding[],
-  headDir: string,
-  judge: ScoreJudge,
-): Promise<{ matches: (number | null)[]; calls: number; costUsd: number }> {
-  const all = golden.map((g) => ({ ...g, severity: "blocking" as const }));
-  const s = await scoreRecord(
-    scoringView(findings, () => "blocking"),
-    all,
-    headDir,
-    judge,
-    {
-      extras: false,
-      rawJudge: false,
-    },
-  );
-  const matches: (number | null)[] = findings.map(() => null);
-  for (const m of s.matched) matches[m.posted] = m.golden;
-  return { matches, calls: s.judgeCalls, costUsd: s.judgeCostUsd };
+async function withJudge<T extends { judgeCalls: number; judgeCostUsd: number; uncached: number }>(
+  state: { cache: JudgeCache; judgeModel: string },
+  client: SdkClient,
+  options: RunOptions,
+  spend: Spend,
+  counts: JudgeCounts,
+  score: (judge: ScoreJudge) => Promise<T>,
+): Promise<T> {
+  const before = new Map<string, JudgeAnswer>(state.cache);
+  const refused = spend.refused;
+  const judge: ScoreJudge = {
+    client: spend.stopped ? null : client,
+    model: state.judgeModel,
+    options,
+    cache: state.cache,
+    asked: new Set(),
+  };
+  const result = await score(judge);
+  if (spend.refused > refused) {
+    for (const [key, answer] of state.cache) {
+      if (answer === "unknown" && before.get(key) !== "unknown") {
+        if (before.has(key)) state.cache.set(key, before.get(key) as JudgeAnswer);
+        else state.cache.delete(key);
+      }
+    }
+  }
+  counts.calls += result.judgeCalls - (spend.refused - refused);
+  counts.costUsd += result.judgeCostUsd;
+  counts.uncached += result.uncached + (spend.refused - refused);
+  return result;
 }
 
 /** One case of the replay, with its clone and its inputs. */
@@ -256,6 +272,16 @@ async function fromRecord(
   if (name === undefined) return null;
   const parsed = RecordSchema.safeParse(JSON.parse(await readFile(join(dir, name), "utf8")));
   if (!parsed.success) throw new ReplayUsageError(`${join(dir, name)} is not a run record`);
+  // A record from before D8 names no sources, so the replay knows no
+  // reviewer, and so no threshold, for its candidates.
+  if (
+    !isStage1(parsed.data) &&
+    parsed.data.stages.verifications.some((v) => v.sources === undefined)
+  ) {
+    throw new ReplayUsageError(
+      `${join(dir, name)}: a verification has no sources (a record from before D8), so the replay cannot know its reviewer`,
+    );
+  }
   return {
     record: parsed.data,
     judgeModel: result?.options.judge_model ?? JUDGE_DEFAULTS.model,
@@ -274,12 +300,14 @@ async function readEntries(
   const parsed = ResultsFileSchema.safeParse(JSON.parse(await readFile(path, "utf8")));
   if (!parsed.success || parsed.data.arm !== arm || parsed.data.tool_version !== version)
     return out;
-  for (const e of parsed.data.entries) out.set(JSON.stringify([e.repeat, e.key]), e);
+  for (const e of parsed.data.entries) out.set(entryKey(e), e);
   return out;
 }
 
-const entryKey = (c: Pick<Candidate, "repeat" | "key">): string =>
-  JSON.stringify([c.repeat, c.key]);
+// The identity of a candidate in a case: its repeat, its reviewer and its
+// key, so two reviewers with the same file, span and claim stay two.
+const entryKey = (c: Pick<Candidate, "repeat" | "reviewer" | "key">): string =>
+  JSON.stringify([c.repeat, c.reviewer, c.key]);
 
 // The threshold of a candidate: of its reviewer, from the repo config at
 // the case base, as in the run. An external source gets thresholds.default.
@@ -290,8 +318,6 @@ function verifyConfigOf(state: CaseState, c: Candidate): VerifyConfig {
   return verifyConfigFor(threshold, state.config);
 }
 
-const isFailure = (r: ReplayResult | QueryFailure): r is QueryFailure => "kind" in r;
-
 // The first-result decision of an entry, with the label of the severity
 // step in place of the verifier label when the step ran.
 function decide(
@@ -301,7 +327,7 @@ function decide(
 ): Pick<ReplayEntry, "decision" | "in_band"> {
   const head = readHeadFile(state.clone, c.finding.file);
   const config = verifyConfigOf(state, c);
-  if (isFailure(entry.result)) {
+  if (isQueryFailure(entry.result)) {
     const d = decideFirst(entry.result, c.finding, head, config);
     return {
       decision: { passed: d.passed, ...(d.unsure ? { unsure: d.unsure } : {}) },
@@ -412,8 +438,7 @@ async function replay(opts: ReplayOptions, clientOf: () => Promise<SdkClient>): 
   await writeFileAtomic(armPath, `${JSON.stringify({ arm, tool_version: version }, null, 2)}\n`);
 
   const tmp = await mkdtemp(join(tmpdir(), "pr-review-replay-"));
-  let judgeCalls = 0;
-  let judgeCost = 0;
+  const counts: JudgeCounts = { calls: 0, costUsd: 0, uncached: 0 };
   try {
     const states: CaseState[] = [];
     const only = opts.reviewers ? new Set(opts.reviewers) : null;
@@ -468,25 +493,23 @@ async function replay(opts: ReplayOptions, clientOf: () => Promise<SdkClient>): 
     // The golden match of every candidate, before any verifier call. The
     // candidates of one record, and the external ones, match apart.
     for (const state of states) {
-      const judge: ScoreJudge = {
-        client,
-        model: state.judgeModel,
-        options,
-        cache: state.cache,
-        asked: new Set(),
-      };
       for (const group of [...new Set(state.candidates.map((c) => c.repeat))]) {
         const members = state.candidates.filter((c) => c.repeat === group);
-        const m = await matchGoldens(
-          members.map((c) => c.finding),
-          state.c.golden,
-          state.clone,
-          judge,
-        );
-        judgeCalls += m.calls;
-        judgeCost += m.costUsd;
+        let matches: (number | null)[] = [];
+        await withJudge(state, client, options, spend, counts, async (judge) => {
+          const all = state.c.golden.map((g) => ({ ...g, severity: "blocking" as const }));
+          const s = await scoreFindings(
+            members.map((c) => c.finding),
+            all,
+            state.clone,
+            judge,
+          );
+          matches = members.map(() => null);
+          for (const m of s.matched) matches[m.posted] = m.golden;
+          return s;
+        });
         members.forEach((cand, i) => {
-          const index = m.matches[i] ?? null;
+          const index = matches[i] ?? null;
           const g = index === null ? undefined : state.c.golden[index];
           state.golden.set(
             entryKey(cand),
@@ -506,11 +529,12 @@ async function replay(opts: ReplayOptions, clientOf: () => Promise<SdkClient>): 
     for (const state of states)
       state.candidates = state.candidates.filter((c) => chosenIds.has(candidateId(c)));
 
-    // The entries of each case: reused, stored, or new.
+    // The entries of each case. An entry gets its decision when it is made,
+    // and again when the severity step changes its label.
     const entries = new Map<string, Map<string, ReplayEntry>>();
     const writes = new Map<string, Promise<void>>();
     const writeCase = (state: CaseState): Promise<void> => {
-      const done = entries.get(state.c.name) ?? new Map();
+      const done = entries.get(state.c.name) ?? new Map<string, ReplayEntry>();
       const file: ResultsFile = {
         version: 1,
         tool_version: version,
@@ -518,7 +542,7 @@ async function replay(opts: ReplayOptions, clientOf: () => Promise<SdkClient>): 
         case: state.c.name,
         entries: state.candidates.flatMap((c) => {
           const e = done.get(entryKey(c));
-          return e ? [{ ...e, ...decide(state, c, e) }] : [];
+          return e ? [e] : [];
         }),
       };
       const path = join(out, state.c.name, "results.json");
@@ -529,14 +553,39 @@ async function replay(opts: ReplayOptions, clientOf: () => Promise<SdkClient>): 
       writes.set(state.c.name, next);
       return next;
     };
-    const base = (state: CaseState, c: Candidate) => ({
-      repeat: c.repeat,
-      key: c.key,
-      finding: c.finding,
-      sources: c.sources,
-      reviewer: c.reviewer,
-      golden: state.golden.get(entryKey(c)) ?? null,
-    });
+    // Make an entry from its parts, with its decision.
+    const make = (
+      state: CaseState,
+      c: Candidate,
+      parts: Pick<ReplayEntry, "result" | "call" | "severity">,
+    ): ReplayEntry => {
+      const entry: ReplayEntry = {
+        repeat: c.repeat,
+        key: c.key,
+        finding: c.finding,
+        sources: c.sources,
+        reviewer: c.reviewer,
+        golden: state.golden.get(entryKey(c)) ?? null,
+        result: parts.result,
+        call: parts.call,
+        ...(parts.severity ? { severity: parts.severity } : {}),
+        decision: null,
+        in_band: false,
+      };
+      return { ...entry, ...decide(state, c, entry) };
+    };
+
+    const spec = opts.severity;
+    const text = spec ? specText(spec) : null;
+    // A label of the current step that a resume keeps: same spec, a label,
+    // and no failure.
+    const labeled = (e: ReplayEntry): boolean =>
+      text !== null &&
+      e.severity?.spec === text &&
+      e.severity.label !== null &&
+      e.severity.failure === undefined;
+    const holds = (e: ReplayEntry | undefined): e is ReplayEntry & { result: ReplayResult } =>
+      e !== undefined && !isQueryFailure(e.result) && e.result.claim_holds && e.result.in_scope;
 
     const semaphore = createSemaphore(opts.concurrency);
     const tasks: Promise<void>[] = [];
@@ -548,23 +597,24 @@ async function replay(opts: ReplayOptions, clientOf: () => Promise<SdkClient>): 
         : new Map<string, ReplayEntry>();
       for (const c of state.candidates) {
         const old = earlier.get(entryKey(c));
-        if (old) {
-          done.set(entryKey(c), { ...old, ...base(state, c) });
+        // A resume keeps a verifier result that did not fail, and a label of
+        // the step that did not fail. It runs every other call again, as
+        // eval --resume runs a failed repeat again.
+        if (old && (opts.arm.kind === "stored" || !isQueryFailure(old.result))) {
+          done.set(
+            entryKey(c),
+            make(state, c, {
+              result: old.result,
+              call: old.call,
+              ...(old.severity && labeled(old) ? { severity: old.severity } : {}),
+            }),
+          );
           continue;
         }
         if (opts.arm.kind === "stored") {
           const stored = c.stored;
           if (!stored) continue;
-          const result: ReplayResult | QueryFailure = isFailureResult(stored.first)
-            ? stored.first
-            : { ...stored.first };
-          done.set(entryKey(c), {
-            ...base(state, c),
-            result,
-            call: stored.call,
-            decision: null,
-            in_band: false,
-          });
+          done.set(entryKey(c), make(state, c, { result: { ...stored.first }, call: stored.call }));
           continue;
         }
         const b = backend as VerifierBackend;
@@ -595,13 +645,7 @@ async function replay(opts: ReplayOptions, clientOf: () => Promise<SdkClient>): 
                   ? r
                   : { kind: "out-of-range", message: `The score ${r.score} is not from 0 to 100.` };
             }
-            done.set(entryKey(c), {
-              ...base(state, c),
-              result,
-              call: outcome.call,
-              decision: null,
-              in_band: false,
-            });
+            done.set(entryKey(c), make(state, c, { result, call: outcome.call }));
             await writeCase(state);
           }),
         );
@@ -610,13 +654,7 @@ async function replay(opts: ReplayOptions, clientOf: () => Promise<SdkClient>): 
     await Promise.all(tasks);
 
     // The severity step, on the results that hold and are in scope.
-    if (opts.severity) {
-      const spec = opts.severity;
-      const text = specText(spec);
-      const holds = (e: ReplayEntry | undefined): e is ReplayEntry & { result: ReplayResult } =>
-        e !== undefined && !isFailure(e.result) && e.result.claim_holds && e.result.in_scope;
-      const labeled = (e: ReplayEntry): boolean =>
-        e.severity?.spec === text && e.severity.label !== null;
+    if (spec) {
       const severityTasks: Promise<void>[] = [];
       for (const state of states) {
         const done = entries.get(state.c.name) ?? new Map<string, ReplayEntry>();
@@ -628,7 +666,8 @@ async function replay(opts: ReplayOptions, clientOf: () => Promise<SdkClient>): 
         const description = (c: Candidate) => state.descriptions.get(c.repeat) ?? "";
         const set = (c: Candidate, s: SeverityEntry) => {
           const e = done.get(entryKey(c));
-          if (e) done.set(entryKey(c), { ...e, severity: s });
+          if (e)
+            done.set(entryKey(c), make(state, c, { result: e.result, call: e.call, severity: s }));
         };
         if (spec.mode === "finding") {
           for (const { c, e } of held) {
@@ -646,6 +685,8 @@ async function replay(opts: ReplayOptions, clientOf: () => Promise<SdkClient>): 
             );
           }
         } else if (held.length > 0 && !held.every(({ e }) => labeled(e))) {
+          // By design, a pr-mode call asks for the whole case when one label
+          // is missing.
           severityTasks.push(
             semaphore(async () => {
               if (!spend.canStart()) return;
@@ -674,28 +715,24 @@ async function replay(opts: ReplayOptions, clientOf: () => Promise<SdkClient>): 
       await Promise.all(severityTasks);
     }
 
-    // The decision of each entry, and the results files.
+    // The results files.
     for (const state of states) await writeCase(state);
     await Promise.all(writes.values());
 
-    // The remaining candidates: no result, or no label of the step.
+    // The remaining candidates: each entry that a resume would still call.
     let remaining = 0;
     for (const state of states) {
       const done = entries.get(state.c.name) ?? new Map<string, ReplayEntry>();
       for (const c of state.candidates) {
         const e = done.get(entryKey(c));
-        const needsLabel =
-          opts.severity !== undefined &&
-          e !== undefined &&
-          !isFailure(e.result) &&
-          e.result.claim_holds &&
-          e.result.in_scope &&
-          e.severity?.spec !== specText(opts.severity);
-        if (e === undefined || needsLabel) remaining += 1;
+        const verifier =
+          e === undefined || (opts.arm.kind === "verifier" && isQueryFailure(e.result));
+        const severity = spec !== undefined && holds(e) && !labeled(e);
+        if (verifier || severity) remaining += 1;
       }
     }
 
-    // The figures: posted (scoreRecord), and the others from the entries.
+    // The figures: posted (scoreFindings), and the others from the entries.
     const hasLabels = !(
       opts.arm.kind === "verifier" &&
       opts.arm.form === "truth" &&
@@ -715,38 +752,28 @@ async function replay(opts: ReplayOptions, clientOf: () => Promise<SdkClient>): 
       const rows: ({ case: string } & Figures)[] = [];
       for (const state of states) {
         const done = entries.get(state.c.name) ?? new Map<string, ReplayEntry>();
-        const ours = state.candidates.filter(
-          (c) =>
-            source === null ||
-            c.reviewer === source ||
-            c.sources.some((s) => s.reviewer === source),
-        );
-        const list = ours.flatMap((c) => {
-          const e = done.get(entryKey(c));
-          return e ? [{ ...e, ...decide(state, c, e) }] : [];
-        });
+        const list = state.candidates
+          .filter(
+            (c) =>
+              source === null ||
+              c.reviewer === source ||
+              c.sources.some((s) => s.reviewer === source),
+          )
+          .flatMap((c) => {
+            const e = done.get(entryKey(c));
+            return e ? [e] : [];
+          });
         let posted: PostedFigures | null = null;
         if (hasLabels) {
           const passed = list.filter((e) => e.decision?.passed === true);
-          const judge: ScoreJudge = {
-            client,
-            model: state.judgeModel,
-            options,
-            cache: state.cache,
-            asked: new Set(),
-          };
-          const s = await scoreRecord(
-            scoringView(
+          const s = await withJudge(state, client, options, spend, counts, (judge) =>
+            scoreFindings(
               passed.map((e) => e.finding),
-              (i) => labelOf(passed[i] as ReplayEntry) ?? "nit",
+              state.c.golden,
+              state.clone,
+              judge,
             ),
-            state.c.golden,
-            state.clone,
-            judge,
-            { extras: false, rawJudge: false },
           );
-          judgeCalls += s.judgeCalls;
-          judgeCost += s.judgeCostUsd;
           const byLabel = { blocking: 0, suggestion: 0, nit: 0 };
           for (const m of s.matched) {
             const label = state.c.golden[m.golden]?.severity;
@@ -779,14 +806,19 @@ async function replay(opts: ReplayOptions, clientOf: () => Promise<SdkClient>): 
       await writeJudgeCache(join(out, state.c.name, JUDGE_CACHE_FILE), state.cache);
     }
 
-    // The escalation figures of the stored records (E3), with no model call.
+    // The escalation figures of the stored records (E3), with no model call,
+    // and the cost of the stored calls that the stored arm reads.
     let escalation: ReplayReport["escalation"] = null;
+    let storedUsd: number | null = null;
     if (opts.arm.kind === "stored") {
+      storedUsd = 0;
       const caseRows = states.map((state) => {
         let escalated = 0;
         let changed = 0;
         let cost = 0;
         for (const c of state.candidates) {
+          storedUsd =
+            (storedUsd ?? 0) + (c.stored?.call?.cost_usd ?? 0) + (c.stored?.escalationCostUsd ?? 0);
           if (!c.stored?.escalated) continue;
           escalated += 1;
           cost += c.stored.escalationCostUsd;
@@ -818,21 +850,29 @@ async function replay(opts: ReplayOptions, clientOf: () => Promise<SdkClient>): 
       sample: {
         kind: typeof opts.sample === "number" ? String(opts.sample) : opts.sample,
         seed: opts.seed,
-        candidates: chosen.map((c) => ({ case: c.case, repeat: c.repeat, key: c.key })),
+        candidates: chosen.map((c) => ({
+          case: c.case,
+          repeat: c.repeat,
+          reviewer: c.reviewer,
+          key: c.key,
+        })),
       },
       scopes,
       escalation,
-      judge: { calls: judgeCalls, cost_usd: judgeCost },
-      cost: {
-        total_usd: (totalAll?.cost_usd ?? 0) + (totalAll?.severity_cost_usd ?? 0) + judgeCost,
-        tokens: totalAll?.tokens ?? 0,
-      },
+      judge: { calls: counts.calls, cost_usd: counts.costUsd, uncached: counts.uncached },
+      cost: { total_usd: spend.spent, stored_usd: storedUsd, tokens: totalAll?.tokens ?? 0 },
       remaining,
       stopped: spend.stopped,
     };
     const json = `${JSON.stringify(report, null, 2)}\n`;
     await writeFileAtomic(join(out, "report.json"), json);
     process.stdout.write(opts.format === "json" ? json : renderReplay(report));
+    if (counts.uncached > 0) {
+      say(
+        `the posted figures are partial: ${counts.uncached} judge ${counts.uncached === 1 ? "question has" : "questions have"} no answer, ` +
+          "and each counts as no match. Run again with --resume to ask them.",
+      );
+    }
     if (spend.stopped) {
       say(
         `the cost limit stopped the replay: the calls of this run cost $${spend.spent.toFixed(4)}, ` +
@@ -847,8 +887,6 @@ async function replay(opts: ReplayOptions, clientOf: () => Promise<SdkClient>): 
     await rm(tmp, { recursive: true, force: true });
   }
 }
-
-const isFailureResult = (r: VerifierResult | QueryFailure): r is QueryFailure => "kind" in r;
 
 const share = (value: number | null): string => ratio(value);
 

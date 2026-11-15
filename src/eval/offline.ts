@@ -122,7 +122,8 @@ type Kept = {
   rawJudge: boolean;
 };
 
-type Scored = { metrics: RepeatMetrics; uncached: number; kept?: Kept };
+/** "mode" is the mode of the scored record, or absent when no record was scored. */
+type Scored = { metrics: RepeatMetrics; uncached: number; kept?: Kept; mode?: "full" | "stage1" };
 
 // Score one repeat again from its record and its judge cache. A repeat
 // that failed in the eval keeps its metrics. "checkout" is a clone of the
@@ -181,7 +182,12 @@ async function scoreRepeat(
   } else {
     m.paired = null;
   }
-  return { metrics: m, uncached, ...(kept ? { kept } : {}) };
+  return {
+    metrics: m,
+    uncached,
+    ...(kept ? { kept } : {}),
+    mode: record.identity.mode ?? "full",
+  };
 }
 
 type ByPassInput = { case: Case; repeat: number; kept: Kept };
@@ -341,6 +347,8 @@ type Collected = {
   missing: ByPassSection["missing"];
   /** The repeats of the by-reviewer scoring: every kept record. */
   reviewerInputs: ByPassInput[];
+  /** The mode of each scored record. */
+  modes: ("full" | "stage1")[];
 };
 
 // Score every repeat in "out". With "keep", collect what the by-pass
@@ -358,6 +366,7 @@ async function collect(
     inputs: [],
     missing: [],
     reviewerInputs: [],
+    modes: [],
   };
   for (const c of cases) {
     const caseDir = join(out, c.name);
@@ -370,6 +379,7 @@ async function collect(
         if (scored.uncached > 0) {
           collected.uncached.push({ case: c.name, repeat, pairs: scored.uncached });
         }
+        if (scored.mode !== undefined) collected.modes.push(scored.mode);
         if (scored.kept) collected.reviewerInputs.push({ case: c, repeat, kept: scored.kept });
         if (scored.kept && hasSources(scored.kept.record))
           collected.inputs.push({ case: c, repeat, kept: scored.kept });
@@ -460,6 +470,11 @@ export async function runEvalReport(
   });
   if (byPass !== null) report.by_pass = byPass;
   if (byReviewer !== null) report.by_reviewer = byReviewer;
+  // Stage 1 records post nothing, so the posted figures show as none, as
+  // the eval with --stage1 shows them.
+  if (collected.modes.length > 0 && collected.modes.every((m) => m === "stage1")) {
+    report.mode = "stage1";
+  }
   const notValid = notValidLines(report.paired as PairedSection);
   if (opts.format === "json") {
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);

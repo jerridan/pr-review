@@ -70,7 +70,7 @@ function storedCall(record: RunRecord, index: number): CallMeta | null {
 /**
  * The candidates of a record. A full record gives its verifications in
  * record order, with their sources and the stored results. A stage 1
- * record gives its stages.candidates in order. A finding with the key of
+ * record gives its stages.candidates in order. A finding with the reviewer and the key of
  * an earlier candidate is not added again.
  */
 export function recordCandidates(record: RunRecord, caseName: string, repeat: number): Candidate[] {
@@ -78,15 +78,18 @@ export function recordCandidates(record: RunRecord, caseName: string, repeat: nu
   const out: Candidate[] = [];
   const add = (finding: Finding, sources: FindingSource[], fallback: string, stored?: Stored) => {
     const key = findingKey(finding);
-    if (seen.has(key)) return;
-    seen.add(key);
+    const reviewer = sources[0]?.reviewer ?? fallback;
+    // Two reviewers with the same file, span and claim give two candidates.
+    const id = JSON.stringify([reviewer, key]);
+    if (seen.has(id)) return;
+    seen.add(id);
     out.push({
       case: caseName,
       repeat,
       key,
       finding,
       sources,
-      reviewer: sources[0]?.reviewer ?? fallback,
+      reviewer,
       ...(stored ? { stored } : {}),
     });
   };
@@ -214,9 +217,9 @@ export function fromReviewers(c: Candidate, names: ReadonlySet<string>): boolean
 /** The --sample value. */
 export type SampleKind = "all" | "golden-plus-equal" | number;
 
-/** The identity of a candidate in the output: its case, its repeat and its key. */
-export const candidateId = (c: Pick<Candidate, "case" | "repeat" | "key">): string =>
-  JSON.stringify([c.case, c.repeat, c.key]);
+/** The identity of a candidate in the output: its case, its repeat, its reviewer and its key. */
+export const candidateId = (c: Pick<Candidate, "case" | "repeat" | "reviewer" | "key">): string =>
+  JSON.stringify([c.case, c.repeat, c.reviewer, c.key]);
 
 // A seeded shuffle (Fisher-Yates) of a copy of "items".
 function shuffled<T>(items: T[], random: () => number): T[] {
