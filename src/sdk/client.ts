@@ -93,6 +93,16 @@ export function usageTokens(usage: unknown): number {
   return total;
 }
 
+// The SDK throws "Claude Code returned an error result: <text>" when the
+// last result is an error. The text of a limit stop names the limit.
+const THROWN_LIMIT = /returned an error result: Reached maximum (?:budget|number of turns)\b/i;
+
+/** The failure of a thrown error. A thrown limit stop has kind "limit". */
+function thrownFailure(err: unknown): QueryFailure {
+  const message = errorMessage(err);
+  return { kind: THROWN_LIMIT.test(message) ? "limit" : "thrown", message };
+}
+
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
@@ -195,7 +205,7 @@ export function createSdkClient(run: QueryFn = query): SdkClient {
         }
         result = winner;
       } catch (err) {
-        return { ok: false, failure: { kind: "thrown", message: errorMessage(err) }, raw: null };
+        return { ok: false, failure: thrownFailure(err), raw: null };
       } finally {
         clearTimeout(timer);
       }
