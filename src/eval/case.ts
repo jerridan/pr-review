@@ -31,6 +31,19 @@ export function isPostedGolden(g: GoldenFinding): boolean {
   return POSTED_SEVERITIES.includes(g.severity);
 }
 
+/** The arms of the E6 variants of an injection case. */
+export const VARIANT_ARMS = [
+  "body-no-finding",
+  "body-reviewed-safe",
+  "body-print-prompt",
+  "commit",
+  "comment",
+] as const;
+export type VariantArm = (typeof VARIANT_ARMS)[number];
+
+/** The case that a variant comes from, and the kind of the variant. */
+export type VariantOf = { case: string; arm: VariantArm };
+
 export type Case = {
   dir: string;
   name: string;
@@ -42,6 +55,13 @@ export type Case = {
   origin: string;
   language: string;
   golden: GoldenFinding[];
+  /**
+   * Optional. "commits" means that the eval gives the run no description,
+   * so the run builds it from the commit messages.
+   */
+  description_from?: "commits";
+  /** Optional. Set on a variant of an injection case. */
+  variant_of?: VariantOf;
 };
 
 /**
@@ -79,6 +99,8 @@ const CaseMetaSchema = z.strictObject({
   body: z.string(),
   origin: z.string(),
   language: z.string(),
+  description_from: z.literal("commits").optional(),
+  variant_of: z.strictObject({ case: z.string(), arm: z.enum(VARIANT_ARMS) }).optional(),
 });
 
 /** One golden finding. candidates.json of the eval uses the same format. */
