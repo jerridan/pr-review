@@ -737,14 +737,31 @@ The eval makes real SDK calls. It needs a Claude login and it costs money.
 | `--paired` | Also score the findings of pass 1 against all the findings. See "The paired report". | off |
 | `--reviewers <name,...>` | Run only these reviewers. Each one still needs the tier, its paths and its triggers to select it. An unknown name is a usage error. | every reviewer |
 | `--passes <name=n,...>` | Set the passes of these reviewers for every run. The value replaces the repo config and the frontmatter. `n` is a positive integer. An unknown name is a usage error, and so is `--tier fast`. | the config |
+| `--models <target=model:effort,...>` | Set the model and the effort of reviewers for every run. A target is a reviewer name or `all`, and a name wins over `all`. The model is an alias or an exact ID. The effort is `low`, `medium`, `high`, `xhigh` or `max`. The value wins over the repo config and the frontmatter. It does not change triage, the verifier, the escalation or the merge. It does not select reviewers: use `--reviewers` for that. An unknown name, model or effort, or the same target two times, is a usage error. | the config |
+| `--max-cost <usd>` | Start no new repeat when the repeats of this invocation cost this many US dollars or more. See "A dollar limit". | no limit |
+| `--stage1` | Run triage and the reviewers only. See "Stage 1: the reviewers with no verifier". | off |
 
-`--reviewers` and `--passes` make a run that is not comparable to the baseline. With either one, `--baseline` and `--write-baseline` are usage errors.
+`--reviewers`, `--passes` and `--models` make a run that is not comparable to the baseline. With any one of them, `--baseline` and `--write-baseline` are usage errors. The same-judge check sees `--models`: a reviewer that `--models` sets to the judge model needs `--allow-same-judge` or another `--judge-model`.
+
+Each entry of `cost.queries` in a record holds the `effort` of its call beside its `model`, after the repo config and `--models`. A record from before 0.15.0 has no `effort` there. For such a record, take the effort from `identity.models` and `identity.selected_reviewers`.
+
+### A dollar limit
+
+`--max-cost <usd>` adds the cost of each repeat that this invocation ran: the queries of its run and the judge queries of its scoring. A reused repeat does not count. Before each repeat, when the sum is at or above the limit, no new repeat starts. A repeat that runs when the sum reaches the limit runs to its end, so the spend can pass the limit by at most one repeat. The eval then writes the results of the finished repeats and the report of what it has. It prints the spend, the limit and the count of the repeats that remain, and exits 4. No gate runs, and the baseline does not change. Run again with `--resume` and the same `--out` to continue. A failed repeat still gives exit code 1, which wins over 4.
+
+### Stage 1: the reviewers with no verifier
+
+`--stage1` runs triage and the reviewers as a normal run does, with `--reviewers`, `--passes` and `--models`. It sends no finding to the verifier, the escalation or the merge. The record has `identity.mode: "stage1"` (a normal record has `"full"`, and a record from before 0.15.0 has none), an empty `stages.verifications`, and `stages.candidates`: the findings that the run would send to the verifier, in the order of the dedupe of the run, each with its reviewer and its sources. A later `pr-review replay` reads them.
+
+The scoring matches the raw candidates to the posted-label goldens, with the raw judge always on. The report gives posted recall and precision as `none`, and adds `by_reviewer`: for each repeat, one scope for all reviewers and one for each reviewer. For each case and in total, a scope gives the raw candidates, the posted-label goldens that they match (`goldens`, `by_label`), the cost of the reviewer queries of the scope, and the cost per golden. `--stage1` is one of the options in `result.json`, so `--resume` refuses to mix stage 1 results with others. With `--stage1`, `--paired`, `--baseline` and `--write-baseline` are usage errors.
+
+`pr-review eval-report --by-reviewer` gives the same section, by the same rule, from the records of any `--out` directory: a full run or a stage 1 run. So a stage 1 arm and a full reference run compare on one rule. With `--ask-missing`, it asks the judge the questions of the section that have no cached answer.
 
 For each case in name order, the eval clones the case into a temporary directory and runs the review there, once for each repeat. The runs go one at a time. The run takes the `title` and the `body` of the case as the PR text. It makes no `gh` call. Each run writes a normal record in `<out>/<case>/<repeat>/`.
 
 ### Resume a run
 
-When a repeat ends, the eval writes `<out>/<case>/<repeat>/result.json`. The file holds the metrics of the repeat, whether it failed or not. It also holds the case name, the case head sha, a fingerprint of the golden findings, the repeat number, the tool version, the file name of the run record, and the options that change the result: the tier, the judge model, `--no-extras`, `--raw-judge`, `--reviewers`, `--passes` and `--paired`. The eval writes the file in one step, so a kill leaves no half file.
+When a repeat ends, the eval writes `<out>/<case>/<repeat>/result.json`. The file holds the metrics of the repeat, whether it failed or not. It also holds the case name, the case head sha, a fingerprint of the golden findings, the repeat number, the tool version, the file name of the run record, and the options that change the result: the tier, the judge model, `--no-extras`, `--raw-judge`, `--reviewers`, `--passes`, `--paired`, `--models` and `--stage1`. The eval writes the file in one step, so a kill leaves no half file.
 
 A run that stops continues with `--resume` and the same `--out`. This holds also for a baseline run with `--write-baseline`. For each repeat, `--resume` reads the result file. It reuses a result that did not fail and that has the same case name, head sha and golden findings. A reused repeat makes no model call and no clone. It runs again when the result failed, when the file is missing or not valid, or when the repeat number in the file differs from its directory. It also runs again when the head sha differs, or when `golden.json` changed after the result. With `--resume`, the eval clears the old output of a repeat before the repeat runs again. Without `--resume`, the old records stay, and the new result file replaces the old one. The report, the aggregate, the exit code, `candidates.json` and the baseline treat a reused result like a new one. A stopped run that continues gives the same aggregate as one run that does not stop. The eval prints on stderr how many repeats it reused.
 
@@ -787,7 +804,7 @@ The paired scoring asks the judge about the pairs of each one-pass set that the 
 | Flag | Meaning |
 |------|---------|
 | `--by-pass` | Add the by-pass section. |
-| `--ask-missing` | Ask the judge the by-pass questions that have no cached answer or a failed one. Needs `--by-pass`. |
+| `--ask-missing` | Ask the judge the by-pass or by-reviewer questions that have no cached answer or a failed one. Needs `--by-pass` or `--by-reviewer`. |
 | `--allow-api-key` | Keep `ANTHROPIC_API_KEY` and the other provider variables in the SDK environment of the judge of `--ask-missing`, as `eval --allow-api-key` does. |
 
 The section has one block for each repeat. A block has one scope for each reviewer that ran two passes, and scope `null` (`every reviewer with two passes` in the table) for all of them together. A reviewer scope holds only the sources of that reviewer. A case is in the scope of a reviewer only when the record has an `ok` entry of pass 1 and of pass 2 for that reviewer. Scope `null` holds, in each case, the reviewers that are in their own scope there. A reviewer that ran more than two passes in a case of the repeat gets no scope and no decision in that repeat. `missing` names each case that a scope leaves out, with the reviewer and the reason: `did not run`, `no pass 1`, `no pass 2`, `pass 1 failed`, `pass 2 failed`, or `ran 3 passes` (for example). Each scope scores three sets:
@@ -824,6 +841,12 @@ Test (b) computes R: the added cost per added golden, over the one-pass cost per
 Each interval is a 90% percentile bootstrap over the cases, with the fixed seed and 10000 resamples. The section states both in `bootstrap`. A resample draws the cases with replacement, and it computes R from its sums. A resample has an unbounded R when it has no one-pass golden, a one-pass cost of zero (no cost data), or summed added goldens of zero or below. `unbounded_resamples` counts those resamples, and `unbounded_causes` counts them by cause. An unbounded R sorts above every number, so it counts as above 2. JSON gives an unbounded R or end as null. `value_cause` names the cause of a null R.
 
 Without `--ask-missing`, no query goes out. A pass 2 set can need a question that the eval never asked, for example when a pass 1 finding took the golden first. `uncached` counts those questions, and the table prints them and the `unknown` answers for each scope. With `--ask-missing`, the judge first answers the by-pass questions with no cached answer, and asks a cached `unknown` answer again, once for each record. A cached `yes` or `no` gets no new query. The answers go into `judge-cache.json` of the repeat. The command then scores the normal report, the paired section and the by-pass section from the cache, so the three sections agree. A query that fails again stores `unknown`, and a later `--ask-missing` asks it again. `ask_missing` gives the count of the queries and the judge cost. `missing` also names each repeat with no by-pass figures, with the reason: `failed repeat` or `no source fields`.
+
+### Size groups
+
+`pr-review eval-sizes --cases <dir> [--format table|json]` gives each case its count of changed lines, and splits the cases into three groups: small, medium and large. It reads only the `diff.patch` of each case, and makes no model call and no clone.
+
+The changed lines are the added and the removed lines in the hunks of the diff. The file headers do not count, and a `\ No newline` line does not count. The lines of the files that the review run excludes are a second figure: rename-only files and the files that match the default generated globs. The command reads no repo config, so the `generated_globs` of a repo config do not apply. The command sorts the cases by changed lines, then by name. The sizes of the three groups differ by at most one, and the larger groups come first. The JSON output gives each case with its figures and its group, and each group with its cases and its range. An empty group has the range `null`.
 
 ### A cases subset by cost
 
