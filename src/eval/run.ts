@@ -517,7 +517,9 @@ async function runRepeat(ctx: EvalContext, c: Case, repeat: number): Promise<Rep
       tierOverride: ctx.opts.tier,
       outDir: join(ctx.out, c.name, String(repeat)),
       allowApiKey: ctx.opts.allowApiKey,
-      description: { title: c.title, body: c.body },
+      ...(c.description_from === "commits"
+        ? {}
+        : { description: { title: c.title, body: c.body } }),
       client: ctx.client,
       ...(ctx.opts.reviewers ? { onlyReviewers: ctx.opts.reviewers } : {}),
       ...(ctx.opts.passes ? { passes: new Map(Object.entries(ctx.opts.passes)) } : {}),
