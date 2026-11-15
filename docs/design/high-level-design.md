@@ -194,7 +194,7 @@ Uses:
 
 The first run casts a wide net. Wide means more passes over the PR's own changes, not a wider scope. Every run reviews only what the PR adds, changes or aggravates. Later runs look only at what changed since the last review and only for blocking problems, so the cycle converges.
 
-**First run.** A reviewer with `passes: N` in its frontmatter runs N times with the same inputs. The union of findings goes to the verifier, then fingerprint and semantic dedupe collapse the repeats. Defaults: 2 passes for diff-bugs and security, 1 elsewhere. The fast tier runs one pass of every selected reviewer. Five runs of one model on SWR-Bench agreed on only 27 golden hits, so repeats raise recall more than any prompt change.
+**First run.** A reviewer with `passes: N` in its frontmatter runs N times with the same inputs. The union of findings goes to the verifier, then fingerprint and semantic dedupe collapse the repeats. Defaults: 1 pass for every built-in reviewer. diff-bugs and security had 2 passes until D4c E7 measured them on S1: a second pass added 2 and 3 posted-label goldens on 28 cases at several times the cost of a golden of one pass (`docs/research/e7-passes-dedupe.md`). A repo sets `reviewers.<name>.passes` to buy a second pass. The fast tier runs one pass of every selected reviewer. Five runs of one model on SWR-Bench agreed on only 27 golden hits, so repeats raise recall more than any prompt change.
 
 **Later runs** (a new push on a PR this tool has reviewed):
 

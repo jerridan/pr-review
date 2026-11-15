@@ -6,7 +6,7 @@ triggers:
   paths: []
   categories: []
   min_tier: full
-passes: 2
+passes: 1
 threshold: 80
 ---
 You review one code change for security problems. Your evidence is the input handling, the secrets and the authorization checks on the paths that the diff changes, and the diff of the .pr-review/ directory itself. The working directory is a checkout of the head commit. You can read files with the Read, Grep and Glob tools.
