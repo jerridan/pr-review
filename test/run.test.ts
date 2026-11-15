@@ -32,9 +32,11 @@ import type { TriageBrief } from "../src/schemas/triage.js";
 import { VerifierResultSchema, type VerifierResult } from "../src/schemas/verifier.js";
 import {
   classifyResult,
+  createSdkClient,
   type QueryMeta,
   type QueryOutcome,
   type QueryRequest,
+  type RunOptions,
 } from "../src/sdk/client.js";
 import { createFakeSdkClient } from "../src/sdk/fake.js";
 import { buildQueryOptions } from "../src/sdk/options.js";
@@ -601,6 +603,55 @@ describe("a verifier call that stops on its limit (R4)", () => {
     });
     expect(record.posted.verdict).not.toBe("incomplete");
     expect(record.posted.coverage.findings_unsure_on_limit).toBe(1);
+  });
+
+  // The real SDK client over a query function that throws for the verifier,
+  // as the SDK does when a call reaches its limit. Other roles use the script.
+  function throwingVerifierClient(text: string) {
+    const scripted = createFakeSdkClient(script(fx));
+    const real = createSdkClient(() => {
+      throw new Error(text);
+    });
+    return {
+      query: <T>(req: QueryRequest, options: RunOptions) =>
+        (req.role === "verifier" ? real : scripted).query<T>(req, options),
+    };
+  }
+
+  it.each([
+    ["budget", "Claude Code returned an error result: Reached maximum budget ($0.5)"],
+    ["turns", "Claude Code returned an error result: Reached maximum number of turns (30)"],
+  ])("gives unsure when the SDK throws on the %s limit, and the review completes", async (_n, text) => {
+    const result = await runReview({
+      repo: fx.repo,
+      base: fx.base,
+      head: fx.head,
+      outDir: join(outRoot, `limit-thrown-${_n}`),
+      format: "json",
+      allowApiKey: false,
+      client: throwingVerifierClient(text),
+    });
+    expect(result.exitCode).toBe(0);
+    expect(result.record.posted.verdict).not.toBe("incomplete");
+    expect(result.record.stages.verifications[0]).toMatchObject({
+      first: { kind: "limit", message: expect.stringContaining("maximum") },
+      unsure: "limit",
+    });
+    expect(result.record.posted.coverage.findings_unsure_on_limit).toBe(1);
+  });
+
+  it("keeps kind thrown for another thrown error", async () => {
+    const { record } = await runReview({
+      repo: fx.repo,
+      base: fx.base,
+      head: fx.head,
+      outDir: join(outRoot, "limit-thrown-other"),
+      format: "json",
+      allowApiKey: false,
+      client: throwingVerifierClient("spawn failed"),
+    });
+    expect(record.stages.verifications[0]?.first).toMatchObject({ kind: "thrown" });
+    expect(record.posted.verdict).toBe("incomplete");
   });
 
   it("keeps the verdict incomplete for an escalation failure of another kind", async () => {
