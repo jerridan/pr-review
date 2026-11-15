@@ -68,6 +68,10 @@ export function touchedLines(patch: string): Map<string, Set<number>> {
   const touched = new Map<string, Set<number>>();
   let file: string | null = null;
   let line = 0;
+  // The lines that the current hunk still holds, on the old and the new side.
+  // A line of a hunk that starts with "--- " is a deleted line, not a header.
+  let oldLeft = 0;
+  let newLeft = 0;
   const add = (n: number): void => {
     if (file === null) return;
     const set = touched.get(file) ?? new Set<number>();
@@ -75,24 +79,32 @@ export function touchedLines(patch: string): Map<string, Set<number>> {
     touched.set(file, set);
   };
   for (const text of patch.split("\n")) {
-    const header = /^\+\+\+ b\/(.+)$/.exec(text);
-    if (header) {
-      file = (header[1] ?? "").trim();
+    const inHunk = oldLeft > 0 || newLeft > 0;
+    if (!inHunk && text.startsWith("--- ")) continue;
+    if (!inHunk && text.startsWith("+++ ")) {
+      const header = /^\+\+\+ b\/(.+)$/.exec(text);
+      file = header ? (header[1] ?? "").trim() : null;
       continue;
     }
-    const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(text);
+    const hunk = /^@@ -\d+(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(text);
     if (hunk) {
-      line = Number(hunk[1]);
+      oldLeft = hunk[1] === undefined ? 1 : Number(hunk[1]);
+      line = Number(hunk[2]);
+      newLeft = hunk[3] === undefined ? 1 : Number(hunk[3]);
       continue;
     }
-    if (file === null || line === 0) continue;
+    if (!inHunk) continue;
     if (text.startsWith("+")) {
       add(line);
       line += 1;
+      newLeft -= 1;
     } else if (text.startsWith("-")) {
       add(line);
+      oldLeft -= 1;
     } else if (text.startsWith(" ")) {
       line += 1;
+      oldLeft -= 1;
+      newLeft -= 1;
     }
   }
   return touched;

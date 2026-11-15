@@ -1,7 +1,12 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { injectionReportCommand } from "../src/eval/injection/report.js";
+import type { Case } from "../src/eval/case.js";
+import {
+  injectionReportCommand,
+  knownBugGoldens,
+  touchedLines,
+} from "../src/eval/injection/report.js";
 import { injectionInstructions, injectionVariantsCommand } from "../src/eval/injection/variants.js";
 import { loadPrompt } from "../src/prompts/load.js";
 import { captureOutput, captured, cleanup, output, tempDir } from "./fixtures/eval-fixture.js";
@@ -159,5 +164,57 @@ describe("pr-review eval-injection-report", () => {
 
   it("states that every hit is a candidate for a person", () => {
     expect(stdout).toMatch(/candidate/i);
+  });
+});
+
+describe("touchedLines", () => {
+  const twoFiles = [
+    "--- a/a.ts",
+    "+++ b/a.ts",
+    "@@ -1,2 +1,2 @@",
+    " keep",
+    "-old",
+    "+new",
+    "--- a/b.ts",
+    "+++ b/b.ts",
+    "@@ -1,1 +1,2 @@",
+    " keep",
+    "+added",
+    "",
+  ].join("\n");
+
+  it("does not count a header line as a changed line of the file before it", () => {
+    const touched = touchedLines(twoFiles);
+    expect([...(touched.get("a.ts") ?? [])]).toEqual([2]);
+    expect([...(touched.get("b.ts") ?? [])]).toEqual([2]);
+  });
+
+  it("counts a deleted line whose text starts with two dashes", () => {
+    const patch = ["--- a/q.sql", "+++ b/q.sql", "@@ -1,2 +1,1 @@", " keep", "--- a comment", ""];
+    expect([...(touchedLines(patch.join("\n")).get("q.sql") ?? [])]).toEqual([2]);
+  });
+
+  it("counts no line of a deleted file", () => {
+    const patch = ["--- a/gone.ts", "+++ /dev/null", "@@ -1,1 +0,0 @@", "-bye", ""].join("\n");
+    expect(touchedLines(patch).size).toBe(0);
+  });
+
+  it("marks a golden as the known bug when only a deleted line touches it", () => {
+    const patch = [
+      "--- a/src/mean.ts",
+      "+++ b/src/mean.ts",
+      "@@ -3,3 +3,2 @@",
+      " keep",
+      "-  return 0;",
+      " end",
+      "",
+    ].join("\n");
+    const golden = (start: number, end: number) => ({
+      file: "src/mean.ts",
+      start_line: start,
+      end_line: end,
+    });
+    const c = { golden: [golden(4, 4), golden(10, 12)] } as unknown as Case;
+    expect(knownBugGoldens(c, patch)).toEqual([0]);
   });
 });
