@@ -1,4 +1,6 @@
 // pr-review replay --verifier-cap: the dollar cap of one verifier call of an arm.
+import { cpSync, readdirSync, rmSync } from "node:fs";
+import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ROLE_DEFAULTS } from "../src/config/models.js";
 import type { Figures, ReplayReport } from "../src/eval/replay/index.js";
@@ -113,5 +115,43 @@ describe("pr-review replay --verifier-cap", () => {
     const code = await replay(replayFake(), ["--help"]);
     expect(code).toBe(0);
     expect(output.stdout).toMatch(/--arm <arm>[\s\S]*judge[\s\S]*--max-cost/);
+  });
+});
+
+describe("pr-review replay --judge-cache", () => {
+  it("lets a second arm with the same shared cache ask the judge nothing", async () => {
+    // A copy of the eval directory with no judge cache.
+    const from = tempDir("replay-nocache", made);
+    cpSync(inputs.full, from, { recursive: true });
+    for (const name of readdirSync(from).filter((n) => n.endsWith("-case"))) {
+      rmSync(join(from, name, "1", "judge-cache.json"), { force: true, recursive: false });
+    }
+    const shared = tempDir("replay-shared", made);
+    const args = (out: string) => [
+      "--cases",
+      inputs.cases,
+      "--from",
+      from,
+      "--out",
+      out,
+      "--format",
+      "json",
+      "--concurrency",
+      "1",
+      "--judge-cache",
+      shared,
+      ...ARM,
+    ];
+    const one = replayFake();
+    expect(await replay(one, args(tempDir("replay-j1", made))), output.stderr).toBe(0);
+    expect(one.calls.filter((c) => c.role === "judge").length).toBeGreaterThan(0);
+    const two = replayFake();
+    expect(await replay(two, args(tempDir("replay-j2", made))), output.stderr).toBe(0);
+    expect(two.calls.filter((c) => c.role === "judge")).toEqual([]);
+  }, 120_000);
+
+  it("names --judge-cache in the help, with the advice to share it between arms", async () => {
+    await replay(replayFake(), ["--help"]);
+    expect(output.stdout).toMatch(/--judge-cache <dir>[\s\S]*every\s+arm/i);
   });
 });

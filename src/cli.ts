@@ -705,7 +705,9 @@ export function createProgram(deps: ProgramDeps): Command {
     .addOption(
       new Option(
         "--arm <arm>",
-        "stored: the stored first results, with no verifier call; the golden match can still ask the judge for questions that the cache of --from does not hold, and --max-cost counts those calls",
+        "stored: the stored first results, with no verifier call; " +
+          "the golden match can still ask the judge for questions that no cache holds, " +
+          "and --max-cost counts those calls",
       ).choices(["stored"]),
     )
     .option(
@@ -732,6 +734,12 @@ export function createProgram(deps: ProgramDeps): Command {
       "--verifier-cap <usd>",
       "the dollar cap of one verifier call of the arm, a positive number (default: the cap of the verifier role); the codex backend has no dollar cap and ignores it",
       parseCap,
+    )
+    .option(
+      "--judge-cache <dir>",
+      "a directory that holds <case>/judge-cache.json: the replay reads the judge answers there " +
+        "before it asks, and writes each new answer there. Give the same directory to every arm " +
+        "of one experiment, so the judge answers each question once",
     )
     .option(
       "--sample <kind>",
@@ -765,6 +773,7 @@ export function createProgram(deps: ProgramDeps): Command {
           concurrency: number;
           maxCost?: number;
           verifierCap?: number;
+          judgeCache?: string;
           sample?: SampleKind;
           seed?: number;
           format: "table" | "json";
@@ -798,6 +807,7 @@ export function createProgram(deps: ProgramDeps): Command {
               concurrency: options.concurrency,
               ...(options.maxCost !== undefined ? { maxCost: options.maxCost } : {}),
               ...(options.verifierCap !== undefined ? { verifierCap: options.verifierCap } : {}),
+              ...(options.judgeCache !== undefined ? { judgeCache: options.judgeCache } : {}),
               sample: options.sample ?? "all",
               seed: options.seed ?? BOOTSTRAP_SEED,
               format: options.format,
