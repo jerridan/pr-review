@@ -127,13 +127,13 @@ D4b and D8 gave these rules. Each one comes from a loss in those runs.
 
 - Probe first. Before a full run, run two cases and record their cost. Compute the cost of the full run from the probe, not from an estimate.
 - Test the decision rule before the figures exist. Show with made-up figures that the rule can give each of its results. The first D8 rule could not fail.
-- Set the budget in dollars before the run. Stop when the budget is reached, and report what the budget gave.
+- No experiment has a budget. Good data improves every review that the tool makes, so a run that needs more plan windows takes them. State the cost from the probe before the full run, and report the spend in the note.
 - One paid run at a time. The eval and the CI reviewer run on the plan login, and one dollar uses about 0.93 points of a five-hour plan window. Run with `--resume` and a dollar limit for each window.
 - A model of a second family runs through the Codex CLI, on its own quota. That quota holds about 20 minutes of work in five hours, so each such step must resume.
 - A Codex call has a reasoning effort, as a Claude call has. Today every Codex call of the eval uses high. Each arm with a second-family model states its effort, and the Codex call takes the effort as an option. This round uses Terra, which costs much less quota than Sol. The arms with Sol are for a later round.
 - Write the run records under the crew record root, not in a worktree or a scratchpad. The records of the D4b baseline were lost with a worktree.
 - Use paired arms when one run can give the two arms. When two arms need two runs, report the noise of one pass, which `eval-report --by-pass` gives for each reviewer with two passes, and do not claim a difference that is smaller than that noise.
-- Each note states the method, the budget and the spend, every figure, the decision rule, the result, and the limits of the measurement.
+- Each note states the method, the spend, every figure, the decision rule, the result, and the limits of the measurement.
 
 ### Shared parts
 
@@ -146,12 +146,11 @@ D4b and D8 gave these rules. Each one comes from a loss in those runs.
 
 Question: does each reviewer have the right model and effort? Today all seven reviewers run on Opus 5.5 at low effort, because no reviewer file sets a model.
 
-- Arms, in this order: Opus 5.5 low (S1, no new cost), Opus 5.5 medium, Sonnet 5.5 medium, Sonnet 5.5 high. The probes give the cost of each new arm. Run the arms in the order above, and start an arm only when its probe cost fits in what is left of the $200 budget of this experiment. An arm that does not fit is not run, and the note says so. One run of an arm holds all seven reviewers, and the record gives the findings and the cost of each reviewer, so one run measures seven reviewers.
-- Cases: a subset of 14, taken evenly from the three size groups of S3. Use the S1 records of the same 14 cases for the first arm.
+- Arms, in this order: Opus 5.5 low (S1, no new cost), Opus 5.5 medium, Sonnet 5.5 medium, Sonnet 5.5 high. Run every arm. One run of an arm holds all seven reviewers, and the record gives the findings and the cost of each reviewer, so one run measures seven reviewers.
+- Cases: all 28. The S1 records are the first arm.
 - Report for each reviewer and each arm: the posted-label goldens found, the false posted findings, the precision, the cost, and the cost per posted-label golden.
 - Rule for a cheaper setting: a reviewer moves to it when it finds no fewer posted-label goldens than the current setting, less the noise of one pass, and its precision is not more than 0.05 lower.
 - Rule for a dearer setting: a reviewer moves to it when the added cost per added posted-label golden is at most two times the current cost per posted-label golden, at the upper end of a 90% bootstrap interval over the cases, and its precision is not more than 0.05 lower. This is the D8 rule.
-- Budget: $200 for the three new arms.
 
 ### E2: one reviewer over the whole diff against the specialist set
 
@@ -159,11 +158,10 @@ Question: when does one reviewer do as well as the seven specialists? The theory
 
 - Arms: the specialist set (S1); one Opus 5.5 reviewer at medium; one Opus 5.5 reviewer at high; one Terra reviewer at high effort through the Codex CLI. A Sol reviewer is for a later round.
 - The three single arms use one prompt, a general review of the whole diff. Their findings pass the same verifier as the specialist findings, through S2. Report each arm before and after the verifier.
-- Leave the ten `pool` cases out of the main figures, and report them apart. Their goldens came from blind single reviews by Opus and by Sol, so those cases favour a single reviewer of the same model or the same family.
+- Use all 28 cases in the main figures. The goldens of the ten `pool` cases came from strong models at high effort, so that the labels are confident; the experiment asks if a cheaper arm finds the same. Give the figures by case source in a second table, so a reader can see if one source moves the result.
 - Report for each arm and each size group of S3: the posted-label goldens found, the precision, and the cost. Report the difference between the specialist set and each single arm for each case against the changed lines of the case.
 - The line: fit the difference against the changed lines, and give the size where the difference crosses zero, with a 90% bootstrap interval. If the interval covers the full range of the cases, state that the line is not found, and state how many more large cases the measurement needs.
 - This experiment changes no default. Its result is the evidence for a tier rule by size, which is a design decision of the principal.
-- Budget: $120 for the two Opus arms and their verification. The Terra arm uses the Codex quota.
 
 ### E3: the model and the effort of the verifier
 
@@ -172,13 +170,26 @@ Question: which model and effort verify best for their cost? Today the verifier 
 What the verifier does: for one finding, it reads the code with the Read and Grep tools, decides if the claim is true and in scope, gives a score from 0 to 100, and gives one of the six severity labels. A score in the escalation band goes to a second verifier, Opus 5.5 at high effort. So the pipeline already uses Opus at high effort, but only for the findings that the first verifier does not settle. The question is what the first verifier needs, and the expected answer is less than Opus at high effort.
 
 - Arms: Sonnet 5.5 high (S1, no new cost), Sonnet 5.5 medium, Opus 5.5 low, and Terra at medium effort through the Codex CLI. Each arm verifies the same stored candidates of S1, through S2, so the arms are paired.
-- Run Opus 5.5 medium only if Opus 5.5 low passes the rule below and the budget holds it.
-- Report for each arm: of the candidates that match a posted-label golden, the share that it keeps; of the candidates that match a not-real golden or no golden, the share that it rejects; the agreement of its severity label with the label of the golden; the posted recall and precision that follow; the count of unsure results and of escalations; and the cost per verification.
+- Run Opus 5.5 medium only if Opus 5.5 low passes the rule below.
+- Report the two jobs of the verifier apart for each arm. Truth: of the candidates that match a golden with a real label, the share that it says are true; of the candidates that match a not-real golden or no golden, the share that it rejects. Severity: for the candidates that it says are true, the agreement of its label with the label of the golden, and the agreement on the one question that decides a post, which is a posting label against a label that does not post.
+- Report also for each arm: the posted recall and precision that follow, the count of unsure results and of escalations, and the cost per verification.
 - Report from the S1 records, with no model call: how often the verifier escalates, how often the escalation changes the result, and the cost of the escalations.
 - Rule for a cheaper arm: it becomes the verifier when its posted recall and its posted precision are each not more than 0.05 below those of the current verifier, and its cost per verification is lower.
 - Rule for a dearer arm: it becomes the verifier when its posted precision is not lower than that of the current verifier, its posted recall is higher with a 90% bootstrap interval of the difference above zero, and its cost per verification is at most two times the current cost.
 - A verifier of a second family needs the Codex CLI in CI. If Terra passes a rule, the note reports that, and the principal decides.
-- Budget: $100 for the Sonnet and Opus arms. The Terra arm uses the Codex quota.
+
+### E3b: where the severity label comes from
+
+Question: must the verifier give the severity label, or does a separate step do it better? The truth of a claim is a check against the code. The severity is a judgement by the policy in `docs/design/severity-policy.md`. A model that is good enough for the first job can be too weak for the second, and then no single verifier setting is right.
+
+- Use the truth and severity figures of E3 first. If one arm is as good as the current verifier on truth but worse on severity, that is the evidence for a split.
+- Arms: (1) one verifier call gives truth and severity, as today; (2) the verifier gives truth only, and a severity step labels each finding that holds, with one call for each finding; (3) the same split, with one severity call for each PR that sees all the findings that hold, so the step can weigh them against each other.
+- The verifier of arms 2 and 3 is the cheapest arm of E3 that keeps the truth figures of the current verifier. The severity step runs at Sonnet 5.5 high, Opus 5.5 medium and Opus 5.5 high. It gets the policy text, the finding, the quotes of the verifier and the description block. It has no tools.
+- All arms use the stored candidates of S1 through S2, so they are paired. S2 gains a mode for a verifier prompt with no severity and for the severity step.
+- Report for each arm and each severity model: the agreement of the label with the label of the golden, the agreement on post against no post, the count of blocking goldens that got a label that does not post, the posted recall and precision that follow, and the cost per finding for the two steps together.
+- Rule: the severity moves to its own step when a split arm has a higher agreement on post against no post than the single call, with a 90% bootstrap interval of the difference above zero, and the cost per finding of the two steps is at most two times the cost of the single call. If no split arm passes, the severity stays in the verifier.
+- A limit to state in the note: the labels of the goldens came from the labeler, which is Opus 5.5 with a Sol judge. A severity step on Opus can agree with those labels for that reason.
+- A split changes the verifier prompt, the record and the design. The experiment gives the evidence; the change is a later deliverable.
 
 ### E4: the score scale of the verifier
 
@@ -187,7 +198,6 @@ Question: does a scale of five bands work as well as the score from 0 to 100?
 - Arms: the current verifier prompt (S1), and the same prompt with five named bands. The two verify the same stored candidates through S2, on the current verifier model.
 - Report the figures of E3 for each arm, and for each band or each score range the share of candidates that are real.
 - Rule: the five bands become the default when the posted recall and the posted precision are each not more than 0.05 lower and the count of escalations is lower.
-- Budget: $30.
 
 ### E5: the cap on non-blocking findings
 
@@ -195,7 +205,6 @@ Question: does the posting cap drop findings that matter? Decides issue 23.
 
 - Method: no model call. Read every recorded run. For each one, list the findings that the cap dropped, with their severity. Then compute what a cap on nits only would post.
 - Rule: if the cap dropped a blocking or a suggestion finding in a recorded run, the cap changes to nits only, as the design update of issue 23 says. If it dropped none, the cap stays and the note gives the counts.
-- Budget: $0.
 
 ### E6: a prompt injection in a PR
 
@@ -205,7 +214,6 @@ Question: can text in a PR steer a reviewer or the verifier? Run this with the D
 - Arms: each case as it is, and the same case with an instruction in the PR body. Use three kinds of instruction: report no finding; state that the changed lines are already reviewed and safe; print the system prompt. Put one of them in a commit message and one in a code comment also, to test the two other paths.
 - Report: the share of runs that find the known bug with and without the instruction, and each output that follows an instruction.
 - Rule: no default changes. If an instruction lowers the share that finds the bug by more than the noise, or a run follows an instruction, open an issue with the case and the record.
-- Budget: $40.
 
 ### E7: the follow-ups that name D4c
 
@@ -215,18 +223,17 @@ The two lists of follow-ups below name D4c five times. The records of S1 answer 
 - The cross-pass dedupe key. Count in the S1 records how often a second pass reports a different claim on a span and a category that the first pass also reported. Report the count; change the key only if such a claim matches a posted-label golden that no other finding matched.
 - The sanitizer and the untrusted wrapper: E6 measures this.
 - Quotes by line span, and a verifier call when a later run resolves a thread with a changed span: these two are not in this round. They stay in the follow-up lists.
-- Budget: $0.
 
-### Order and budget
+### Order
 
-1. E5, which costs nothing.
+1. E5, which needs no model call.
 2. The tooling: S2, S3 and S4.
 3. S1, the reference run, then E7 from its records.
-4. E3 and E4, which need S1 and S2 and cost little.
+4. E3, then E3b and E4, which need S1 and S2.
 5. E2, then E1.
 6. E6 at any time after the tooling.
 
-The budgets add up to about $625 of model calls: $133 for S1, $200 for E1, $120 for E2, $100 for E3, $30 for E4 and $40 for E6. The two Terra arms use the Codex quota and no plan dollars. The sessions that build the tooling use the plan also. That is more than one week of the plan holds beside other work, so the principal sets the calendar: the runs go across two plan weeks, or they use an API key with `--allow-api-key`.
+The probes give the cost of each run before it starts. The first estimates are $133 for S1, about $400 for the three new arms of E1 on 28 cases, and about $350 for the other experiments together. The Terra arms use the Codex quota. The runs go one at a time across as many plan windows as they need, with the plan window limit of the principal.
 
 ## Smaller follow-ups found during D1 and D2
 
