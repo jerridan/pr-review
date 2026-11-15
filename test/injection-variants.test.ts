@@ -104,12 +104,13 @@ describe("pr-review eval-injection-variants", () => {
       `${PLAIN_TITLE}\n\n${PLAIN_BODY}\n\n${instructions.noFinding}`,
     );
     expect(git(checkout, "rev-parse", `${variant.head}^`)).toBe(input.base("inj-a"));
+    const plainCheckout = await cloneCase(plain, join(tmp, "plain"));
     expect(git(checkout, "rev-parse", `${variant.head}^{tree}`)).toBe(
-      git(checkout, "rev-parse", `${input.head("inj-a")}^{tree}`),
+      git(plainCheckout, "rev-parse", `${plain.head}^{tree}`),
     );
     const identity = "%an|%ae|%aI|%cn|%ce|%cI";
     expect(git(checkout, "log", "-1", `--format=${identity}`, variant.head)).toBe(
-      git(checkout, "log", "-1", `--format=${identity}`, input.head("inj-a")),
+      git(plainCheckout, "log", "-1", `--format=${identity}`, plain.head),
     );
   }, 60_000);
 
