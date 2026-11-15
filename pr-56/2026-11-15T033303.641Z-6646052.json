@@ -1,0 +1,1824 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 56,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "E5: cap nits only, after the cap dropped suggestions in recorded runs",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/56"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "5c3fe52686749bd83f7028b2fc2f1a6c9e4be2ab",
+    "head": "66460526471acf0dccb84ca0c638e6deca2943cc",
+    "started_at": "2026-11-15T03:33:03.641Z",
+    "tool_version": "0.13.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "E5: cap nits only, after the cap dropped suggestions in recorded runs\n\nD4c experiment E5: the cap on non-blocking findings. Refs #23 (the PR does not close it).\n\n## Result\n\nThe cap dropped 22 findings in 8 of 190 recorded runs: 14 suggestions, 8 nits and no blocking finding. A cap on nits only posts 315 findings where the cap posted 293. The E5 rule fires, so the cap now caps nits only.\n\n## Changes\n\n- `src/merge/cap.ts`: every blocking finding and every suggestion posts. Nits post in ranked order up to the cap value. The formula and the `caps.non_blocking_*` keys do not change, so no repo config breaks.\n- Tests: `test/merge.test.ts` tests the new cap. In `test/explain.test.ts`, the end-to-end fixture now uses two nits, because its two suggestions both post now.\n- Docs: design section 3.6 and decision 10, `severity-policy.md`, and the README config rows now say that the cap applies to nits only. `docs/research/e5-nit-cap.md` is the note. TICKETS.md marks E5 done.\n- The version goes to 0.14.0.\n\nThe experiment made no model call. The spend is $0.\n\n## Checks\n\n`npm test` (1504 passed), `npm run lint`, `npm run typecheck` and `npm run build` pass.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZdfE1rqbczPpmGQQ5S\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": ".claude-plugin/marketplace.json",
+        "hunks": 1
+      },
+      {
+        "path": ".claude-plugin/plugin.json",
+        "hunks": 1
+      },
+      {
+        "path": "README.md",
+        "hunks": 1
+      },
+      {
+        "path": "TICKETS.md",
+        "hunks": 1
+      },
+      {
+        "path": "docs/design/high-level-design.md",
+        "hunks": 2
+      },
+      {
+        "path": "docs/design/severity-policy.md",
+        "hunks": 1
+      },
+      {
+        "path": "docs/research/e5-nit-cap.md",
+        "hunks": 1
+      },
+      {
+        "path": "package.json",
+        "hunks": 1
+      },
+      {
+        "path": "src/merge/cap.ts",
+        "hunks": 3
+      },
+      {
+        "path": "test/explain.test.ts",
+        "hunks": 3
+      },
+      {
+        "path": "test/merge.test.ts",
+        "hunks": 3
+      }
+    ],
+    "excluded_files": [
+      {
+        "path": "package-lock.json",
+        "reason": "generated"
+      }
+    ],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "Changes the posting cap logic in src/merge/cap.ts so suggestions are never capped, which alters which findings post, and tests were rewritten to match.",
+      "confidence": "high",
+      "categories": [
+        "bug",
+        "test",
+        "docs",
+        "other"
+      ],
+      "hotspots": [
+        "src/merge/cap.ts: applyCap",
+        "test/explain.test.ts: changed severities and expectations",
+        "test/merge.test.ts: cap tests",
+        "docs/design/high-level-design.md: section 3.6 wording"
+      ],
+      "file_notes": [
+        {
+          "file": "src/merge/cap.ts",
+          "note": "Logic change: suggestions now always post; only nits are capped and the overflow goes to capped. Key names are unchanged."
+        },
+        {
+          "file": "test/merge.test.ts",
+          "note": "Cap tests rewritten for the nits-only behavior. Check that they cover the edge cases, such as cap 0 and a mix of severities."
+        },
+        {
+          "file": "test/explain.test.ts",
+          "note": "The fixture severities changed from suggestion to nit so the cap test still hits a cap. The expected message still says 'over the non-blocking cap'. Check that it matches the source."
+        },
+        {
+          "file": "docs/research/e5-nit-cap.md",
+          "note": "New research note with the E5 results. Docs only."
+        },
+        {
+          "file": "docs/design/high-level-design.md",
+          "note": "Design text updated to the nits-only cap."
+        },
+        {
+          "file": "docs/design/severity-policy.md",
+          "note": "Policy text updated to the nits-only cap."
+        },
+        {
+          "file": "README.md",
+          "note": "Config key descriptions reworded."
+        },
+        {
+          "file": "TICKETS.md",
+          "note": "Adds a done note for E5."
+        },
+        {
+          "file": "package.json",
+          "note": "Version bump to 0.14.0."
+        },
+        {
+          "file": ".claude-plugin/plugin.json",
+          "note": "Version bump to 0.14.0."
+        },
+        {
+          "file": ".claude-plugin/marketplace.json",
+          "note": "Version bump to 0.14.0."
+        }
+      ],
+      "summary": "The change moves the per-run posting cap from all non-blocking findings to nits only. Blocking findings and suggestions always post. The cap formula and config keys stay the same. Tests, design docs, the README and an E5 research note are updated, and the version goes to 0.14.0."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: Changes the posting cap logic in src/merge/cap.ts so suggestions are never capped, which alters which findings post, and tests were rewritten to match.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "test/explain.test.ts",
+            "start_line": 217,
+            "end_line": 218,
+            "category": "convention",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The fixture claims are still named CLAIM-SUGGEST-A and CLAIM-SUGGEST-B, but the change makes them nits.",
+            "evidence": "if (m.includes(\"CLAIM-SUGGEST-A\")) return verdict({ score: 92, severity: \"nit\" });",
+            "suggested_fix": "Rename the claims to CLAIM-NIT-A and CLAIM-NIT-B.",
+            "explanation": "Elsewhere in the file, fixture claim names state the outcome of the claim, so a name that says suggestion for a nit misleads the reader.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4768,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 14305,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0014410000000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 384,
+              "cacheReadInputTokens": 5136,
+              "cacheCreationInputTokens": 13814,
+              "webSearchRequests": 0,
+              "costUSD": 0.1192272,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 72,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1206682
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6661,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 14293,
+              "outputTokens": 18,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0014383,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 610,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 15837,
+              "webSearchRequests": 0,
+              "costUSD": 0.1395158,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 164,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1409541
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/explain/index.ts",
+            "start_line": 280,
+            "end_line": 280,
+            "category": "other",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The explain output still says a finding was capped over the non-blocking cap, but the cap now applies to nits only.",
+            "evidence": "() => \"capped: over the non-blocking cap\",",
+            "suggested_fix": "Change the text to \"capped: over the cap on nits\" and update the test expectation.",
+            "explanation": "Users now read a reason that names the wrong set of findings, since only nits can be capped.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7384,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 14301,
+              "outputTokens": 18,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0014391,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 476,
+              "cacheReadInputTokens": 24536,
+              "cacheCreationInputTokens": 14149,
+              "webSearchRequests": 0,
+              "costUSD": 0.1276352,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 123,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1290743
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4819,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 14303,
+              "outputTokens": 18,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0014393,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 333,
+              "cacheReadInputTokens": 5363,
+              "cacheCreationInputTokens": 13812,
+              "webSearchRequests": 0,
+              "costUSD": 0.1182366,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 77,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1196759
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/explain/index.ts",
+            "start_line": 280,
+            "end_line": 280,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "medium",
+            "claim": "The explain output still calls the cap \"the non-blocking cap\". After this change the cap applies to nits only.",
+            "evidence": "() => \"capped: over the non-blocking cap\",",
+            "suggested_fix": "Change the text to \"capped: over the cap on nits\" and update the tests.",
+            "explanation": "Only nits can be capped now, so the user-facing text gives the wrong scope of the cap.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6752,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 14307,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0014417,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 480,
+              "cacheReadInputTokens": 21921,
+              "cacheCreationInputTokens": 16385,
+              "webSearchRequests": 0,
+              "costUSD": 0.14508020000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 141,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1465219
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/explain/index.ts",
+            "start_line": 280,
+            "end_line": 280,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The explain reason for a capped finding still says \"non-blocking cap\", but the cap now applies only to nits.",
+            "evidence": "() => \"capped: over the non-blocking cap\",",
+            "suggested_fix": "Change the text to \"capped: over the cap on nits\" and update the test in test/explain.test.ts to match.",
+            "explanation": "After this change only nits can be capped, so the user-facing text now describes the wrong scope.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6175,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 24823,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0024928000000000003,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 427,
+              "cacheReadInputTokens": 32829,
+              "cacheCreationInputTokens": 26970,
+              "webSearchRequests": 0,
+              "costUSD": 0.23088179999999997,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 69,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.23337459999999996
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4782,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 14307,
+              "outputTokens": 18,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0014397,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 353,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 16087,
+              "webSearchRequests": 0,
+              "costUSD": 0.1363758,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 70,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.13781549999999998
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 2675,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 14303,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0014408000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 91,
+              "cacheReadInputTokens": 5330,
+              "cacheCreationInputTokens": 13812,
+              "webSearchRequests": 0,
+              "costUSD": 0.11338999999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 37,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1148308
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7702,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 14293,
+              "outputTokens": 18,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0014383,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 670,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 16848,
+              "webSearchRequests": 0,
+              "costUSD": 0.14880379999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 222,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1502421
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "test/explain.test.ts",
+          "start_line": 217,
+          "end_line": 218,
+          "category": "convention",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The fixture claims are still named CLAIM-SUGGEST-A and CLAIM-SUGGEST-B, but the change makes them nits.",
+          "evidence": "if (m.includes(\"CLAIM-SUGGEST-A\")) return verdict({ score: 92, severity: \"nit\" });",
+          "suggested_fix": "Rename the claims to CLAIM-NIT-A and CLAIM-NIT-B.",
+          "explanation": "Elsewhere in the file, fixture claim names state the outcome of the claim, so a name that says suggestion for a nit misleads the reader.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (m.includes(\"CLAIM-SUGGEST-A\")) return verdict({ score: 92, severity: \"nit\" });",
+            "if (m.includes(\"CLAIM-SUGGEST-B\")) return verdict({ score: 91, severity: \"nit\" });"
+          ],
+          "rationale": "The diff keeps the CLAIM-SUGGEST-A and CLAIM-SUGGEST-B names but changes both verdicts to severity \"nit\", so the names now mislead. This is minor, because the test still passes and the only cost is a misleading name.",
+          "score": 90,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (m.includes(\"CLAIM-SUGGEST-A\")) return verdict({ score: 92, severity: \"nit\" });",
+            "if (m.includes(\"CLAIM-SUGGEST-B\")) return verdict({ score: 91, severity: \"nit\" });"
+          ],
+          "rationale": "The diff keeps the CLAIM-SUGGEST-A and CLAIM-SUGGEST-B names but changes both verdicts to severity \"nit\", so the names now mislead. This is minor, because the test still passes and the only cost is a misleading name.",
+          "score": 90,
+          "severity": "nit"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "conventions",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/explain/index.ts",
+          "start_line": 280,
+          "end_line": 280,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "medium",
+          "claim": "The explain output still calls the cap \"the non-blocking cap\". After this change the cap applies to nits only.",
+          "evidence": "() => \"capped: over the non-blocking cap\",",
+          "suggested_fix": "Change the text to \"capped: over the cap on nits\" and update the tests.",
+          "explanation": "Only nits can be capped now, so the user-facing text gives the wrong scope of the cap.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "() => \"capped: over the non-blocking cap\",",
+            "// The cap on nits per run. Blocking and suggestion findings have no cap."
+          ],
+          "rationale": "cap.ts now caps nits only, but the explain reason still says \\\"the non-blocking cap\\\". The config keys keep the name caps.non_blocking_*, so the wording is only loosely stale. The fix is cheap but touches tests.",
+          "score": 80,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "() => \"capped: over the non-blocking cap\",",
+            "give 3 + ceil(hunks / 4), at most 20. The key names keep \"non_blocking\" so"
+          ],
+          "rationale": "The explain reason still says \"the non-blocking cap\", but after this change the cap drops only nits, so the text now gives the wrong scope. The text still matches the `caps.non_blocking_*` config key names, and the outcome it reports is correct, so this is a minor wording issue.",
+          "score": 80,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "() => \"capped: over the non-blocking cap\",",
+            "give 3 + ceil(hunks / 4), at most 20. The key names keep \"non_blocking\" so"
+          ],
+          "rationale": "The explain reason still says \"the non-blocking cap\", but after this change the cap drops only nits, so the text now gives the wrong scope. The text still matches the `caps.non_blocking_*` config key names, and the outcome it reports is correct, so this is a minor wording issue.",
+          "score": 80,
+          "severity": "nit"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "docs-and-comments",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/explain/index.ts",
+          "start_line": 280,
+          "end_line": 280,
+          "category": "other",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The explain output still says a finding was capped over the non-blocking cap, but the cap now applies to nits only.",
+          "evidence": "() => \"capped: over the non-blocking cap\",",
+          "suggested_fix": "Change the text to \"capped: over the cap on nits\" and update the test expectation.",
+          "explanation": "Users now read a reason that names the wrong set of findings, since only nits can be capped.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "() => \"capped: over the non-blocking cap\",",
+            "capped: nits.slice(room),",
+            "export function nonBlockingCap(totalHunks: number"
+          ],
+          "rationale": "After this change applyCap only caps nits, so the explain reason is now less precise. It is still literally true, because the cap keys keep the name non_blocking and nits are non-blocking. The fix is a cheap text edit, but three test expectations would also need to change.",
+          "score": 80,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "() => \"capped: over the non-blocking cap\",",
+            "// The cap on nits per run. Blocking and suggestion findings have no cap.",
+            "capped: nits.slice(room),"
+          ],
+          "rationale": "The claim holds. The PR changed cap.ts so that only nits are capped, but the explain reason still says \"the non-blocking cap\". The config keys still use the name non_blocking, so the text is out of date and unclear rather than wrong. That makes it a cheap wording nit.",
+          "score": 85,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "() => \"capped: over the non-blocking cap\",",
+            "// The cap on nits per run. Blocking and suggestion findings have no cap.",
+            "capped: nits.slice(room),"
+          ],
+          "rationale": "The claim holds. The PR changed cap.ts so that only nits are capped, but the explain reason still says \"the non-blocking cap\". The config keys still use the name non_blocking, so the text is out of date and unclear rather than wrong. That makes it a cheap wording nit.",
+          "score": 85,
+          "severity": "nit"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/explain/index.ts",
+          "start_line": 280,
+          "end_line": 280,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The explain reason for a capped finding still says \"non-blocking cap\", but the cap now applies only to nits.",
+          "evidence": "() => \"capped: over the non-blocking cap\",",
+          "suggested_fix": "Change the text to \"capped: over the cap on nits\" and update the test in test/explain.test.ts to match.",
+          "explanation": "After this change only nits can be capped, so the user-facing text now describes the wrong scope.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "() => \"capped: over the non-blocking cap\",",
+            "Post every blocking finding and every suggestion. Post nits in ranked order"
+          ],
+          "rationale": "The explain reason still reads \\\"over the non-blocking cap\\\", although applyCap now caps only nits. The wording is still tied to the config key names (`caps.non_blocking_*`), which were kept, so the text is imprecise, not wrong. The effect is small.",
+          "score": 80,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "() => \"capped: over the non-blocking cap\",",
+            "// The cap on nits per run. Blocking and suggestion findings have no cap.",
+            "capped: nits.slice(room),"
+          ],
+          "rationale": "The claim holds. After this change, `src/merge/cap.ts` sends only nits to \"capped\", but the explain reason still says \"non-blocking cap\", which now reads as if suggestions could be capped too. The config keys keep the `non_blocking_*` names, so the text still matches the key name, which makes this a small wording issue.",
+          "score": 85,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "() => \"capped: over the non-blocking cap\",",
+            "// The cap on nits per run. Blocking and suggestion findings have no cap.",
+            "capped: nits.slice(room),"
+          ],
+          "rationale": "The claim holds. After this change, `src/merge/cap.ts` sends only nits to \"capped\", but the explain reason still says \"non-blocking cap\", which now reads as if suggestions could be capped too. The config keys keep the `non_blocking_*` names, so the text still matches the key name, which makes this a small wording issue.",
+          "score": 85,
+          "severity": "nit"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "history",
+            "pass": 1
+          }
+        ]
+      }
+    ],
+    "merges": [
+      {
+        "group": [
+          1,
+          2,
+          3
+        ],
+        "result": {
+          "merged": [
+            {
+              "member_index": 1,
+              "claim": "The explain output still says a finding was capped over the \"non-blocking cap\", but the cap now applies to nits only.",
+              "explanation": "Only nits can be capped now, so the user-facing reason names the wrong scope of the cap.",
+              "suggested_fix": "Change the text to \"capped: over the cap on nits\" and update the test expectation in test/explain.test.ts.",
+              "severity": "nit"
+            }
+          ]
+        }
+      }
+    ],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [
+      {
+        "file": "test/explain.test.ts",
+        "start_line": 217,
+        "end_line": 218,
+        "category": "convention",
+        "severity_estimate": "nit",
+        "confidence": "low",
+        "claim": "The fixture claims are still named CLAIM-SUGGEST-A and CLAIM-SUGGEST-B, but the change makes them nits.",
+        "evidence": "if (m.includes(\"CLAIM-SUGGEST-A\")) return verdict({ score: 92, severity: \"nit\" });",
+        "suggested_fix": "Rename the claims to CLAIM-NIT-A and CLAIM-NIT-B.",
+        "explanation": "Elsewhere in the file, fixture claim names state the outcome of the claim, so a name that says suggestion for a nit misleads the reader.",
+        "needs_context": false,
+        "fingerprint": "366d1920b23aaf14",
+        "severity": "nit",
+        "score": 90,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "if (m.includes(\"CLAIM-SUGGEST-A\")) return verdict({ score: 92, severity: \"nit\" });",
+            "if (m.includes(\"CLAIM-SUGGEST-B\")) return verdict({ score: 91, severity: \"nit\" });"
+          ],
+          "rationale": "The diff keeps the CLAIM-SUGGEST-A and CLAIM-SUGGEST-B names but changes both verdicts to severity \"nit\", so the names now mislead. This is minor, because the test still passes and the only cost is a misleading name.",
+          "score": 90,
+          "severity": "nit"
+        },
+        "span_text": "if (m.includes(\"CLAIM-SUGGEST-A\")) return verdict({ score: 92, severity: \"nit\" }); if (m.includes(\"CLAIM-SUGGEST-B\")) return verdict({ score: 91, severity: \"nit\" });",
+        "sources": [
+          {
+            "reviewer": "conventions",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "file": "src/explain/index.ts",
+        "start_line": 280,
+        "end_line": 280,
+        "category": "other",
+        "severity_estimate": "nit",
+        "confidence": "low",
+        "claim": "The explain output still says a finding was capped over the \"non-blocking cap\", but the cap now applies to nits only.",
+        "evidence": "() => \"capped: over the non-blocking cap\",",
+        "explanation": "Only nits can be capped now, so the user-facing reason names the wrong scope of the cap.",
+        "needs_context": false,
+        "fingerprint": "dc64c8381d45f400",
+        "severity": "nit",
+        "score": 85,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "() => \"capped: over the non-blocking cap\",",
+            "// The cap on nits per run. Blocking and suggestion findings have no cap.",
+            "capped: nits.slice(room),"
+          ],
+          "rationale": "The claim holds. The PR changed cap.ts so that only nits are capped, but the explain reason still says \"the non-blocking cap\". The config keys still use the name non_blocking, so the text is out of date and unclear rather than wrong. That makes it a cheap wording nit.",
+          "score": 85,
+          "severity": "nit"
+        },
+        "span_text": "() => \"capped: over the non-blocking cap\",",
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          },
+          {
+            "reviewer": "docs-and-comments",
+            "pass": 1
+          },
+          {
+            "reviewer": "history",
+            "pass": 1
+          }
+        ],
+        "suggested_fix": "Change the text to \"capped: over the cap on nits\" and update the test expectation in test/explain.test.ts."
+      }
+    ],
+    "github": {
+      "review_id": 5908857102,
+      "review_url": "https://github.com/jerridan/pr-review/pull/56#pullrequestreview-5908857102",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [
+        {
+          "fingerprint": "366d1920b23aaf14",
+          "comment_id": 4576875950
+        }
+      ],
+      "in_body": [
+        "dc64c8381d45f400"
+      ],
+      "check_run": {
+        "id": 132686710601
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6255,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 13406,
+            "outputTokens": 378,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0015295999999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 356,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 867,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 12919,
+            "webSearchRequests": 0,
+            "costUSD": 0.0604762,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0620058
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "pass": 2,
+        "model": "claude-opus-5-5",
+        "duration_ms": 4819,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 14303,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0014393,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 333,
+            "cacheReadInputTokens": 5363,
+            "cacheCreationInputTokens": 13812,
+            "webSearchRequests": 0,
+            "costUSD": 0.1182366,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 77,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1196759
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 4768,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 14305,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0014410000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 384,
+            "cacheReadInputTokens": 5136,
+            "cacheCreationInputTokens": 13814,
+            "webSearchRequests": 0,
+            "costUSD": 0.1192272,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 72,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1206682
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 6752,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 14307,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0014417,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 480,
+            "cacheReadInputTokens": 21921,
+            "cacheCreationInputTokens": 16385,
+            "webSearchRequests": 0,
+            "costUSD": 0.14508020000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 141,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1465219
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 6661,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 14293,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0014383,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 610,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 15837,
+            "webSearchRequests": 0,
+            "costUSD": 0.1395158,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 164,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1409541
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 7384,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 14301,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0014391,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 476,
+            "cacheReadInputTokens": 24536,
+            "cacheCreationInputTokens": 14149,
+            "webSearchRequests": 0,
+            "costUSD": 0.1276352,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 123,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1290743
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "pass": 2,
+        "model": "claude-opus-5-5",
+        "duration_ms": 2675,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 14303,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0014408000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 91,
+            "cacheReadInputTokens": 5330,
+            "cacheCreationInputTokens": 13812,
+            "webSearchRequests": 0,
+            "costUSD": 0.11338999999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 37,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1148308
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 4782,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 14307,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0014397,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 353,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 16087,
+            "webSearchRequests": 0,
+            "costUSD": 0.1363758,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 70,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.13781549999999998
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 6175,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 24823,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0024928000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 427,
+            "cacheReadInputTokens": 32829,
+            "cacheCreationInputTokens": 26970,
+            "webSearchRequests": 0,
+            "costUSD": 0.23088179999999997,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 69,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.23337459999999996
+      },
+      {
+        "role": "verifier",
+        "verification": 0,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 4555,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9407,
+            "outputTokens": 500,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011907,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 476,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 551,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 8920,
+            "webSearchRequests": 0,
+            "costUSD": 0.0416307,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 174,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0428214
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 7702,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 14293,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0014383,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 670,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 16848,
+            "webSearchRequests": 0,
+            "costUSD": 0.14880379999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 222,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1502421
+      },
+      {
+        "role": "verifier",
+        "verification": 1,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 5496,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8715,
+            "outputTokens": 301,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0010220000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 281,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 618,
+            "cacheReadInputTokens": 16962,
+            "cacheCreationInputTokens": 8797,
+            "webSearchRequests": 0,
+            "costUSD": 0.0430722,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 180,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0440942
+      },
+      {
+        "role": "verifier",
+        "verification": 2,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6275,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8716,
+            "outputTokens": 263,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0010031,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 245,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 724,
+            "cacheReadInputTokens": 16963,
+            "cacheCreationInputTokens": 9523,
+            "webSearchRequests": 0,
+            "costUSD": 0.0470363,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 238,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0480394
+      },
+      {
+        "role": "verifier",
+        "verification": 3,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6371,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8715,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0008815000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 765,
+            "cacheReadInputTokens": 16962,
+            "cacheCreationInputTokens": 10197,
+            "webSearchRequests": 0,
+            "costUSD": 0.0501422,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 251,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.05102369999999999
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 8322,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8723,
+            "outputTokens": 17,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0008808,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 674,
+            "cacheReadInputTokens": 16962,
+            "cacheCreationInputTokens": 8672,
+            "webSearchRequests": 0,
+            "costUSD": 0.08626439999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 217,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.08714519999999999
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 2,
+        "model": "claude-opus-5-5",
+        "duration_ms": 9134,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8710,
+            "outputTokens": 315,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0010285000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 293,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 753,
+            "cacheReadInputTokens": 16949,
+            "cacheCreationInputTokens": 8932,
+            "webSearchRequests": 0,
+            "costUSD": 0.08992180000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 275,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.09095030000000001
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 3,
+        "model": "claude-opus-5-5",
+        "duration_ms": 8963,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8729,
+            "outputTokens": 240,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009929000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 224,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 750,
+            "cacheReadInputTokens": 16968,
+            "cacheCreationInputTokens": 8929,
+            "webSearchRequests": 0,
+            "costUSD": 0.0898416,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 277,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0908345
+      },
+      {
+        "role": "merge",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 1742,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 1942,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0002052,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 193,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 2517,
+            "webSearchRequests": 0,
+            "costUSD": 0.012002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.012207200000000001
+      }
+    ],
+    "total_cost_usd": 1.8222790999999998,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 31,
+      "gather": 160,
+      "triage": 6911,
+      "find_verify": 28917,
+      "merge": 2363
+    },
+    "errors": []
+  }
+}
