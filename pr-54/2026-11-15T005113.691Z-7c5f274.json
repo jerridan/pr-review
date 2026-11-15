@@ -1,0 +1,2071 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 54,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "D8 measure, phase 2: history and tests stay at one pass, with the by-pass report (0.13.0)",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/54"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "6a9bfd78f0872f31a448d0eb71c9d23784e75a4b",
+    "head": "7c5f27473bfb4e104bdb33354a4f37923eaf57f1",
+    "started_at": "2026-11-15T00:51:13.691Z",
+    "tool_version": "0.12.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "D8 measure, phase 2: history and tests stay at one pass, with the by-pass report (0.13.0)\n\nD8 \"measure\", phase 2: the passes measurement, its note, and the by-pass report that made it. Version 0.13.0.\n\n## Result\n\nhistory and tests stay at one pass. The defaults do not change, so the README worst case and the design stay as they are, and no gate run was needed.\n\nOne repeat of history and tests at two passes, on the 28 pinned cases, cost $89.15 of the $150 budget. The two passes of one reviewer are two independent samples of one pass, so each reviewer gives three sets: pass 1, pass 2 and both.\n\n| Reviewer | Goldens pass 1 / pass 2 / both | R (90% interval) | Precision one pass → both | Result |\n|---|---|---|---|---|\n| history | 22 / 22 / 26 | 4.83 (2.68 to 10.18) | 0.880 → 0.839 | (b) fails, (c) holds: one pass |\n| tests | 27 / 27 / 28 | 19.29 (7.70 to unbounded) | 0.593 → 0.483 | (b) and (c) fail: one pass |\n\nR is the added cost per added posted-label golden over the one-pass cost per golden. The rule: two passes when the upper end of the interval of R is at most 2 and the precision of both is no more than 0.05 below the one-pass precision. `docs/research/passes-recall.md` holds every figure, the definitions, the seed and the count of resamples.\n\nThe run records of the D4b baseline do not exist, so there are no figures for diff-bugs and security.\n\n## Code\n\n- `pr-review eval-report --by-pass` scores the pass 1, pass 2 and both sets per reviewer and for all multi-pass reviewers together, from the stored records and judge answers, with no model call. It prints the one-pass mean, the noise of one pass, the added goldens, false findings and cost, a seeded percentile bootstrap (seed 20261114, 10000 resamples, 90%) and the decision tests (b) and (c).\n- `--ask-missing` asks only the judge questions that a single-pass set needs and that the live run never asked, and stores the answers in the judge cache. The measurement used it for 2 questions ($0.02).\n- New modules: `src/eval/by-pass.ts`, `src/eval/bootstrap.ts`. 18 tests in `test/eval-by-pass.test.ts`.\n\n## TICKETS.md\n\nThe D8 entry now states what was done: no subset (one repeat of all 28 cases fit the budget), the three-set report, the new decision rule and why it replaces the first one, and the result.\n\n## Decisions\n\n- The principal chose one repeat of all 28 cases over three repeats of a ten-case subset, because the count of goldens decides how stable the result is.\n- The principal replaced the rule \"gain above zero in every repeat\" (it cannot fail in a paired design) with tests (b) and (c), before the figures existed.\n- Definitions accepted by the principal: the one-pass precision is pooled over the two single sets; the one-pass cost per golden is the mean single-set cost over the mean single-set goldens. Run-wide queries (triage, merge) are in no set's cost.\n\n## Checks\n\n`npm test` (1495 tests), `npm run lint`, `npm run typecheck`, `npm run build` pass. The new tests fail at the red commit 4af4d3f.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZdxyMz7K7QjPYwYbt4\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": ".claude-plugin/marketplace.json",
+        "hunks": 1
+      },
+      {
+        "path": ".claude-plugin/plugin.json",
+        "hunks": 1
+      },
+      {
+        "path": "README.md",
+        "hunks": 1
+      },
+      {
+        "path": "TICKETS.md",
+        "hunks": 1
+      },
+      {
+        "path": "docs/research/passes-recall.md",
+        "hunks": 1
+      },
+      {
+        "path": "package.json",
+        "hunks": 1
+      },
+      {
+        "path": "src/cli.ts",
+        "hunks": 2
+      },
+      {
+        "path": "src/eval/bootstrap.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/by-pass.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/offline.ts",
+        "hunks": 7
+      },
+      {
+        "path": "src/eval/paired.ts",
+        "hunks": 2
+      },
+      {
+        "path": "src/eval/report.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/eval-by-pass.test.ts",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [
+      {
+        "path": "package-lock.json",
+        "reason": "generated"
+      }
+    ],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "Adds new statistical decision logic (bootstrap, ratio tests), a new CLI flag with model calls and judge-cache writes, and changes the offline report flow.",
+      "confidence": "high",
+      "categories": [
+        "bug",
+        "test",
+        "docs",
+        "other"
+      ],
+      "hotspots": [
+        "src/eval/by-pass.ts: ratioOf, summarizeScope, byPassRecord, setCost",
+        "src/eval/offline.ts: byPassSection, judge cache writes with --ask-missing, asked set",
+        "src/cli.ts: eval-report --ask-missing/--by-pass validation and clientFrom",
+        "src/eval/bootstrap.ts: percentileInterval, tail rounding, resamples",
+        "src/eval/paired.ts: newly exported helpers"
+      ],
+      "file_notes": [
+        {
+          "file": "src/eval/by-pass.ts",
+          "note": "new module: per-pass scoring, bootstrap-based decision rule, table rendering"
+        },
+        {
+          "file": "src/eval/bootstrap.ts",
+          "note": "new seeded PRNG, resampling and percentile interval"
+        },
+        {
+          "file": "src/eval/offline.ts",
+          "note": "wires by-pass section, optional judge client, writes judge-cache"
+        },
+        {
+          "file": "src/cli.ts",
+          "note": "new --by-pass and --ask-missing options; usage error check"
+        },
+        {
+          "file": "src/eval/paired.ts",
+          "note": "exports only (VERIFIER_ROLES, Keep, keepsAny, setRecord)"
+        },
+        {
+          "file": "src/eval/report.ts",
+          "note": "adds optional by_pass type field"
+        },
+        {
+          "file": "test/eval-by-pass.test.ts",
+          "note": "new tests for by-pass report and decision logic"
+        },
+        {
+          "file": "README.md",
+          "note": "documents the by-pass report"
+        },
+        {
+          "file": "TICKETS.md",
+          "note": "records the decision and measurement outcome"
+        },
+        {
+          "file": "docs/research/passes-recall.md",
+          "note": "rewritten research note"
+        },
+        {
+          "file": "package.json",
+          "note": "version bump to 0.13.0"
+        },
+        {
+          "file": ".claude-plugin/plugin.json",
+          "note": "version bump"
+        },
+        {
+          "file": ".claude-plugin/marketplace.json",
+          "note": "version bump"
+        }
+      ],
+      "summary": "Adds `pr-review eval-report --by-pass`, which scores pass 1, pass 2 and both for each reviewer with two passes. It reports a bootstrap interval and applies a cost-ratio and precision decision rule. `--ask-missing` lets the judge answer uncached questions and writes them to the judge cache. It also adds docs, a research note on the history and tests measurement, and a version bump to 0.13.0."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: Adds new statistical decision logic (bootstrap, ratio tests), a new CLI flag with model calls and judge-cache writes, and changes the offline report flow.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6129,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 38908,
+              "outputTokens": 25,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0039032999999999997,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 492,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 40494,
+              "webSearchRequests": 0,
+              "costUSD": 0.33441180000000004,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 117,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.33831510000000004
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6444,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 38918,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0039018000000000004,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 566,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 40462,
+              "webSearchRequests": 0,
+              "costUSD": 0.3356358,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 134,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.3395376
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 8239,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 38916,
+              "outputTokens": 31,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0039071,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 502,
+              "cacheReadInputTokens": 46847,
+              "cacheCreationInputTokens": 41185,
+              "webSearchRequests": 0,
+              "costUSD": 0.34890540000000003,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 346,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.35281250000000003
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 12384,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 38908,
+              "outputTokens": 31,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0039063,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 764,
+              "cacheReadInputTokens": 46839,
+              "cacheCreationInputTokens": 41548,
+              "webSearchRequests": 0,
+              "costUSD": 0.35704779999999997,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 589,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.36095409999999994
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/offline.ts",
+            "start_line": 226,
+            "end_line": 227,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "medium",
+            "claim": "The doc comment of runEvalReport does not mention the by-pass section that it now prints, or the judge cache that it writes with --ask-missing.",
+            "evidence": "metrics and the paired section. Give 0, or 2 for an invalid case.",
+            "suggested_fix": "Add: \"With --by-pass, also the by-pass section; with --ask-missing, it asks the judge and writes the cache.\"",
+            "explanation": "With --by-pass, the function also prints the by-pass section. With --ask-missing, it can query the judge and write judge-cache.json.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7298,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 38918,
+              "outputTokens": 26,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0039048000000000004,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 684,
+              "cacheReadInputTokens": 46532,
+              "cacheCreationInputTokens": 40885,
+              "webSearchRequests": 0,
+              "costUSD": 0.3500824,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 275,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.3539872
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5945,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 52737,
+              "outputTokens": 26,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0052867,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 441,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 54625,
+              "webSearchRequests": 0,
+              "costUSD": 0.4464398,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 94,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.4517265
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4171,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 38918,
+              "outputTokens": 31,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.003907300000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 318,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 40698,
+              "webSearchRequests": 0,
+              "costUSD": 0.33256379999999996,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 50,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.33647109999999997
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 3934,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 38916,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0039021000000000004,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 331,
+              "cacheReadInputTokens": 5330,
+              "cacheCreationInputTokens": 38425,
+              "webSearchRequests": 0,
+              "costUSD": 0.315094,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 50,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.3189961
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/offline.ts",
+            "start_line": 262,
+            "end_line": 271,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "The by-pass `missing` entries (failed repeat, no source fields) have no test.",
+            "evidence": "reason: scored.metrics.failed ? \"failed repeat\" : NO_SOURCES,",
+            "suggested_fix": "Add a test with an old record that has no sources and with a failed repeat. Assert the `missing` entries in the JSON and the lines in the table.",
+            "explanation": "No test in eval-by-pass.test.ts checks `section.missing`, so a wrong reason or a dropped entry would go unnoticed.",
+            "needs_context": false
+          },
+          {
+            "file": "src/eval/offline.ts",
+            "start_line": 196,
+            "end_line": 198,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "No test shows that a cached `unknown` answer gets no new query under --ask-missing.",
+            "evidence": "asked: new Set(kept.cache.keys()),",
+            "suggested_fix": "Seed the cache with an `unknown` answer, run with --ask-missing, and assert that the fake client got no judge call.",
+            "explanation": "The README promises this behaviour, but only the uncached path is tested, so removing this line would not fail any test.",
+            "needs_context": false
+          },
+          {
+            "file": "test/eval-by-pass.test.ts",
+            "start_line": 397,
+            "end_line": 398,
+            "category": "test",
+            "severity_estimate": "nit",
+            "confidence": "medium",
+            "claim": "The test checks only that the seed is a number, so a wrong seed still passes.",
+            "evidence": "expect(typeof first.bootstrap.seed).toBe(\"number\");",
+            "suggested_fix": "Assert the documented seed value, or drop the assertion.",
+            "explanation": "The documented seed 20261114 is part of what the report states, and this assertion cannot fail while the seed is any number.",
+            "needs_context": false
+          },
+          {
+            "file": "src/eval/bootstrap.ts",
+            "start_line": 46,
+            "end_line": 59,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "percentileInterval and resamples have no direct unit test for their tail rounding and their empty-input cases.",
+            "evidence": "const tail = Math.round((sorted.length * (1 - level)) / 2);",
+            "suggested_fix": "Add unit tests of percentileInterval on a known list (for example 0..99 at 0.9) and on an empty list.",
+            "explanation": "The scope-level tests use degenerate inputs where every resample gives the same value, so an off-by-one in the tail would not show.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 13839,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 38918,
+              "outputTokens": 19,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0039013000000000003,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 1501,
+              "cacheReadInputTokens": 47591,
+              "cacheCreationInputTokens": 42097,
+              "webSearchRequests": 0,
+              "costUSD": 0.37633020000000006,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 404,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.38023150000000006
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "src/eval/offline.ts",
+          "start_line": 226,
+          "end_line": 227,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "medium",
+          "claim": "The doc comment of runEvalReport does not mention the by-pass section that it now prints, or the judge cache that it writes with --ask-missing.",
+          "evidence": "metrics and the paired section. Give 0, or 2 for an invalid case.",
+          "suggested_fix": "Add: \"With --by-pass, also the by-pass section; with --ask-missing, it asks the judge and writes the cache.\"",
+          "explanation": "With --by-pass, the function also prints the by-pass section. With --ask-missing, it can query the judge and write judge-cache.json.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "* Print the report of the records in the --out directory: the normal\n * metrics and the paired section. Give 0, or 2 for an invalid case.",
+            "if (opts.byPass === true) {\n      const client = opts.askMissing === true ? await clientOf() : null;"
+          ],
+          "rationale": "The function doc still lists only the normal metrics and the paired section. The function now also prints the by-pass section and can write the judge cache. The file header does describe both flags, so the gap is small.",
+          "score": 85,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "metrics and the paired section. Give 0, or 2 for an invalid case.",
+            "if (opts.byPass === true) {",
+            "const tail = byPass !== null ? `${renderByPass(byPass).join(\"\\n\")}\\n` : \"\";",
+            "if (scored.judgeCalls > 0) await writeJudgeCache(kept.cachePath, kept.cache);",
+            "// --by-pass, it adds the by-pass section (by-pass.ts). With --ask-missing,"
+          ],
+          "rationale": "The change added the by-pass section and judge-cache writes to runEvalReport, but its doc comment still lists only the normal metrics and the paired section. The header comment of the file already describes both flags, so this is a minor docs gap.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "metrics and the paired section. Give 0, or 2 for an invalid case.",
+            "if (opts.byPass === true) {",
+            "const tail = byPass !== null ? `${renderByPass(byPass).join(\"\\n\")}\\n` : \"\";",
+            "if (scored.judgeCalls > 0) await writeJudgeCache(kept.cachePath, kept.cache);",
+            "// --by-pass, it adds the by-pass section (by-pass.ts). With --ask-missing,"
+          ],
+          "rationale": "The change added the by-pass section and judge-cache writes to runEvalReport, but its doc comment still lists only the normal metrics and the paired section. The header comment of the file already describes both flags, so this is a minor docs gap.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "docs-and-comments",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/eval/offline.ts",
+          "start_line": 262,
+          "end_line": 271,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "The by-pass `missing` entries (failed repeat, no source fields) have no test.",
+          "evidence": "reason: scored.metrics.failed ? \"failed repeat\" : NO_SOURCES,",
+          "suggested_fix": "Add a test with an old record that has no sources and with a failed repeat. Assert the `missing` entries in the JSON and the lines in the table.",
+          "explanation": "No test in eval-by-pass.test.ts checks `section.missing`, so a wrong reason or a dropped entry would go unnoticed.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "reason: scored.metrics.failed ? \"failed repeat\" : NO_SOURCES,",
+            "byPassMissing.push({ case: c.name, repeat, reason: \"failed repeat\" });"
+          ],
+          "rationale": "The added missing-entry code has no test. The by-pass test file has no assertion on `missing`, and its only matches are for `ask_missing`. The gap is real but minor.",
+          "score": 82,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "reason: scored.metrics.failed ? \"failed repeat\" : NO_SOURCES,",
+            "byPassMissing.push({ case: c.name, repeat, reason: \"failed repeat\" });",
+            "expect(output.stdout).toMatch(/no source fields: case-a repeat 1\\b/i);"
+          ],
+          "rationale": "No test reads `by_pass.missing` or the by-pass missing lines. eval-by-pass.test.ts only checks `ask_missing`, and the no-source-fields test in eval-paired.test.ts runs without --by-pass, so it covers the paired section only. The new by-pass missing entries have no test.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "reason: scored.metrics.failed ? \"failed repeat\" : NO_SOURCES,",
+            "byPassMissing.push({ case: c.name, repeat, reason: \"failed repeat\" });",
+            "expect(output.stdout).toMatch(/no source fields: case-a repeat 1\\b/i);"
+          ],
+          "rationale": "No test reads `by_pass.missing` or the by-pass missing lines. eval-by-pass.test.ts only checks `ask_missing`, and the no-source-fields test in eval-paired.test.ts runs without --by-pass, so it covers the paired section only. The new by-pass missing entries have no test.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/eval/offline.ts",
+          "start_line": 196,
+          "end_line": 198,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "No test shows that a cached `unknown` answer gets no new query under --ask-missing.",
+          "evidence": "asked: new Set(kept.cache.keys()),",
+          "suggested_fix": "Seed the cache with an `unknown` answer, run with --ask-missing, and assert that the fake client got no judge call.",
+          "explanation": "The README promises this behaviour, but only the uncached path is tested, so removing this line would not fail any test.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "asked: new Set(kept.cache.keys()),",
+            "A cached answer, also \"unknown\", gets no new query."
+          ],
+          "rationale": "The `--ask-missing` tests only cover an uncached question (the `fake([], \\\"yes\\\")` case). No test in `test/eval-by-pass.test.ts` seeds a cached `unknown` answer. Removing the `asked` line would make `score.ts` ask `unknown` answers again, and no test would fail.",
+          "score": 82,
+          "severity": "suggestion"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "asked: new Set(kept.cache.keys()),",
+            "client !== null && (answer === undefined || (answer === \"unknown\" && !asked.has(key)));",
+            "it(\"asks the judge for those questions only with --ask-missing, and caches the answers\", async () => {",
+            "// Pass 1 takes G_A with an exact match, so the live run never asks"
+          ],
+          "rationale": "The only --ask-missing test uses a case whose cache holds no \"unknown\" answer. Without the `asked` set, score.ts would ask again about a cached \"unknown\", so removing line 198 would cause extra paid judge queries and no test would fail. The new code and its promise come from this change, so the gap is in scope.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "asked: new Set(kept.cache.keys()),",
+            "client !== null && (answer === undefined || (answer === \"unknown\" && !asked.has(key)));",
+            "it(\"asks the judge for those questions only with --ask-missing, and caches the answers\", async () => {",
+            "// Pass 1 takes G_A with an exact match, so the live run never asks"
+          ],
+          "rationale": "The only --ask-missing test uses a case whose cache holds no \"unknown\" answer. Without the `asked` set, score.ts would ask again about a cached \"unknown\", so removing line 198 would cause extra paid judge queries and no test would fail. The new code and its promise come from this change, so the gap is in scope.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "test/eval-by-pass.test.ts",
+          "start_line": 397,
+          "end_line": 398,
+          "category": "test",
+          "severity_estimate": "nit",
+          "confidence": "medium",
+          "claim": "The test checks only that the seed is a number, so a wrong seed still passes.",
+          "evidence": "expect(typeof first.bootstrap.seed).toBe(\"number\");",
+          "suggested_fix": "Assert the documented seed value, or drop the assertion.",
+          "explanation": "The documented seed 20261114 is part of what the report states, and this assertion cannot fail while the seed is any number.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(typeof first.bootstrap.seed).toBe(\"number\");",
+            "expect(output.stdout).toContain(`seed ${first.bootstrap.seed}`);"
+          ],
+          "rationale": "The test asserts only that the seed is a number, so a wrong seed would pass. The seed is a fixed constant (BOOTSTRAP_SEED = 20261114 in src/eval/bootstrap.ts). The test already checks that the table output matches the JSON seed and that the bootstrap is the same across runs, so the gap is small.",
+          "score": 85,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(typeof first.bootstrap.seed).toBe(\"number\");",
+            "expect(first.bootstrap).toMatchObject({ resamples: 10000, level: 0.9 });",
+            "export const BOOTSTRAP_SEED = 20261114;"
+          ],
+          "rationale": "The finding is correct: the test only checks that the seed is a number, while the resamples and the level are checked against fixed values. If the seed constant changed, the figures in docs/research/passes-recall.md could no longer be reproduced and the test would still pass. The fix is a one-line assertion, so this is a minor, cheap test gap.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(typeof first.bootstrap.seed).toBe(\"number\");",
+            "expect(first.bootstrap).toMatchObject({ resamples: 10000, level: 0.9 });",
+            "export const BOOTSTRAP_SEED = 20261114;"
+          ],
+          "rationale": "The finding is correct: the test only checks that the seed is a number, while the resamples and the level are checked against fixed values. If the seed constant changed, the figures in docs/research/passes-recall.md could no longer be reproduced and the test would still pass. The fix is a one-line assertion, so this is a minor, cheap test gap.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/eval/bootstrap.ts",
+          "start_line": 46,
+          "end_line": 59,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "percentileInterval and resamples have no direct unit test for their tail rounding and their empty-input cases.",
+          "evidence": "const tail = Math.round((sorted.length * (1 - level)) / 2);",
+          "suggested_fix": "Add unit tests of percentileInterval on a known list (for example 0..99 at 0.9) and on an empty list.",
+          "explanation": "The scope-level tests use degenerate inputs where every resample gives the same value, so an off-by-one in the tail would not show.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const tail = Math.round((sorted.length * (1 - level)) / 2);",
+            "if (values.length === 0) return { lower: null, upper: null };"
+          ],
+          "rationale": "No test imports or calls percentileInterval or resamples directly. test/eval-by-pass.test.ts only checks the bootstrap through the report: it checks that two runs agree, and that the seed and resample count are printed. The tail rounding is therefore not pinned by a known-answer test. The risk is small, because at N=10000 and level 0.9 the tail is exactly 500.",
+          "score": 72,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const tail = Math.round((sorted.length * (1 - level)) / 2);",
+            "if (values.length === 0) return { lower: null, upper: null };",
+            "expect(bugs.added.goldens_per_case.upper).toBeCloseTo(2 / 3);"
+          ],
+          "rationale": "No test calls percentileInterval or resamples directly, so the claim is true. The explanation overstates the gap, though: the scope-level tests do check non-degenerate interval ends (lower 0, upper 2/3), so the tail logic is covered indirectly. A missing direct unit test with indirect coverage is not worth posting.",
+          "score": 72,
+          "severity": "dont_post"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const tail = Math.round((sorted.length * (1 - level)) / 2);",
+            "if (values.length === 0) return { lower: null, upper: null };",
+            "expect(bugs.added.goldens_per_case.upper).toBeCloseTo(2 / 3);"
+          ],
+          "rationale": "No test calls percentileInterval or resamples directly, so the claim is true. The explanation overstates the gap, though: the scope-level tests do check non-degenerate interval ends (lower 0, upper 2/3), so the tail logic is covered indirectly. A missing direct unit test with indirect coverage is not worth posting.",
+          "score": 72,
+          "severity": "dont_post"
+        },
+        "passed": false,
+        "sources": [
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ]
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [
+      {
+        "file": "src/eval/offline.ts",
+        "start_line": 196,
+        "end_line": 198,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "No test shows that a cached `unknown` answer gets no new query under --ask-missing.",
+        "evidence": "asked: new Set(kept.cache.keys()),",
+        "suggested_fix": "Seed the cache with an `unknown` answer, run with --ask-missing, and assert that the fake client got no judge call.",
+        "explanation": "The README promises this behaviour, but only the uncached path is tested, so removing this line would not fail any test.",
+        "needs_context": false,
+        "fingerprint": "32d808242e8aae00",
+        "severity": "suggestion",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "asked: new Set(kept.cache.keys()),",
+            "client !== null && (answer === undefined || (answer === \"unknown\" && !asked.has(key)));",
+            "it(\"asks the judge for those questions only with --ask-missing, and caches the answers\", async () => {",
+            "// Pass 1 takes G_A with an exact match, so the live run never asks"
+          ],
+          "rationale": "The only --ask-missing test uses a case whose cache holds no \"unknown\" answer. Without the `asked` set, score.ts would ask again about a cached \"unknown\", so removing line 198 would cause extra paid judge queries and no test would fail. The new code and its promise come from this change, so the gap is in scope.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "span_text": "// Every cached key counts as asked, so a cached \"unknown\" gets no // new query: the client answers the missing questions only. asked: new Set(kept.cache.keys()),",
+        "sources": [
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "file": "src/eval/offline.ts",
+        "start_line": 262,
+        "end_line": 271,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "The by-pass `missing` entries (failed repeat, no source fields) have no test.",
+        "evidence": "reason: scored.metrics.failed ? \"failed repeat\" : NO_SOURCES,",
+        "suggested_fix": "Add a test with an old record that has no sources and with a failed repeat. Assert the `missing` entries in the JSON and the lines in the table.",
+        "explanation": "No test in eval-by-pass.test.ts checks `section.missing`, so a wrong reason or a dropped entry would go unnoticed.",
+        "needs_context": false,
+        "fingerprint": "d501b91b091e81c1",
+        "severity": "suggestion",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "reason: scored.metrics.failed ? \"failed repeat\" : NO_SOURCES,",
+            "byPassMissing.push({ case: c.name, repeat, reason: \"failed repeat\" });",
+            "expect(output.stdout).toMatch(/no source fields: case-a repeat 1\\b/i);"
+          ],
+          "rationale": "No test reads `by_pass.missing` or the by-pass missing lines. eval-by-pass.test.ts only checks `ask_missing`, and the no-source-fields test in eval-paired.test.ts runs without --by-pass, so it covers the paired section only. The new by-pass missing entries have no test.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "span_text": "else byPassMissing.push({ case: c.name, repeat, reason: scored.metrics.failed ? \"failed repeat\" : NO_SOURCES, }); } catch (err) { repeats.push(failedMetrics(repeat, messageOf(err), 0)); byPassMissing.push({ case: c.name, repeat, reason: \"failed repeat\" }); say(`case ${c.name}, repeat ${repeat}: ${messageOf(err)}`);",
+        "sources": [
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "file": "src/eval/offline.ts",
+        "start_line": 226,
+        "end_line": 227,
+        "category": "docs",
+        "severity_estimate": "nit",
+        "confidence": "medium",
+        "claim": "The doc comment of runEvalReport does not mention the by-pass section that it now prints, or the judge cache that it writes with --ask-missing.",
+        "evidence": "metrics and the paired section. Give 0, or 2 for an invalid case.",
+        "suggested_fix": "Add: \"With --by-pass, also the by-pass section; with --ask-missing, it asks the judge and writes the cache.\"",
+        "explanation": "With --by-pass, the function also prints the by-pass section. With --ask-missing, it can query the judge and write judge-cache.json.",
+        "needs_context": false,
+        "fingerprint": "74ddf4e505df6fd2",
+        "severity": "nit",
+        "score": 92,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "metrics and the paired section. Give 0, or 2 for an invalid case.",
+            "if (opts.byPass === true) {",
+            "const tail = byPass !== null ? `${renderByPass(byPass).join(\"\\n\")}\\n` : \"\";",
+            "if (scored.judgeCalls > 0) await writeJudgeCache(kept.cachePath, kept.cache);",
+            "// --by-pass, it adds the by-pass section (by-pass.ts). With --ask-missing,"
+          ],
+          "rationale": "The change added the by-pass section and judge-cache writes to runEvalReport, but its doc comment still lists only the normal metrics and the paired section. The header comment of the file already describes both flags, so this is a minor docs gap.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "span_text": "* Print the report of the records in the --out directory: the normal * metrics and the paired section. Give 0, or 2 for an invalid case.",
+        "sources": [
+          {
+            "reviewer": "docs-and-comments",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "file": "test/eval-by-pass.test.ts",
+        "start_line": 397,
+        "end_line": 398,
+        "category": "test",
+        "severity_estimate": "nit",
+        "confidence": "medium",
+        "claim": "The test checks only that the seed is a number, so a wrong seed still passes.",
+        "evidence": "expect(typeof first.bootstrap.seed).toBe(\"number\");",
+        "suggested_fix": "Assert the documented seed value, or drop the assertion.",
+        "explanation": "The documented seed 20261114 is part of what the report states, and this assertion cannot fail while the seed is any number.",
+        "needs_context": false,
+        "fingerprint": "fec582ce1517f9f4",
+        "severity": "nit",
+        "score": 92,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(typeof first.bootstrap.seed).toBe(\"number\");",
+            "expect(first.bootstrap).toMatchObject({ resamples: 10000, level: 0.9 });",
+            "export const BOOTSTRAP_SEED = 20261114;"
+          ],
+          "rationale": "The finding is correct: the test only checks that the seed is a number, while the resamples and the level are checked against fixed values. If the seed constant changed, the figures in docs/research/passes-recall.md could no longer be reproduced and the test would still pass. The fix is a one-line assertion, so this is a minor, cheap test gap.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "span_text": "expect(first.bootstrap).toMatchObject({ resamples: 10000, level: 0.9 }); expect(typeof first.bootstrap.seed).toBe(\"number\");",
+        "sources": [
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ]
+      }
+    ],
+    "github": {
+      "review_id": 5908276583,
+      "review_url": "https://github.com/jerridan/pr-review/pull/54#pullrequestreview-5908276583",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [
+        {
+          "fingerprint": "32d808242e8aae00",
+          "comment_id": 4576458686
+        },
+        {
+          "fingerprint": "d501b91b091e81c1",
+          "comment_id": 4576458688
+        },
+        {
+          "fingerprint": "74ddf4e505df6fd2",
+          "comment_id": 4576458694
+        },
+        {
+          "fingerprint": "fec582ce1517f9f4",
+          "comment_id": 4576458696
+        }
+      ],
+      "in_body": [],
+      "check_run": {
+        "id": 132647979366
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6732,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 37216,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0037311,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1000,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 36729,
+            "webSearchRequests": 0,
+            "costUSD": 0.1570462,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.16077729999999998
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 6129,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 38908,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0039032999999999997,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 492,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 40494,
+            "webSearchRequests": 0,
+            "costUSD": 0.33441180000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 117,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.33831510000000004
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 6444,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 38918,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0039018000000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 566,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 40462,
+            "webSearchRequests": 0,
+            "costUSD": 0.3356358,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 134,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.3395376
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 7298,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 38918,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0039048000000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 684,
+            "cacheReadInputTokens": 46532,
+            "cacheCreationInputTokens": 40885,
+            "webSearchRequests": 0,
+            "costUSD": 0.3500824,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 275,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.3539872
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 8239,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 38916,
+            "outputTokens": 31,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0039071,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 502,
+            "cacheReadInputTokens": 46847,
+            "cacheCreationInputTokens": 41185,
+            "webSearchRequests": 0,
+            "costUSD": 0.34890540000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 346,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.35281250000000003
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 4171,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 38918,
+            "outputTokens": 31,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.003907300000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 318,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 40698,
+            "webSearchRequests": 0,
+            "costUSD": 0.33256379999999996,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 50,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.33647109999999997
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "pass": 2,
+        "model": "claude-opus-5-5",
+        "duration_ms": 3934,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 38916,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0039021000000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 331,
+            "cacheReadInputTokens": 5330,
+            "cacheCreationInputTokens": 38425,
+            "webSearchRequests": 0,
+            "costUSD": 0.315094,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 50,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.3189961
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "pass": 2,
+        "model": "claude-opus-5-5",
+        "duration_ms": 12384,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 38908,
+            "outputTokens": 31,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0039063,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 764,
+            "cacheReadInputTokens": 46839,
+            "cacheCreationInputTokens": 41548,
+            "webSearchRequests": 0,
+            "costUSD": 0.35704779999999997,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 589,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.36095409999999994
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 5945,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 52737,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0052867,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 441,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 54625,
+            "webSearchRequests": 0,
+            "costUSD": 0.4464398,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 94,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.4517265
+      },
+      {
+        "role": "verifier",
+        "verification": 0,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 4480,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16286,
+            "outputTokens": 382,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0018196,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 357,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 489,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 15799,
+            "webSearchRequests": 0,
+            "costUSD": 0.0685267,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0703463
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 13839,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 38918,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0039013000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 1501,
+            "cacheReadInputTokens": 47591,
+            "cacheCreationInputTokens": 42097,
+            "webSearchRequests": 0,
+            "costUSD": 0.37633020000000006,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 404,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.38023150000000006
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 0,
+        "model": "claude-opus-5-5",
+        "duration_ms": 7083,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16292,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016417,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 800,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 15797,
+            "webSearchRequests": 0,
+            "costUSD": 0.14325739999999998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 100,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.14489909999999998
+      },
+      {
+        "role": "verifier",
+        "verification": 3,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6845,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 23326,
+            "outputTokens": 17,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0023411,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 636,
+            "cacheReadInputTokens": 31573,
+            "cacheCreationInputTokens": 23210,
+            "webSearchRequests": 0,
+            "costUSD": 0.10236530000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 130,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1047064
+      },
+      {
+        "role": "verifier",
+        "verification": 2,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 8481,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16267,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016382,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 919,
+            "cacheReadInputTokens": 45339,
+            "cacheCreationInputTokens": 19240,
+            "webSearchRequests": 0,
+            "costUSD": 0.0906959,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 133,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0923341
+      },
+      {
+        "role": "verifier",
+        "verification": 4,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 9518,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5043,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005153,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 933,
+            "cacheReadInputTokens": 31769,
+            "cacheCreationInputTokens": 5371,
+            "webSearchRequests": 0,
+            "costUSD": 0.0340069,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 169,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0345222
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 3,
+        "model": "claude-opus-5-5",
+        "duration_ms": 6195,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 23324,
+            "outputTokens": 259,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0024619,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 233,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 623,
+            "cacheReadInputTokens": 31563,
+            "cacheCreationInputTokens": 23163,
+            "webSearchRequests": 0,
+            "costUSD": 0.20409259999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 157,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.20655449999999997
+      },
+      {
+        "role": "verifier",
+        "verification": 1,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 14879,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16269,
+            "outputTokens": 359,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0018063999999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 335,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 10,
+            "outputTokens": 1587,
+            "cacheReadInputTokens": 89793,
+            "cacheCreationInputTokens": 18777,
+            "webSearchRequests": 0,
+            "costUSD": 0.09997729999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 317,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1017837
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 4,
+        "model": "claude-opus-5-5",
+        "duration_ms": 8746,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5045,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005155000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 949,
+            "cacheReadInputTokens": 22565,
+            "cacheCreationInputTokens": 6428,
+            "webSearchRequests": 0,
+            "costUSD": 0.07494100000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 319,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.07545650000000001
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 2,
+        "model": "claude-opus-5-5",
+        "duration_ms": 14311,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-opus-5-5": {
+            "inputTokens": 10,
+            "outputTokens": 1417,
+            "cacheReadInputTokens": 92804,
+            "cacheCreationInputTokens": 20506,
+            "webSearchRequests": 0,
+            "costUSD": 0.2109888,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 447,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-haiku-5-5": {
+            "inputTokens": 16257,
+            "outputTokens": 443,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0018472,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 418,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.212836
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 10000,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16305,
+            "outputTokens": 260,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0017605,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 237,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 1062,
+            "cacheReadInputTokens": 66982,
+            "cacheCreationInputTokens": 17865,
+            "webSearchRequests": 0,
+            "costUSD": 0.17758839999999998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 193,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.17934889999999998
+      }
+    ],
+    "total_cost_usd": 4.6165967,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 41,
+      "gather": 165,
+      "triage": 7622,
+      "find_verify": 50175,
+      "merge": 7
+    },
+    "errors": []
+  }
+}
