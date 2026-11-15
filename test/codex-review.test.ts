@@ -249,6 +249,46 @@ describe("pr-review eval-codex-review", () => {
     expect(output.stdout).toMatch(/tokens: 1500/);
   }, 60_000);
 
+  it("prints one line per case with its tokens, before the summary", async () => {
+    plan({
+      "MARK-a": { findings: [], stderr: "tokens used\n1,200\n" },
+      "MARK-b": { exit: 1, stderr: "boom\ntokens used\n300\n" },
+      "MARK-c": { findings: [] },
+    });
+    await run();
+    const lines = output.stdout.trim().split("\n");
+    expect(lines.slice(0, 3)).toEqual([
+      "case case-a: done tokens 1200",
+      "case case-b: failed tokens 300",
+      "case case-c: done tokens unknown",
+    ]);
+    expect(lines[3]).toBe("done: 2");
+  }, 60_000);
+
+  it("writes tokens.json with the tokens of each case, and keeps old entries on a rerun", async () => {
+    plan({
+      "MARK-a": { findings: [], stderr: "tokens used\n1,200\n" },
+      "MARK-b": { exit: 1, stderr: "boom\ntokens used\n300\n" },
+      "MARK-c": { findings: [] },
+    });
+    await run();
+    const file = join(out, "tokens.json");
+    expect(JSON.parse(readFileSync(file, "utf8"))).toEqual({
+      "case-a": 1200,
+      "case-b": 300,
+      "case-c": null,
+    });
+    // The rerun does case-b only, and keeps the other entries.
+    plan({ default: { findings: [], stderr: "tokens used\n50\n" } });
+    expect(await run()).toBe(0);
+    expect(JSON.parse(readFileSync(file, "utf8"))).toEqual({
+      "case-a": 1200,
+      "case-b": 50,
+      "case-c": null,
+    });
+    expect(readdirSync(out).filter((n) => n.startsWith("."))).toEqual([]);
+  }, 60_000);
+
   it("exits 2 for a missing option or an unknown effort, and calls no codex", async () => {
     expect(await codexReviewCommand(["--cases", cases])).toBe(2);
     expect(await run("--effort", "extreme")).toBe(2);
