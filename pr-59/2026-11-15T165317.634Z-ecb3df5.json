@@ -1,0 +1,2215 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 59,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Set diff-bugs and security to one pass by E7, fix the verifier budget throw, and raise the verifier caps",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/59"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "cec32f71ec9f8d9c2aa585a1623c9ca56c40856c",
+    "head": "ecb3df5098894969c93817067524a9aa6a6a383c",
+    "started_at": "2026-11-15T16:53:17.634Z",
+    "tool_version": "0.16.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Set diff-bugs and security to one pass by E7, fix the verifier budget throw, and raise the verifier caps\n\n## Summary\n\nE7 of D4c from the S1 reference run, and two fixes that S1 found. Version 0.17.0.\n\n- **E7: diff-bugs and security go to one pass.** On S1 (28 cases, one repeat, `eval-report --by-pass`, no model call), both fail test (b) of the D8 rule:\n  - diff-bugs: a second pass added 2 goldens at $7.15 for each added golden, against $0.58 for each golden of one pass. R is 12.4, and the upper end of its interval is 63.5.\n  - security: a second pass added 3 goldens at $2.89 for each, against $0.61. R is 4.8, and its interval has no upper end.\n  - Test (c) passes for both.\n  - Every built-in reviewer now runs one pass. A repo sets `reviewers.<name>.passes` to buy a second pass.\n- **E7: the cross-pass dedupe key stays.** A second pass gave 38 claims on a span and a category that the first pass also gave. None of them matched a golden that no other finding matched.\n- **The budget throw.** In S1, a verifier call threw \"Reached maximum budget ($0.5)\" instead of returning the limit subtype. The client counted the throw as a failed call, so the review was incomplete and the eval repeat failed. Now a thrown budget or turn-limit stop gives the failure kind `limit`, for every role, so the finding ends unsure and the review completes (`src/sdk/client.ts`).\n- **The verifier caps go up:** a verifier call from $0.50 to $1, and an escalation from $1 to $2. In S1, the first verifier has a 99th percentile of $0.40 and a maximum of $0.42, and the escalation reached $0.999. A cap costs nothing until a call reaches it. The principal decided this change.\n- **`replay --verifier-cap <usd>`** sets the cap of an arm, for the Opus arms of E3. The report counts the capped calls of each arm.\n- **`replay --judge-cache <dir>`** gives the arms of one experiment a shared judge cache, so a second arm asks nothing again.\n- The help and the README now say that `--arm stored` makes no verifier call but can ask the judge for the golden match.\n- The note is `docs/research/e7-passes-dedupe.md`. It also gives the E3 figures from S1: 135 of 239 verifications escalated (56%), the escalation changed 28 of them (21%), and the escalations cost $47.81 against $39.99 for the first verifier.\n\n## Spend\n\nS1 cost $165.00 on the plan login: $159.02 for the 28 cases, and $5.98 for one failed attempt of injection-walle-6, which is the budget throw above. The E7 analysis made no model call. Two runs of `replay --arm stored` asked the judge for about $2.80 together. The records of S1 are in the crew record root, outside the repo.\n\n## Test plan\n\n- [x] `npm test` (1687 tests), `npm run lint`, `npm run typecheck`, `npm run build`\n- [x] `scripts/check-version-bump.sh cec32f7 HEAD` gives 0.16.0 to 0.17.0\n- [x] The red commits 0394d03 (the budget throw) and 1fb3757 (`--verifier-cap`) fail before their fixes\n- [x] The tests that need two passes now set them, and no assertion became weaker\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZg7V9Qr9viaw1dTW3s\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": ".claude-plugin/marketplace.json",
+        "hunks": 1
+      },
+      {
+        "path": ".claude-plugin/plugin.json",
+        "hunks": 1
+      },
+      {
+        "path": "README.md",
+        "hunks": 3
+      },
+      {
+        "path": "TICKETS.md",
+        "hunks": 2
+      },
+      {
+        "path": "docs/design/high-level-design.md",
+        "hunks": 1
+      },
+      {
+        "path": "docs/research/e7-passes-dedupe.md",
+        "hunks": 1
+      },
+      {
+        "path": "package.json",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/reviewers/diff-bugs.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/reviewers/security.md",
+        "hunks": 1
+      },
+      {
+        "path": "src/cli.ts",
+        "hunks": 5
+      },
+      {
+        "path": "src/config/models.ts",
+        "hunks": 2
+      },
+      {
+        "path": "src/eval/replay/backend.ts",
+        "hunks": 3
+      },
+      {
+        "path": "src/eval/replay/figures.ts",
+        "hunks": 3
+      },
+      {
+        "path": "src/eval/replay/index.ts",
+        "hunks": 10
+      },
+      {
+        "path": "src/sdk/client.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/eval-by-pass.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/eval-models.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/eval-paired.test.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/fixtures/replay-fixture.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/record.test.ts",
+        "hunks": 5
+      },
+      {
+        "path": "test/replay-cap.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/reviewers.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/run.test.ts",
+        "hunks": 5
+      },
+      {
+        "path": "test/sdk-options.test.ts",
+        "hunks": 2
+      }
+    ],
+    "excluded_files": [
+      {
+        "path": "package-lock.json",
+        "reason": "generated"
+      }
+    ],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "The change alters logic and defaults: reviewer pass counts, verifier dollar caps, SDK error classification, and new replay CLI options with cache-merging behavior.",
+      "confidence": "high",
+      "categories": [
+        "bug",
+        "performance",
+        "test",
+        "docs",
+        "other"
+      ],
+      "hotspots": [
+        "src/sdk/client.ts: THROWN_LIMIT regex and thrownFailure (a thrown limit stop becomes kind limit, so the verdict changes from incomplete to unsure)",
+        "src/eval/replay/index.ts: saveCache merge into the shared judge cache, armText cap naming, resume arm check",
+        "src/eval/replay/backend.ts: capUsd passed via overrides.maxBudgetUsd",
+        "src/config/models.ts: verifier caps raised from 0.5 to 1 and from 1 to 2",
+        "prompts/reviewers/diff-bugs.md and security.md: passes 2 to 1",
+        "src/cli.ts: parseCap and the new options --verifier-cap and --judge-cache",
+        "src/eval/replay/figures.ts: capped count"
+      ],
+      "file_notes": [
+        {
+          "file": "src/sdk/client.ts",
+          "note": "Behavior change: a thrown 'Reached maximum budget/turns' error is now classified as a limit failure. Check the regex against the real SDK message."
+        },
+        {
+          "file": "src/config/models.ts",
+          "note": "Verifier and escalation dollar caps doubled. This changes cost exposure."
+        },
+        {
+          "file": "src/eval/replay/index.ts",
+          "note": "New verifierCap and judgeCache options. The shared cache is read, merged and written, which could race if arms run concurrently."
+        },
+        {
+          "file": "src/eval/replay/backend.ts",
+          "note": "Cap is now a parameter and is applied through overrides."
+        },
+        {
+          "file": "src/eval/replay/figures.ts",
+          "note": "New capped figure, summed per case and in total."
+        },
+        {
+          "file": "src/eval/replay/index.ts",
+          "note": "The table gains a 'capped' column."
+        },
+        {
+          "file": "src/cli.ts",
+          "note": "New flags, updated help text, and parseCap validation."
+        },
+        {
+          "file": "prompts/reviewers/diff-bugs.md",
+          "note": "Default passes 2 to 1."
+        },
+        {
+          "file": "prompts/reviewers/security.md",
+          "note": "Default passes 2 to 1."
+        },
+        {
+          "file": "README.md",
+          "note": "Documents the new flags, the pass defaults and the worst-case cost."
+        },
+        {
+          "file": "docs/research/e7-passes-dedupe.md",
+          "note": "New research note."
+        },
+        {
+          "file": "docs/design/high-level-design.md",
+          "note": "Docs update for the pass defaults."
+        },
+        {
+          "file": "TICKETS.md",
+          "note": "Docs only."
+        },
+        {
+          "file": ".claude-plugin/plugin.json",
+          "note": "Version bump."
+        },
+        {
+          "file": ".claude-plugin/marketplace.json",
+          "note": "Version bump."
+        },
+        {
+          "file": "package.json",
+          "note": "Version bump."
+        },
+        {
+          "file": "test/replay-cap.test.ts",
+          "note": "New tests for --verifier-cap and --judge-cache."
+        },
+        {
+          "file": "test/run.test.ts",
+          "note": "New tests for thrown-limit handling. Existing tests now set passes explicitly."
+        },
+        {
+          "file": "test/record.test.ts",
+          "note": "Counts updated for 7 passes."
+        },
+        {
+          "file": "test/reviewers.test.ts",
+          "note": "Builtin pass expectations updated."
+        },
+        {
+          "file": "test/sdk-options.test.ts",
+          "note": "Cap expectations updated."
+        },
+        {
+          "file": "test/eval-by-pass.test.ts",
+          "note": "Passes set explicitly in the CLI args."
+        },
+        {
+          "file": "test/eval-models.test.ts",
+          "note": "Passes set explicitly in the CLI args."
+        },
+        {
+          "file": "test/eval-paired.test.ts",
+          "note": "Passes set explicitly in the CLI args."
+        },
+        {
+          "file": "test/fixtures/replay-fixture.ts",
+          "note": "New limitVerifier option."
+        }
+      ],
+      "summary": "This is the 0.17.0 release. It drops diff-bugs and security to one pass by default, based on the E7 analysis. It doubles the verifier and escalation dollar caps, and a thrown SDK budget or turn limit error now counts as a limit stop that ends unsure. It adds `--verifier-cap` and `--judge-cache` to replay, a `capped` figure, docs, and test updates."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: The change alters logic and defaults: reviewer pass counts, verifier dollar caps, SDK error classification, and new replay CLI options with cache-merging behavior.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    },
+    "mode": "full"
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/cli.ts",
+            "start_line": 726,
+            "end_line": 731,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "medium",
+            "claim": "The --max-cost help text still names a $0.50 cap. The verifier cap default is now $1.",
+            "evidence": "concurrency times the largest dollar cap of one call (the larger of --verifier-cap and the severity cap: $1 with --severity pr, else $0.50)",
+            "suggested_fix": "Say that the default verifier cap is $1, or take the figure from ROLE_DEFAULTS.",
+            "explanation": "The change raised ROLE_DEFAULTS.verifier.maxBudgetUsd to 1, so the help text gives a wrong default to the user.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4686,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 26282,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0026392000000000004,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 398,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 27868,
+              "webSearchRequests": 0,
+              "costUSD": 0.2315238,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 95,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.234163
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/cli.ts",
+            "start_line": 726,
+            "end_line": 731,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "medium",
+            "claim": "The description says the verifier cap goes up to $1, but the --max-cost help still gives $0.50 as the largest cap of one call when neither --severity pr nor --verifier-cap is set.",
+            "evidence": "concurrency times the largest dollar cap of one call (the larger of --verifier-cap and the severity cap: $1 with --severity pr, else $0.50)",
+            "suggested_fix": "Say that the largest cap is the larger of the verifier cap ($1 by default, or --verifier-cap) and the severity cap.",
+            "explanation": "The default verifier cap is now $1, so the largest cap of one call is at least $1, and the help understates how far the spend can pass the limit.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5396,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 26286,
+              "outputTokens": 28,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0026426,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 495,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 27830,
+              "webSearchRequests": 0,
+              "costUSD": 0.2331598,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 158,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.2358024
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7825,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 26282,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0026387000000000003,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 681,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 28095,
+              "webSearchRequests": 0,
+              "costUSD": 0.23899979999999998,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 259,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.24163849999999998
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7200,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 26282,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0026392000000000004,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 580,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 28095,
+              "webSearchRequests": 0,
+              "costUSD": 0.2369798,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 197,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.239619
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/cli.ts",
+            "start_line": 730,
+            "end_line": 730,
+            "category": "docs",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "The --max-cost help still gives $0.50 as the largest cap, but the default cap of a verifier call is now $1.",
+            "evidence": "concurrency times the largest dollar cap of one call (the larger of --verifier-cap and the severity cap: $1 with --severity pr, else $0.50)",
+            "suggested_fix": "Say that the largest cap is the larger of the verifier cap (default $1) and the severity cap.",
+            "explanation": "This change raises ROLE_DEFAULTS.verifier.maxBudgetUsd to 1. So by default the largest cap of one call is $1, not $0.50.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6808,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 26284,
+              "outputTokens": 26,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0026414,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 629,
+              "cacheReadInputTokens": 33898,
+              "cacheCreationInputTokens": 28179,
+              "webSearchRequests": 0,
+              "costUSD": 0.2448076,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 177,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.24744899999999997
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/cli.ts",
+            "start_line": 729,
+            "end_line": 731,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "medium",
+            "claim": "The --max-cost help still names $0.50 as the largest cap of one call when no --severity pr is set, but the default verifier cap is now $1.",
+            "evidence": "\"concurrency times the largest dollar cap of one call (the larger of --verifier-cap and the severity cap: $1 with --severity pr, else $0.50)\",",
+            "suggested_fix": "Say that the largest cap is the verifier cap ($1 by default, or the value of --verifier-cap) or the severity cap, whichever is larger.",
+            "explanation": "The diff raises ROLE_DEFAULTS.verifier.maxBudgetUsd from 0.5 to 1, so this upper bound on overspend is now wrong.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7962,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 51130,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.005124,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 627,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 53018,
+              "webSearchRequests": 0,
+              "costUSD": 0.4373038,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 138,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.44242780000000004
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6402,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 26286,
+              "outputTokens": 29,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0026431000000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 423,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 28066,
+              "webSearchRequests": 0,
+              "costUSD": 0.2336078,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 45,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.2362509
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5100,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 26284,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0026394,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 399,
+              "cacheReadInputTokens": 5330,
+              "cacheCreationInputTokens": 25793,
+              "webSearchRequests": 0,
+              "costUSD": 0.215398,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 56,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.2180374
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "test/replay-cap.test.ts",
+            "start_line": 101,
+            "end_line": 105,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "high",
+            "claim": "The table test matches only the word 'capped', which the column header always holds, so it cannot fail when the capped count is wrong or missing.",
+            "evidence": "expect(output.stdout).toMatch(/capped/);",
+            "suggested_fix": "Assert the row value under the capped column, for example that the total row shows 1 in the capped column.",
+            "explanation": "The header row passes the assertion whatever value the column shows.",
+            "needs_context": false
+          },
+          {
+            "file": "src/eval/replay/index.ts",
+            "start_line": 426,
+            "end_line": 433,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "No test checks that saveCache keeps the answers that another arm already wrote to the shared judge cache.",
+            "evidence": "for (const [k, v] of state.cache) merged.set(k, v);",
+            "suggested_fix": "Seed the shared cache file with an extra key, run one arm, then assert that the key is still in the file.",
+            "explanation": "The test of the shared cache runs two arms that ask the same questions, so it still passes if the code overwrites the file instead of merging into it.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 12358,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 26278,
+              "outputTokens": 27,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0026413,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 1212,
+              "cacheReadInputTokens": 34951,
+              "cacheCreationInputTokens": 29687,
+              "webSearchRequests": 0,
+              "costUSD": 0.2687422,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 626,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.2713835
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "src/cli.ts",
+          "start_line": 726,
+          "end_line": 731,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "medium",
+          "claim": "The --max-cost help text still names a $0.50 cap. The verifier cap default is now $1.",
+          "evidence": "concurrency times the largest dollar cap of one call (the larger of --verifier-cap and the severity cap: $1 with --severity pr, else $0.50)",
+          "suggested_fix": "Say that the default verifier cap is $1, or take the figure from ROLE_DEFAULTS.",
+          "explanation": "The change raised ROLE_DEFAULTS.verifier.maxBudgetUsd to 1, so the help text gives a wrong default to the user.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "concurrency times the largest dollar cap of one call (the larger of --verifier-cap and the severity cap: $1 with --severity pr, else $0.50)",
+            "maxBudgetUsd: 1,\n    timeoutMs: 300_000,\n    tools: \"read-only\",",
+            "capUsd: number = ROLE_DEFAULTS.verifier.maxBudgetUsd,"
+          ],
+          "rationale": "ROLE_DEFAULTS.verifier.maxBudgetUsd is now 1, and the verifier cap is the default for every `--verifier` arm. So without `--severity pr` the largest cap of one call is $1, not $0.50. The help text this change rewrote still says \"else $0.50\", so it understates the possible overshoot of `--max-cost`.",
+          "score": 85,
+          "severity": "suggestion"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "concurrency times the largest dollar cap of one call (the larger of --verifier-cap and the severity cap: $1 with --severity pr, else $0.50)",
+            "maxBudgetUsd: 0.5,",
+            "export const SEVERITY_PR_DEFAULTS: RoleConfig = {",
+            "the dollar cap of one verifier call of the arm, a positive number (default: the cap of the verifier role)"
+          ],
+          "rationale": "In the help text, \"$1 with --severity pr, else $0.50\" describes the severity cap, and those figures are right: SEVERITY_PR_DEFAULTS is $1 and SEVERITY_FINDING_DEFAULTS is $0.50. The text does not call $0.50 the verifier cap, and the --verifier-cap help says its default comes from the verifier role.",
+          "score": 12,
+          "severity": "not_real"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "concurrency times the largest dollar cap of one call (the larger of --verifier-cap and the severity cap: $1 with --severity pr, else $0.50)",
+            "maxBudgetUsd: 0.5,",
+            "export const SEVERITY_PR_DEFAULTS: RoleConfig = {",
+            "the dollar cap of one verifier call of the arm, a positive number (default: the cap of the verifier role)"
+          ],
+          "rationale": "In the help text, \"$1 with --severity pr, else $0.50\" describes the severity cap, and those figures are right: SEVERITY_PR_DEFAULTS is $1 and SEVERITY_FINDING_DEFAULTS is $0.50. The text does not call $0.50 the verifier cap, and the --verifier-cap help says its default comes from the verifier role.",
+          "score": 12,
+          "severity": "not_real"
+        },
+        "passed": false,
+        "sources": [
+          {
+            "reviewer": "conventions",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/cli.ts",
+          "start_line": 726,
+          "end_line": 731,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "medium",
+          "claim": "The description says the verifier cap goes up to $1, but the --max-cost help still gives $0.50 as the largest cap of one call when neither --severity pr nor --verifier-cap is set.",
+          "evidence": "concurrency times the largest dollar cap of one call (the larger of --verifier-cap and the severity cap: $1 with --severity pr, else $0.50)",
+          "suggested_fix": "Say that the largest cap is the larger of the verifier cap ($1 by default, or --verifier-cap) and the severity cap.",
+          "explanation": "The default verifier cap is now $1, so the largest cap of one call is at least $1, and the help understates how far the spend can pass the limit.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "concurrency times the largest dollar cap of one call (the larger of --verifier-cap and the severity cap: $1 with --severity pr, else $0.50)",
+            "maxBudgetUsd: 1,\n    timeoutMs: 300_000,"
+          ],
+          "rationale": "The verifier role default cap is now $1 (src/config/models.ts), so with a verifier arm and no --verifier-cap the largest one-call cap is at least $1. The help's \\\"else $0.50\\\" understates the overshoot bound, and this PR edited that exact sentence.",
+          "score": 85,
+          "severity": "suggestion"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "concurrency times the largest dollar cap of one call (the larger of --verifier-cap and the severity cap: $1 with --severity pr, else $0.50)",
+            "maxBudgetUsd: 1,",
+            "capUsd: number = ROLE_DEFAULTS.verifier.maxBudgetUsd,",
+            "the dollar cap of one verifier call of the arm, a positive number (default: the cap of the verifier role); the codex backend has no dollar cap and ignores it"
+          ],
+          "rationale": "The change edited this help line, but it still ends with \"else $0.50\". The default verifier cap is now $1 (ROLE_DEFAULTS.verifier.maxBudgetUsd = 1, and the replay backend uses it when --verifier-cap is absent). So without --severity pr or --verifier-cap, the cap of one call is $1, and the help understates by half how far the spend can pass --max-cost.",
+          "score": 85,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "concurrency times the largest dollar cap of one call (the larger of --verifier-cap and the severity cap: $1 with --severity pr, else $0.50)",
+            "maxBudgetUsd: 1,",
+            "capUsd: number = ROLE_DEFAULTS.verifier.maxBudgetUsd,",
+            "the dollar cap of one verifier call of the arm, a positive number (default: the cap of the verifier role); the codex backend has no dollar cap and ignores it"
+          ],
+          "rationale": "The change edited this help line, but it still ends with \"else $0.50\". The default verifier cap is now $1 (ROLE_DEFAULTS.verifier.maxBudgetUsd = 1, and the replay backend uses it when --verifier-cap is absent). So without --severity pr or --verifier-cap, the cap of one call is $1, and the help understates by half how far the spend can pass --max-cost.",
+          "score": 85,
+          "severity": "suggestion"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "description-drift",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/cli.ts",
+          "start_line": 730,
+          "end_line": 730,
+          "category": "docs",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "The --max-cost help still gives $0.50 as the largest cap, but the default cap of a verifier call is now $1.",
+          "evidence": "concurrency times the largest dollar cap of one call (the larger of --verifier-cap and the severity cap: $1 with --severity pr, else $0.50)",
+          "suggested_fix": "Say that the largest cap is the larger of the verifier cap (default $1) and the severity cap.",
+          "explanation": "This change raises ROLE_DEFAULTS.verifier.maxBudgetUsd to 1. So by default the largest cap of one call is $1, not $0.50.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "concurrency times the largest dollar cap of one call (the larger of --verifier-cap and the severity cap: $1 with --severity pr, else $0.50)",
+            "maxBudgetUsd: 1,\n    timeoutMs: 300_000,\n    tools: \"read-only\",\n  },\n  \"verifier-escalation\""
+          ],
+          "rationale": "The verifier role default cap is now $1 (src/config/models.ts), so the help's \\\"else $0.50\\\" is stale. The change edited this help line without fixing the figure.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "concurrency times the largest dollar cap of one call (the larger of --verifier-cap and the severity cap: $1 with --severity pr, else $0.50)",
+            "maxBudgetUsd: 1,\n    timeoutMs: 300_000,\n    tools: \"read-only\",\n  },\n  \"verifier-escalation\""
+          ],
+          "rationale": "The verifier role default cap is now $1 (src/config/models.ts), so the help's \\\"else $0.50\\\" is stale. The change edited this help line without fixing the figure.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "docs-and-comments",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/cli.ts",
+          "start_line": 729,
+          "end_line": 731,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "medium",
+          "claim": "The --max-cost help still names $0.50 as the largest cap of one call when no --severity pr is set, but the default verifier cap is now $1.",
+          "evidence": "\"concurrency times the largest dollar cap of one call (the larger of --verifier-cap and the severity cap: $1 with --severity pr, else $0.50)\",",
+          "suggested_fix": "Say that the largest cap is the verifier cap ($1 by default, or the value of --verifier-cap) or the severity cap, whichever is larger.",
+          "explanation": "The diff raises ROLE_DEFAULTS.verifier.maxBudgetUsd from 0.5 to 1, so this upper bound on overspend is now wrong.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "concurrency times the largest dollar cap of one call (the larger of --verifier-cap and the severity cap: $1 with --severity pr, else $0.50)\"",
+            "    maxBudgetUsd: 1,\n    timeoutMs: 300_000,\n    tools: \"read-only\",\n  },\n  \"verifier-escalation\""
+          ],
+          "rationale": "The default verifier cap is now $1 (ROLE_DEFAULTS.verifier.maxBudgetUsd), but the help still says the largest cap is \"$0.50\" without --severity pr. With a verifier arm and no --verifier-cap, the largest cap is therefore $1, so the stated overspend bound is too low.",
+          "score": 85,
+          "severity": "suggestion"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"concurrency times the largest dollar cap of one call (the larger of --verifier-cap and the severity cap: $1 with --severity pr, else $0.50)\",",
+            "maxBudgetUsd: 1,",
+            "capUsd: number = ROLE_DEFAULTS.verifier.maxBudgetUsd,"
+          ],
+          "rationale": "This change sets the default verifier cap to $1 (ROLE_DEFAULTS.verifier.maxBudgetUsd = 1), and replay uses it when --verifier-cap is not given. The --max-cost help, which the same change rewrote, still gives \"$1 with --severity pr, else $0.50\" and does not mention the $1 default. So for a run without --severity pr, it gives an overspend bound that is half the real one.",
+          "score": 85,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "\"concurrency times the largest dollar cap of one call (the larger of --verifier-cap and the severity cap: $1 with --severity pr, else $0.50)\",",
+            "maxBudgetUsd: 1,",
+            "capUsd: number = ROLE_DEFAULTS.verifier.maxBudgetUsd,"
+          ],
+          "rationale": "This change sets the default verifier cap to $1 (ROLE_DEFAULTS.verifier.maxBudgetUsd = 1), and replay uses it when --verifier-cap is not given. The --max-cost help, which the same change rewrote, still gives \"$1 with --severity pr, else $0.50\" and does not mention the $1 default. So for a run without --severity pr, it gives an overspend bound that is half the real one.",
+          "score": 85,
+          "severity": "suggestion"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "history",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "test/replay-cap.test.ts",
+          "start_line": 101,
+          "end_line": 105,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "high",
+          "claim": "The table test matches only the word 'capped', which the column header always holds, so it cannot fail when the capped count is wrong or missing.",
+          "evidence": "expect(output.stdout).toMatch(/capped/);",
+          "suggested_fix": "Assert the row value under the capped column, for example that the total row shows 1 in the capped column.",
+          "explanation": "The header row passes the assertion whatever value the column shows.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(output.stdout).toMatch(/capped/);",
+            "\"unsure\",\n        \"capped\",\n        \"failed\","
+          ],
+          "rationale": "renderReplay always puts \\\"capped\\\" in the header row, so toMatch(/capped/) passes whatever the capped value is. The test would still pass if the row value were wrong or missing. It doesn't check the exit code either.",
+          "score": 93,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(output.stdout).toMatch(/capped/);",
+            "\"unsure\",\n        \"capped\",\n        \"failed\","
+          ],
+          "rationale": "renderReplay always puts \\\"capped\\\" in the header row, so toMatch(/capped/) passes whatever the capped value is. The test would still pass if the row value were wrong or missing. It doesn't check the exit code either.",
+          "score": 93,
+          "severity": "suggestion"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/eval/replay/index.ts",
+          "start_line": 426,
+          "end_line": 433,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "No test checks that saveCache keeps the answers that another arm already wrote to the shared judge cache.",
+          "evidence": "for (const [k, v] of state.cache) merged.set(k, v);",
+          "suggested_fix": "Seed the shared cache file with an extra key, run one arm, then assert that the key is still in the file.",
+          "explanation": "The test of the shared cache runs two arms that ask the same questions, so it still passes if the code overwrites the file instead of merging into it.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "for (const [k, v] of state.cache) merged.set(k, v);",
+            "expect(two.calls.filter((c) => c.role === \"judge\")).toEqual([]);"
+          ],
+          "rationale": "The only --judge-cache test (test/replay-cap.test.ts) runs two arms against one shared cache and checks that the second arm makes no judge call. It never seeds the shared file with a key from another arm. A change that overwrote the shared file instead of merging would still pass.",
+          "score": 85,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "for (const [k, v] of state.cache) merged.set(k, v);",
+            "if (existsSync(shared)) for (const [k, v] of await readJudgeCache(shared)) cache.set(k, v);",
+            "expect(two.calls.filter((c) => c.role === \"judge\")).toEqual([]);"
+          ],
+          "rationale": "It is true that no test checks the merge: the only shared-cache test runs two arms one after the other and checks that the second asks the judge nothing. But each arm loads the shared file into state.cache before it writes, so an overwrite would keep the other arm's keys too. The merge only matters when two arms write at the same time, and the suggested test would pass even if the code overwrote the file, so the finding is not worth the author's time.",
+          "score": 80,
+          "severity": "dont_post"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "for (const [k, v] of state.cache) merged.set(k, v);",
+            "if (existsSync(shared)) for (const [k, v] of await readJudgeCache(shared)) cache.set(k, v);",
+            "expect(two.calls.filter((c) => c.role === \"judge\")).toEqual([]);"
+          ],
+          "rationale": "It is true that no test checks the merge: the only shared-cache test runs two arms one after the other and checks that the second asks the judge nothing. But each arm loads the shared file into state.cache before it writes, so an overwrite would keep the other arm's keys too. The merge only matters when two arms write at the same time, and the suggested test would pass even if the code overwrote the file, so the finding is not worth the author's time.",
+          "score": 80,
+          "severity": "dont_post"
+        },
+        "passed": false,
+        "sources": [
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ]
+      }
+    ],
+    "merges": [
+      {
+        "group": [
+          0,
+          1,
+          2
+        ],
+        "result": {
+          "merged": [
+            {
+              "member_index": 1,
+              "claim": "The --max-cost help still gives $0.50 as the largest per-call cap when --severity pr is not set, but the default verifier cap is now $1.",
+              "explanation": "ROLE_DEFAULTS.verifier.maxBudgetUsd was raised to 1, so the largest per-call cap is at least $1 and the help understates how far spend can exceed the limit.",
+              "suggested_fix": "Say that the largest cap is the larger of the verifier cap ($1 by default, or the value of --verifier-cap) and the severity cap.",
+              "severity": "nit"
+            }
+          ]
+        }
+      }
+    ],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [
+      {
+        "file": "test/replay-cap.test.ts",
+        "start_line": 101,
+        "end_line": 105,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "high",
+        "claim": "The table test matches only the word 'capped', which the column header always holds, so it cannot fail when the capped count is wrong or missing.",
+        "evidence": "expect(output.stdout).toMatch(/capped/);",
+        "suggested_fix": "Assert the row value under the capped column, for example that the total row shows 1 in the capped column.",
+        "explanation": "The header row passes the assertion whatever value the column shows.",
+        "needs_context": false,
+        "fingerprint": "b6fc55a0f7a5759b",
+        "severity": "suggestion",
+        "score": 93,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "expect(output.stdout).toMatch(/capped/);",
+            "\"unsure\",\n        \"capped\",\n        \"failed\","
+          ],
+          "rationale": "renderReplay always puts \\\"capped\\\" in the header row, so toMatch(/capped/) passes whatever the capped value is. The test would still pass if the row value were wrong or missing. It doesn't check the exit code either.",
+          "score": 93,
+          "severity": "suggestion"
+        },
+        "span_text": "it(\"shows the capped count in the table\", async () => { const client = replayFake({ limitVerifier: [\"CLAIM-P1\"] }); await run(client, ARM, undefined, \"table\"); expect(output.stdout).toMatch(/capped/); }, 120_000);",
+        "sources": [
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "file": "src/cli.ts",
+        "start_line": 730,
+        "end_line": 730,
+        "category": "docs",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "The --max-cost help still gives $0.50 as the largest per-call cap when --severity pr is not set, but the default verifier cap is now $1.",
+        "evidence": "concurrency times the largest dollar cap of one call (the larger of --verifier-cap and the severity cap: $1 with --severity pr, else $0.50)",
+        "explanation": "ROLE_DEFAULTS.verifier.maxBudgetUsd was raised to 1, so the largest per-call cap is at least $1 and the help understates how far spend can exceed the limit.",
+        "needs_context": false,
+        "fingerprint": "9c30eb75cb686f74",
+        "severity": "nit",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "concurrency times the largest dollar cap of one call (the larger of --verifier-cap and the severity cap: $1 with --severity pr, else $0.50)",
+            "maxBudgetUsd: 1,\n    timeoutMs: 300_000,\n    tools: \"read-only\",\n  },\n  \"verifier-escalation\""
+          ],
+          "rationale": "The verifier role default cap is now $1 (src/config/models.ts), so the help's \\\"else $0.50\\\" is stale. The change edited this help line without fixing the figure.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "span_text": "\"concurrency times the largest dollar cap of one call (the larger of --verifier-cap and the severity cap: $1 with --severity pr, else $0.50)\",",
+        "sources": [
+          {
+            "reviewer": "description-drift",
+            "pass": 1
+          },
+          {
+            "reviewer": "docs-and-comments",
+            "pass": 1
+          },
+          {
+            "reviewer": "history",
+            "pass": 1
+          }
+        ],
+        "suggested_fix": "Say that the largest cap is the larger of the verifier cap ($1 by default, or the value of --verifier-cap) and the severity cap."
+      }
+    ],
+    "github": {
+      "review_id": 5911810696,
+      "review_url": "https://github.com/jerridan/pr-review/pull/59#pullrequestreview-5911810696",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [
+        {
+          "fingerprint": "b6fc55a0f7a5759b",
+          "comment_id": 4579298790
+        },
+        {
+          "fingerprint": "9c30eb75cb686f74",
+          "comment_id": 4579298793
+        }
+      ],
+      "in_body": [],
+      "check_run": {
+        "id": 132884992543
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 10171,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 24500,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.002462,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1558,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 24013,
+            "webSearchRequests": 0,
+            "costUSD": 0.1117622,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.11422420000000001
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 4686,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 26282,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0026392000000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 398,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 27868,
+            "webSearchRequests": 0,
+            "costUSD": 0.2315238,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 95,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.234163
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 5396,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 26286,
+            "outputTokens": 28,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0026426,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 495,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 27830,
+            "webSearchRequests": 0,
+            "costUSD": 0.2331598,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 158,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.2358024
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 6808,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 26284,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0026414,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 629,
+            "cacheReadInputTokens": 33898,
+            "cacheCreationInputTokens": 28179,
+            "webSearchRequests": 0,
+            "costUSD": 0.2448076,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 177,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.24744899999999997
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "pass": 2,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 7200,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 26282,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0026392000000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 580,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 28095,
+            "webSearchRequests": 0,
+            "costUSD": 0.2369798,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 197,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.239619
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 7825,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 26282,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0026387000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 681,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 28095,
+            "webSearchRequests": 0,
+            "costUSD": 0.23899979999999998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 259,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.24163849999999998
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 6402,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 26286,
+            "outputTokens": 29,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0026431000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 423,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 28066,
+            "webSearchRequests": 0,
+            "costUSD": 0.2336078,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 45,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.2362509
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "pass": 2,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 5100,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 26284,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0026394,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 399,
+            "cacheReadInputTokens": 5330,
+            "cacheCreationInputTokens": 25793,
+            "webSearchRequests": 0,
+            "costUSD": 0.215398,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 56,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.2180374
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 7962,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 51130,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.005124,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 627,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 53018,
+            "webSearchRequests": 0,
+            "costUSD": 0.4373038,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 138,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.44242780000000004
+      },
+      {
+        "role": "verifier",
+        "verification": 0,
+        "model": "claude-sonnet-5-5",
+        "effort": "high",
+        "duration_ms": 8886,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11068,
+            "outputTokens": 300,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012568,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 278,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 1156,
+            "cacheReadInputTokens": 35343,
+            "cacheCreationInputTokens": 13888,
+            "webSearchRequests": 0,
+            "costUSD": 0.0706583,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 440,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0719151
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 12358,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 26278,
+            "outputTokens": 27,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0026413,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 1212,
+            "cacheReadInputTokens": 34951,
+            "cacheCreationInputTokens": 29687,
+            "webSearchRequests": 0,
+            "costUSD": 0.2687422,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 626,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.2713835
+      },
+      {
+        "role": "verifier",
+        "verification": 1,
+        "model": "claude-sonnet-5-5",
+        "effort": "high",
+        "duration_ms": 8858,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11102,
+            "outputTokens": 246,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012332000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 227,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 1106,
+            "cacheReadInputTokens": 35571,
+            "cacheCreationInputTokens": 13218,
+            "webSearchRequests": 0,
+            "costUSD": 0.0675011,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 312,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0687343
+      },
+      {
+        "role": "verifier",
+        "verification": 3,
+        "model": "claude-sonnet-5-5",
+        "effort": "high",
+        "duration_ms": 8696,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11050,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011170000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 1113,
+            "cacheReadInputTokens": 35230,
+            "cacheCreationInputTokens": 12899,
+            "webSearchRequests": 0,
+            "costUSD": 0.066261,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 276,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.067378
+      },
+      {
+        "role": "verifier",
+        "verification": 2,
+        "model": "claude-sonnet-5-5",
+        "effort": "high",
+        "duration_ms": 11136,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10996,
+            "outputTokens": 253,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012261000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 234,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 8,
+            "outputTokens": 1247,
+            "cacheReadInputTokens": 52146,
+            "cacheCreationInputTokens": 12969,
+            "webSearchRequests": 0,
+            "costUSD": 0.06957659999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 340,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0708027
+      },
+      {
+        "role": "verifier",
+        "verification": 4,
+        "model": "claude-sonnet-5-5",
+        "effort": "high",
+        "duration_ms": 7399,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8905,
+            "outputTokens": 321,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.001051,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 298,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 659,
+            "cacheReadInputTokens": 30306,
+            "cacheCreationInputTokens": 9881,
+            "webSearchRequests": 0,
+            "costUSD": 0.0491566,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 96,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.050207600000000005
+      },
+      {
+        "role": "verifier",
+        "verification": 5,
+        "model": "claude-sonnet-5-5",
+        "effort": "high",
+        "duration_ms": 6373,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 15291,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0015386000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 644,
+            "cacheReadInputTokens": 43994,
+            "cacheCreationInputTokens": 17162,
+            "webSearchRequests": 0,
+            "costUSD": 0.07949939999999998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 65,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.08103799999999999
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 0,
+        "model": "claude-opus-5-5",
+        "effort": "high",
+        "duration_ms": 11891,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11070,
+            "outputTokens": 234,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.001224,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 215,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 1215,
+            "cacheReadInputTokens": 35643,
+            "cacheCreationInputTokens": 14224,
+            "webSearchRequests": 0,
+            "costUSD": 0.1452446,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 499,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1464686
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 3,
+        "model": "claude-opus-5-5",
+        "effort": "high",
+        "duration_ms": 11074,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11046,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011161,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 1112,
+            "cacheReadInputTokens": 35248,
+            "cacheCreationInputTokens": 13853,
+            "webSearchRequests": 0,
+            "costUSD": 0.1401376,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 443,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.14125369999999998
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 1,
+        "model": "claude-opus-5-5",
+        "effort": "high",
+        "duration_ms": 13947,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11106,
+            "outputTokens": 256,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012386,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 237,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 1485,
+            "cacheReadInputTokens": 35827,
+            "cacheCreationInputTokens": 14375,
+            "webSearchRequests": 0,
+            "costUSD": 0.1518894,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 732,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.15312800000000001
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 5,
+        "model": "claude-opus-5-5",
+        "effort": "high",
+        "duration_ms": 14546,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 15303,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0015413,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 10,
+            "outputTokens": 1477,
+            "cacheReadInputTokens": 83238,
+            "cacheCreationInputTokens": 17146,
+            "webSearchRequests": 0,
+            "costUSD": 0.1833956,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 296,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1849369
+      },
+      {
+        "role": "merge",
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 2118,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 2172,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0002282,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 246,
+            "cacheReadInputTokens": 1062,
+            "cacheCreationInputTokens": 1685,
+            "webSearchRequests": 0,
+            "costUSD": 0.009310200000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0095384
+      }
+    ],
+    "total_cost_usd": 3.5263970000000002,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 42,
+      "gather": 436,
+      "triage": 11139,
+      "find_verify": 45566,
+      "merge": 2832
+    },
+    "errors": []
+  }
+}
