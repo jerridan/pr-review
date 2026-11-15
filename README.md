@@ -492,7 +492,7 @@ The run never grants Write or Edit. A built-in reviewer never gets Bash. When a 
 
 ## Reviewers
 
-Seven built-in reviewers exist. The tier and the triggers decide which of them run. Each reviewer reports only what the diff adds, changes or aggravates. Each one has its own evidence source and a "Do not flag" list, so the reviewers do not report the same problem twice. The files are in `prompts/reviewers/`.
+Seven built-in reviewers run by default. One more, `general-review`, runs only when a run names it (see "The general-review reviewer"). The tier and the triggers decide which of them run. Each reviewer reports only what the diff adds, changes or aggravates. Each one has its own evidence source and a "Do not flag" list, so the reviewers do not report the same problem twice. The files are in `prompts/reviewers/`.
 
 | Reviewer | Evidence | Lowest tier | Passes |
 |----------|----------|-------------|--------|
@@ -505,6 +505,23 @@ Seven built-in reviewers exist. The tier and the triggers decide which of them r
 | `docs-and-comments` | The comments and docs that the change makes stale. | full | 1 |
 
 `diff-bugs` is the original reviewer. The other six are new. All seven run on every change at or above their lowest tier. At the fast tier, every reviewer runs one pass.
+
+### The general-review reviewer
+
+`general-review` is one general review of the whole diff for every category: bugs, security, tests, docs and conventions. It makes one pass, and it reads each changed file in full. It sets no model and no effort, so the eval option `--models` sets them. It has no path trigger and no category trigger, and its lowest tier is fast.
+
+The frontmatter key `opt_in` (a boolean) marks a reviewer that does not run by default. Without the key, a reviewer is not opt-in, and the parsed frontmatter does not hold it. A reviewer with `opt_in: true` runs only when the run names it, for example with `--reviewers general-review`. It still needs its tier and its triggers. `general-review` has `opt_in: true`, so a normal run never runs it.
+
+The E2 test compares one general reviewer with the pipeline of specialised reviewers. The Claude arms use these commands:
+
+```bash
+pr-review eval --cases eval/cases --reviewers general-review --models general-review=opus:medium --stage1
+pr-review eval --cases eval/cases --reviewers general-review --models general-review=opus:high --stage1
+```
+
+The eval records of a `--stage1` run hold the findings before the verifier. Replay these records through `--from` to get the "after the verifier" figures. The options `--models` and `--stage1`, and the replay, come from the eval tooling. The eval tooling is a separate change. When `--models` is not on `main` yet, the option is in the d4c-tools pull request.
+
+The Terra arm runs the same prompt through Codex. See "The Codex general reviewer".
 
 The description is the sanitized PR title, labels and body with `--pr`. Without `--pr`, it is the sanitized subject and body of each commit between the base and the head. Every reviewer and the verifier get it. When the description is empty, `description-drift` does not run, and coverage lists it under `reviewers_skipped` with the reason `no description`. The same list names a reviewer that the config disables, with the reason `disabled by config`.
 
@@ -1033,6 +1050,29 @@ For example, a precision with mean 0.667 and min 0.5 has a spread of 0.167. Twic
 ### Explain a record
 
 `pr-review explain <record.json>` shows why each finding of a run record was kept or dropped. It prints one row for each finding. A row shows the reviewer and the pass, the file and the span, the category and the claim. It also shows the last stage, the outcome and the reason. `--format json` prints the rows with the raw fields of each finding. The default is `--format table`. The command works on every record, also a record of an eval run.
+
+### The Codex general reviewer
+
+`pr-review eval-codex-review --cases <dir> --out <dir>` runs the `general-review` prompt through Codex on each case of a cases directory. It is the Terra arm of the E2 test. Codex makes real calls, and they cost quota. The command needs the `codex` program on `PATH` and a Codex login. It reads no credential.
+
+| Flag | Meaning | Default |
+|------|---------|---------|
+| `--cases <dir>` | The cases directory. | required |
+| `--out <dir>` | The directory for the candidates files. | required |
+| `--model <id>` | The Codex model. | `gpt-6.1-terra` |
+| `--effort low\|medium\|high\|xhigh` | The reasoning effort. | `high` |
+| `--source <name>` | The `source` field of each file. | `codex-general-review-<model>-<effort>` |
+| `--force` | Run again the cases that already have a file. | off |
+
+For each case, the command clones the case at its head, as the eval does. It builds the system prompt and the user message of a pipeline reviewer from the prompt files, with the `general-review` body, the rule files of the base commit, the diff and the changed files. The description is the title and the body of the case, each sanitized and joined with a blank line. The exclusions are those of the repo config. The message holds no triage brief and no history block. A brief needs a triage model call. So the Terra arm gets no brief, and the Opus arms do. The E2 note must state this as a limit. Codex reads the files of the checkout with its own read-only sandbox.
+
+The command writes `<out>/<case name>.json` with `{ "source": "<source>", "findings": [ ... ] }`. Each finding has the fields of a reviewer finding. A finding that fails the finding schema fails the case. The command does not filter by evidence or by line range. The replay does that.
+
+**Resume rule.** The command writes each finished case at once, to a temp file and then by rename. A rerun with the same `--out` directory skips each case whose file exists, unless `--force` is set. A failed case writes no file. The command prints the case and the error, and goes on with the next case. A rerun does the cases that have no file.
+
+**Quota stop.** When Codex stops on a usage limit, the command stops at once. It prints that the quota is out and exits with 1. The finished cases stay. Run the command again later to continue.
+
+At the end the command prints `done`, `skipped`, `failed` and `tokens`, the sum of the token counts that Codex printed. The exit code is 0 when no case failed. It is 1 when a case failed or the quota is out. It is 2 for a usage error or a cases directory that is not valid.
 
 ### Exit codes
 

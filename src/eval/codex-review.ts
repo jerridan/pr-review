@@ -176,7 +176,7 @@ async function finished(out: string): Promise<Set<string>> {
 /**
  * Run the command with its arguments. Give the exit code: 0 when every case
  * is done or skipped, 1 when a case failed or the quota is out, and 2 for a
- * usage error.
+ * usage error or a cases directory that is not valid.
  */
 export async function codexReviewCommand(args: string[]): Promise<number> {
   const parsed = parseCodexReviewArgs(args);
@@ -190,7 +190,7 @@ export async function codexReviewCommand(args: string[]): Promise<number> {
     cases = await loadCases(options.cases);
   } catch (err) {
     process.stderr.write(`${err instanceof CaseError ? err.message : messageOf(err)}\n`);
-    return 1;
+    return 2;
   }
   await mkdir(options.out, { recursive: true });
   const have = await finished(options.out);
