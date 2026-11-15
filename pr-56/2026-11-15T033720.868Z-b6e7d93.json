@@ -1,0 +1,1546 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 56,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "E5: cap nits only, after the cap dropped suggestions in recorded runs",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/56"
+    },
+    "run_kind": "later",
+    "prior": {
+      "head": "66460526471acf0dccb84ca0c638e6deca2943cc",
+      "source": "record",
+      "record": "/home/runner/work/_temp/pr-review-records/pr-56/2026-11-15T033303.641Z-6646052.json",
+      "open": [
+        "366d1920b23aaf14",
+        "dc64c8381d45f400"
+      ],
+      "dismissed": [],
+      "fetch_failed": false
+    },
+    "base": "5c3fe52686749bd83f7028b2fc2f1a6c9e4be2ab",
+    "head": "b6e7d938576bf9b0c93e3a3a050e55cc7ebd7ab4",
+    "started_at": "2026-11-15T03:37:20.868Z",
+    "tool_version": "0.13.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "E5: cap nits only, after the cap dropped suggestions in recorded runs\n\nD4c experiment E5: the cap on non-blocking findings. Refs #23 (the PR does not close it).\n\n## Result\n\nThe cap dropped 22 findings in 8 of 190 recorded runs: 14 suggestions, 8 nits and no blocking finding. A cap on nits only posts 315 findings where the cap posted 293. The E5 rule fires, so the cap now caps nits only.\n\n## Changes\n\n- `src/merge/cap.ts`: every blocking finding and every suggestion posts. Nits post in ranked order up to the cap value. The formula and the `caps.non_blocking_*` keys do not change, so no repo config breaks.\n- Tests: `test/merge.test.ts` tests the new cap. In `test/explain.test.ts`, the end-to-end fixture now uses two nits, because its two suggestions both post now.\n- Docs: design section 3.6 and decision 10, `severity-policy.md`, and the README config rows now say that the cap applies to nits only. `docs/research/e5-nit-cap.md` is the note. TICKETS.md marks E5 done.\n- The version goes to 0.14.0.\n\nThe experiment made no model call. The spend is $0.\n\n## Checks\n\n`npm test` (1504 passed), `npm run lint`, `npm run typecheck` and `npm run build` pass.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZdfE1rqbczPpmGQQ5S\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": ".claude-plugin/marketplace.json",
+        "hunks": 1
+      },
+      {
+        "path": ".claude-plugin/plugin.json",
+        "hunks": 1
+      },
+      {
+        "path": "README.md",
+        "hunks": 1
+      },
+      {
+        "path": "TICKETS.md",
+        "hunks": 2
+      },
+      {
+        "path": "docs/design/high-level-design.md",
+        "hunks": 2
+      },
+      {
+        "path": "docs/design/severity-policy.md",
+        "hunks": 1
+      },
+      {
+        "path": "docs/research/e5-nit-cap.md",
+        "hunks": 1
+      },
+      {
+        "path": "package.json",
+        "hunks": 1
+      },
+      {
+        "path": "src/explain/index.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/merge/cap.ts",
+        "hunks": 3
+      },
+      {
+        "path": "src/merge/index.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/explain.test.ts",
+        "hunks": 7
+      },
+      {
+        "path": "test/merge.test.ts",
+        "hunks": 4
+      }
+    ],
+    "excluded_files": [
+      {
+        "path": "package-lock.json",
+        "reason": "generated"
+      }
+    ],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "The change alters the posting-cap logic in applyCap so suggestions are no longer capped, which changes which findings reach users, and it renames a function and changes a user-visible reason string.",
+      "confidence": "high",
+      "categories": [
+        "bug",
+        "test",
+        "docs",
+        "convention"
+      ],
+      "hotspots": [
+        "src/merge/cap.ts: applyCap (posted/capped ordering, suggestions now uncapped)",
+        "src/merge/cap.ts: nitCap rename (check for leftover nonBlockingCap references elsewhere in src)",
+        "src/explain/index.ts: reason string changed to 'over the posting cap'",
+        "src/merge/index.ts: call site of nitCap",
+        "test/merge.test.ts: new cap tests"
+      ],
+      "file_notes": [
+        {
+          "file": "src/merge/cap.ts",
+          "note": "Logic change: only nits are capped. Function renamed to nitCap. Posted order is now blocking, then suggestions, then nits."
+        },
+        {
+          "file": "src/merge/index.ts",
+          "note": "Import and call renamed to nitCap."
+        },
+        {
+          "file": "src/explain/index.ts",
+          "note": "User-visible reason string changed. Any other consumer or doc that matches the old string would break."
+        },
+        {
+          "file": "test/merge.test.ts",
+          "note": "Cap tests rewritten for the nits-only behaviour."
+        },
+        {
+          "file": "test/explain.test.ts",
+          "note": "Fixtures changed from suggestions to nits. Expected strings updated."
+        },
+        {
+          "file": "docs/research/e5-nit-cap.md",
+          "note": "New research note. Docs only."
+        },
+        {
+          "file": "docs/design/high-level-design.md",
+          "note": "Design text updated for the nits-only cap."
+        },
+        {
+          "file": "docs/design/severity-policy.md",
+          "note": "One bullet updated."
+        },
+        {
+          "file": "README.md",
+          "note": "Config table descriptions updated. Key names unchanged."
+        },
+        {
+          "file": "TICKETS.md",
+          "note": "Ticket status text."
+        },
+        {
+          "file": "package.json",
+          "note": "Version bump to 0.14.0."
+        },
+        {
+          "file": ".claude-plugin/plugin.json",
+          "note": "Version bump to 0.14.0."
+        },
+        {
+          "file": ".claude-plugin/marketplace.json",
+          "note": "Version bump to 0.14.0."
+        }
+      ],
+      "summary": "The change makes the posting cap apply to nits only. Blocking findings and suggestions now always post, and overflow nits go to `capped`. It renames `nonBlockingCap` to `nitCap`, changes the explain reason text, updates tests and docs, adds the E5 research note, and bumps the version to 0.14.0. The config key names are unchanged."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: The change alters the posting-cap logic in applyCap so suggestions are no longer capped, which changes which findings reach users, and it renames a function and changes a user-visible reason string.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 9915,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 10084,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0010189,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 589,
+              "cacheReadInputTokens": 19865,
+              "cacheCreationInputTokens": 10230,
+              "webSearchRequests": 0,
+              "costUSD": 0.097609,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 374,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0986279
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "docs/design/high-level-design.md",
+            "start_line": 152,
+            "end_line": 152,
+            "category": "docs",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "The description says the change adds `docs/research/e5-nit-cap.md`, but that file is not in the diff, although the design text links to it.",
+            "evidence": "See `docs/research/e5-nit-cap.md`.",
+            "suggested_fix": "Add the research note to the change.",
+            "explanation": "The design links to a research note that the change does not add.",
+            "needs_context": true
+          },
+          {
+            "file": "src/merge/cap.ts",
+            "start_line": 14,
+            "end_line": 19,
+            "category": "docs",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "The description says the version goes to 0.14.0 and that `severity-policy.md`, the README config rows and design decision 10 now say the cap applies to nits only, but the diff changes no package.json, no plugin manifest, no README and no severity-policy.md.",
+            "evidence": "export function nitCap(totalHunks: number, caps: CapConfig = DEFAULT_CAPS): number {",
+            "suggested_fix": "Bump the version in package.json and in the two .claude-plugin manifests. Update the README, severity-policy.md and decision 10.",
+            "explanation": "The version bump and the doc updates that the description lists are not in the diff.",
+            "needs_context": true
+          },
+          {
+            "file": "src/explain/index.ts",
+            "start_line": 280,
+            "end_line": 280,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The description does not say that the reason text in the explain output changes from 'over the non-blocking cap' to 'over the posting cap'.",
+            "evidence": "() => \"capped: over the posting cap\",",
+            "explanation": "This change to user-visible output is not in the description.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 10546,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 10068,
+              "outputTokens": 24,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0010188000000000003,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 874,
+              "cacheReadInputTokens": 19765,
+              "cacheCreationInputTokens": 10555,
+              "webSearchRequests": 0,
+              "costUSD": 0.10588900000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 143,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1069078
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 10098,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 10080,
+              "outputTokens": 18,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.001017,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 6,
+              "outputTokens": 528,
+              "cacheReadInputTokens": 36191,
+              "cacheCreationInputTokens": 10683,
+              "webSearchRequests": 0,
+              "costUSD": 0.10328620000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 332,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.10430320000000001
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 9071,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 10074,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0010174000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 6,
+              "outputTokens": 506,
+              "cacheReadInputTokens": 36184,
+              "cacheCreationInputTokens": 10683,
+              "webSearchRequests": 0,
+              "costUSD": 0.1028448,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 286,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1038622
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 11503,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 10074,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0010179000000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 6,
+              "outputTokens": 803,
+              "cacheReadInputTokens": 35866,
+              "cacheCreationInputTokens": 12035,
+              "webSearchRequests": 0,
+              "costUSD": 0.11953719999999998,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 404,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1205551
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 8007,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 25952,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0026062000000000004,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 402,
+              "cacheReadInputTokens": 36337,
+              "cacheCreationInputTokens": 26404,
+              "webSearchRequests": 0,
+              "costUSD": 0.22655540000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 271,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.22916160000000002
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4852,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 10066,
+              "outputTokens": 21,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0010171000000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 366,
+              "cacheReadInputTokens": 5330,
+              "cacheCreationInputTokens": 9575,
+              "webSearchRequests": 0,
+              "costUSD": 0.084994,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 70,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.08601110000000001
+        }
+      },
+      {
+        "name": "security",
+        "pass": 2,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 2743,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 10084,
+              "outputTokens": 18,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0010174,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 88,
+              "cacheReadInputTokens": 5330,
+              "cacheCreationInputTokens": 9593,
+              "webSearchRequests": 0,
+              "costUSD": 0.07957800000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 34,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.08059540000000001
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 10028,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 10070,
+              "outputTokens": 18,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.001016,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 698,
+              "cacheReadInputTokens": 21789,
+              "cacheCreationInputTokens": 10511,
+              "webSearchRequests": 0,
+              "costUSD": 0.10242180000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 567,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.10343780000000001
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "docs/design/high-level-design.md",
+          "start_line": 152,
+          "end_line": 152,
+          "category": "docs",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "The description says the change adds `docs/research/e5-nit-cap.md`, but that file is not in the diff, although the design text links to it.",
+          "evidence": "See `docs/research/e5-nit-cap.md`.",
+          "suggested_fix": "Add the research note to the change.",
+          "explanation": "The design links to a research note that the change does not add.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "See `docs/research/e5-nit-cap.md`."
+          ],
+          "rationale": "`docs/research/e5-nit-cap.md` exists in the head checkout, so the link resolves. The diff shown covers only the design file, so the finding's \"not in the diff\" claim rests on a partial view.",
+          "score": 3,
+          "severity": "not_real"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "See `docs/research/e5-nit-cap.md`."
+          ],
+          "rationale": "The claim is false: `docs/research/e5-nit-cap.md` is present in the head checkout, so the link resolves. The diff in the message covers only the design document, so it could not show the note.",
+          "score": 3,
+          "severity": "not_real"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "See `docs/research/e5-nit-cap.md`."
+          ],
+          "rationale": "The claim is false: `docs/research/e5-nit-cap.md` is present in the head checkout, so the link resolves. The diff in the message covers only the design document, so it could not show the note.",
+          "score": 3,
+          "severity": "not_real"
+        },
+        "passed": false,
+        "sources": [
+          {
+            "reviewer": "description-drift",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/merge/cap.ts",
+          "start_line": 14,
+          "end_line": 19,
+          "category": "docs",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "The description says the version goes to 0.14.0 and that `severity-policy.md`, the README config rows and design decision 10 now say the cap applies to nits only, but the diff changes no package.json, no plugin manifest, no README and no severity-policy.md.",
+          "evidence": "export function nitCap(totalHunks: number, caps: CapConfig = DEFAULT_CAPS): number {",
+          "suggested_fix": "Bump the version in package.json and in the two .claude-plugin manifests. Update the README, severity-policy.md and decision 10.",
+          "explanation": "The version bump and the doc updates that the description lists are not in the diff.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": false,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "export function nitCap(totalHunks: number, caps: CapConfig = DEFAULT_CAPS): number {"
+          ],
+          "rationale": "The head checkout has package.json at version 0.14.0. It also has the changed docs (severity-policy.md, high-level-design.md, e5-nit-cap.md, TICKETS.md) and both plugin manifests. The finding judged the whole PR from the diff of one file, so its claim is false.",
+          "score": 3,
+          "severity": "not_real"
+        },
+        "final": {
+          "in_scope": false,
+          "claim_holds": false,
+          "introduced_by_pr": false,
+          "quotes": [
+            "export function nitCap(totalHunks: number, caps: CapConfig = DEFAULT_CAPS): number {"
+          ],
+          "rationale": "The head checkout has package.json at version 0.14.0. It also has the changed docs (severity-policy.md, high-level-design.md, e5-nit-cap.md, TICKETS.md) and both plugin manifests. The finding judged the whole PR from the diff of one file, so its claim is false.",
+          "score": 3,
+          "severity": "not_real"
+        },
+        "passed": false,
+        "sources": [
+          {
+            "reviewer": "description-drift",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/explain/index.ts",
+          "start_line": 280,
+          "end_line": 280,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The description does not say that the reason text in the explain output changes from 'over the non-blocking cap' to 'over the posting cap'.",
+          "evidence": "() => \"capped: over the posting cap\",",
+          "explanation": "This change to user-visible output is not in the description.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "() => \"capped: over the posting cap\","
+          ],
+          "rationale": "The diff changes the explain reason string from \"over the non-blocking cap\" to \"over the posting cap\", and the description does not mention it. The change is a small wording update that follows from the cap now applying to nits only, so it is not worth a comment.",
+          "score": 80,
+          "severity": "dont_post"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "() => \"capped: over the posting cap\","
+          ],
+          "rationale": "The finding is correct: the diff changes the explain reason text, and the description's Changes list names only cap.ts, the tests, the docs and the version, not src/explain. But it is a one-line rewording that matches the new nits-only cap, so a note that the description leaves it out is not worth the author's time.",
+          "score": 88,
+          "severity": "dont_post"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "() => \"capped: over the posting cap\","
+          ],
+          "rationale": "The finding is correct: the diff changes the explain reason text, and the description's Changes list names only cap.ts, the tests, the docs and the version, not src/explain. But it is a one-line rewording that matches the new nits-only cap, so a note that the description leaves it out is not worth the author's time.",
+          "score": 88,
+          "severity": "dont_post"
+        },
+        "passed": false,
+        "sources": [
+          {
+            "reviewer": "description-drift",
+            "pass": 1
+          }
+        ]
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5908868121,
+      "review_url": "https://github.com/jerridan/pr-review/pull/56#pullrequestreview-5908868121",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 132687676540
+      },
+      "cleanup_comment_id": null,
+      "resolved": [
+        {
+          "thread_id": "PRRT_kwDOVHw73s63l4VB",
+          "fingerprint": "366d1920b23aaf14"
+        }
+      ],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 6611,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 17236,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0017366000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 982,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 16749,
+            "webSearchRequests": 0,
+            "costUSD": 0.0769462,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.07868280000000001
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "pass": 2,
+        "model": "claude-opus-5-5",
+        "duration_ms": 9071,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10074,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0010174000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 506,
+            "cacheReadInputTokens": 36184,
+            "cacheCreationInputTokens": 10683,
+            "webSearchRequests": 0,
+            "costUSD": 0.1028448,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 286,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1038622
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 9915,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10084,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0010189,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 589,
+            "cacheReadInputTokens": 19865,
+            "cacheCreationInputTokens": 10230,
+            "webSearchRequests": 0,
+            "costUSD": 0.097609,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 374,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0986279
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 10098,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10080,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.001017,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 528,
+            "cacheReadInputTokens": 36191,
+            "cacheCreationInputTokens": 10683,
+            "webSearchRequests": 0,
+            "costUSD": 0.10328620000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 332,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.10430320000000001
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 10546,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10068,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0010188000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 874,
+            "cacheReadInputTokens": 19765,
+            "cacheCreationInputTokens": 10555,
+            "webSearchRequests": 0,
+            "costUSD": 0.10588900000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 143,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1069078
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 11503,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10074,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0010179000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 803,
+            "cacheReadInputTokens": 35866,
+            "cacheCreationInputTokens": 12035,
+            "webSearchRequests": 0,
+            "costUSD": 0.11953719999999998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 404,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1205551
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "pass": 2,
+        "model": "claude-opus-5-5",
+        "duration_ms": 2743,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10084,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0010174,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 88,
+            "cacheReadInputTokens": 5330,
+            "cacheCreationInputTokens": 9593,
+            "webSearchRequests": 0,
+            "costUSD": 0.07957800000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 34,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.08059540000000001
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 4852,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10066,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0010171000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 366,
+            "cacheReadInputTokens": 5330,
+            "cacheCreationInputTokens": 9575,
+            "webSearchRequests": 0,
+            "costUSD": 0.084994,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 70,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.08601110000000001
+      },
+      {
+        "role": "verifier",
+        "verification": 0,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 4420,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 461,
+            "cacheReadInputTokens": 31118,
+            "cacheCreationInputTokens": 22601,
+            "webSearchRequests": 0,
+            "costUSD": 0.09813380000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 85,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-haiku-5-5": {
+            "inputTokens": 22871,
+            "outputTokens": 411,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0024925999999999998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 386,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1006264
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 8007,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 25952,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0026062000000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 402,
+            "cacheReadInputTokens": 36337,
+            "cacheCreationInputTokens": 26404,
+            "webSearchRequests": 0,
+            "costUSD": 0.22655540000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 271,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.22916160000000002
+      },
+      {
+        "role": "verifier",
+        "verification": 2,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 3349,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9166,
+            "outputTokens": 219,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0010261,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 201,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 424,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 8679,
+            "webSearchRequests": 0,
+            "costUSD": 0.03939669999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 135,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.040422799999999995
+      },
+      {
+        "role": "verifier",
+        "verification": 1,
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 5416,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5094,
+            "outputTokens": 335,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0006769,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 317,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 668,
+            "cacheReadInputTokens": 13341,
+            "cacheCreationInputTokens": 5138,
+            "webSearchRequests": 0,
+            "costUSD": 0.028574099999999998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 76,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.029251
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 10028,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10070,
+            "outputTokens": 18,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.001016,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 698,
+            "cacheReadInputTokens": 21789,
+            "cacheCreationInputTokens": 10511,
+            "webSearchRequests": 0,
+            "costUSD": 0.10242180000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 567,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.10343780000000001
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 0,
+        "model": "claude-opus-5-5",
+        "duration_ms": 7110,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 22859,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0022954,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 395,
+            "cacheReadInputTokens": 31098,
+            "cacheCreationInputTokens": 22575,
+            "webSearchRequests": 0,
+            "costUSD": 0.1947356,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 46,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.197031
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 2,
+        "model": "claude-opus-5-5",
+        "duration_ms": 5337,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9160,
+            "outputTokens": 294,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0010630000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 276,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 431,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 8665,
+            "webSearchRequests": 0,
+            "costUSD": 0.07882140000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 122,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.07988440000000001
+      }
+    ],
+    "total_cost_usd": 1.5593605,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 37,
+      "gather": 218,
+      "scope": 6,
+      "triage": 7388,
+      "find_verify": 26400,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
