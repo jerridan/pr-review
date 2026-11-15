@@ -431,9 +431,9 @@ A config file that does not parse or validate stops the run. An unknown key is a
 | `skip.title_keywords` | list of strings | empty | Skip the review when the PR title holds one of the strings. |
 | `skip.labels` | list of strings | empty | Skip the review when the PR has one of the labels. |
 | `skip.bot_authors` | list of strings | empty | Skip the review when the PR author is one of the bots. |
-| `caps.non_blocking_base` | integer, 0 or more | 3 | The base cap on non-blocking findings. |
-| `caps.non_blocking_per_hunks` | integer, 1 or more | 4 | The number of hunks that add one to the cap. |
-| `caps.non_blocking_max` | integer, 1 or more | 20 | The highest value of the cap. |
+| `caps.non_blocking_base` | integer, 0 or more | 3 | The base cap on nits. Blocking and suggestion findings have no cap. |
+| `caps.non_blocking_per_hunks` | integer, 1 or more | 4 | The number of hunks that add one to the cap on nits. |
+| `caps.non_blocking_max` | integer, 1 or more | 20 | The highest value of the cap on nits. |
 | `models.<role>` | object with `model` and `effort` | see below | The model and the effort of one role. |
 | `pre_existing` | `off` or `comment` | `off` | The handling of pre-existing problems. |
 | `concurrency` | integer, 1 or more | 5 | The number of model queries that run at the same time. |

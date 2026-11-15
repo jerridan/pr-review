@@ -149,7 +149,7 @@ Verification starts per finding as soon as its reviewer returns. Merge is the on
 2. Drop findings that match an open or dismissed thread from a previous run.
 3. Apply repo suppressions by category, path and reviewer. This happens before the groups form. The run checks each finding with the name of its own reviewer, and the record keeps each removed finding with its rule.
 4. Group by file and overlapping lines. One Sonnet call merges groups that say the same thing and picks the best wording.
-5. Rank by severity then verifier score. No cap on blocking findings. Non-blocking findings are capped per run at `3 + ceil(hunks / 4)`, at most 20, suggestions filled before nits. A 4-hunk PR gets 4, a 20-hunk PR gets 8. Overflow goes in the summary as a list. This is a starting formula. The cap stays until the harness (D4c) measures it against real records. If it changes, it caps nits only.
+5. Rank by severity then verifier score. No cap on blocking findings or on suggestions. Nits are capped per run at `3 + ceil(hunks / 4)`, at most 20, in ranked order. A 4-hunk PR gets 4 nits, a 20-hunk PR gets 8. Overflow goes in the summary as a list. D4c E5 measured the first cap, which also dropped suggestions, against the recorded runs. It dropped 14 suggestions and no blocking finding, so the cap changed to nits only. See `docs/research/e5-nit-cap.md`.
 
 ### 3.7 Report
 
@@ -414,7 +414,7 @@ Settled on 2026-10-13:
 8. **Auth**: the user's Claude subscription, in CI and locally. See section 9.
 
 9. **Verifier model**: Sonnet, with Opus escalation. Severity assigned by the verifier, downgradable at merge.
-10. **Non-blocking cap**: `3 + ceil(hunks / 4)`, at most 20. A starting value. The cap stays until the harness measures it against real records. If it changes, it caps nits only. See section 3.6.
+10. **Cap on nits**: `3 + ceil(hunks / 4)`, at most 20. Blocking and suggestion findings have no cap. D4c E5 measured the cap against real records and changed it to nits only. See section 3.6.
 11. **Failures**: always visible in the review, verdict `incomplete`. Never post unverified findings.
 12. **Records**: workflow artifact plus a `pr-review-records` branch.
 13. **Distribution**: composite action run from source, wrapped in a reusable workflow, plus the CLI. No npm package. The concurrency limit is the `concurrency` key of the repo config, default 5, as decision 17 says.

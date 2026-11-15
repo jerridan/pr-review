@@ -211,6 +211,7 @@ Question: does the posting cap drop findings that matter? Decides issue 23.
 
 - Method: no model call. Read every recorded run. For each one, list the findings that the cap dropped, with their severity. Then compute what a cap on nits only would post.
 - Rule: if the cap dropped a blocking or a suggestion finding in a recorded run, the cap changes to nits only, as the design update of issue 23 says. If it dropped none, the cap stays and the note gives the counts.
+- Done 2026-11-14: the cap dropped 14 suggestions and 8 nits in 8 of 190 runs, and no blocking finding, so the cap changed to nits only. The note is `docs/research/e5-nit-cap.md`.
 
 ### E6: a prompt injection in a PR
 
