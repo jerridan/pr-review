@@ -8,10 +8,23 @@ import { writeFileAtomic } from "./atomic.js";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { z } from "zod";
-import { EXIT_FAILURE, EXIT_GATE, EXIT_OK, EXIT_USAGE, type ProgramDeps } from "../cli.js";
+import {
+  EXIT_FAILURE,
+  EXIT_GATE,
+  EXIT_OK,
+  EXIT_STOPPED,
+  EXIT_USAGE,
+  type ProgramDeps,
+} from "../cli.js";
 import { JUDGE_DEFAULTS, ROLE_DEFAULTS, resolveModel } from "../config/models.js";
 import { loadRepoConfig } from "../config/repo-config.js";
-import { effectiveModel, loadBuiltinReviewers } from "../reviewers/loader.js";
+import {
+  ALL_REVIEWERS,
+  effectiveModel,
+  loadBuiltinReviewers,
+  type ModelPick,
+  type RunModels,
+} from "../reviewers/loader.js";
 import { runReview } from "../run.js";
 import type { RunRecord } from "../schemas/record.js";
 import type { SdkClient } from "../sdk/client.js";
@@ -39,6 +52,7 @@ import {
   writeJudgeCache,
   type JudgeCache,
 } from "./judge-cache.js";
+import { buildByReviewer, byReviewerRecord } from "./by-reviewer.js";
 import { failedMetrics, metrics, type RepeatMetrics } from "./metrics.js";
 import { hasSources, pairedRepeat } from "./paired.js";
 import { buildReport, renderTable, type Report } from "./report.js";
@@ -68,7 +82,23 @@ export type EvalOptions = {
   reviewers?: string[];
   /** --passes: the passes of named reviewers for every run. */
   passes?: Record<string, number>;
+  /** --models: the model and the effort of named reviewers, or of all, for every run. */
+  models?: RunModels;
+  /**
+   * --max-cost: no new repeat starts when the repeats that this invocation
+   * ran cost this many US dollars or more. Absent means no limit.
+   */
+  maxCost?: number;
+  /**
+   * --stage1: each run sends no finding to the verifier, the escalation or
+   * the merge. The scoring matches the raw candidates with the raw judge
+   * on, and the report adds the figures of each reviewer.
+   */
+  stage1?: boolean;
 };
+
+// The raw judge is on with --raw-judge, and always with --stage1.
+const rawJudgeOn = (opts: EvalOptions): boolean => opts.rawJudge || opts.stage1 === true;
 
 function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -126,7 +156,7 @@ async function caseReviewers(
     .filter((def) => only === null || only.has(def.frontmatter.name))
     .filter((def) => TIER_RANK[def.frontmatter.triggers.min_tier] <= TIER_RANK[tier])
     .filter((def) => config.reviewers[def.frontmatter.name]?.enabled !== false)
-    .filter((def) => effectiveModel(def, config).model === judgeModel)
+    .filter((def) => effectiveModel(def, config, opts.models).model === judgeModel)
     .map((def) => def.frontmatter.name);
   return { judgeModel: same, custom };
 }
@@ -161,9 +191,14 @@ async function checkCases(
   }
 }
 
-// The names of --reviewers and --passes that no reviewer has, in order.
+// The names of --reviewers, --passes and --models that no reviewer has, in
+// order. The target "all" of --models is not a name.
 function unknownReviewers(opts: EvalOptions, names: Set<string>): string[] {
-  const asked = [...(opts.reviewers ?? []), ...Object.keys(opts.passes ?? {})];
+  const asked = [
+    ...(opts.reviewers ?? []),
+    ...Object.keys(opts.passes ?? {}),
+    ...Object.keys(opts.models ?? {}).filter((name) => name !== ALL_REVIEWERS),
+  ];
   return [...new Set(asked.filter((name) => !names.has(name)))];
 }
 
@@ -187,7 +222,13 @@ async function baselines(
 }
 
 type RepeatOutcome =
-  | { kind: "done"; metrics: RepeatMetrics; record?: string }
+  | {
+      kind: "done";
+      metrics: RepeatMetrics;
+      record?: string;
+      /** The known cost of every call of the repeat: its run and its judge. */
+      spentUsd: number;
+    }
   | { kind: "same-judge"; reviewers: string[] };
 
 type EvalContext = {
@@ -214,6 +255,10 @@ type ResultOptions = {
   passes: Record<string, number> | null;
   /** True for --paired: the metrics then hold the paired figures. */
   paired: boolean;
+  /** --models by target, or null. */
+  models: Record<string, ModelPick> | null;
+  /** True for --stage1. */
+  stage1: boolean;
 };
 
 // The fields of the metrics that buildReport and renderTable read.
@@ -254,6 +299,13 @@ const ResultFileSchema = z.object({
     reviewers: z.array(z.string()).nullable().default(null),
     passes: z.record(z.string(), number).nullable().default(null),
     paired: z.boolean().default(false),
+    // A result from before D4c has no models: it ran with no --models.
+    models: z
+      .record(z.string(), z.object({ model: z.string(), effort: z.string() }))
+      .nullable()
+      .default(null),
+    // A result from before D4c ran the whole pipeline.
+    stage1: z.boolean().default(false),
   }),
   metrics: MetricsShape.loose(),
 });
@@ -277,16 +329,20 @@ export type ResultFile = {
 
 class ResumeError extends Error {}
 
+// The entries of a record in key order, so that the JSON text is stable.
+const byKey = <T>(record: Readonly<Record<string, T>>): Record<string, T> =>
+  Object.fromEntries(Object.entries(record).sort(([a], [b]) => (a < b ? -1 : 1)));
+
 const resultOptions = (ctx: EvalContext): ResultOptions => ({
   tier: ctx.opts.tier,
   judge_model: ctx.judgeModel,
   extras: ctx.opts.extras,
-  raw_judge: ctx.opts.rawJudge,
+  raw_judge: rawJudgeOn(ctx.opts),
   reviewers: ctx.opts.reviewers ? [...new Set(ctx.opts.reviewers)].sort() : null,
-  passes: ctx.opts.passes
-    ? Object.fromEntries(Object.entries(ctx.opts.passes).sort(([a], [b]) => (a < b ? -1 : 1)))
-    : null,
+  passes: ctx.opts.passes ? byKey(ctx.opts.passes) : null,
   paired: ctx.opts.paired === true,
+  models: ctx.opts.models ? byKey(ctx.opts.models) : null,
+  stage1: ctx.opts.stage1 === true,
 });
 
 // A hash of the golden findings. A change of golden.json changes it.
@@ -341,7 +397,9 @@ const sameOptions = (a: ResultOptions, b: ResultOptions): boolean =>
   a.raw_judge === b.raw_judge &&
   JSON.stringify(a.reviewers) === JSON.stringify(b.reviewers) &&
   JSON.stringify(a.passes) === JSON.stringify(b.passes) &&
-  a.paired === b.paired;
+  a.paired === b.paired &&
+  JSON.stringify(a.models) === JSON.stringify(b.models) &&
+  a.stage1 === b.stage1;
 
 // The results to reuse, by "<case>/<repeat>". A result that is failed, or
 // that has another case, head or golden fingerprint, is not reused. It runs
@@ -440,9 +498,12 @@ function incompleteMessage(record: RunRecord): string {
 // exits 1, or that gives an incomplete review gives a failed repeat.
 async function runRepeat(ctx: EvalContext, c: Case, repeat: number): Promise<RepeatOutcome> {
   const start = performance.now();
+  // The known cost of the calls so far. A failed repeat still costs them.
+  let spentUsd = 0;
   const failed = (error: string): RepeatOutcome => ({
     kind: "done",
     metrics: failedMetrics(repeat, error, Math.round(performance.now() - start)),
+    spentUsd,
   });
   // The judge answers go to the cache file of the repeat, so a later
   // offline report can score the record with no model call. A cache file
@@ -469,7 +530,10 @@ async function runRepeat(ctx: EvalContext, c: Case, repeat: number): Promise<Rep
       client: ctx.client,
       ...(ctx.opts.reviewers ? { onlyReviewers: ctx.opts.reviewers } : {}),
       ...(ctx.opts.passes ? { passes: new Map(Object.entries(ctx.opts.passes)) } : {}),
+      ...(ctx.opts.models ? { models: ctx.opts.models } : {}),
+      ...(ctx.opts.stage1 === true ? { stage1: true } : {}),
     });
+    spentUsd = result.record.cost.total_cost_usd ?? 0;
     if (result.exitCode !== 0) return failed(result.error ?? "The run exited with code 1.");
     // An incomplete review exits 0, but its findings do not show the
     // reviewers. A score of it would be wrong, so the repeat fails.
@@ -495,9 +559,15 @@ async function runRepeat(ctx: EvalContext, c: Case, repeat: number): Promise<Rep
     try {
       score = await scoreRecord(result.record, c.golden, checkout, judge, {
         extras: ctx.opts.extras,
-        rawJudge: ctx.opts.rawJudge,
+        rawJudge: rawJudgeOn(ctx.opts),
       });
       m = metrics(result.record, score, repeat);
+      if (ctx.opts.stage1 === true) {
+        const rows = await byReviewerRecord(result.record, c.golden, checkout, judge);
+        m.by_reviewer = rows.rows;
+        m.judge_calls += rows.judgeCalls;
+        m.judge_cost_usd += rows.judgeCostUsd;
+      }
       if (ctx.opts.paired === true) {
         if (hasSources(result.record)) {
           const p = await pairedRepeat(
@@ -505,7 +575,7 @@ async function runRepeat(ctx: EvalContext, c: Case, repeat: number): Promise<Rep
             c.golden,
             checkout,
             judge,
-            { rawJudge: ctx.opts.rawJudge },
+            { rawJudge: rawJudgeOn(ctx.opts) },
             score,
           );
           m.paired = p.paired;
@@ -532,7 +602,8 @@ async function runRepeat(ctx: EvalContext, c: Case, repeat: number): Promise<Rep
         `warning: case ${c.name}, repeat ${repeat}: cannot update candidates.json: ${messageOf(err)}`,
       );
     }
-    return { kind: "done", metrics: m, record: basename(result.recordPath) };
+    spentUsd += m.judge_cost_usd;
+    return { kind: "done", metrics: m, record: basename(result.recordPath), spentUsd };
   } catch (err) {
     return failed(messageOf(err));
   } finally {
@@ -554,7 +625,9 @@ function gateMessage(gate: Gate): string {
 /**
  * Run the eval and give its exit code: 0 when the gate passed or did not
  * run, 1 for a failed repeat or a run error, 2 for an invalid case or a
- * configuration error, 3 when the gate failed. Exit code 1 wins over 3.
+ * configuration error, 3 when the gate failed, 4 when --max-cost stopped
+ * the eval. Exit code 1 wins over 4, and 4 wins over 3: no gate runs on a
+ * stopped eval.
  */
 export async function runEval(opts: EvalOptions, deps: ProgramDeps): Promise<number> {
   const startedAt = new Date().toISOString();
@@ -630,14 +703,25 @@ export async function runEval(opts: EvalOptions, deps: ProgramDeps): Promise<num
     }
   }
 
-  // The runs go in sequence: case by case, and repeat by repeat.
+  // The runs go in sequence: case by case, and repeat by repeat. With
+  // --max-cost, a repeat starts only while the repeats of this invocation
+  // cost less than the limit. After a stop, the loop only counts the
+  // repeats that remain, and still takes the reused ones.
   const results: { name: string; repeats: RepeatMetrics[] }[] = [];
+  let spent = 0;
+  let stopped = false;
+  let remaining = 0;
   for (const c of cases) {
     const repeats: RepeatMetrics[] = [];
     for (let repeat = 1; repeat <= opts.repeat; repeat++) {
       const reused = reuse.get(`${c.name}/${repeat}`);
       if (reused !== undefined) {
         repeats.push(reused);
+        continue;
+      }
+      if (opts.maxCost !== undefined && spent >= opts.maxCost) stopped = true;
+      if (stopped) {
+        remaining += 1;
         continue;
       }
       // With --resume, the old output of this repeat stays out of the way of
@@ -661,16 +745,23 @@ export async function runEval(opts: EvalOptions, deps: ProgramDeps): Promise<num
           `warning: case ${c.name}, repeat ${repeat}: cannot write result.json: ${messageOf(err)}`,
         );
       }
+      spent += outcome.spentUsd;
       repeats.push(outcome.metrics);
     }
-    results.push({ name: c.name, repeats });
+    if (repeats.length > 0) results.push({ name: c.name, repeats });
   }
 
   const paired = opts.paired === true ? { uncached: [] } : undefined;
   let report: Report = buildReport(results, null, ref, paired);
   const failed = report.failed_repeats.length > 0;
   let runError: string | null = null;
-  if (base.gate) {
+  // A stopped eval has only a part of the repeats, so no gate runs and the
+  // baseline does not change.
+  if (stopped) {
+    if (opts.baseline !== undefined) {
+      say("no gate runs and no baseline changes, because the eval stopped at the cost limit.");
+    }
+  } else if (base.gate) {
     const known = base.gate.cases_ref;
     if (known !== null && ref !== null && known !== ref) {
       say(
@@ -692,6 +783,17 @@ export async function runEval(opts: EvalOptions, deps: ProgramDeps): Promise<num
         runError = messageOf(err);
       }
     }
+  }
+
+  if (opts.stage1 === true) {
+    report.mode = "stage1";
+    report.by_reviewer = buildByReviewer(
+      results.flatMap((c) =>
+        c.repeats.flatMap((r) =>
+          r.by_reviewer ? [{ case: c.name, repeat: r.repeat, rows: r.by_reviewer }] : [],
+        ),
+      ),
+    );
   }
 
   const json = `${JSON.stringify(report, null, 2)}\n`;
@@ -725,7 +827,16 @@ export async function runEval(opts: EvalOptions, deps: ProgramDeps): Promise<num
     );
   }
   if (report.gate && !report.gate.passed) say(gateMessage(report.gate));
+  if (stopped) {
+    say(
+      `the cost limit stopped the eval: the repeats of this run cost $${spent.toFixed(4)}, ` +
+        `and the limit is $${(opts.maxCost ?? 0).toFixed(4)}. ` +
+        `${remaining} ${remaining === 1 ? "repeat remains" : "repeats remain"}. ` +
+        "Run again with --resume to continue.",
+    );
+  }
   if (failed || runError !== null) return EXIT_FAILURE;
+  if (stopped) return EXIT_STOPPED;
   if (report.gate && !report.gate.passed) return EXIT_GATE;
   return EXIT_OK;
 }

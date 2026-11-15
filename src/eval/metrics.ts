@@ -1,6 +1,7 @@
 // The metrics of one repeat of one case: the run record and its score.
 import { countDrops, explain } from "../explain/index.js";
 import type { RunRecord } from "../schemas/record.js";
+import type { ReviewerRow } from "./by-reviewer.js";
 import type { RepeatPaired } from "./paired.js";
 import type { ScoreResult } from "./score.js";
 
@@ -42,6 +43,11 @@ export type RepeatMetrics = {
    * has no source fields. Absent when the eval did not ask for them.
    */
   paired?: RepeatPaired | null;
+  /**
+   * The figures of each reviewer, and of all reviewers (null), of an eval
+   * with --stage1. Absent for any other eval.
+   */
+  by_reviewer?: ReviewerRow[];
 };
 
 /**
@@ -51,9 +57,11 @@ export type RepeatMetrics = {
  * posted. Adjudicated precision also counts the extras that the extras
  * judge accepted. It is null when no finding posted or when extras are
  * off. A posted finding that matches a not-real golden is a false
- * positive. The review cost holds no judge cost.
+ * positive. The review cost holds no judge cost. A stage 1 record posts
+ * nothing by design, so its recall and precision are null ("none"), not 0.
  */
 export function metrics(record: RunRecord, score: ScoreResult, repeat: number): RepeatMetrics {
+  const stage1 = record.identity.mode === "stage1";
   const posted = record.posted.findings.length;
   // Each match holds one posted golden and one posted finding.
   const matched = score.matched.length;
@@ -64,7 +72,7 @@ export function metrics(record: RunRecord, score: ScoreResult, repeat: number): 
     repeat,
     failed: false,
     error: null,
-    recall: goldens === 0 ? null : matched / goldens,
+    recall: stage1 || goldens === 0 ? null : matched / goldens,
     precision: posted === 0 ? null : matched / posted,
     posted,
     matched,

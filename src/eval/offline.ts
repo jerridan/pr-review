@@ -4,10 +4,12 @@
 // the diff that the judge saw. The judge
 // answers come from the cache file of each repeat. A question with no
 // cached answer counts as no match, and the report says so. With
-// --by-pass, it adds the by-pass section (by-pass.ts). With --ask-missing,
-// the judge first answers the by-pass questions that have no answer or a
-// failed one, and those answers go into the cache file of the repeat. The
-// report then scores every section from the cache, so all agree.
+// --by-pass, it adds the by-pass section (by-pass.ts). With --by-reviewer,
+// it adds the figures of each reviewer (by-reviewer.ts). With
+// --ask-missing, the judge first answers the questions of those sections
+// that have no answer or a failed one, and those answers go into the cache
+// file of the repeat. The report then scores every section from the cache,
+// so all agree.
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -24,6 +26,12 @@ import {
   type ByPassRow,
   type ByPassSection,
 } from "./by-pass.js";
+import {
+  buildByReviewer,
+  byReviewerRecord,
+  type ByReviewerInput,
+  type ByReviewerSection,
+} from "./by-reviewer.js";
 import { CaseError, casesRef, loadCases, type Case } from "./case.js";
 import { cloneCase } from "./checkout.js";
 import {
@@ -52,7 +60,12 @@ export type EvalReportOptions = {
   format: "table" | "json";
   /** Add the by-pass section. */
   byPass?: boolean;
-  /** Let the judge answer the by-pass questions with no answer or a failed one. Needs byPass. */
+  /** Add the by-reviewer section. */
+  byReviewer?: boolean;
+  /**
+   * Let the judge answer the questions of the by-pass and by-reviewer
+   * sections with no answer or a failed one. Needs byPass or byReviewer.
+   */
   askMissing?: boolean;
   /** Keep ANTHROPIC_API_KEY and the other provider variables for the judge of --ask-missing. */
   allowApiKey?: boolean;
@@ -99,7 +112,7 @@ async function readRecord(dir: string, named: string | undefined): Promise<RunRe
   return parsed.data;
 }
 
-/** What the by-pass scoring of a repeat needs: a record with source fields. */
+/** What the by-pass and by-reviewer scorings of a repeat need. */
 type Kept = {
   record: RunRecord;
   head: string;
@@ -115,7 +128,7 @@ type Scored = { metrics: RepeatMetrics; uncached: number; kept?: Kept };
 // that failed in the eval keeps its metrics. "checkout" is a clone of the
 // case: the key of each judge answer holds the head lines and the diff
 // that the judge saw, so the scoring reads them as the eval did. With
-// "keep", the result holds what the by-pass scoring needs.
+// "keep", the result holds what the by-pass and by-reviewer scorings need.
 async function scoreRepeat(
   c: Case,
   dir: string,
@@ -144,17 +157,17 @@ async function scoreRepeat(
   });
   const m = metrics(record, score, repeat);
   let uncached = score.uncached;
-  let kept: Kept | undefined;
-  if (hasSources(record)) {
-    if (keep)
-      kept = {
+  const kept: Kept | undefined = keep
+    ? {
         record,
         head,
         cache,
         cachePath,
         judgeModel: result.options.judge_model,
         rawJudge: result.options.raw_judge,
-      };
+      }
+    : undefined;
+  if (hasSources(record)) {
     const p = await pairedRepeat(
       record,
       c.golden,
@@ -288,11 +301,46 @@ async function byPassSection(
   };
 }
 
+/**
+ * The by-reviewer section of the kept repeats. With "client", the judge
+ * answers each question with no answer or a failed one, once per record,
+ * and the cache file of the repeat gets the new answers.
+ */
+async function byReviewerSection(
+  inputs: ByPassInput[],
+  client: SdkClient | null,
+  allowApiKey: boolean,
+): Promise<ByReviewerSection> {
+  let questions = 0;
+  let costUsd = 0;
+  const rows: ByReviewerInput[] = [];
+  for (const { case: c, repeat, kept } of inputs) {
+    const judge: ScoreJudge = {
+      client,
+      model: kept.judgeModel,
+      options: { allowApiKey, env: client === null ? {} : process.env },
+      cache: kept.cache,
+      // One set for the record: a failed answer gets one new query, not
+      // one per scope.
+      asked: new Set(),
+    };
+    const scored = await byReviewerRecord(kept.record, c.golden, kept.head, judge);
+    questions += scored.judgeCalls;
+    costUsd += scored.judgeCostUsd;
+    if (scored.judgeCalls > 0) await writeJudgeCache(kept.cachePath, kept.cache);
+    rows.push({ case: c.name, repeat, rows: scored.rows });
+  }
+  return buildByReviewer(rows, client === null ? null : { questions, cost_usd: costUsd });
+}
+
 type Collected = {
   results: { name: string; repeats: RepeatMetrics[] }[];
   uncached: PairedSection["uncached"];
+  /** The repeats of the by-pass scoring: a kept record with source fields. */
   inputs: ByPassInput[];
   missing: ByPassSection["missing"];
+  /** The repeats of the by-reviewer scoring: every kept record. */
+  reviewerInputs: ByPassInput[];
 };
 
 // Score every repeat in "out". With "keep", collect what the by-pass
@@ -304,7 +352,13 @@ async function collect(
   keep: boolean,
   quiet: boolean,
 ): Promise<Collected> {
-  const collected: Collected = { results: [], uncached: [], inputs: [], missing: [] };
+  const collected: Collected = {
+    results: [],
+    uncached: [],
+    inputs: [],
+    missing: [],
+    reviewerInputs: [],
+  };
   for (const c of cases) {
     const caseDir = join(out, c.name);
     const repeats: RepeatMetrics[] = [];
@@ -316,7 +370,9 @@ async function collect(
         if (scored.uncached > 0) {
           collected.uncached.push({ case: c.name, repeat, pairs: scored.uncached });
         }
-        if (scored.kept) collected.inputs.push({ case: c, repeat, kept: scored.kept });
+        if (scored.kept) collected.reviewerInputs.push({ case: c, repeat, kept: scored.kept });
+        if (scored.kept && hasSources(scored.kept.record))
+          collected.inputs.push({ case: c, repeat, kept: scored.kept });
         else
           collected.missing.push({
             case: c.name,
@@ -336,10 +392,11 @@ async function collect(
 
 /**
  * Print the report of the records in the --out directory: the normal
- * metrics and the paired section, and with --by-pass the by-pass section.
- * With --ask-missing, the judge first answers the by-pass questions with
- * no answer or a failed one, and judge-cache.json of each repeat gets the
- * answers; every section then reads them. Give 0, or 2 for an invalid case.
+ * metrics and the paired section, with --by-pass the by-pass section, and
+ * with --by-reviewer the by-reviewer section. With --ask-missing, the judge
+ * first answers the questions of those sections with no answer or a failed
+ * one, and judge-cache.json of each repeat gets the answers; every section
+ * then reads them. Give 0, or 2 for an invalid case.
  */
 export async function runEvalReport(
   opts: EvalReportOptions,
@@ -355,7 +412,10 @@ export async function runEvalReport(
   }
   const out = resolve(opts.out);
   const byPassOn = opts.byPass === true;
+  const byReviewerOn = opts.byReviewer === true;
+  const keep = byPassOn || byReviewerOn;
   let byPass: ByPassSection | null = null;
+  let byReviewer: ByReviewerSection | null = null;
   let collected: Collected;
   const tmp = await mkdtemp(join(tmpdir(), "pr-review-eval-report-"));
   try {
@@ -370,16 +430,27 @@ export async function runEvalReport(
       return clone;
     };
     let asked: ByPassSection["ask_missing"] = null;
-    if (byPassOn && opts.askMissing === true) {
+    let askedReviewer: ByReviewerSection["ask_missing"] = null;
+    if (keep && opts.askMissing === true) {
       const first = await collect(cases, out, checkoutOf, true, true);
       const client = await clientOf();
-      const section = await byPassSection(first.inputs, [], client, opts.allowApiKey === true);
-      asked = section.ask_missing;
+      const allowApiKey = opts.allowApiKey === true;
+      if (byPassOn) {
+        asked = (await byPassSection(first.inputs, [], client, allowApiKey)).ask_missing;
+      }
+      if (byReviewerOn) {
+        askedReviewer = (await byReviewerSection(first.reviewerInputs, client, allowApiKey))
+          .ask_missing;
+      }
     }
-    collected = await collect(cases, out, checkoutOf, byPassOn, false);
+    collected = await collect(cases, out, checkoutOf, keep, false);
     if (byPassOn) {
       byPass = await byPassSection(collected.inputs, collected.missing, null, false);
       byPass.ask_missing = asked;
+    }
+    if (byReviewerOn) {
+      byReviewer = await byReviewerSection(collected.reviewerInputs, null, false);
+      byReviewer.ask_missing = askedReviewer;
     }
   } finally {
     await rm(tmp, { recursive: true, force: true });
@@ -388,6 +459,7 @@ export async function runEvalReport(
     uncached: collected.uncached,
   });
   if (byPass !== null) report.by_pass = byPass;
+  if (byReviewer !== null) report.by_reviewer = byReviewer;
   const notValid = notValidLines(report.paired as PairedSection);
   if (opts.format === "json") {
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);

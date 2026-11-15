@@ -11,6 +11,7 @@ import {
   effectivePasses,
   reviewerTools,
   type ReviewerDefinition,
+  type RunModels,
 } from "../reviewers/loader.js";
 import { FindingsOutputSchema, type Finding, type FindingsOutput } from "../schemas/finding.js";
 import type { FindingSource, QueryFailure } from "../schemas/record.js";
@@ -81,6 +82,11 @@ type FindContext = {
    * pass of each query. Absent means the client that runReviewers gets.
    */
   clientForPass?: (pass: number) => SdkClient;
+  /**
+   * The model and the effort of reviewers for this run (--models of the
+   * eval). They win over the config and the frontmatter.
+   */
+  models?: RunModels;
 };
 
 /** The reviewer that gets the history block in its user message. */
@@ -315,7 +321,10 @@ export async function runReviewers(
             userMessage,
             schema: FindingsOutputSchema,
             cwd: ctx.cwd,
-            overrides: { ...effectiveModel(def, ctx.config), ...effectiveBudget(def, ctx.config) },
+            overrides: {
+              ...effectiveModel(def, ctx.config, ctx.models),
+              ...effectiveBudget(def, ctx.config),
+            },
             tools: def.frontmatter.tools,
             ...(tools.get(def)?.bashGranted ? { bash: true } : {}),
           },
