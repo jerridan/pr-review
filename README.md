@@ -875,7 +875,10 @@ The changed lines are the added and the removed lines in the hunks of the diff. 
 ```bash
 pr-review replay --cases eval/cases --from <eval out> --arm stored --out replay-stored
 pr-review replay --cases eval/cases --from <eval out> --verifier claude:sonnet:medium --out replay-sonnet-medium --max-cost 20
+pr-review replay --cases eval/cases --from <eval out> --verifier codex:gpt-6.1-terra:medium --out replay-terra-medium
 ```
+
+The `codex` backend runs the Codex CLI with the model and the effort of the arm. The second example is the Terra arm of E3. Codex gives no cost, so each call stores `cost_usd: null` and the tokens of the call. The report sums the tokens, and `--max-cost` does not count a Codex call. A failed Codex call is a failed result, and a later `--resume` runs it again. A call that hits the Codex usage limit is a failed result of kind `limit`, and the text of the failure names the quota. The replay does not stop at it.
 
 A replay asks the first verifier only. It makes no escalation call, no merge call and no cap. So its figures compare only with other replays, not with an eval report. `--arm stored` is the comparison arm: it takes the stored first result of each candidate, with no verifier call. A result in the escalation band, or of a finding with `needs_context`, gets the decision of the first result alone, and the report counts it as in the band.
 
@@ -886,7 +889,7 @@ A replay asks the first verifier only. It makes no escalation call, no merge cal
 | `--repeat <n>` | The repeat of the `--from` records. | 1 |
 | `--candidates <dir>` | Candidates from a reviewer outside the pipeline: one `<case>.json` for each case, of the form `{ "source": "<name>", "findings": [<finding>...] }`. Each finding has the fields of a reviewer finding. It gets the same line-range check and evidence check, and the report counts the dropped findings by reason. The source name acts as a reviewer name, and the threshold is `thresholds.default`. With `--from`, the candidates are the union of the two sets. | none |
 | `--reviewers <name,...>` | Keep only the candidates with a source of these reviewers. | all |
-| `--verifier <backend:model:effort>` | The verifier of the arm. The backend is `claude` or `codex`. The `codex` backend exits 2 before any call until the Codex call takes a model and an effort. | required, or `--arm stored` |
+| `--verifier <backend:model:effort>` | The verifier of the arm. The backend is `claude` or `codex`. The effort of a `codex` arm can be `low`, `medium`, `high`, `xhigh` or `max`. | required, or `--arm stored` |
 | `--prompt score\|truth\|bands` | The prompt form. `score` is `prompts/verifier.md`. `truth` gives no severity. `bands` gives one of five named bands in place of the score, and the frontmatter of `prompts/verifier-bands.md` maps each band to a score. | `score` |
 | `--arm stored` | The stored first results, with no verifier call. Its report also gives, from the records, how many candidates escalated, how many of them changed the decision, and the cost of the escalations. A stage 1 record has no stored result, so it exits 2. | none |
 | `--severity <mode:model:effort>` | The severity step, with no tools. `finding` makes one call for each candidate that holds and is in scope. `pr` makes one call for each case, with all such candidates. Its label replaces the verifier label. | none |

@@ -23,7 +23,7 @@ export const CODEX_TIMEOUT_MS = 900_000;
  */
 export const TERRA_MODEL = "gpt-6.1-terra";
 
-export type CodexEffort = "low" | "medium" | "high" | "xhigh";
+export type CodexEffort = "low" | "medium" | "high" | "xhigh" | "max";
 /** The model and the effort of one call. A missing field takes the default. */
 export type CodexOptions = { model?: string; effort?: CodexEffort };
 
