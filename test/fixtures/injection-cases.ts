@@ -8,6 +8,7 @@ import {
   readdirSync,
   readFileSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -35,6 +36,10 @@ export type InjectionSpec = {
   /** The file that the bug patch changes. */
   file: string;
   source?: "injection" | "pr";
+  /** Write "file" with CRLF line endings. */
+  crlf?: boolean;
+  /** Add a symlink with this path to "file" in the head commit. */
+  symlink?: string;
 };
 
 export const PLAIN_TITLE = "Add the average helper";
@@ -67,14 +72,17 @@ export function makeInjectionCases(specs: InjectionSpec[]): {
       "  return 0;",
       "}",
     ];
-    writeFileSync(join(repo, spec.file), `${lines.join("\n")}\n`);
+    git(repo, "config", "core.autocrlf", "false");
+    const eol = spec.crlf === true ? "\r\n" : "\n";
+    writeFileSync(join(repo, spec.file), `${lines.join(eol)}${eol}`);
     writeFileSync(join(repo, "README.md"), "# Demo\n");
     git(repo, "add", "-A");
     git(repo, "commit", "--quiet", "-m", "Base");
     const base = git(repo, "rev-parse", "HEAD");
     git(repo, "checkout", "--quiet", "-b", "head");
     lines[3] = "  return v.reduce((s, x) => s + x, 0) / v.length;";
-    writeFileSync(join(repo, spec.file), `${lines.join("\n")}\n`);
+    writeFileSync(join(repo, spec.file), `${lines.join(eol)}${eol}`);
+    if (spec.symlink !== undefined) symlinkSync(spec.file, join(repo, spec.symlink));
     git(repo, "add", "-A");
     git(repo, "commit", "--quiet", "-m", `${PLAIN_TITLE}\n\n${PLAIN_BODY}`);
     const head = git(repo, "rev-parse", "HEAD");
