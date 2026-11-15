@@ -13,12 +13,24 @@ import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { Command, CommanderError, InvalidArgumentError, Option } from "commander";
 import { z } from "zod";
-import { EFFORTS, JUDGE_DEFAULTS, ROLE_DEFAULTS, resolveModel } from "./config/models.js";
+import {
+  EFFORTS,
+  JUDGE_DEFAULTS,
+  ROLE_DEFAULTS,
+  resolveModel,
+  type Effort,
+} from "./config/models.js";
 import { registerLabelCommand } from "./eval/label/index.js";
 import { registerPoolCommands } from "./eval/pool/index.js";
 import { runEvalReport } from "./eval/offline.js";
 import { runEval } from "./eval/run.js";
 import { runEvalSizes } from "./eval/sizes.js";
+import { BOOTSTRAP_SEED } from "./eval/bootstrap.js";
+import { BACKENDS, type VerifierSpec } from "./eval/replay/backend.js";
+import { PROMPT_FORMS, type PromptForm } from "./eval/replay/forms.js";
+import type { SampleKind } from "./eval/replay/candidates.js";
+import { REPLAY_NOTE, runReplay } from "./eval/replay/index.js";
+import { SEVERITY_MODES, type SeveritySpec } from "./eval/replay/severity.js";
 import { runEvalSubset } from "./eval/subset.js";
 import { explain } from "./explain/index.js";
 import { renderExplainJson, renderExplainTable } from "./explain/format.js";
@@ -29,7 +41,7 @@ import { formatJson } from "./output/json.js";
 import { formatTable } from "./output/table.js";
 import { loadPrompt } from "./prompts/load.js";
 import type { ModelPick, RunModels } from "./reviewers/loader.js";
-import { runReview } from "./run.js";
+import { DEFAULT_CONCURRENCY, runReview } from "./run.js";
 import type { SdkClient } from "./sdk/client.js";
 
 export const EXIT_OK = 0;
@@ -180,6 +192,76 @@ function parseModels(value: string): RunModels {
     models[target] = { model, effort: known };
   }
   return models;
+}
+
+// Parse the effort of a --verifier or --severity value.
+function parseEffort(effort: string, value: string): Effort {
+  const known = EFFORTS.find((e) => e === effort.toLowerCase());
+  if (known === undefined) {
+    throw new InvalidArgumentError(
+      `Unknown effort "${effort}" in "${value}". Use ${EFFORTS.join(", ")}.`,
+    );
+  }
+  return known;
+}
+
+// Split a "first:model:effort" value into its three parts.
+function threeParts(value: string, first: string): [string, string, string] {
+  const parts = value.split(":").map((p) => p.trim());
+  if (parts.length !== 3 || parts.some((p) => p === "")) {
+    throw new InvalidArgumentError(`Give the value as ${first}:model:effort, not "${value}".`);
+  }
+  return parts as [string, string, string];
+}
+
+// Parse --verifier: backend:model:effort. A claude model is an alias or an
+// exact ID. A codex model goes to the Codex call as it is.
+function parseVerifier(value: string): VerifierSpec {
+  const [backend, model, effort] = threeParts(value, "backend");
+  const known = BACKENDS.find((b) => b === backend);
+  if (known === undefined) {
+    throw new InvalidArgumentError(`Unknown backend "${backend}". Use ${BACKENDS.join(" or ")}.`);
+  }
+  let resolved = model;
+  if (known === "claude") {
+    try {
+      resolved = resolveModel(model);
+    } catch (err) {
+      throw new InvalidArgumentError(err instanceof Error ? err.message : String(err));
+    }
+  }
+  return { backend: known, model: resolved, effort: parseEffort(effort, value) };
+}
+
+// Parse --severity: mode:model:effort.
+function parseSeverity(value: string): SeveritySpec {
+  const [mode, model, effort] = threeParts(value, "mode");
+  const known = SEVERITY_MODES.find((m) => m === mode);
+  if (known === undefined) {
+    throw new InvalidArgumentError(`Unknown mode "${mode}". Use ${SEVERITY_MODES.join(" or ")}.`);
+  }
+  let resolved: string;
+  try {
+    resolved = resolveModel(model);
+  } catch (err) {
+    throw new InvalidArgumentError(err instanceof Error ? err.message : String(err));
+  }
+  return { mode: known, model: resolved, effort: parseEffort(effort, value) };
+}
+
+// Parse --sample: all, golden-plus-equal, or a positive integer.
+function parseSample(value: string): SampleKind {
+  if (value === "all" || value === "golden-plus-equal") return value;
+  if (/^[1-9][0-9]*$/.test(value) && Number.isSafeInteger(Number(value))) return Number(value);
+  throw new InvalidArgumentError("Give all, golden-plus-equal or a positive integer.");
+}
+
+// Parse --seed: an integer of 0 or more.
+function parseSeed(value: string): number {
+  if (!/^[0-9]+$/.test(value) || !Number.isSafeInteger(Number(value))) {
+    throw new InvalidArgumentError("Give the seed as an integer of 0 or more.");
+  }
+  return Number(value);
 }
 
 // Parse an amount in US dollars: a number of 0 or more.
@@ -592,6 +674,133 @@ export function createProgram(deps: ProgramDeps): Command {
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
           process.stderr.write(`pr-review eval-subset: ${message}\n`);
+          process.exitCode = EXIT_FAILURE;
+        }
+      },
+    );
+
+  program
+    .command("replay")
+    .description(
+      "Verify the stored candidates of an eval again with the first verifier of one arm, and report the figures. " +
+        REPLAY_NOTE,
+    )
+    .requiredOption("--cases <dir>", "the cases directory of the eval")
+    .option("--from <dir>", "the --out directory of the eval: the run record of each case")
+    .option("--repeat <n>", "the repeat of the --from records, a positive integer", parseRepeat, 1)
+    .option(
+      "--candidates <dir>",
+      'candidates from a reviewer outside the pipeline: <case>.json files of { "source", "findings" }',
+    )
+    .option("--reviewers <name,...>", "keep only the candidates of these sources", parseReviewers)
+    .option(
+      "--verifier <backend:model:effort>",
+      "the verifier of the arm: backend claude or codex",
+      parseVerifier,
+    )
+    .addOption(
+      new Option("--prompt <form>", "the prompt form of the verifier")
+        .choices([...PROMPT_FORMS])
+        .default("score"),
+    )
+    .addOption(
+      new Option("--arm <arm>", "stored: the stored first results, with no verifier call").choices([
+        "stored",
+      ]),
+    )
+    .option(
+      "--severity <mode:model:effort>",
+      "the severity step: mode finding (one call per candidate) or pr (one call per case)",
+      parseSeverity,
+    )
+    .requiredOption("--out <dir>", "the directory of the results, one arm per directory")
+    .option("--resume", "reuse the finished results of the same arm in --out")
+    .option(
+      "--concurrency <n>",
+      "the calls at once, a positive integer",
+      parseRepeat,
+      DEFAULT_CONCURRENCY,
+    )
+    .option(
+      "--max-cost <usd>",
+      "start no new call when the calls of this invocation cost this many US dollars or more; " +
+        "the calls in flight run to their end, so the spend can pass the limit by at most the " +
+        "concurrency times the largest dollar cap of one call ($1 with --severity pr, else $0.50)",
+      parseUsd,
+    )
+    .option(
+      "--sample <kind>",
+      "all, golden-plus-equal, or a count of candidates (default: all)",
+      parseSample,
+    )
+    .option("--seed <n>", `the seed of the sample (default: ${BOOTSTRAP_SEED})`, parseSeed)
+    .addOption(
+      new Option("--format <format>", "the format of the report on stdout")
+        .choices(["table", "json"])
+        .default("table"),
+    )
+    .option(
+      "--allow-api-key",
+      "keep ANTHROPIC_API_KEY and the other provider variables in the SDK environment",
+    )
+    .action(
+      async (
+        options: {
+          cases: string;
+          from?: string;
+          repeat: number;
+          candidates?: string;
+          reviewers?: string[];
+          verifier?: VerifierSpec;
+          prompt: PromptForm;
+          arm?: "stored";
+          severity?: SeveritySpec;
+          out: string;
+          resume?: boolean;
+          concurrency: number;
+          maxCost?: number;
+          sample?: SampleKind;
+          seed?: number;
+          format: "table" | "json";
+          allowApiKey?: boolean;
+        },
+        command: Command,
+      ) => {
+        if ((options.arm === undefined) === (options.verifier === undefined)) {
+          command.error(
+            options.arm === undefined
+              ? "error: give --verifier or --arm stored"
+              : "error: give --verifier or --arm stored, not both",
+            { exitCode: EXIT_USAGE },
+          );
+        }
+        try {
+          process.exitCode = await runReplay(
+            {
+              cases: options.cases,
+              ...(options.from !== undefined ? { from: options.from } : {}),
+              repeat: options.repeat,
+              ...(options.candidates !== undefined ? { candidates: options.candidates } : {}),
+              ...(options.reviewers !== undefined ? { reviewers: options.reviewers } : {}),
+              arm:
+                options.verifier !== undefined
+                  ? { kind: "verifier", verifier: options.verifier, form: options.prompt }
+                  : { kind: "stored" },
+              ...(options.severity !== undefined ? { severity: options.severity } : {}),
+              out: options.out,
+              resume: options.resume === true,
+              concurrency: options.concurrency,
+              ...(options.maxCost !== undefined ? { maxCost: options.maxCost } : {}),
+              sample: options.sample ?? "all",
+              seed: options.seed ?? BOOTSTRAP_SEED,
+              format: options.format,
+              allowApiKey: options.allowApiKey === true,
+            },
+            () => clientFrom(deps),
+          );
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          process.stderr.write(`pr-review replay: ${message}\n`);
           process.exitCode = EXIT_FAILURE;
         }
       },

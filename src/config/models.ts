@@ -5,11 +5,19 @@ export type Role = "triage" | "reviewer" | "verifier" | "verifier-escalation" | 
 
 /**
  * The roles of the eval, not of a run. "judge" scores the eval, "labeler"
- * labels a golden, and the three "pool" roles build a pooled golden set.
+ * labels a golden, the three "pool" roles build a pooled golden set, and
+ * the two "severity" roles label the candidates of a replay.
  * They are not in ROLES, a run record has no entry for them, and a repo
  * config cannot set them.
  */
-export type EvalRole = "judge" | "labeler" | "pool-reviewer" | "pool-grouper" | "adjudicator";
+export type EvalRole =
+  | "judge"
+  | "labeler"
+  | "pool-reviewer"
+  | "pool-grouper"
+  | "adjudicator"
+  | "severity-finding"
+  | "severity-pr";
 
 /** The role of one query. */
 export type QueryRole = Role | EvalRole;
@@ -179,12 +187,38 @@ export const POOL_GROUPER_DEFAULTS: RoleConfig = {
   tools: "none",
 };
 
+/**
+ * The severity step of a replay, mode "finding": one call labels one
+ * candidate. The replay names the model and the effort; these are the
+ * defaults. It has no tools.
+ */
+export const SEVERITY_FINDING_DEFAULTS: RoleConfig = {
+  model: MODEL_IDS.sonnet,
+  effort: "high",
+  maxTurns: 5,
+  maxBudgetUsd: 0.5,
+  timeoutMs: 300_000,
+  tools: "none",
+};
+
+/** The severity step of a replay, mode "pr": one call labels the candidates of one case. */
+export const SEVERITY_PR_DEFAULTS: RoleConfig = {
+  model: MODEL_IDS.sonnet,
+  effort: "high",
+  maxTurns: 5,
+  maxBudgetUsd: 1,
+  timeoutMs: 600_000,
+  tools: "none",
+};
+
 const EVAL_DEFAULTS: Record<EvalRole, RoleConfig> = {
   judge: JUDGE_DEFAULTS,
   labeler: LABELER_DEFAULTS,
   "pool-reviewer": POOL_REVIEWER_DEFAULTS,
   "pool-grouper": POOL_GROUPER_DEFAULTS,
   adjudicator: ADJUDICATOR_DEFAULTS,
+  "severity-finding": SEVERITY_FINDING_DEFAULTS,
+  "severity-pr": SEVERITY_PR_DEFAULTS,
 };
 
 /** Give true when "role" is a role of the eval, not of a run. */
