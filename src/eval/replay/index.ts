@@ -160,6 +160,8 @@ const armText = (arm: ReplayArm): string =>
 class Spend {
   spent = 0;
   stopped = false;
+  /** True when the Codex quota stopped the replay. */
+  quotaOut = false;
   /** The calls that the limit refused. */
   refused = 0;
   constructor(private readonly limit: number | undefined) {}
@@ -636,6 +638,12 @@ async function replay(opts: ReplayOptions, clientOf: () => Promise<SdkClient>): 
               cwd: state.clone,
               schema: f.schema,
             });
+            if (outcome.quota) {
+              // Keep no result for this candidate, so a rerun calls it again.
+              spend.quotaOut = true;
+              spend.stopped = true;
+              return;
+            }
             let result: ReplayResult | QueryFailure;
             if (outcome.failure !== null) result = outcome.failure;
             else {
@@ -872,6 +880,13 @@ async function replay(opts: ReplayOptions, clientOf: () => Promise<SdkClient>): 
         `the posted figures are partial: ${counts.uncached} judge ${counts.uncached === 1 ? "question has" : "questions have"} no answer, ` +
           "and each counts as no match. Run again with --resume to ask them.",
       );
+    }
+    if (spend.quotaOut) {
+      say(
+        `the Codex quota is out, so the replay stopped. ${remaining} ${remaining === 1 ? "candidate remains" : "candidates remain"}. ` +
+          "Run again with --resume to continue.",
+      );
+      return EXIT_STOPPED;
     }
     if (spend.stopped) {
       say(

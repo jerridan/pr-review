@@ -24,6 +24,8 @@ export type VerifierOutcome = {
   output: unknown;
   failure: QueryFailure | null;
   call: CallMeta;
+  /** True when the Codex quota is out: the replay makes no more calls. */
+  quota?: true;
 };
 
 export interface VerifierBackend {
@@ -137,6 +139,7 @@ export function codexBackend(spec: VerifierSpec): VerifierBackend {
               output: null,
               failure: codexFailure(outcome.error, outcome.stderr),
               call: meta(outcome.tokens),
+              ...(codexQuotaError(outcome.stderr) ? { quota: true as const } : {}),
             };
       } catch (err) {
         return {

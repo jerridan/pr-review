@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { EXIT_STOPPED } from "../src/cli.js";
 import type { ReplayReport, ResultsFile } from "../src/eval/replay/index.js";
 import { captureOutput, cleanup, makeFixture, output, tempDir } from "./fixtures/eval-fixture.js";
 import {
@@ -67,8 +68,8 @@ const argvLog = (): string[][] =>
     .split("\n")
     .map((l) => JSON.parse(l) as string[]);
 
-async function replayCodex() {
-  const out = tempDir("replay-codex-out", made);
+async function replayCodex(into?: string, ...extra: string[]) {
+  const out = into ?? tempDir("replay-codex-out", made);
   const client = replayFake();
   const code = await replay(client, [
     "--cases",
@@ -83,6 +84,7 @@ async function replayCodex() {
     "1",
     "--verifier",
     "codex:gpt-6.1-terra:medium",
+    ...extra,
   ]);
   return { code, out, client };
 }
@@ -132,16 +134,25 @@ describe("pr-review replay: the codex verifier", () => {
     }
   }, 120_000);
 
-  it("names the quota in the failure of a call that hits the usage limit", async () => {
+  it("stops at the first quota error, keeps the results, and a rerun finishes the rest", async () => {
     writeFileSync(join(dir, "fail"), "");
     writeFileSync(
       join(dir, "stderr.txt"),
       "ERROR: You've hit your usage limit. Try again at 4:33 PM.\n",
     );
-    const { out } = await replayCodex();
-    expect(entriesOf(out)[0]?.result).toMatchObject({
-      kind: "limit",
-      message: expect.stringMatching(/quota/i),
-    });
+    const first = await replayCodex();
+    expect(first.code).toBe(EXIT_STOPPED);
+    expect(argvLog()).toHaveLength(1);
+    expect(output.stderr).toMatch(/Codex quota is out/);
+
+    rmSync(join(dir, "fail"));
+    rmSync(join(dir, "log.jsonl"));
+    writeFileSync(join(dir, "stderr.txt"), "tokens used\n1,000\n");
+    const second = await replayCodex(first.out, "--resume");
+    expect(second.code).toBe(0);
+    expect(argvLog()).toHaveLength(6);
+    expect(entriesOf(first.out).map((e) => e.result)).not.toContainEqual(
+      expect.objectContaining({ kind: "limit" }),
+    );
   }, 120_000);
 });
