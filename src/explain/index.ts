@@ -277,7 +277,7 @@ export function explain(record: RunRecord): ExplainRow[] {
     alive,
     "cap",
     () => "dropped",
-    () => "capped: over the non-blocking cap",
+    () => "capped: over the posting cap",
   );
   place(
     posted.below_floor,

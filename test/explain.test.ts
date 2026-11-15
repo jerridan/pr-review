@@ -166,8 +166,8 @@ describe("pr-review explain on a review with one finding of each outcome (R10.5,
       finding(fx.file, 14, "bug", LOW_CLAIM, "return total / values.length;"),
       finding(fx.file, 12, "bug", "CLAIM-BADQUOTE", "THIS TEXT IS NOT IN THE FILE"),
       finding(ci, 8, "performance", "CLAIM-SUPPRESSED", "- run: npm test"),
-      finding(ci, 1, "convention", "CLAIM-SUGGEST-A", "name: ci"),
-      finding(ci, 5, "convention", "CLAIM-SUGGEST-B", "runs-on: ubuntu-latest"),
+      finding(ci, 1, "convention", "CLAIM-NIT-A", "name: ci"),
+      finding(ci, 5, "convention", "CLAIM-NIT-B", "runs-on: ubuntu-latest"),
       finding(fx.file, 3, "bug", "CLAIM-PREEXISTING", "for (let i = 0; i < values.length; i++) {"),
     ];
     const tests: Finding[] = [finding(fx.file, fx.line, "bug", "CLAIM-DUP", loop)];
@@ -214,8 +214,8 @@ describe("pr-review explain on a review with one finding of each outcome (R10.5,
           if (m.includes("CLAIM-PREEXISTING")) {
             return verdict({ in_scope: false, introduced_by_pr: false });
           }
-          if (m.includes("CLAIM-SUGGEST-A")) return verdict({ score: 92, severity: "nit" });
-          if (m.includes("CLAIM-SUGGEST-B")) return verdict({ score: 91, severity: "nit" });
+          if (m.includes("CLAIM-NIT-A")) return verdict({ score: 92, severity: "nit" });
+          if (m.includes("CLAIM-NIT-B")) return verdict({ score: 91, severity: "nit" });
           return verdict({});
         }
         case "merge":
@@ -279,8 +279,8 @@ describe("pr-review explain on a review with one finding of each outcome (R10.5,
       "dropped",
       "suppressed by rule SUPPRESS-RULE: CI speed is out of scope",
     );
-    expectRow("CLAIM-SUGGEST-A", "post", "kept", "posted as nit");
-    expectRow("CLAIM-SUGGEST-B", "cap", "dropped", "capped: over the non-blocking cap");
+    expectRow("CLAIM-NIT-A", "post", "kept", "posted as nit");
+    expectRow("CLAIM-NIT-B", "cap", "dropped", "capped: over the posting cap");
     expectRow("CLAIM-PREEXISTING", "scope", "dropped", "pre-existing: out of scope");
 
     // Merge kept one of the two reports of the planted bug.
@@ -296,8 +296,8 @@ describe("pr-review explain on a review with one finding of each outcome (R10.5,
 
   it("gives each entry the reviewer, the pass and the raw fields of the finding", async () => {
     const entries = await explainJson(recordPath);
-    const suggest = entries.find((e) => e.claim === "CLAIM-SUGGEST-B");
-    expect(suggest).toMatchObject({
+    const nit = entries.find((e) => e.claim === "CLAIM-NIT-B");
+    expect(nit).toMatchObject({
       reviewer: "conventions",
       pass: 1,
       file: ".github/workflows/ci.yml",
@@ -307,7 +307,7 @@ describe("pr-review explain on a review with one finding of each outcome (R10.5,
       evidence: "runs-on: ubuntu-latest",
       severity: "nit",
     });
-    expect(typeof suggest?.fingerprint).toBe("string");
+    expect(typeof nit?.fingerprint).toBe("string");
   });
 
   it("prints a table by default, with the seven items on one line for each finding", async () => {
@@ -328,9 +328,9 @@ describe("pr-review explain on a review with one finding of each outcome (R10.5,
     ]) {
       expect(header).toContain(column);
     }
-    const [suggest] = row("CLAIM-SUGGEST-B");
-    expect(suggest).toMatch(
-      /conventions\s+1\s+\.github\/workflows\/ci\.yml:5-5\s+convention\s+CLAIM-SUGGEST-B\s+cap\s+dropped\s+capped: over the non-blocking cap/,
+    const [nitRow] = row("CLAIM-NIT-B");
+    expect(nitRow).toMatch(
+      /conventions\s+1\s+\.github\/workflows\/ci\.yml:5-5\s+convention\s+CLAIM-NIT-B\s+cap\s+dropped\s+capped: over the posting cap/,
     );
     // The claim of two lines shows on one line.
     const low = row("CLAIM-LOWSCORE");
@@ -858,10 +858,7 @@ describe("explain: suppress, merge and cap (R7.3, R7.4)", () => {
     });
     expect(rows.map((r) => [r.stage, r.reason])).toEqual([
       ["post", "posted as blocking; merge rejected: The merge result has no findings."],
-      [
-        "cap",
-        "capped: over the non-blocking cap; merge rejected: The merge result has no findings.",
-      ],
+      ["cap", "capped: over the posting cap; merge rejected: The merge result has no findings."],
     ]);
   });
 });

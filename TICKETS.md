@@ -115,7 +115,7 @@ Goal: record three decisions in the design. No code change. Can ride with any de
 
 - Section 10: one SDK `query()` per reviewer pass is the dispatch mechanism. A subagent mode, if ever added, is a budget option for the deep reviewers and not a recall lever. Closes issue 22.
 - Section 6: when a trusted custom reviewer gets Bash, the run allows read-only git commands and denies fetch, pull, checkout, switch and gh by deny rules, not by the allow list alone. The record lists every permission denial. Closes issue 28.
-- Section 3.6: the cap stays until D4c measures it against real records. If it changes, it caps nits only. Issue 23 stays open until then.
+- Section 3.6: D4c E5 measured the cap against real records, and the cap now caps nits only. Done in section 3.6. Issue 23 closes when E5 merges.
 
 ## D4c: First experiments
 

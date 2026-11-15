@@ -149,7 +149,7 @@ Verification starts per finding as soon as its reviewer returns. Merge is the on
 2. Drop findings that match an open or dismissed thread from a previous run.
 3. Apply repo suppressions by category, path and reviewer. This happens before the groups form. The run checks each finding with the name of its own reviewer, and the record keeps each removed finding with its rule.
 4. Group by file and overlapping lines. One Sonnet call merges groups that say the same thing and picks the best wording.
-5. Rank by severity then verifier score. No cap on blocking findings or on suggestions. Nits are capped per run at `3 + ceil(hunks / 4)`, at most 20, in ranked order. A 4-hunk PR gets 4 nits, a 20-hunk PR gets 8. Overflow goes in the summary as a list. D4c E5 measured the first cap, which also dropped suggestions, against the recorded runs. It dropped 14 suggestions and no blocking finding, so the cap changed to nits only. See `docs/research/e5-nit-cap.md`.
+5. Rank by severity then verifier score. No cap on blocking findings or on suggestions. Nits are capped per run at `3 + ceil(hunks / 4)`, at most 20, in ranked order. A 4-hunk PR gets 4 nits, a 20-hunk PR gets 8. The record keeps the overflow in `stages.capped`. The review does not list it. D4c E5 measured the first cap, which also dropped suggestions, against the recorded runs. It dropped 14 suggestions and no blocking finding, so the cap changed to nits only. See `docs/research/e5-nit-cap.md`.
 
 ### 3.7 Report
 
