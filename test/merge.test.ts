@@ -395,10 +395,10 @@ describe("mergeFindings (A7)", () => {
     ]);
   });
 
-  it("caps non-blocking findings and keeps the overflow in capped", async () => {
+  it("posts every suggestion and caps only the nits", async () => {
     const verified = Array.from({ length: 6 }, (_, i) => ({
       finding: finding(i * 2 + 1, i * 2 + 1),
-      result: result(90 - i, i < 3 ? ("suggestion" as const) : ("nit" as const)),
+      result: result(90 - i, i < 5 ? ("suggestion" as const) : ("nit" as const)),
     }));
     const out = await mergeFindings(noMergeClient(), OPTIONS, verified, ctx(1));
     expect(nonBlockingCap(1)).toBe(4);
@@ -406,6 +406,25 @@ describe("mergeFindings (A7)", () => {
       "suggestion",
       "suggestion",
       "suggestion",
+      "suggestion",
+      "suggestion",
+      "nit",
+    ]);
+    expect(out.capped).toEqual([]);
+  });
+
+  it("keeps the overflow of nits in capped", async () => {
+    const verified = Array.from({ length: 8 }, (_, i) => ({
+      finding: finding(i * 2 + 1, i * 2 + 1),
+      result: result(90 - i, i < 2 ? ("suggestion" as const) : ("nit" as const)),
+    }));
+    const out = await mergeFindings(noMergeClient(), OPTIONS, verified, ctx(1));
+    expect(out.posted.map((p) => p.severity)).toEqual([
+      "suggestion",
+      "suggestion",
+      "nit",
+      "nit",
+      "nit",
       "nit",
     ]);
     expect(out.capped.map((p) => p.severity)).toEqual(["nit", "nit"]);
@@ -458,34 +477,47 @@ describe("cap", () => {
     };
   }
 
-  it("fills suggestions before nits", () => {
+  it("posts all suggestions when they outnumber the cap", () => {
     const ranked = [
       posted("suggestion", 90, 1),
       posted("suggestion", 85, 2),
-      posted("nit", 99, 3),
-      posted("nit", 95, 4),
+      posted("suggestion", 80, 3),
+      posted("suggestion", 75, 4),
+      posted("nit", 99, 5),
     ];
     const out = applyCap(ranked, 3);
-    expect(out.posted.map((p) => p.start_line)).toEqual([1, 2, 3]);
-    expect(out.capped.map((p) => p.start_line)).toEqual([4]);
+    expect(out.posted.map((p) => p.start_line)).toEqual([1, 2, 3, 4]);
+    expect(out.capped.map((p) => p.start_line)).toEqual([5]);
   });
 
-  it("puts suggestions first even when the input lists a nit first", () => {
-    const out = applyCap([posted("nit", 99, 1), posted("suggestion", 80, 2)], 1);
-    expect(out.posted.map((p) => p.start_line)).toEqual([2]);
-    expect(out.capped.map((p) => p.start_line)).toEqual([1]);
+  it("posts the first nits in ranked order up to the cap, with few or many suggestions", () => {
+    const nits = [10, 11, 12, 13, 14].map((n, i) => posted("nit", 99 - i, n));
+    const cap = 3;
+    for (const count of [1, 6]) {
+      const suggestions = Array.from({ length: count }, (_, i) =>
+        posted("suggestion", 90 - i, i + 1),
+      );
+      const out = applyCap([...suggestions, ...nits], cap);
+      const postedNits = out.posted.filter((p) => p.severity === "nit").map((p) => p.start_line);
+      expect(postedNits).toEqual([10, 11, 12]);
+      expect(out.posted.filter((p) => p.severity === "suggestion")).toHaveLength(count);
+      expect(out.capped.map((p) => p.start_line)).toEqual([13, 14]);
+    }
   });
 
   it("never caps blocking findings", () => {
     const blocking = Array.from({ length: 25 }, (_, i) => posted("blocking", 90, i + 1));
-    const out = applyCap([...blocking, posted("suggestion", 90, 30), posted("nit", 90, 31)], 1);
-    expect(out.posted).toHaveLength(26);
+    const out = applyCap(
+      [...blocking, posted("suggestion", 90, 30), posted("nit", 90, 31), posted("nit", 89, 32)],
+      1,
+    );
+    expect(out.posted).toHaveLength(27);
     expect(out.posted.filter((p) => p.severity === "blocking")).toHaveLength(25);
     expect(out.capped.map((p) => p.severity)).toEqual(["nit"]);
   });
 
   it("caps at the limit exactly", () => {
-    const items = Array.from({ length: 5 }, (_, i) => posted("suggestion", 90 - i, i + 1));
+    const items = Array.from({ length: 5 }, (_, i) => posted("nit", 90 - i, i + 1));
     expect(applyCap(items, 5).capped).toEqual([]);
     expect(applyCap(items, 4).capped.map((p) => p.start_line)).toEqual([5]);
     expect(applyCap(items, 0).posted).toEqual([]);
