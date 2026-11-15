@@ -246,6 +246,12 @@ export type ReplayFakeOptions = {
   /** The label of the severity step by claim. Default: the verifier severity. */
   labels?: Record<string, string>;
   severityCost?: number;
+  /** The claims whose verifier call fails. */
+  failVerifier?: string[];
+  /** The claims whose severity call (finding mode) fails. */
+  failSeverity?: string[];
+  /** The claims that a pr-mode answer leaves out. */
+  omit?: string[];
 };
 
 /** The fake of the replay: the verifier of each form, the judge, and the severity step. */
@@ -261,6 +267,9 @@ export function replayFake(opts: ReplayFakeOptions = {}) {
       opts.labels?.[claim] ?? results[claim]?.severity ?? "nit";
     switch (req.role) {
       case "verifier": {
+        if (opts.failVerifier?.includes(claimIn(req.userMessage))) {
+          return { ok: false, failure: { kind: "thrown", message: "down" }, raw: null };
+        }
         const r = results[claimIn(req.userMessage)];
         if (!r) throw new Error(`no replay result for ${claimIn(req.userMessage)}`);
         const cost = opts.verifierCost ?? 0.1;
@@ -277,6 +286,9 @@ export function replayFake(opts: ReplayFakeOptions = {}) {
       case "judge":
         return ok({ same_issue: "yes", reason: "r" }, opts.judgeCost ?? 0);
       case "severity-finding":
+        if (opts.failSeverity?.includes(claimIn(req.userMessage))) {
+          return { ok: false, failure: { kind: "thrown", message: "down" }, raw: null };
+        }
         return ok(
           { severity: labelOf(claimIn(req.userMessage)), rationale: "r" },
           opts.severityCost ?? 0.05,
@@ -287,11 +299,11 @@ export function replayFake(opts: ReplayFakeOptions = {}) {
         const unique = [...new Set(claims)];
         return ok(
           {
-            labels: unique.map((claim, index) => ({
-              index,
-              severity: labelOf(claim),
-              rationale: "r",
-            })),
+            labels: unique.flatMap((claim, index) =>
+              opts.omit?.includes(claim)
+                ? []
+                : [{ index, severity: labelOf(claim), rationale: "r" }],
+            ),
           },
           opts.severityCost ?? 0.05,
         );

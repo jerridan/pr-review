@@ -158,7 +158,8 @@ export const DEFAULT_CONCURRENCY = 5;
 type CostEntry = RunRecord["cost"]["queries"][number];
 type VerificationEntry = RunRecord["stages"]["verifications"][number];
 
-function toolVersion(): string {
+/** The version of this tool, from package.json. */
+export function toolVersion(): string {
   // This file is at src/run.ts and at dist/run.js; package.json is one level up.
   const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
     version?: string;

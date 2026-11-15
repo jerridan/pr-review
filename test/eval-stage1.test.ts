@@ -400,6 +400,31 @@ describe("pr-review eval-report --by-reviewer", () => {
     expect(output.stdout).toMatch(/By reviewer/);
     expect(output.stdout).toMatch(/total\s+diff-bugs\s+3\s+3\s+2\s+1\s+0\s+\$0\.8000\s+\$0\.2667/);
   });
+
+  it("marks the report of stage 1 records as stage 1, with posted recall and precision none", async () => {
+    const run = async (dir: string, ...extra: string[]) => {
+      output.stdout = "";
+      const code = await exitCodeOf(
+        createProgram({ client: fake() }).parseAsync([
+          "node",
+          "pr-review",
+          "eval-report",
+          "--cases",
+          cases,
+          "--out",
+          dir,
+          ...extra,
+        ]),
+      );
+      expect(code, output.stderr).toBe(0);
+    };
+    await run(stage1Out, "--format", "json");
+    expect((JSON.parse(output.stdout) as Report).mode).toBe("stage1");
+    await run(stage1Out);
+    expect(output.stdout).toMatch(/posted recall and precision: none/i);
+    await run(fullOut, "--format", "json");
+    expect((JSON.parse(output.stdout) as Report).mode).toBeUndefined();
+  });
 });
 
 describe("pr-review eval --stage1: usage and resume", () => {

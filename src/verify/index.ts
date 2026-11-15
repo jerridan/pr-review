@@ -123,7 +123,7 @@ export function quoteMatches(quotes: string[], headFileText: string | null): boo
 }
 
 /** True when the value is a failed query, not a verifier result. */
-export function isQueryFailure(value: VerifierResult | QueryFailure): value is QueryFailure {
+export function isQueryFailure<T extends object>(value: T | QueryFailure): value is QueryFailure {
   return "kind" in value;
 }
 

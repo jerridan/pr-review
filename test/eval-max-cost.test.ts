@@ -203,3 +203,21 @@ describe("pr-review eval --max-cost (R3)", () => {
     expect(help).toMatch(/--max-cost <usd>[\s\S]*at\s+most\s+one\s+repeat/);
   });
 });
+
+describe("pr-review eval --max-cost over several cases (PR 57)", () => {
+  it("names each case with a repeat that did not run in the remaining count", async () => {
+    const root = tempDir("max-cost-cases", made);
+    const two = casesFrom(template, join(root, "two"), [
+      { name: "case-a", golden: [] },
+      { name: "case-b", golden: [] },
+    ]);
+    const out = tempDir("max-cost-two", made);
+    const client = fake({ triage: 1 });
+    const code = await evalWith(two, out, client, "--repeat", "2", "--max-cost", "1.5");
+    expect(code, output.stderr).toBe(EXIT_STOPPED);
+    expect(triageCalls(client)).toBe(2);
+    expect(output.stderr).toMatch(/2 repeats remain \(case-b: 1, 2\)/);
+    const report = JSON.parse(readFileSync(join(out, "report.json"), "utf8")) as Report;
+    expect(report.cases.map((c) => c.name)).toEqual(["case-a"]);
+  }, 120_000);
+});

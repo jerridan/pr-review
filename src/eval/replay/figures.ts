@@ -3,7 +3,7 @@
 import { isPostedSeverity } from "../../schemas/verifier.js";
 import type { LabelSeverity } from "../../schemas/label.js";
 import { BANDS, type ReplayEntry, type ReplayResult } from "../../schemas/replay.js";
-import type { QueryFailure } from "../../schemas/record.js";
+import { isQueryFailure } from "../../verify/index.js";
 import type { GoldenFinding } from "../case.js";
 import { noDrops, type Dropped } from "./candidates.js";
 
@@ -73,8 +73,6 @@ export type Figures = {
   dropped: Dropped;
 };
 
-const isFailure = (r: ReplayResult | QueryFailure): r is QueryFailure => "kind" in r;
-
 const REAL_LABELS: readonly LabelSeverity[] = ["blocking", "suggestion", "nit", "dont_post"];
 const isReal = (label: LabelSeverity | undefined): boolean =>
   label !== undefined && REAL_LABELS.includes(label);
@@ -83,7 +81,7 @@ const ratio = (part: number, whole: number): number | null => (whole === 0 ? nul
 
 /** The label that the decision and the severity figures use: the step, else the verifier. */
 export const labelOf = (e: ReplayEntry): LabelSeverity | null =>
-  e.severity?.label ?? (isFailure(e.result) ? null : e.result.severity);
+  e.severity?.label ?? (isQueryFailure(e.result) ? null : e.result.severity);
 
 // The bucket of a result: its band, or its score range of 10.
 function bucketOf(r: ReplayResult): string {
@@ -125,7 +123,7 @@ export function caseFigures(
     }
   }
   const results = entries.filter(
-    (e): e is ReplayEntry & { result: ReplayResult } => !isFailure(e.result),
+    (e): e is ReplayEntry & { result: ReplayResult } => !isQueryFailure(e.result),
   );
   const real = results.filter((e) => isReal(e.golden?.label));
   const fake = results.filter((e) => e.golden === null || e.golden.label === "not_real");
@@ -194,7 +192,7 @@ export function caseFigures(
     in_band: entries.filter((e) => e.in_band).length,
     unsure: entries.filter((e) => e.decision?.unsure !== undefined).length,
     failed:
-      entries.filter((e) => isFailure(e.result)).length +
+      entries.filter((e) => isQueryFailure(e.result)).length +
       entries.filter((e) => e.severity?.failure !== undefined).length,
     verifications: verified.length,
     cost_usd: cost,

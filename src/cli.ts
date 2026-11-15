@@ -174,18 +174,8 @@ function parseModels(value: string): RunModels {
       throw new InvalidArgumentError(`Give each part as target=model:effort, not "${part}".`);
     }
     const [, target, alias, effort] = match as unknown as [string, string, string, string];
-    let model: string;
-    try {
-      model = resolveModel(alias);
-    } catch (err) {
-      throw new InvalidArgumentError(err instanceof Error ? err.message : String(err));
-    }
-    const known = EFFORTS.find((e) => e === effort.toLowerCase());
-    if (known === undefined) {
-      throw new InvalidArgumentError(
-        `Unknown effort "${effort}" in "${part.trim()}". Use ${EFFORTS.join(", ")}.`,
-      );
-    }
+    const model = parseModel(alias);
+    const known = parseEffort(effort, part.trim());
     if (Object.hasOwn(models, target)) {
       throw new InvalidArgumentError(`The target "${target}" is in --models more than once.`);
     }
@@ -194,7 +184,17 @@ function parseModels(value: string): RunModels {
   return models;
 }
 
-// Parse the effort of a --verifier or --severity value.
+// Resolve the model of a --models, --verifier or --severity value: an
+// alias or an exact ID. An unknown alias is a usage error.
+function parseModel(alias: string): string {
+  try {
+    return resolveModel(alias);
+  } catch (err) {
+    throw new InvalidArgumentError(err instanceof Error ? err.message : String(err));
+  }
+}
+
+// Parse the effort of a --models, --verifier or --severity value.
 function parseEffort(effort: string, value: string): Effort {
   const known = EFFORTS.find((e) => e === effort.toLowerCase());
   if (known === undefined) {
@@ -222,14 +222,7 @@ function parseVerifier(value: string): VerifierSpec {
   if (known === undefined) {
     throw new InvalidArgumentError(`Unknown backend "${backend}". Use ${BACKENDS.join(" or ")}.`);
   }
-  let resolved = model;
-  if (known === "claude") {
-    try {
-      resolved = resolveModel(model);
-    } catch (err) {
-      throw new InvalidArgumentError(err instanceof Error ? err.message : String(err));
-    }
-  }
+  const resolved = known === "claude" ? parseModel(model) : model;
   return { backend: known, model: resolved, effort: parseEffort(effort, value) };
 }
 
@@ -240,13 +233,7 @@ function parseSeverity(value: string): SeveritySpec {
   if (known === undefined) {
     throw new InvalidArgumentError(`Unknown mode "${mode}". Use ${SEVERITY_MODES.join(" or ")}.`);
   }
-  let resolved: string;
-  try {
-    resolved = resolveModel(model);
-  } catch (err) {
-    throw new InvalidArgumentError(err instanceof Error ? err.message : String(err));
-  }
-  return { mode: known, model: resolved, effort: parseEffort(effort, value) };
+  return { mode: known, model: parseModel(model), effort: parseEffort(effort, value) };
 }
 
 // Parse --sample: all, golden-plus-equal, or a positive integer.

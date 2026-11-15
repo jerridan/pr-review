@@ -2,7 +2,7 @@
 // sequence, score each record against the golden findings of its case,
 // and report the metrics. The gate compares the report with a baseline.
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { writeFileAtomic } from "./atomic.js";
 import { tmpdir } from "node:os";
@@ -25,7 +25,7 @@ import {
   type ModelPick,
   type RunModels,
 } from "../reviewers/loader.js";
-import { runReview } from "../run.js";
+import { runReview, toolVersion } from "../run.js";
 import type { RunRecord } from "../schemas/record.js";
 import type { SdkClient } from "../sdk/client.js";
 import type { RunOptions } from "../sdk/options.js";
@@ -106,15 +106,6 @@ function messageOf(err: unknown): string {
 
 function say(message: string): void {
   process.stderr.write(`pr-review eval: ${message}\n`);
-}
-
-function toolVersion(): string {
-  // This file is at src/eval/run.ts and at dist/eval/run.js. package.json
-  // is two levels up.
-  const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as {
-    version?: string;
-  };
-  return pkg.version ?? "0.0.0";
 }
 
 // The SDK loads only when the eval needs the real client.
@@ -711,6 +702,8 @@ export async function runEval(opts: EvalOptions, deps: ProgramDeps): Promise<num
   let spent = 0;
   let stopped = false;
   let remaining = 0;
+  // The repeats that did not run, by case, for the stop message.
+  const left = new Map<string, number[]>();
   for (const c of cases) {
     const repeats: RepeatMetrics[] = [];
     for (let repeat = 1; repeat <= opts.repeat; repeat++) {
@@ -722,6 +715,7 @@ export async function runEval(opts: EvalOptions, deps: ProgramDeps): Promise<num
       if (opts.maxCost !== undefined && spent >= opts.maxCost) stopped = true;
       if (stopped) {
         remaining += 1;
+        left.set(c.name, [...(left.get(c.name) ?? []), repeat]);
         continue;
       }
       // With --resume, the old output of this repeat stays out of the way of
@@ -831,7 +825,8 @@ export async function runEval(opts: EvalOptions, deps: ProgramDeps): Promise<num
     say(
       `the cost limit stopped the eval: the repeats of this run cost $${spent.toFixed(4)}, ` +
         `and the limit is $${(opts.maxCost ?? 0).toFixed(4)}. ` +
-        `${remaining} ${remaining === 1 ? "repeat remains" : "repeats remain"}. ` +
+        `${remaining} ${remaining === 1 ? "repeat remains" : "repeats remain"} ` +
+        `(${[...left].map(([name, repeats]) => `${name}: ${repeats.join(", ")}`).join("; ")}). ` +
         "Run again with --resume to continue.",
     );
   }
