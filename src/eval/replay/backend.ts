@@ -1,10 +1,10 @@
 // The verifier backends of the replay. Each backend makes one first
 // verifier call for one candidate. "claude" calls the SDK client with the
-// verifier role. "codex" is the place of the Codex CLI verifier: the Codex
-// call takes no model option and no effort option yet, so the backend
-// refuses before any call.
+// verifier role. "codex" runs the Codex CLI with the model and the effort
+// of the arm.
 import type { z } from "zod";
 import { ROLE_DEFAULTS, resolveModel, type Effort } from "../../config/models.js";
+import { codexQuotaError, runCodex } from "../codex.js";
 import type { QueryFailure } from "../../schemas/record.js";
 import type { CallMeta } from "../../schemas/replay.js";
 import type { SdkClient } from "../../sdk/client.js";
@@ -37,10 +37,6 @@ export interface VerifierBackend {
   readonly capUsd: number;
   verify(call: VerifierCall): Promise<VerifierOutcome>;
 }
-
-/** The text of the codex refusal. */
-export const CODEX_UNAVAILABLE =
-  "the codex verifier needs the model and effort options of the Codex call";
 
 function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -97,21 +93,58 @@ export function claudeBackend(
   };
 }
 
+// The failure of a codex call that did not give a result. A usage limit is
+// "limit". An out file that is missing, not JSON, or against the schema is
+// "no-structured-output". Every other failure is "thrown". The message keeps
+// the error text of the Codex runner.
+function codexFailure(error: string, stderr: string): QueryFailure {
+  if (codexQuotaError(stderr)) {
+    return { kind: "limit", message: `the Codex quota or usage limit stopped the call: ${error}` };
+  }
+  const noOutput = /^(codex wrote no out file|the out file )/.test(error);
+  return { kind: noOutput ? "no-structured-output" : "thrown", message: error };
+}
+
 /**
- * The codex backend. It refuses before any call, because the Codex call
- * takes no model option and no effort option yet. When the call takes
- * them (runCodex(prompt, checkout, schema, what, { model, effort })) and
- * its outcome holds "tokens", "verify" calls it with one prompt string
- * (the system prompt, then the user message), and gives cost_usd null and
- * the tokens; "unavailable" becomes null.
+ * The codex backend. "verify" runs the Codex CLI with the model and the
+ * effort of the arm and one prompt string: the system prompt, a blank line,
+ * then the user message. Codex gives no cost, so cost_usd is null and the
+ * call keeps the tokens. A failed call gives a failure, never a throw.
  */
 export function codexBackend(spec: VerifierSpec): VerifierBackend {
   return {
     spec,
-    unavailable: CODEX_UNAVAILABLE,
+    unavailable: null,
     capUsd: 0,
-    verify() {
-      return Promise.reject(new Error(CODEX_UNAVAILABLE));
+    async verify(call) {
+      const start = performance.now();
+      const meta = (tokens: number | null): CallMeta => ({
+        model: spec.model,
+        effort: spec.effort,
+        cost_usd: null,
+        duration_ms: Math.round(performance.now() - start),
+        tokens,
+      });
+      try {
+        const prompt = `${call.system.trimEnd()}\n\n${call.userMessage}`;
+        const outcome = await runCodex(prompt, call.cwd, call.schema, "verifier", {
+          model: spec.model,
+          effort: spec.effort,
+        });
+        return outcome.ok
+          ? { output: outcome.output, failure: null, call: meta(outcome.tokens) }
+          : {
+              output: null,
+              failure: codexFailure(outcome.error, outcome.stderr),
+              call: meta(outcome.tokens),
+            };
+      } catch (err) {
+        return {
+          output: null,
+          failure: { kind: "thrown", message: messageOf(err) },
+          call: meta(null),
+        };
+      }
     },
   };
 }

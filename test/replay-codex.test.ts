@@ -90,9 +90,7 @@ async function replayCodex() {
 const entriesOf = (out: string) =>
   ["a-case", "b-case"].flatMap(
     (name) =>
-      (
-        JSON.parse(readFileSync(join(out, name, "results.json"), "utf8")) as ResultsFile
-      ).entries,
+      (JSON.parse(readFileSync(join(out, name, "results.json"), "utf8")) as ResultsFile).entries,
   );
 
 describe("pr-review replay: the codex verifier", () => {
