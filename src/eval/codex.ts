@@ -17,8 +17,47 @@ export const STDERR_LIMIT = 2000;
 /** The wall-clock limit of one codex call, in milliseconds. */
 export const CODEX_TIMEOUT_MS = 900_000;
 
-export type CodexOutcome<T> =
-  { ok: true; output: T; stderr: string } | { ok: false; error: string; stderr: string };
+/**
+ * The slug of the Terra model. The command "codex debug models" lists this
+ * slug in codex-cli 0.167.0.
+ */
+export const TERRA_MODEL = "gpt-6.1-terra";
+
+export type CodexEffort = "low" | "medium" | "high" | "xhigh";
+/** The model and the effort of one call. A missing field takes the default. */
+export type CodexOptions = { model?: string; effort?: CodexEffort };
+
+/** "tokens" is the count that codex prints at the end of stderr, or null. */
+export type CodexOutcome<T> = (
+  { ok: true; output: T; stderr: string } | { ok: false; error: string; stderr: string }
+) & { tokens: number | null };
+
+// The form of the token count. At the end of a call, codex prints the line
+// "tokens used" and then the count on the next line, with commas, for
+// example "21,755". Source: the stored stderr tails of the label records of
+// earlier runs in this repo.
+const TOKENS_RE = /tokens used\s*\n\s*([\d,]+)/gi;
+
+/** The token count at the end of a stderr text, or null when it holds none. */
+export function codexTokens(stderr: string): number | null {
+  const matches = [...stderr.matchAll(TOKENS_RE)];
+  const last = matches.at(-1)?.[1];
+  if (last === undefined) return null;
+  const count = Number(last.replaceAll(",", ""));
+  return Number.isFinite(count) ? count : null;
+}
+
+// The form of a quota stop. Codex prints "ERROR: You've hit your usage
+// limit." and then the time of the next try. The apostrophe is straight or
+// curly, and "You have" also occurs. Source: the stored stderr tails of the
+// label and pool records of earlier runs, and CODEX_ERROR in
+// test/fixtures/pool-fakes.ts.
+const QUOTA_RE = /hit your usage limit/i;
+
+/** True when the stderr tail of a call shows a usage or quota limit. */
+export function codexQuotaError(stderr: string): boolean {
+  return QUOTA_RE.test(stderr);
+}
 
 /** The argv of one call. The prompt is the last argument. */
 export function codexArgs(
@@ -26,6 +65,7 @@ export function codexArgs(
   schemaFile: string,
   outFile: string,
   prompt: string,
+  opts: CodexOptions = {},
 ): string[] {
   return [
     "exec",
@@ -37,9 +77,9 @@ export function codexArgs(
     "-s",
     "read-only",
     "-m",
-    CODEX_MODEL,
+    opts.model ?? CODEX_MODEL,
     "-c",
-    `model_reasoning_effort=${CODEX_EFFORT}`,
+    `model_reasoning_effort=${opts.effort ?? CODEX_EFFORT}`,
     "--output-schema",
     schemaFile,
     "-o",
@@ -88,18 +128,21 @@ export async function runCodex<T>(
   checkout: string,
   schema: z.ZodType<T>,
   what: string,
+  opts: CodexOptions = {},
 ): Promise<CodexOutcome<T>> {
   const dir = await mkdtemp(join(tmpdir(), "pr-review-codex-"));
   let stderr = "";
-  const fail = (error: string): CodexOutcome<T> => ({ ok: false, error, stderr });
+  let tokens: number | null = null;
+  const fail = (error: string): CodexOutcome<T> => ({ ok: false, error, stderr, tokens });
   try {
     const schemaFile = join(dir, "schema.json");
     const outFile = join(dir, "out.json");
     await writeFile(schemaFile, JSON.stringify(toSdkJsonSchema(schema)));
-    const result = await exec(codexArgs(checkout, schemaFile, outFile, prompt), checkout);
+    const result = await exec(codexArgs(checkout, schemaFile, outFile, prompt, opts), checkout);
     // Codex prints its banner and the whole prompt first, and an error last.
     // So the record keeps the end of stderr, not the start.
     stderr = result.stderr.slice(-STDERR_LIMIT);
+    tokens = codexTokens(result.stderr);
     if (result.error) return fail(exitMessage(result.error));
     let text: string;
     try {
@@ -116,7 +159,7 @@ export async function runCodex<T>(
     const parsed = schema.safeParse(value);
     if (!parsed.success)
       return fail(`the out file fails the ${what} schema: ${parsed.error.message}`);
-    return { ok: true, output: parsed.data, stderr };
+    return { ok: true, output: parsed.data, stderr, tokens };
   } catch (err) {
     return fail(messageOf(err));
   } finally {
