@@ -281,7 +281,8 @@ function summary(sets: SetFigures[]): PairedSetSummary {
   };
 }
 
-const diff = (a: number | null, b: number | null): number | null =>
+/** a less b, or null when either is null. */
+export const diff = (a: number | null, b: number | null): number | null =>
   a === null || b === null ? null : a - b;
 
 // The figures of "scope" for one repeat. A reviewer that ran one pass in

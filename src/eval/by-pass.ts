@@ -13,7 +13,7 @@ import {
   resamples,
 } from "./bootstrap.js";
 import type { GoldenFinding } from "./case.js";
-import { keptQueryCost, setRecord, type Keep } from "./paired.js";
+import { diff, keptQueryCost, setRecord, type Keep } from "./paired.js";
 import { columns, ratio, usd } from "./report.js";
 import { scoreRecord, type ScoreJudge } from "./score.js";
 
@@ -295,9 +295,6 @@ function ratioOf(rows: ByPassRow[]): number | Unbounded {
 
 const finite = (value: number | null): number | null =>
   value === null || !Number.isFinite(value) ? null : value;
-
-const diff = (a: number | null, b: number | null): number | null =>
-  a === null || b === null ? null : a - b;
 
 /**
  * The figures and the decision of one scope, from the rows of its cases.
