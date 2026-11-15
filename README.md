@@ -878,7 +878,7 @@ pr-review replay --cases eval/cases --from <eval out> --verifier claude:sonnet:m
 pr-review replay --cases eval/cases --from <eval out> --verifier codex:gpt-6.1-terra:medium --out replay-terra-medium
 ```
 
-The `codex` backend runs the Codex CLI with the model and the effort of the arm. The second example is the Terra arm of E3. Codex gives no cost, so each call stores `cost_usd: null` and the tokens of the call. The report sums the tokens, and `--max-cost` does not count a Codex call. A failed Codex call is a failed result, and a later `--resume` runs it again. A call that hits the Codex usage limit is a failed result of kind `limit`, and the text of the failure names the quota. The replay does not stop at it.
+The `codex` backend runs the Codex CLI with the model and the effort of the arm. The second example is the Terra arm of E3. Codex gives no cost, so each call stores `cost_usd: null` and the tokens of the call. The report sums the tokens, and `--max-cost` does not count a Codex call. A failed Codex call is a failed result, and a later `--resume` runs it again. A call that hits the Codex usage limit stops the replay as `--max-cost` does: no new call starts, the finished results stay, the replay prints that the Codex quota is out, and it exits 4. Run again with `--resume` to continue.
 
 A replay asks the first verifier only. It makes no escalation call, no merge call and no cap. So its figures compare only with other replays, not with an eval report. `--arm stored` is the comparison arm: it takes the stored first result of each candidate, with no verifier call. A result in the escalation band, or of a finding with `needs_context`, gets the decision of the first result alone, and the report counts it as in the band.
 
