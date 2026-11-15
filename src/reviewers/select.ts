@@ -13,20 +13,24 @@ const TIER_RANK: Record<Tier, number> = { skip: 0, fast: 1, full: 2 };
 /**
  * Pick each reviewer whose min_tier is at or below the tier, whose paths
  * are empty or match a changed file, and whose categories are empty or
- * match a triage category. The skip tier picks no reviewer. "trigger"
- * tells why the reviewer runs.
+ * match a triage category. The skip tier picks no reviewer. A reviewer
+ * with opt_in true is a candidate only when "named" holds its name. It
+ * still needs its tier and its triggers. "trigger" tells why the reviewer
+ * runs.
  */
 export function selectReviewers(
   defs: ReviewerDefinition[],
   tier: Tier,
   changedFiles: string[],
   categories: string[],
+  named?: ReadonlySet<string>,
 ): { def: ReviewerDefinition; trigger: string }[] {
   if (tier === "skip") return [];
   const triageCategories = new Set(categories.map((c) => c.toLowerCase()));
   const picked: { def: ReviewerDefinition; trigger: string }[] = [];
 
   for (const def of defs) {
+    if (def.frontmatter.opt_in === true && !named?.has(def.frontmatter.name)) continue;
     const { paths, categories: wanted, min_tier: minTier } = def.frontmatter.triggers;
     if (TIER_RANK[minTier] > TIER_RANK[tier]) continue;
 

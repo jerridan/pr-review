@@ -667,6 +667,7 @@ export async function runReview(input: RunInput): Promise<RunResult> {
         decision.tier,
         scoped.changedFiles.map((f) => f.path),
         brief?.categories ?? [],
+        only ?? undefined,
       ).filter((s) => only === null || only.has(s.def.frontmatter.name));
       const { run: selected, skipped } = skipSelected(candidates, {
         config,

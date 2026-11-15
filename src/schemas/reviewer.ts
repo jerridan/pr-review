@@ -20,6 +20,11 @@ export type ReviewerFrontmatter = {
    * false. The parsed value is always set.
    */
   trusted?: boolean;
+  /**
+   * Optional. A reviewer with true runs only when a run names it. Absent
+   * means false, and the parsed value stays absent.
+   */
+  opt_in?: boolean;
 };
 
 export const ReviewerFrontmatterSchema: z.ZodType<ReviewerFrontmatter> = z.strictObject({
@@ -38,4 +43,5 @@ export const ReviewerFrontmatterSchema: z.ZodType<ReviewerFrontmatter> = z.stric
     message: "threshold must be from 0 to 100",
   }),
   trusted: z.boolean().default(false),
+  opt_in: z.boolean().optional(),
 });
