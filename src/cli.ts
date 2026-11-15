@@ -80,6 +80,7 @@ interface EvalReportCliOptions {
   format: "table" | "json";
   byPass?: boolean;
   askMissing?: boolean;
+  allowApiKey?: boolean;
 }
 
 // Commander exits with 1 on a usage error. This makes it 2. Help and
@@ -440,7 +441,11 @@ export function createProgram(deps: ProgramDeps): Command {
     )
     .option(
       "--ask-missing",
-      "with --by-pass, ask the judge the by-pass questions that have no cached answer, and cache the answers",
+      "with --by-pass, ask the judge the by-pass questions that have no answer or a failed one, and cache the answers",
+    )
+    .option(
+      "--allow-api-key",
+      "with --ask-missing, keep ANTHROPIC_API_KEY and the other provider variables in the SDK environment of the judge",
     )
     .action(async (options: EvalReportCliOptions, command: Command) => {
       if (options.askMissing === true && options.byPass !== true) {

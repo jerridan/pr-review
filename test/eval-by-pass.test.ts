@@ -13,6 +13,7 @@ import {
   type PassSet,
 } from "../src/eval/by-pass.js";
 import type { GoldenFinding } from "../src/eval/case.js";
+import type { Report } from "../src/eval/report.js";
 import { isRecordFileName } from "../src/record/write.js";
 import { ExtrasOutputSchema } from "../src/eval/score.js";
 import type { QueryMeta, QueryOutcome, QueryRequest } from "../src/sdk/client.js";
@@ -486,6 +487,7 @@ const set = (goldens: number, posted: number, cost: number): PassSet => ({
   cost_usd: cost,
   raw_goldens: goldens,
   uncached: 0,
+  unknown: 0,
 });
 const row = (
   name: string,
@@ -574,14 +576,20 @@ describe("the decision of a scope (R4)", () => {
   });
 });
 
-// The record file of one repeat, parsed, and a function that writes it back.
-function editRecord(dir: string, edit: (record: Record<string, any>) => void): void {
+// The parts of a record file that the tests change.
+type RecordJson = {
+  stages: { reviewers: { name: string; pass: number }[] };
+  cost: { queries: Record<string, unknown>[] };
+};
+
+// Read the record file of one repeat, give it to "edit", and write what
+// "edit" gives back.
+function editRecord(dir: string, edit: (record: RecordJson) => RecordJson): void {
   const name = readdirSync(dir).find(isRecordFileName);
   if (!name) throw new Error(`no record in ${dir}`);
   const path = join(dir, name);
-  const record = JSON.parse(readFileSync(path, "utf8")) as Record<string, any>;
-  edit(record);
-  writeFileSync(path, JSON.stringify(record));
+  const record = JSON.parse(readFileSync(path, "utf8")) as RecordJson;
+  writeFileSync(path, JSON.stringify(edit(record)));
 }
 
 describe("the review fixes of the by-pass report (PR 54)", () => {
@@ -592,15 +600,12 @@ describe("the review fixes of the by-pass report (PR 54)", () => {
     editRecord(join(dir, "c-clean", "1"), (record) => {
       const strip = JSON.parse(JSON.stringify(record), (key: string, value: unknown) =>
         key === "sources" ? undefined : value,
-      ) as Record<string, any>;
+      ) as RecordJson;
       for (const q of strip.cost.queries) {
         delete q.pass;
         delete q.verification;
       }
-      Object.assign(record, strip);
-      record.stages = strip.stages;
-      record.posted = strip.posted;
-      record.cost = strip.cost;
+      return strip;
     });
     const { code } = await report(mainCases, dir);
     expect(code, output.stderr).toBe(0);
@@ -615,8 +620,9 @@ describe("the review fixes of the by-pass report (PR 54)", () => {
     cpSync(mainOut, dir, { recursive: true });
     editRecord(join(dir, "a-split", "1"), (record) => {
       record.stages.reviewers = record.stages.reviewers.filter(
-        (r: { name: string; pass: number }) => !(r.name === "diff-bugs" && r.pass === 2),
+        (r) => !(r.name === "diff-bugs" && r.pass === 2),
       );
+      return record;
     });
     const { code } = await report(mainCases, dir);
     expect(code, output.stderr).toBe(0);
@@ -638,10 +644,10 @@ describe("the review fixes of the by-pass report (PR 54)", () => {
     const dir = tempDir("by-pass-three", made);
     cpSync(mainOut, dir, { recursive: true });
     editRecord(join(dir, "a-split", "1"), (record) => {
-      const second = record.stages.reviewers.find(
-        (r: { name: string; pass: number }) => r.name === "diff-bugs" && r.pass === 2,
-      );
+      const second = record.stages.reviewers.find((r) => r.name === "diff-bugs" && r.pass === 2);
+      if (!second) throw new Error("no pass 2");
       record.stages.reviewers.push({ ...second, pass: 3 });
+      return record;
     });
     const { code } = await report(mainCases, dir);
     expect(code, output.stderr).toBe(0);
@@ -711,12 +717,10 @@ describe("the review fixes of the by-pass report (PR 54)", () => {
       rmSync(join(dir, "e-order", "1", "judge-cache.json"));
       const { code } = await report(orderCases, dir, ["--ask-missing"], fake([], "yes"));
       expect(code, output.stderr).toBe(0);
-      const parsed = JSON.parse(output.stdout) as {
-        paired: { uncached: unknown[]; scopes: { reviewer: string | null; cases: any[] }[] };
-      };
-      expect(parsed.paired.uncached).toEqual([]);
+      const parsed = JSON.parse(output.stdout) as Report;
+      expect(parsed.paired?.uncached).toEqual([]);
       expect(output.stderr).not.toMatch(/not valid/i);
-      const every = parsed.paired.scopes.find((s) => s.reviewer === null);
+      const every = parsed.paired?.scopes.find((s) => s.reviewer === null);
       expect(every?.cases[0]?.repeats[0]?.one_pass.recall).toBe(1);
     });
 
