@@ -538,10 +538,10 @@ describe("the record parts", () => {
   });
 
   it("holds the raw stage outputs, the drop and the failed escalation", () => {
-    // diff-bugs and security run two passes; the other five run one.
-    expect(record.stages.reviewers).toHaveLength(9);
+    // Each of the seven reviewers runs one pass.
+    expect(record.stages.reviewers).toHaveLength(7);
     const diffBugs = record.stages.reviewers.filter((r) => r.name === "diff-bugs");
-    expect(diffBugs.map((r) => r.pass).sort()).toEqual([1, 2]);
+    expect(diffBugs.map((r) => r.pass)).toEqual([1]);
     for (const run of diffBugs) {
       expect(run.findings).toEqual([plantedFinding(fx)]);
       expect(run.dropped).toEqual([
@@ -551,7 +551,7 @@ describe("the record parts", () => {
         },
       ]);
     }
-    // Both passes give the same finding, so one copy is verified.
+    // The pass gives the finding, and one copy is verified.
     expect(record.stages.verifications).toEqual([
       {
         finding: plantedFinding(fx),
@@ -559,10 +559,7 @@ describe("the record parts", () => {
         escalated: { kind: "thrown", message: "x" },
         final: null,
         passed: false,
-        sources: [
-          { reviewer: "diff-bugs", pass: 1 },
-          { reviewer: "diff-bugs", pass: 2 },
-        ],
+        sources: [{ reviewer: "diff-bugs", pass: 1 }],
       },
     ]);
     expect(record.stages.merges).toEqual([]);
@@ -590,7 +587,7 @@ describe("the record parts", () => {
     expect(new Set(record.cost.queries.map((q) => q.role))).toEqual(
       new Set(["reviewer", "triage", "verifier", "verifier-escalation"]),
     );
-    expect(record.cost.queries.filter((q) => q.role === "reviewer")).toHaveLength(9);
+    expect(record.cost.queries.filter((q) => q.role === "reviewer")).toHaveLength(7);
     const reviewer = record.cost.queries.find(
       (q) => q.role === "reviewer" && q.reviewer === "diff-bugs",
     );
@@ -607,8 +604,8 @@ describe("the record parts", () => {
       cost_usd: null,
       stop_reason: null,
     });
-    // Triage 0.02, nine reviewer passes at 0.5 each, one verifier at 0.1.
-    expect(record.cost.total_cost_usd).toBeCloseTo(0.02 + 9 * 0.5 + 0.1, 10);
+    // Triage 0.02, seven reviewer passes at 0.5 each, one verifier at 0.1.
+    expect(record.cost.total_cost_usd).toBeCloseTo(0.02 + 7 * 0.5 + 0.1, 10);
     // The failed escalation has no cost, so the total is a lower bound.
     expect(record.cost.queries_without_cost).toBe(1);
     expect(Object.keys(record.cost.stage_ms)).toEqual(

@@ -140,6 +140,8 @@ async function evalWith(out: string, client: ReturnType<typeof fake>, ...extra: 
       "1",
       "--reviewers",
       "diff-bugs,tests",
+      "--passes",
+      "diff-bugs=2",
       "--no-extras",
       ...extra,
     ]),
