@@ -1,4 +1,4 @@
-// The cap on non-blocking findings per run. Blocking findings have no cap.
+// The cap on nits per run. Blocking and suggestion findings have no cap.
 import type { RepoConfig } from "../config/repo-config.js";
 import type { PostedFinding } from "../schemas/record.js";
 
@@ -12,8 +12,9 @@ export const DEFAULT_CAPS: CapConfig = {
 };
 
 /**
- * base + ceil(hunks / per_hunks), at most max. The defaults give
- * 3 + ceil(hunks / 4), at most 20.
+ * The cap on nits: base + ceil(hunks / per_hunks), at most max. The defaults
+ * give 3 + ceil(hunks / 4), at most 20. The key names keep "non_blocking" so
+ * that no repo config breaks.
  */
 export function nonBlockingCap(totalHunks: number, caps: CapConfig = DEFAULT_CAPS): number {
   const perHunks = Math.max(1, caps.non_blocking_per_hunks);
@@ -24,21 +25,19 @@ export function nonBlockingCap(totalHunks: number, caps: CapConfig = DEFAULT_CAP
 }
 
 /**
- * Post every blocking finding. Fill the cap with suggestions first, then
- * nits, each in ranked order. The rest go to "capped".
+ * Post every blocking finding and every suggestion. Post nits in ranked order
+ * up to the cap. The rest of the nits go to "capped".
  */
 export function applyCap(
   ranked: PostedFinding[],
   cap: number,
 ): { posted: PostedFinding[]; capped: PostedFinding[] } {
   const blocking = ranked.filter((p) => p.severity === "blocking");
-  const nonBlocking = [
-    ...ranked.filter((p) => p.severity === "suggestion"),
-    ...ranked.filter((p) => p.severity === "nit"),
-  ];
+  const suggestions = ranked.filter((p) => p.severity === "suggestion");
+  const nits = ranked.filter((p) => p.severity === "nit");
   const room = Math.max(0, cap);
   return {
-    posted: [...blocking, ...nonBlocking.slice(0, room)],
-    capped: nonBlocking.slice(room),
+    posted: [...blocking, ...suggestions, ...nits.slice(0, room)],
+    capped: nits.slice(room),
   };
 }

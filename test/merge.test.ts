@@ -484,10 +484,11 @@ describe("cap", () => {
       posted("suggestion", 80, 3),
       posted("suggestion", 75, 4),
       posted("nit", 99, 5),
+      posted("nit", 98, 6),
     ];
-    const out = applyCap(ranked, 3);
-    expect(out.posted.map((p) => p.start_line)).toEqual([1, 2, 3, 4]);
-    expect(out.capped.map((p) => p.start_line)).toEqual([5]);
+    const out = applyCap(ranked, 1);
+    expect(out.posted.map((p) => p.start_line)).toEqual([1, 2, 3, 4, 5]);
+    expect(out.capped.map((p) => p.start_line)).toEqual([6]);
   });
 
   it("posts the first nits in ranked order up to the cap, with few or many suggestions", () => {
