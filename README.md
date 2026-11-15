@@ -804,6 +804,7 @@ The paired scoring asks the judge about the pairs of each one-pass set that the 
 | Flag | Meaning |
 |------|---------|
 | `--by-pass` | Add the by-pass section. |
+| `--by-reviewer` | Add the by-reviewer section. See "Stage 1: the reviewers with no verifier". |
 | `--ask-missing` | Ask the judge the by-pass or by-reviewer questions that have no cached answer or a failed one. Needs `--by-pass` or `--by-reviewer`. |
 | `--allow-api-key` | Keep `ANTHROPIC_API_KEY` and the other provider variables in the SDK environment of the judge of `--ask-missing`, as `eval --allow-api-key` does. |
 
