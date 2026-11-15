@@ -1,7 +1,7 @@
 // D8 phase 2: the by-pass report. The two passes of one reviewer are two
 // samples of one pass. eval-report --by-pass scores pass 1, pass 2 and
 // both from the records and the judge caches of an earlier eval.
-import { cpSync, readFileSync } from "node:fs";
+import { cpSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createProgram } from "../src/cli.js";
@@ -13,6 +13,7 @@ import {
   type PassSet,
 } from "../src/eval/by-pass.js";
 import type { GoldenFinding } from "../src/eval/case.js";
+import { isRecordFileName } from "../src/record/write.js";
 import { ExtrasOutputSchema } from "../src/eval/score.js";
 import type { QueryMeta, QueryOutcome, QueryRequest } from "../src/sdk/client.js";
 import { createFakeSdkClient } from "../src/sdk/fake.js";
@@ -96,7 +97,8 @@ type Findings = ReturnType<typeof finding>[];
 // The findings of diff-bugs, by run (one run per case, in case order) and
 // by pass. security gives nothing. The first query of a reviewer in a run
 // is its pass 1: the semaphore starts the queries in arrival order.
-function fake(byRun: [Findings, Findings][], judge: "yes" | "no" = "yes") {
+// "fail" makes each match judge query throw: the answer is then "unknown".
+function fake(byRun: [Findings, Findings][], judge: "yes" | "no" | "fail" = "yes") {
   let runs = 0;
   let calls = new Map<string, number>();
   return createFakeSdkClient((req: QueryRequest): QueryOutcome<unknown> => {
@@ -154,6 +156,7 @@ function fake(byRun: [Findings, Findings][], judge: "yes" | "no" = "yes") {
         );
       case "judge":
         if (req.schema === ExtrasOutputSchema) return ok({ real: "no", reason: "r" });
+        if (judge === "fail") throw new Error("the judge is down");
         return ok({ same_issue: judge, reason: "r" }, 0.5);
       default:
         throw new Error(`unexpected role ${req.role}`);
@@ -166,6 +169,7 @@ async function evalRun(
   cases: string,
   client: ReturnType<typeof fake>,
   reviewers: string,
+  ...extra: string[]
 ): Promise<string> {
   const out = tempDir("by-pass-out", made);
   const code = await captured(() =>
@@ -185,6 +189,7 @@ async function evalRun(
         reviewers,
         "--format",
         "json",
+        ...extra,
       ]),
     ),
   );
@@ -395,7 +400,7 @@ describe("pr-review eval-report --by-pass: the one-pass arm and the decision (R3
     await report(mainCases, mainOut);
     expect(sectionOf()).toEqual(first);
     expect(first.bootstrap).toMatchObject({ resamples: 10000, level: 0.9 });
-    expect(typeof first.bootstrap.seed).toBe("number");
+    expect(first.bootstrap.seed).toBe(20261114);
 
     await report(mainCases, mainOut, ["--format", "table"]);
     expect(output.stdout).toContain(`seed ${first.bootstrap.seed}`);
@@ -566,5 +571,175 @@ describe("the decision of a scope (R4)", () => {
   it("gives the same intervals on two calls", () => {
     const rows = [gains("x"), flat("y"), gains("z")];
     expect(summarizeScope("h", rows)).toEqual(summarizeScope("h", rows));
+  });
+});
+
+// The record file of one repeat, parsed, and a function that writes it back.
+function editRecord(dir: string, edit: (record: Record<string, any>) => void): void {
+  const name = readdirSync(dir).find(isRecordFileName);
+  if (!name) throw new Error(`no record in ${dir}`);
+  const path = join(dir, name);
+  const record = JSON.parse(readFileSync(path, "utf8")) as Record<string, any>;
+  edit(record);
+  writeFileSync(path, JSON.stringify(record));
+}
+
+describe("the review fixes of the by-pass report (PR 54)", () => {
+  it("names each repeat with no by-pass figures and the reason", async () => {
+    const dir = tempDir("by-pass-missing", made);
+    cpSync(mainOut, dir, { recursive: true });
+    writeFileSync(join(dir, "b-false", "1", "judge-cache.json"), "{ not json");
+    editRecord(join(dir, "c-clean", "1"), (record) => {
+      const strip = JSON.parse(JSON.stringify(record), (key: string, value: unknown) =>
+        key === "sources" ? undefined : value,
+      ) as Record<string, any>;
+      for (const q of strip.cost.queries) {
+        delete q.pass;
+        delete q.verification;
+      }
+      Object.assign(record, strip);
+      record.stages = strip.stages;
+      record.posted = strip.posted;
+      record.cost = strip.cost;
+    });
+    const { code } = await report(mainCases, dir);
+    expect(code, output.stderr).toBe(0);
+    expect(sectionOf().missing).toEqual([
+      { case: "b-false", repeat: 1, reason: "failed repeat" },
+      { case: "c-clean", repeat: 1, reason: "no source fields" },
+    ]);
+  });
+
+  it("leaves a case out of a reviewer scope when the reviewer has no pass 2 there", async () => {
+    const dir = tempDir("by-pass-nopass2", made);
+    cpSync(mainOut, dir, { recursive: true });
+    editRecord(join(dir, "a-split", "1"), (record) => {
+      record.stages.reviewers = record.stages.reviewers.filter(
+        (r: { name: string; pass: number }) => !(r.name === "diff-bugs" && r.pass === 2),
+      );
+    });
+    const { code } = await report(mainCases, dir);
+    expect(code, output.stderr).toBe(0);
+    const section = sectionOf();
+    expect(section.missing).toContainEqual({
+      case: "a-split",
+      repeat: 1,
+      reviewer: "diff-bugs",
+      reason: "no pass 2",
+    });
+    const bugs = scopeOf(section, "diff-bugs");
+    expect(bugs.cases.map((c) => c.case)).toEqual(["b-false", "c-clean"]);
+    // The scope of every reviewer keeps a-split with security only.
+    const every = scopeOf(section, null);
+    expect(every.cases.find((c) => c.case === "a-split")?.both.posted).toBe(0);
+  });
+
+  it("gives no decision for a reviewer that ran more than two passes", async () => {
+    const dir = tempDir("by-pass-three", made);
+    cpSync(mainOut, dir, { recursive: true });
+    editRecord(join(dir, "a-split", "1"), (record) => {
+      const second = record.stages.reviewers.find(
+        (r: { name: string; pass: number }) => r.name === "diff-bugs" && r.pass === 2,
+      );
+      record.stages.reviewers.push({ ...second, pass: 3 });
+    });
+    const { code } = await report(mainCases, dir);
+    expect(code, output.stderr).toBe(0);
+    const section = sectionOf();
+    expect(section.missing).toContainEqual({
+      case: "a-split",
+      repeat: 1,
+      reviewer: "diff-bugs",
+      reason: "ran 3 passes",
+    });
+    expect(section.repeats[0]?.scopes.map((s) => s.reviewer)).toEqual([null, "security"]);
+    expect(scopeOf(section, null).total.both.posted).toBe(0);
+  });
+
+  it("names a one-pass cost of zero as the cause of an unbounded R", () => {
+    const free = row("x", set(2, 2, 0), set(2, 2, 0), set(3, 3, 0));
+    const scope = summarizeScope("history", [free, free]);
+    expect(scope.decision.ratio).toMatchObject({
+      value: null,
+      value_cause: "no one-pass cost",
+      unbounded_resamples: 10000,
+      unbounded_causes: { no_added_golden: 0, no_one_pass_golden: 0, no_one_pass_cost: 10000 },
+      passed: false,
+    });
+  });
+
+  describe("--ask-missing", () => {
+    let cases = "";
+    let out = "";
+    let orderCases = "";
+    let orderOut = "";
+    beforeAll(async () => {
+      const root = tempDir("by-pass-ask2", made);
+      cases = casesFrom(template, join(root, "cases"), [{ name: "d-judge", golden: [G_A] }]);
+      out = await evalRun(cases, fake([[[A], [A2]]]), "diff-bugs");
+      // Pass 1 raises A2 only, so the paired one-pass set asks about A2 and G_A.
+      orderCases = casesFrom(template, join(root, "order"), [{ name: "e-order", golden: [G_A] }]);
+      orderOut = await evalRun(orderCases, fake([[[A2], [A]]]), "diff-bugs", "--no-extras");
+    }, 120_000);
+
+    it("reports an unknown answer per set, and asks a cached unknown again", async () => {
+      const dir = tempDir("by-pass-unknown", made);
+      cpSync(out, dir, { recursive: true });
+      await report(cases, dir, ["--ask-missing"], fake([], "fail"));
+      const failed = scopeOf(sectionOf(), "diff-bugs").total.pass_2;
+      expect(failed).toMatchObject({ goldens: 0, uncached: 0, unknown: 1 });
+
+      const client = fake([], "yes");
+      await report(cases, dir, ["--ask-missing"], client);
+      expect(client.calls.map((c) => c.role)).toEqual(["judge"]);
+      expect(scopeOf(sectionOf(), "diff-bugs").total.pass_2).toMatchObject({
+        goldens: 1,
+        unknown: 0,
+      });
+    });
+
+    it("prints the unknown answers of each set in the table", async () => {
+      const dir = tempDir("by-pass-unknown-table", made);
+      cpSync(out, dir, { recursive: true });
+      await report(cases, dir, ["--ask-missing", "--format", "table"], fake([], "fail"));
+      expect(output.stdout).toMatch(/unknown judge answers: pass 1 0, pass 2 1, both 0/i);
+    });
+
+    it("gives the paired section of the same output the new answers", async () => {
+      const dir = tempDir("by-pass-order", made);
+      cpSync(orderOut, dir, { recursive: true });
+      rmSync(join(dir, "e-order", "1", "judge-cache.json"));
+      const { code } = await report(orderCases, dir, ["--ask-missing"], fake([], "yes"));
+      expect(code, output.stderr).toBe(0);
+      const parsed = JSON.parse(output.stdout) as {
+        paired: { uncached: unknown[]; scopes: { reviewer: string | null; cases: any[] }[] };
+      };
+      expect(parsed.paired.uncached).toEqual([]);
+      expect(output.stderr).not.toMatch(/not valid/i);
+      const every = parsed.paired.scopes.find((s) => s.reviewer === null);
+      expect(every?.cases[0]?.repeats[0]?.one_pass.recall).toBe(1);
+    });
+
+    it("keeps the API key for the judge with --allow-api-key", async () => {
+      const seen: boolean[] = [];
+      const base = fake([], "yes");
+      const client = {
+        calls: base.calls,
+        query: <T>(
+          req: QueryRequest,
+          options: { allowApiKey: boolean; env: NodeJS.ProcessEnv },
+        ) => {
+          seen.push(options.allowApiKey);
+          return base.query<T>(req, options);
+        },
+      };
+      for (const flags of [["--ask-missing", "--allow-api-key"], ["--ask-missing"]]) {
+        const dir = tempDir("by-pass-key", made);
+        cpSync(out, dir, { recursive: true });
+        const { code } = await report(cases, dir, flags, client);
+        expect(code, output.stderr).toBe(0);
+      }
+      expect(seen).toEqual([true, false]);
+    });
   });
 });
