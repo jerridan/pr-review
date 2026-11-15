@@ -103,6 +103,8 @@ export type ReplayOptions = {
   maxCost?: number;
   /** The dollar cap of one verifier call. The codex backend ignores it. */
   verifierCap?: number;
+  /** A directory that holds <case>/judge-cache.json, shared by the arms of one experiment. */
+  judgeCache?: string;
   sample: SampleKind;
   seed: number;
   format: "table" | "json";
@@ -419,6 +421,16 @@ async function replay(opts: ReplayOptions, clientOf: () => Promise<SdkClient>): 
 
   const cases = await loadCases(opts.cases);
   const out = resolve(opts.out);
+  // Write the answers of a case to --out, and to the shared cache when it is
+  // given. The shared file may hold answers of another arm: keep them.
+  const saveCache = async (state: CaseState): Promise<void> => {
+    await writeJudgeCache(join(out, state.c.name, JUDGE_CACHE_FILE), state.cache);
+    if (opts.judgeCache === undefined) return;
+    const shared = join(resolve(opts.judgeCache), state.c.name, JUDGE_CACHE_FILE);
+    const merged: JudgeCache = existsSync(shared) ? await readJudgeCache(shared) : new Map();
+    for (const [k, v] of state.cache) merged.set(k, v);
+    await writeJudgeCache(shared, merged);
+  };
   const armPath = join(out, "arm.json");
   if (opts.resume && existsSync(armPath)) {
     const stored = JSON.parse(await readFile(armPath, "utf8")) as { arm?: string };
@@ -486,6 +498,10 @@ async function replay(opts: ReplayOptions, clientOf: () => Promise<SdkClient>): 
       const outCache = join(out, c.name, JUDGE_CACHE_FILE);
       if (existsSync(outCache))
         for (const [k, v] of await readJudgeCache(outCache)) cache.set(k, v);
+      if (opts.judgeCache !== undefined) {
+        const shared = join(resolve(opts.judgeCache), c.name, JUDGE_CACHE_FILE);
+        if (existsSync(shared)) for (const [k, v] of await readJudgeCache(shared)) cache.set(k, v);
+      }
       states.push({
         c,
         clone,
@@ -529,7 +545,7 @@ async function replay(opts: ReplayOptions, clientOf: () => Promise<SdkClient>): 
           );
         });
       }
-      await writeJudgeCache(join(out, state.c.name, JUDGE_CACHE_FILE), state.cache);
+      await saveCache(state);
     }
 
     // The sample, over all cases at once.
@@ -821,7 +837,7 @@ async function replay(opts: ReplayOptions, clientOf: () => Promise<SdkClient>): 
       scopes.push({ source, cases: rows, total: sumFigures(rows) });
     }
     for (const state of states) {
-      await writeJudgeCache(join(out, state.c.name, JUDGE_CACHE_FILE), state.cache);
+      await saveCache(state);
     }
 
     // The escalation figures of the stored records (E3), with no model call,
