@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { DEFAULT_REPO_CONFIG, type Suppression } from "../src/config/repo-config.js";
-import { applyCap, DEFAULT_CAPS, nonBlockingCap } from "../src/merge/cap.js";
+import { applyCap, DEFAULT_CAPS, nitCap } from "../src/merge/cap.js";
 import { fingerprint, fingerprintSpanText } from "../src/merge/fingerprint.js";
 import { groupFindings, mergeFindings } from "../src/merge/index.js";
 import { applySuppressions } from "../src/merge/suppress.js";
@@ -401,7 +401,7 @@ describe("mergeFindings (A7)", () => {
       result: result(90 - i, i < 5 ? ("suggestion" as const) : ("nit" as const)),
     }));
     const out = await mergeFindings(noMergeClient(), OPTIONS, verified, ctx(1));
-    expect(nonBlockingCap(1)).toBe(4);
+    expect(nitCap(1)).toBe(4);
     expect(out.posted.map((p) => p.severity)).toEqual([
       "suggestion",
       "suggestion",
@@ -444,25 +444,25 @@ describe("mergeFindings (A7)", () => {
 
 describe("cap", () => {
   it("is 3 + ceil(hunks / 4), at most 20", () => {
-    expect(nonBlockingCap(0)).toBe(3);
-    expect(nonBlockingCap(1)).toBe(4);
-    expect(nonBlockingCap(4)).toBe(4);
-    expect(nonBlockingCap(5)).toBe(5);
-    expect(nonBlockingCap(20)).toBe(8);
-    expect(nonBlockingCap(68)).toBe(20);
-    expect(nonBlockingCap(69)).toBe(20);
-    expect(nonBlockingCap(10_000)).toBe(20);
+    expect(nitCap(0)).toBe(3);
+    expect(nitCap(1)).toBe(4);
+    expect(nitCap(4)).toBe(4);
+    expect(nitCap(5)).toBe(5);
+    expect(nitCap(20)).toBe(8);
+    expect(nitCap(68)).toBe(20);
+    expect(nitCap(69)).toBe(20);
+    expect(nitCap(10_000)).toBe(20);
   });
 
   it("takes the base, the hunks per step and the maximum from the repo config", () => {
-    expect(nonBlockingCap(0, DEFAULT_CAPS)).toBe(3);
+    expect(nitCap(0, DEFAULT_CAPS)).toBe(3);
     expect(DEFAULT_CAPS).toEqual(DEFAULT_REPO_CONFIG.caps);
     const caps = { non_blocking_base: 1, non_blocking_per_hunks: 2, non_blocking_max: 5 };
-    expect(nonBlockingCap(0, caps)).toBe(1);
-    expect(nonBlockingCap(1, caps)).toBe(2);
-    expect(nonBlockingCap(4, caps)).toBe(3);
-    expect(nonBlockingCap(100, caps)).toBe(5);
-    expect(nonBlockingCap(3, { ...caps, non_blocking_base: 0 })).toBe(2);
+    expect(nitCap(0, caps)).toBe(1);
+    expect(nitCap(1, caps)).toBe(2);
+    expect(nitCap(4, caps)).toBe(3);
+    expect(nitCap(100, caps)).toBe(5);
+    expect(nitCap(3, { ...caps, non_blocking_base: 0 })).toBe(2);
   });
 
   function posted(severity: Severity, score: number, n: number): PostedFinding {
@@ -504,6 +504,15 @@ describe("cap", () => {
       expect(out.posted.filter((p) => p.severity === "suggestion")).toHaveLength(count);
       expect(out.capped.map((p) => p.start_line)).toEqual([13, 14]);
     }
+  });
+
+  it("posts a suggestion ahead of the nits even when the input lists a nit first", () => {
+    const out = applyCap(
+      [posted("nit", 99, 1), posted("suggestion", 80, 2), posted("nit", 98, 3)],
+      1,
+    );
+    expect(out.posted.map((p) => p.start_line)).toEqual([2, 1]);
+    expect(out.capped.map((p) => p.start_line)).toEqual([3]);
   });
 
   it("never caps blocking findings", () => {

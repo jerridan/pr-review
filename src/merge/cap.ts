@@ -16,7 +16,7 @@ export const DEFAULT_CAPS: CapConfig = {
  * give 3 + ceil(hunks / 4), at most 20. The key names keep "non_blocking" so
  * that no repo config breaks.
  */
-export function nonBlockingCap(totalHunks: number, caps: CapConfig = DEFAULT_CAPS): number {
+export function nitCap(totalHunks: number, caps: CapConfig = DEFAULT_CAPS): number {
   const perHunks = Math.max(1, caps.non_blocking_per_hunks);
   return Math.min(
     caps.non_blocking_max,

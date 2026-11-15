@@ -16,7 +16,7 @@ import type { SdkClient } from "../sdk/client.js";
 import type { RunOptions } from "../sdk/options.js";
 import type { Semaphore } from "../semaphore.js";
 import { wrapUntrusted } from "../untrusted.js";
-import { applyCap, nonBlockingCap, type CapConfig } from "./cap.js";
+import { applyCap, nitCap, type CapConfig } from "./cap.js";
 import { fingerprint, fingerprintSpanText } from "./fingerprint.js";
 
 /** A verified finding, with the reviewer passes that raised it when the run knows them. */
@@ -255,7 +255,7 @@ export async function mergeFindings(
   const merges = results.flatMap((r) => (r.record ? [r.record] : []));
   const { posted, capped } = applyCap(
     rank(results.flatMap((r) => r.posted)),
-    nonBlockingCap(ctx.totalHunks, ctx.caps),
+    nitCap(ctx.totalHunks, ctx.caps),
   );
   return { posted, capped, merges };
 }
