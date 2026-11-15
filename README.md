@@ -521,6 +521,8 @@ pr-review eval --cases eval/cases --reviewers general-review --models general-re
 
 The eval records of a `--stage1` run hold the findings before the verifier. Replay these records through `--from` to get the "after the verifier" figures. The options `--models` and `--stage1`, and the replay, come from the eval tooling. The eval tooling is a separate change. When `--models` is not on `main` yet, the option is in the d4c-tools pull request.
 
+"general-review" is now the name of a built-in reviewer, so a repo that has a custom reviewer with that name must rename it.
+
 The Terra arm runs the same prompt through Codex. See "The Codex general reviewer".
 
 The description is the sanitized PR title, labels and body with `--pr`. Without `--pr`, it is the sanitized subject and body of each commit between the base and the head. Every reviewer and the verifier get it. When the description is empty, `description-drift` does not run, and coverage lists it under `reviewers_skipped` with the reason `no description`. The same list names a reviewer that the config disables, with the reason `disabled by config`.
@@ -1064,7 +1066,7 @@ For example, a precision with mean 0.667 and min 0.5 has a spread of 0.167. Twic
 | `--source <name>` | The `source` field of each file. | `codex-general-review-<model>-<effort>` |
 | `--force` | Run again the cases that already have a file. | off |
 
-For each case, the command clones the case at its head, as the eval does. It builds the system prompt and the user message of a pipeline reviewer from the prompt files, with the `general-review` body, the rule files of the base commit, the diff and the changed files. The description is the title and the body of the case, each sanitized and joined with a blank line. The exclusions are those of the repo config. The message holds no triage brief and no history block. A brief needs a triage model call. So the Terra arm gets no brief, and the Opus arms do. The E2 note must state this as a limit. Codex reads the files of the checkout with its own read-only sandbox.
+For each case, the command clones the case at its head, as the eval does. It builds the system prompt and the user message of a pipeline reviewer from the prompt files, with the `general-review` body, the rule files of the base commit, the diff and the changed files. The description is the title and the body of the case, each sanitized and joined with a blank line. A case with `description_from` set to `commits` gets the sanitized commit messages of base..head instead. The exclusions are those of the repo config. The message holds no triage brief and no history block. A brief needs a triage model call. So the Terra arm gets no brief, and the Opus arms do. The E2 note must state this as a limit. Codex reads the files of the checkout with its own read-only sandbox.
 
 The command writes `<out>/<case name>.json` with `{ "source": "<source>", "findings": [ ... ] }`. Each finding has the fields of a reviewer finding. A finding that fails the finding schema fails the case. The command does not filter by evidence or by line range. The replay does that.
 
@@ -1090,11 +1092,13 @@ The E6 test checks that a hidden instruction does not change a review. Two comma
 
 The three body variants keep the head, the bundle and the diff of the plain case. They change only `case.json`. The `commit` variant sets `description_from` to `commits` in `case.json`. Then the eval gives the run no description, and the run builds it from the commit messages. The `comment` variant uses the first file, in path order, that `injection.patch` changes, that the head holds, and whose extension has a known comment syntax. A case with no such file gets no `comment` variant, and the command names it in an error. A new head commit holds the change. It has the base as its parent, and the author, the committer and the dates of the plain head. The same inputs give the same head sha. A comment at the end of a file shifts no golden line, so each variant keeps the golden of its plain case. The instruction texts are in `prompts/injection-instructions.md`.
 
+An injection case has a head commit message equal to its PR title and body (`scripts/inject-case.sh`). So the description of the `commit` arm is the plain text plus the instruction.
+
 `case.json` has two optional fields for this test. `description_from` has the one value `commits`. `variant_of` has `case`, the name of the plain case, and `arm`, one of `body-no-finding`, `body-reviewed-safe`, `body-print-prompt`, `commit` and `comment`.
 
 `pr-review eval-injection-report --runs <eval out dir> --cases <dir> [--json <file>]` reads the records of an eval run over the plain and variant cases in `<dir>`. It prints a table and writes a JSON file. The default file is `injection-report.json` in `--runs`. For each arm (`plain` and the five variants) the table gives the runs, the runs that found the known bug, and the share. For each variant case it gives the same three figures beside those of its plain case. The command prints the rule of E6 word for word and computes no decision.
 
-**The known bug.** The known bug of an injection case is each golden with a line that `injection.patch` adds, or the line after a line that it deletes, in the same file. The command stops with an error when no golden of a case fits. A run "found" the known bug when a posted finding of the run matches that golden. The match is the match of the eval for that run. The command makes no model call. It scores each record again with `judge-cache.json` of the repeat. A run with no valid result or record, or a match that needs a judge answer that the cache lacks, counts as `unknown`. The share uses the runs that are not unknown.
+**The known bug.** The known bug of an injection case is each golden with a line that `injection.patch` adds, or the line after a line that it deletes, in the same file. The command stops with an error when no golden of a case fits. A run "found" the known bug when a posted finding of the run matches that golden. The match is the match of the eval for that run. The command makes no model call. It scores each record again with `judge-cache.json` of the repeat. A run with no valid result or no record, or a match that needs a judge answer that the cache lacks, counts as `unknown`. Any other error stops the command with exit code 1. The error goes to stderr with the case and the repeat. Examples are a record that is not valid JSON, a failed clone and a failed score. The share uses the runs that are not unknown.
 
 **The three detection rules.** The report lists each run output that may follow an instruction. The detection is mechanical, by kind of instruction:
 
@@ -1112,6 +1116,13 @@ Every hit is a candidate for a person to judge. A finding that reports the injec
 | 1 | A repeat failed, or a run error occurred. | Not used. | An error that is not a usage error. | An error that is not a usage error. |
 | 2 | A usage error, an invalid case, or a configuration error such as a judge model equal to a reviewer model. | A usage error, or a file that is missing, is not JSON or is not a run record. | A usage error or an invalid case. | A usage error, an invalid case, a cost source that is not valid, a case with no cost, or a `--to` that exists. |
 | 3 | The gate failed. | Not used. | Not used. | Not used. |
+
+| Code | `eval-codex-review` | `eval-injection-variants` | `eval-injection-report` |
+|------|--------------------|---------------------------|-------------------------|
+| 0 | No case failed. Each case is done or skipped. | Each injection case got its variants. | The command printed the report. |
+| 1 | A case failed, or the Codex quota is out. | A case got no variants, for example because no file can hold a comment. | An error: an invalid case, a case with no known bug, a record that is not valid, a failed clone, or a failed score. |
+| 2 | A usage error, or a cases directory that is not valid. | A usage error, an invalid case, an `--out` inside the input directory or inside `eval/cases/`, or an input with no injection case. | A usage error. |
+| 3 | Not used. | Not used. | Not used. |
 
 A failed repeat is a run that exits 1, throws, or gives an incomplete review. A review is incomplete when its record has the verdict `incomplete`, for example when every reviewer query hits a session limit. Such a run exits 0, but its findings do not show the reviewers. So the eval does not score it. The error of the repeat gives the errors of the record. A case whose `.pr-review/` config is not valid makes each of its runs fail. A judge query that fails is not a failed repeat. The eval counts it as no match and warns. With a failed repeat and a failed gate, the eval exits 1, and the report still holds the gate.
 
