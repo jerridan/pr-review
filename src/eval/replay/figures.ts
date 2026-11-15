@@ -193,9 +193,9 @@ export function caseFigures(
       })),
     in_band: entries.filter((e) => e.in_band).length,
     unsure: entries.filter((e) => e.decision?.unsure !== undefined).length,
-    capped: entries.filter((e) => isQueryFailure(e.result) && e.result.kind === "limit").length,
+    capped: entries.filter((e) => isCapped(e.result)).length,
     failed:
-      entries.filter((e) => isQueryFailure(e.result)).length +
+      entries.filter((e) => isQueryFailure(e.result) && !isCapped(e.result)).length +
       entries.filter((e) => e.severity?.failure !== undefined).length,
     verifications: verified.length,
     cost_usd: cost,
@@ -205,6 +205,19 @@ export function caseFigures(
     tokens: entries.reduce((sum, e) => sum + (e.call?.tokens ?? 0), 0),
     dropped,
   };
+}
+
+/**
+ * True for a verifier call that stopped on its dollar or turn limit. The
+ * decision of such a call is unsure, and it is not a failed call. A Codex
+ * quota stop is also kind "limit", but it is a failure that a later run asks again.
+ */
+export function isCapped(result: unknown): boolean {
+  return (
+    isQueryFailure(result as never) &&
+    (result as { kind: string; message: string }).kind === "limit" &&
+    !/^the Codex quota/.test((result as { message: string }).message)
+  );
 }
 
 /** The sum of the figures of the cases of one scope. Each share comes from the sums. */
