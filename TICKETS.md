@@ -148,6 +148,7 @@ D4b and D8 gave these rules. Each one comes from a loss in those runs.
 Question: does each reviewer have the right model and effort? Today all seven reviewers run on Opus 5.5 at low effort, because no reviewer file sets a model.
 
 - Arms, in this order: Opus 5.5 low (S1, no new cost), Opus 5.5 medium, Sonnet 5.5 medium, Sonnet 5.5 high. Run every arm. One run of an arm holds all seven reviewers, and the record gives the findings and the cost of each reviewer, so one run measures seven reviewers.
+- Two more arms for the three light reviewers only, which are conventions, docs-and-comments and description-drift: Haiku 5.5 at medium effort and Haiku 5.5 at high effort. D7 found that these three cost much and rarely find a serious item, so a cheaper model that keeps their results lowers the cost of every review. A run of these arms holds the three reviewers only, through the option that limits a run to named reviewers.
 - Cases: all 28. The S1 records are the first arm. The D8 measurement records hold two more passes of history and of tests at Opus 5.5 low on the same cases; use them as more samples of the first arm for those two reviewers.
 - Passes: run E7 first. Each arm uses the pass defaults that E7 leaves, so a reviewer that E7 moves to one pass runs one pass in every arm.
 - Two stages. Stage 1 runs the reviewers of each new arm with no verifier, and matches the raw candidates to the goldens. A golden that an arm did not raise cannot be posted by it, so stage 1 is sufficient to reject a setting that raises fewer posted-label goldens than the current one, less the noise of one pass, for no lower cost. Stage 2 sends to the verifier, through S2, only the candidates of the reviewer and arm pairs that stage 1 did not reject.
@@ -238,7 +239,7 @@ The two lists of follow-ups below name D4c five times. The records of S1 answer 
 5. E2, then E1.
 6. E6 at any time after the tooling.
 
-The probes give the cost of each run before it starts. The first estimates are $133 for S1, about $250 to $400 for the three new arms of E1, by how much stage 1 rejects, and about $250 for the other experiments together. The Terra arms use the Codex quota. The runs go one at a time across as many plan windows as they need, with the plan window limit of the principal.
+The probes give the cost of each run before it starts. The first estimates are $133 for S1, about $250 to $400 for the three new arms of E1 with all the reviewers, by how much stage 1 rejects, a small sum for the two Haiku arms, and about $250 for the other experiments together. The Terra arms use the Codex quota. The runs go one at a time across as many plan windows as they need, with the plan window limit of the principal.
 
 ## Smaller follow-ups found during D1 and D2
 
