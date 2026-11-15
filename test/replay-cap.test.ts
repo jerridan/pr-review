@@ -2,7 +2,12 @@
 import { cpSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { ROLE_DEFAULTS } from "../src/config/models.js";
+import {
+  JUDGE_DEFAULTS,
+  ROLE_DEFAULTS,
+  SEVERITY_FINDING_DEFAULTS,
+  SEVERITY_PR_DEFAULTS,
+} from "../src/config/models.js";
 import type { Figures, ReplayReport } from "../src/eval/replay/index.js";
 import { captureOutput, cleanup, makeFixture, output, tempDir } from "./fixtures/eval-fixture.js";
 import { makeReplayInputs, replay, replayFake, type Made } from "./fixtures/replay-fixture.js";
@@ -98,11 +103,72 @@ describe("pr-review replay --verifier-cap", () => {
     expect(rows.every((f) => f.capped <= f.unsure)).toBe(true);
   }, 120_000);
 
-  it("shows the capped count in the table", async () => {
-    const client = replayFake({ limitVerifier: ["CLAIM-P1"] });
-    await run(client, ARM, undefined, "table");
-    expect(output.stdout).toMatch(/capped/);
+  it("counts a capped call as unsure and not as failed", async () => {
+    const client = replayFake({
+      limitVerifier: ["CLAIM-P1", "CLAIM-F"],
+      failVerifier: ["CLAIM-U"],
+    });
+    const { code } = await run(client, ARM);
+    expect(code, output.stderr).toBe(0);
+    const report = JSON.parse(output.stdout) as ReplayReport;
+    const total = report.scopes.find((s) => s.source === null)?.total;
+    expect(total?.capped).toBe(2);
+    expect(total?.failed).toBe(1);
   }, 120_000);
+
+  it("does not call a capped candidate again on a resume at the same cap", async () => {
+    const first = await run(replayFake({ limitVerifier: ["CLAIM-P1", "CLAIM-F"] }), ARM);
+    expect(first.code, output.stderr).toBe(0);
+    const client = replayFake();
+    const again = await run(client, [...ARM, "--resume"], first.out);
+    expect(again.code, output.stderr).toBe(0);
+    expect(client.calls.filter((c) => c.role === "verifier")).toEqual([]);
+    const report = JSON.parse(output.stdout) as ReplayReport;
+    expect(report.remaining).toBe(0);
+    expect(report.scopes.find((s) => s.source === null)?.total.capped).toBe(2);
+  }, 120_000);
+
+  it("refuses --verifier-cap with --arm stored", async () => {
+    const client = replayFake();
+    const code = await replay(client, [
+      "--cases",
+      inputs.cases,
+      "--from",
+      inputs.full,
+      "--out",
+      tempDir("replay-cap", made),
+      "--arm",
+      "stored",
+      "--verifier-cap",
+      "0.2",
+    ]);
+    expect(code).toBe(2);
+    expect(output.stderr).toMatch(/--verifier-cap/);
+    expect(client.calls).toEqual([]);
+  });
+
+  it("shows the capped count in the total row of the table", async () => {
+    const client = replayFake({ limitVerifier: ["CLAIM-P1", "CLAIM-F"] });
+    await run(client, ARM, undefined, "table");
+    const rows = output.stdout
+      .split("\n")
+      .filter((l) => /^(case|total)\s/.test(l))
+      .map((l) => l.trim().split(/\s{2,}/));
+    const at = rows[0]?.indexOf("capped") ?? -1;
+    expect(at).toBeGreaterThan(-1);
+    expect(rows.find((r) => r[0] === "total")?.[at]).toBe("2");
+  }, 120_000);
+
+  it("states the bound of --max-cost from the verifier, severity and judge caps", async () => {
+    await replay(replayFake(), ["--help"]);
+    const help = output.stdout.replace(/\s+/g, " ");
+    expect(help).toContain(
+      `verifier cap (--verifier-cap, default $${ROLE_DEFAULTS.verifier.maxBudgetUsd})`,
+    );
+    expect(help).toContain(`$${SEVERITY_PR_DEFAULTS.maxBudgetUsd} with --severity pr`);
+    expect(help).toContain(`$${SEVERITY_FINDING_DEFAULTS.maxBudgetUsd} with --severity finding`);
+    expect(help).toContain(`judge cap ($${JUDGE_DEFAULTS.maxBudgetUsd})`);
+  });
 
   it("names --verifier-cap in the help of --max-cost, and says codex ignores it", async () => {
     const code = await replay(replayFake(), ["--help"]);
