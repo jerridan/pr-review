@@ -1,0 +1,407 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 55,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Give each D4c experiment a method, a budget and a decision rule",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/55"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "ca403bc3646370ae73802d6d1682980de43f9756",
+    "head": "919c1d406b5936db9b66dadf18577eae36b1dae3",
+    "started_at": "2026-11-15T02:33:12.352Z",
+    "tool_version": "0.13.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Give each D4c experiment a method, a budget and a decision rule\n\nThis PR changes the D4c entry of `TICKETS.md`. It changes no code.\n\n## Why\n\nThe D4c entry gave one line for each of six experiments, with no method, no budget and no decision rule. D4b and D8 showed what that costs: a paid run that could not be stopped and continued, a budget that the first two cases broke, and a decision rule that could not fail. The principal also asked for three of the experiments to be wider.\n\n## What changes\n\n**Rules for every experiment.** A paid probe of two cases before a full run. A test that the decision rule can give each of its results. A budget in dollars. One paid run at a time. Records under the crew record root.\n\n**Shared parts.** One reference run of the full pipeline with stored records (S1), a replay tool that verifies stored candidates again (S2), size groups of the cases (S3), and an eval option for the model and the effort of the reviewers (S4).\n\n**The experiments, with the wider questions of the principal:**\n\n- **E1** is now the model and the effort of every reviewer, not of diff-bugs only. Opus at medium effort is an arm. One run of an arm measures all seven reviewers.\n- **E2** compares the specialist set with one Opus reviewer at medium, one at high, and one Sol reviewer. It reports by PR size and looks for the size where the specialists become better.\n- **E3** adds Terra as a verifier arm, on the same stored candidates.\n- **E4, E5, E6** keep their questions and gain a method, a rule and a budget.\n- **E7** collects the five follow-ups that name D4c. The S1 records answer two of them at no cost, among them the passes of diff-bugs and security, which D8 could not measure.\n\n**Order and budget.** About $585 of model calls in all. That is more than one plan week holds beside other work, so the entry leaves the calendar to the principal.\n\n## What a reviewer must check\n\n- **E2 and the pool cases.** The goldens of the ten `pool` cases came from blind single reviews by Opus and by Sol. Those cases favour a single reviewer of the same model, so the entry reports them apart. That leaves 18 cases for the main figures of E2, which can be too few to find the size line. The entry says to state that plainly if it happens.\n- **E1 and the noise between runs.** Two arms of E1 are two runs, so they are not paired. The entry requires the note to report the noise of one pass and to claim no smaller difference.\n- **The numbers in the rules** (two times the cost, 0.05 of precision, 90% intervals) follow the D8 rule. The budgets are estimates until the probes run.\n\n## Verification\n\n`npm test` (1503 tests), `npm run lint`, `npm run typecheck` and `npm run build` pass.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZeE9g8BLHRTtXEThp4\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": "TICKETS.md",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "fast",
+      "reason": "Only TICKETS.md, a planning document that no code reads, changes; the risk is limited to unclear or inconsistent plan text.",
+      "confidence": "high",
+      "categories": [
+        "docs"
+      ],
+      "hotspots": [
+        "TICKETS.md: D4c decision rules (E1, E3, E4)",
+        "TICKETS.md: budget sum in 'Order and budget'"
+      ],
+      "file_notes": [
+        {
+          "file": "TICKETS.md",
+          "note": "Rewrites the D4c ticket from a short list into rules, shared parts S1-S4, and experiments E1-E7 with budgets. Docs only."
+        }
+      ],
+      "summary": "The change rewrites the D4c \"First experiments\" ticket in TICKETS.md. It adds shared rules, shared tooling parts (S1-S4), seven experiments (E1-E7) with decision rules and budgets, and an order of work. No code changes."
+    },
+    "tier": "fast",
+    "tier_reason": "Triage: Only TICKETS.md, a planning document that no code reads, changes; the risk is limited to unclear or inconsistent plan text.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= fast; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= fast; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "high"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    }
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 2946,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 6561,
+              "outputTokens": 27,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0006696,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 102,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 11205,
+              "webSearchRequests": 0,
+              "costUSD": 0.09168799999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 48,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0923576
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6633,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 6559,
+              "outputTokens": 24,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0006679,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 529,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 11430,
+              "webSearchRequests": 0,
+              "costUSD": 0.102028,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 210,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.10269589999999999
+        }
+      }
+    ],
+    "verifications": [],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "diff-bugs"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5908627516,
+      "review_url": "https://github.com/jerridan/pr-review/pull/55#pullrequestreview-5908627516",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 132672631199
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "duration_ms": 3409,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 5213,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0005343,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 436,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 5987,
+            "webSearchRequests": 0,
+            "costUSD": 0.028312,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.028846300000000002
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 2946,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 6561,
+            "outputTokens": 27,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0006696,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 102,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 11205,
+            "webSearchRequests": 0,
+            "costUSD": 0.09168799999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 48,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0923576
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "duration_ms": 6633,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 6559,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0006679,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 529,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 11430,
+            "webSearchRequests": 0,
+            "costUSD": 0.102028,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 210,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.10269589999999999
+      }
+    ],
+    "total_cost_usd": 0.22389979999999998,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 45,
+      "gather": 41,
+      "triage": 4672,
+      "find_verify": 7439,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
