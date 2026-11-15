@@ -106,7 +106,13 @@ async function promptOf(c: Case, checkout: string): Promise<string> {
     fileHistory: false,
   });
   // The description is the sanitized title and body, as src/run.ts builds it.
-  const description = `${sanitizeGitHubText(c.title).text}\n\n${sanitizeGitHubText(c.body).text}`;
+  // A case with description_from "commits" gets no such description, as in an
+  // eval run. Gather then holds the sanitized commit messages of base..head
+  // (commitMessages and sanitizeCommitMessages), and the command keeps them.
+  const description =
+    c.description_from === "commits"
+      ? gathered.description
+      : `${sanitizeGitHubText(c.title).text}\n\n${sanitizeGitHubText(c.body).text}`;
   const def = loadBuiltinReviewers().find((d) => d.frontmatter.name === REVIEWER);
   if (!def) throw new Error(`The built-in reviewer ${REVIEWER} is missing.`);
   const system = buildReviewerSystemPrompt(def.systemPrompt, {
