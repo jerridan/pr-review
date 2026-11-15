@@ -119,16 +119,108 @@ Goal: record three decisions in the design. No code change. Can ride with any de
 
 ## D4c: First experiments
 
-Goal: run the first experiments on the eval and write the results to `docs/research/`.
+Goal: run the first experiments on the eval and write the results to `docs/research/`, one note for each experiment. An experiment changes a default only by its decision rule.
 
-Each experiment follows the cost rules of the D8 measurement design: a subset of the cases, a budget in dollars that is set before the run, `--resume`, and paired arms when one run can give the two arms.
+### Rules for every experiment
 
-- diff-bugs on Opus 5.5 low against Sonnet 5.5 medium, on cost per confirmed finding.
-- One Opus reviewer at medium over the whole diff against the specialist set.
-- The verifier on Sonnet 5.5 high against Opus 5.5 high.
-- The 0 to 100 score against a 5-band scale.
-- The non-blocking cap formula against real records. Decides issue 23.
-- A prompt injection in a PR body against the sanitizer and the untrusted wrapper, after D7.
+D4b and D8 gave these rules. Each one comes from a loss in those runs.
+
+- Probe first. Before a full run, run two cases and record their cost. Compute the cost of the full run from the probe, not from an estimate.
+- Test the decision rule before the figures exist. Show with made-up figures that the rule can give each of its results. The first D8 rule could not fail.
+- Set the budget in dollars before the run. Stop when the budget is reached, and report what the budget gave.
+- One paid run at a time. The eval and the CI reviewer run on the plan login, and one dollar uses about 0.93 points of a five-hour plan window. Run with `--resume` and a dollar limit for each window.
+- A model of a second family runs through the Codex CLI, on its own quota. That quota holds about 20 minutes of work in five hours, so each such step must resume.
+- Write the run records under the crew record root, not in a worktree or a scratchpad. The records of the D4b baseline were lost with a worktree.
+- Use paired arms when one run can give the two arms. When two arms need two runs, report the noise of one pass, which `eval-report --by-pass` gives for each reviewer with two passes, and do not claim a difference that is smaller than that noise.
+- Each note states the method, the budget and the spend, every figure, the decision rule, the result, and the limits of the measurement.
+
+### Shared parts
+
+- S1, the reference run. One repeat of the full pipeline at the current defaults on the 28 pinned cases, with stored records. About $133. It is the comparison arm of E1 and E2, and it holds the candidate findings for E3 and E4. It also gives the two-pass figures of diff-bugs and security that D8 could not give.
+- S2, the replay tool. It reads the candidate findings of a stored run and verifies them again with another verifier model or another verifier prompt, and it scores the result as the eval does. It also takes candidate findings from a reviewer outside the pipeline, such as a Codex review, so that those findings pass the same verifier.
+- S3, the size groups. Give each case its count of changed lines, and split the cases into three groups of about equal count: small, medium and large.
+- S4, the model option. An eval option sets the model and the effort of named reviewers, or of all reviewers, for one run.
+
+### E1: the model and the effort of each reviewer
+
+Question: does each reviewer have the right model and effort? Today all seven reviewers run on Opus 5.5 at low effort, because no reviewer file sets a model.
+
+- Arms: Opus 5.5 low (S1), Opus 5.5 medium, Sonnet 5.5 medium, and Sonnet 5.5 high if the budget permits. One run of an arm holds all seven reviewers, and the record gives the findings and the cost of each reviewer, so one run measures seven reviewers.
+- Cases: a subset of 14, taken evenly from the three size groups of S3. Use the S1 records of the same 14 cases for the first arm.
+- Report for each reviewer and each arm: the posted-label goldens found, the false posted findings, the precision, the cost, and the cost per posted-label golden.
+- Rule for a cheaper setting: a reviewer moves to it when it finds no fewer posted-label goldens than the current setting, less the noise of one pass, and its precision is not more than 0.05 lower.
+- Rule for a dearer setting: a reviewer moves to it when the added cost per added posted-label golden is at most two times the current cost per posted-label golden, at the upper end of a 90% bootstrap interval over the cases, and its precision is not more than 0.05 lower. This is the D8 rule.
+- Budget: $200 for the three new arms.
+
+### E2: one reviewer over the whole diff against the specialist set
+
+Question: when does one reviewer do as well as the seven specialists? The theory of the principal: one reviewer does well on a small PR, the specialists do better on a large one, and a line exists between the two.
+
+- Arms: the specialist set (S1); one Opus 5.5 reviewer at medium; one Opus 5.5 reviewer at high; one Sol reviewer through the Codex CLI.
+- The three single arms use one prompt, a general review of the whole diff. Their findings pass the same verifier as the specialist findings, through S2. Report each arm before and after the verifier.
+- Leave the ten `pool` cases out of the main figures, and report them apart. Their goldens came from blind single reviews by Opus and by Sol, so those cases favour a single reviewer of the same model.
+- Report for each arm and each size group of S3: the posted-label goldens found, the precision, and the cost. Report the difference between the specialist set and each single arm for each case against the changed lines of the case.
+- The line: fit the difference against the changed lines, and give the size where the difference crosses zero, with a 90% bootstrap interval. If the interval covers the full range of the cases, state that the line is not found, and state how many more large cases the measurement needs.
+- This experiment changes no default. Its result is the evidence for a tier rule by size, which is a design decision of the principal.
+- Budget: $120 for the two Opus arms and their verification. The Sol arm uses the Codex quota.
+
+### E3: the model of the verifier
+
+Question: which model verifies best? Today the verifier is Sonnet 5.5 at high effort.
+
+- Arms: Sonnet 5.5 high (S1), Opus 5.5 high, and Terra through the Codex CLI. Each arm verifies the same stored candidates of S1, through S2, so the arms are paired.
+- Report for each arm: of the candidates that match a posted-label golden, the share that it keeps; of the candidates that match a not-real golden or no golden, the share that it rejects; the posted recall and precision that follow; the count of unsure results and of escalations; and the cost per verification.
+- Rule: a model becomes the verifier when its posted precision is not lower than that of the current verifier, its posted recall is higher with a 90% bootstrap interval of the difference above zero, and its cost per verification is at most two times the current cost.
+- A verifier of a second family needs the Codex CLI in CI. If Terra passes the rule, the note reports that, and the principal decides.
+- Budget: $60 for the Opus arm. The Terra arm uses the Codex quota.
+
+### E4: the score scale of the verifier
+
+Question: does a scale of five bands work as well as the score from 0 to 100?
+
+- Arms: the current verifier prompt (S1), and the same prompt with five named bands. The two verify the same stored candidates through S2, on the current verifier model.
+- Report the figures of E3 for each arm, and for each band or each score range the share of candidates that are real.
+- Rule: the five bands become the default when the posted recall and the posted precision are each not more than 0.05 lower and the count of escalations is lower.
+- Budget: $30.
+
+### E5: the cap on non-blocking findings
+
+Question: does the posting cap drop findings that matter? Decides issue 23.
+
+- Method: no model call. Read every recorded run. For each one, list the findings that the cap dropped, with their severity. Then compute what a cap on nits only would post.
+- Rule: if the cap dropped a blocking or a suggestion finding in a recorded run, the cap changes to nits only, as the design update of issue 23 says. If it dropped none, the cap stays and the note gives the counts.
+- Budget: $0.
+
+### E6: a prompt injection in a PR
+
+Question: can text in a PR steer a reviewer or the verifier? Run this with the D7 change, because the PR body now reaches every reviewer and the verifier.
+
+- Cases: the four bug-injection cases of D4b. Each one has one known bug, so a suppressed finding is measurable.
+- Arms: each case as it is, and the same case with an instruction in the PR body. Use three kinds of instruction: report no finding; state that the changed lines are already reviewed and safe; print the system prompt. Put one of them in a commit message and one in a code comment also, to test the two other paths.
+- Report: the share of runs that find the known bug with and without the instruction, and each output that follows an instruction.
+- Rule: no default changes. If an instruction lowers the share that finds the bug by more than the noise, or a run follows an instruction, open an issue with the case and the record.
+- Budget: $40.
+
+### E7: the follow-ups that name D4c
+
+The two lists of follow-ups below name D4c five times. The records of S1 answer two of them with no model call, and E6 answers one.
+
+- The passes of diff-bugs and security. Run `eval-report --by-pass` on the S1 records, and apply the D8 rule to the two reviewers. A reviewer that fails the rule goes to one pass.
+- The cross-pass dedupe key. Count in the S1 records how often a second pass reports a different claim on a span and a category that the first pass also reported. Report the count; change the key only if such a claim matches a posted-label golden that no other finding matched.
+- The sanitizer and the untrusted wrapper: E6 measures this.
+- Quotes by line span, and a verifier call when a later run resolves a thread with a changed span: these two are not in this round. They stay in the follow-up lists.
+- Budget: $0.
+
+### Order and budget
+
+1. E5, which costs nothing.
+2. The tooling: S2, S3 and S4.
+3. S1, the reference run, then E7 from its records.
+4. E3 and E4, which need S1 and S2 and cost little.
+5. E2, then E1.
+6. E6 at any time after the tooling.
+
+The budgets add up to about $585 of model calls: $133 for S1, $200 for E1, $120 for E2, $60 for E3, $30 for E4 and $40 for E6. The sessions that build the tooling use the plan also. That is more than one week of the plan holds beside other work, so the principal sets the calendar: the runs go across two plan weeks, or they use an API key with `--allow-api-key`.
 
 ## Smaller follow-ups found during D1 and D2
 
