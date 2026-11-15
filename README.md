@@ -848,6 +848,39 @@ Without `--ask-missing`, no query goes out. A pass 2 set can need a question tha
 
 The changed lines are the added and the removed lines in the hunks of the diff. The file headers do not count, and a `\ No newline` line does not count. The lines of the files that the review run excludes are a second figure: rename-only files and the files that match the default generated globs. The command reads no repo config, so the `generated_globs` of a repo config do not apply. The command sorts the cases by changed lines, then by name. The sizes of the three groups differ by at most one, and the larger groups come first. The JSON output gives each case with its figures and its group, and each group with its cases and its range. An empty group has the range `null`.
 
+### Replay the verifier
+
+`pr-review replay` verifies the stored candidates of an eval again, with the first verifier of one arm, and scores the result as the eval does. It changes the verifier model, the effort or the prompt, and keeps the candidates. So two arms over the same `--from` directory are paired.
+
+```bash
+pr-review replay --cases eval/cases --from <eval out> --arm stored --out replay-stored
+pr-review replay --cases eval/cases --from <eval out> --verifier claude:sonnet:medium --out replay-sonnet-medium --max-cost 20
+```
+
+A replay asks the first verifier only. It makes no escalation call, no merge call and no cap. So its figures compare only with other replays, not with an eval report. `--arm stored` is the comparison arm: it takes the stored first result of each candidate, with no verifier call. A result in the escalation band, or of a finding with `needs_context`, gets the decision of the first result alone, and the report counts it as in the band.
+
+| Flag | Meaning | Default |
+|------|---------|---------|
+| `--cases <dir>` | The cases directory of the eval. | required |
+| `--from <dir>` | The `--out` directory of the eval. The candidates of a full record are its `stages.verifications`. The candidates of a stage 1 record are its `stages.candidates`. | none |
+| `--repeat <n>` | The repeat of the `--from` records. | 1 |
+| `--candidates <dir>` | Candidates from a reviewer outside the pipeline: one `<case>.json` for each case, of the form `{ "source": "<name>", "findings": [<finding>...] }`. Each finding has the fields of a reviewer finding. It gets the same line-range check and evidence check, and the report counts the dropped findings by reason. The source name acts as a reviewer name, and the threshold is `thresholds.default`. With `--from`, the candidates are the union of the two sets. | none |
+| `--reviewers <name,...>` | Keep only the candidates with a source of these reviewers. | all |
+| `--verifier <backend:model:effort>` | The verifier of the arm. The backend is `claude` or `codex`. The `codex` backend exits 2 before any call until the Codex call takes a model and an effort. | required, or `--arm stored` |
+| `--prompt score\|truth\|bands` | The prompt form. `score` is `prompts/verifier.md`. `truth` gives no severity. `bands` gives one of five named bands in place of the score, and the frontmatter of `prompts/verifier-bands.md` maps each band to a score. | `score` |
+| `--arm stored` | The stored first results, with no verifier call. Its report also gives, from the records, how many candidates escalated, how many of them changed the decision, and the cost of the escalations. A stage 1 record has no stored result, so it exits 2. | none |
+| `--severity <mode:model:effort>` | The severity step, with no tools. `finding` makes one call for each candidate that holds and is in scope. `pr` makes one call for each case, with all such candidates. Its label replaces the verifier label. | none |
+| `--out <dir>` | The results directory. It holds one arm. | required |
+| `--resume` | Reuse the finished results of the same arm in `--out`. A new `--severity` reuses the verifier results and adds only the severity calls. | off |
+| `--concurrency <n>` | The calls that run at once. | 5 |
+| `--max-cost <usd>` | Start no new call when the calls of this invocation cost this many US dollars or more: the verifier, severity and judge calls. The calls in flight run to their end, so the spend can pass the limit by at most the concurrency times the largest cap of one call. The replay then reports what it has and exits 4. | no limit |
+| `--sample all\|golden-plus-equal\|<n>` | Verify a sample of the candidates. `golden-plus-equal` takes every candidate that matches a golden and an equal count of the others. The sample is drawn over all cases with `--seed`. | `all` |
+| `--seed <n>` | The seed of the sample. | the bootstrap seed |
+
+Before any verifier call, the replay clones each case into a temporary directory and matches every candidate to the goldens of its case, of every label, by the match of the eval. It reads the judge cache of the `--from` repeat and writes the new answers to `<out>/<case>/judge-cache.json`. Each candidate gets the verifier input of the run: the head file, the diff of its file, the description of the record and the git facts of its file, which the replay makes again from the clone. Each finished result goes into `<out>/<case>/` at once, so a kill loses only the calls in flight. A codex result stores `cost_usd: null` and the tokens of the call.
+
+The report gives each figure in total and for each case, for each source and for all: the posted recall and precision; the candidates and the goldens that they match before the verifier; the truth figures (the share of real candidates that the verifier says hold, and the share of the others that it rejects); the severity figures (the agreement of the label with the golden label, the agreement on post against no post, and the blocking goldens that got a label that does not post); the share of real candidates for each band or each score range of 10; the counts of results in the band, of unsure results and of failed calls; and the cost per verification.
+
 ### A cases subset by cost
 
 `pr-review eval-subset` makes a new cases directory that leaves out the expensive cases.
