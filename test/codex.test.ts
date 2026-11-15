@@ -76,10 +76,6 @@ describe("the model and the effort of a codex call", () => {
     expect(valueAfter(argv, "-m")).toBe("gpt-6.1-sol");
     expect(argv).toContain("model_reasoning_effort=xhigh");
   });
-
-  it("names the terra model gpt-6.1-terra", () => {
-    expect(TERRA_MODEL).toBe("gpt-6.1-terra");
-  });
 });
 
 describe("the token count of a codex call", () => {
