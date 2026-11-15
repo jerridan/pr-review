@@ -621,24 +621,27 @@ describe("a verifier call that stops on its limit (R4)", () => {
   it.each([
     ["budget", "Claude Code returned an error result: Reached maximum budget ($0.5)"],
     ["turns", "Claude Code returned an error result: Reached maximum number of turns (30)"],
-  ])("gives unsure when the SDK throws on the %s limit, and the review completes", async (_n, text) => {
-    const result = await runReview({
-      repo: fx.repo,
-      base: fx.base,
-      head: fx.head,
-      outDir: join(outRoot, `limit-thrown-${_n}`),
-      format: "json",
-      allowApiKey: false,
-      client: throwingVerifierClient(text),
-    });
-    expect(result.exitCode).toBe(0);
-    expect(result.record.posted.verdict).not.toBe("incomplete");
-    expect(result.record.stages.verifications[0]).toMatchObject({
-      first: { kind: "limit", message: expect.stringContaining("maximum") },
-      unsure: "limit",
-    });
-    expect(result.record.posted.coverage.findings_unsure_on_limit).toBe(1);
-  });
+  ])(
+    "gives unsure when the SDK throws on the %s limit, and the review completes",
+    async (_n, text) => {
+      const result = await runReview({
+        repo: fx.repo,
+        base: fx.base,
+        head: fx.head,
+        outDir: join(outRoot, `limit-thrown-${_n}`),
+        format: "json",
+        allowApiKey: false,
+        client: throwingVerifierClient(text),
+      });
+      expect(result.exitCode).toBe(0);
+      expect(result.record.posted.verdict).not.toBe("incomplete");
+      expect(result.record.stages.verifications[0]).toMatchObject({
+        first: { kind: "limit", message: expect.stringContaining("maximum") },
+        unsure: "limit",
+      });
+      expect(result.record.posted.coverage.findings_unsure_on_limit).toBe(1);
+    },
+  );
 
   it("keeps kind thrown for another thrown error", async () => {
     const { record } = await runReview({

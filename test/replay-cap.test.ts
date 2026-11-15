@@ -108,4 +108,10 @@ describe("pr-review replay --verifier-cap", () => {
     expect(output.stdout).toMatch(/--max-cost <usd>[\s\S]*--verifier-cap/);
     expect(output.stdout).toMatch(/--verifier-cap <usd>[\s\S]*codex/i);
   });
+
+  it("says in the help that the stored arm can ask the judge, and that --max-cost counts it", async () => {
+    const code = await replay(replayFake(), ["--help"]);
+    expect(code).toBe(0);
+    expect(output.stdout).toMatch(/--arm <arm>[\s\S]*judge[\s\S]*--max-cost/);
+  });
 });

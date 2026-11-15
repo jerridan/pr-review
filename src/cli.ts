@@ -263,6 +263,15 @@ function parseUsd(value: string): number {
   return n;
 }
 
+// Parse --verifier-cap: a number above 0.
+function parseCap(value: string): number {
+  const n = Number(value);
+  if (value.trim() === "" || !Number.isFinite(n) || n <= 0) {
+    throw new InvalidArgumentError("Give the cap in US dollars as a number above 0.");
+  }
+  return n;
+}
+
 // Parse --github-repo: owner/repo.
 function parseSlug(value: string): string {
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(value)) {
@@ -694,9 +703,10 @@ export function createProgram(deps: ProgramDeps): Command {
         .default("score"),
     )
     .addOption(
-      new Option("--arm <arm>", "stored: the stored first results, with no verifier call").choices([
-        "stored",
-      ]),
+      new Option(
+        "--arm <arm>",
+        "stored: the stored first results, with no verifier call; the golden match can still ask the judge for questions that the cache of --from does not hold, and --max-cost counts those calls",
+      ).choices(["stored"]),
     )
     .option(
       "--severity <mode:model:effort>",
@@ -715,8 +725,13 @@ export function createProgram(deps: ProgramDeps): Command {
       "--max-cost <usd>",
       "start no new call when the calls of this invocation cost this many US dollars or more; " +
         "the calls in flight run to their end, so the spend can pass the limit by at most the " +
-        "concurrency times the largest dollar cap of one call ($1 with --severity pr, else $0.50)",
+        "concurrency times the largest dollar cap of one call (the larger of --verifier-cap and the severity cap: $1 with --severity pr, else $0.50)",
       parseUsd,
+    )
+    .option(
+      "--verifier-cap <usd>",
+      "the dollar cap of one verifier call of the arm, a positive number (default: the cap of the verifier role); the codex backend has no dollar cap and ignores it",
+      parseCap,
     )
     .option(
       "--sample <kind>",
@@ -749,6 +764,7 @@ export function createProgram(deps: ProgramDeps): Command {
           resume?: boolean;
           concurrency: number;
           maxCost?: number;
+          verifierCap?: number;
           sample?: SampleKind;
           seed?: number;
           format: "table" | "json";
@@ -781,6 +797,7 @@ export function createProgram(deps: ProgramDeps): Command {
               resume: options.resume === true,
               concurrency: options.concurrency,
               ...(options.maxCost !== undefined ? { maxCost: options.maxCost } : {}),
+              ...(options.verifierCap !== undefined ? { verifierCap: options.verifierCap } : {}),
               sample: options.sample ?? "all",
               seed: options.seed ?? BOOTSTRAP_SEED,
               format: options.format,
