@@ -251,8 +251,7 @@ async function scoreRepeats(runs: string, c: Case, known: number[]): Promise<Rep
         });
         const hit = score.matched.some((m) => known.includes(m.golden));
         out.push({ repeat, found: hit ? true : score.uncached > 0 ? "unknown" : false, record });
-      } catch (err) {
-        console.error('DEBUG', err);
+      } catch {
         out.push({ repeat, found: "unknown", record: null });
       }
     }

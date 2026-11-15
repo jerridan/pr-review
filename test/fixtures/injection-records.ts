@@ -95,7 +95,19 @@ export function makeRecord(findings: PostedFinding[], summary = "A small change.
     stages: {
       reviewers: [],
       verifications: findings.map((f) => ({
-        finding: f,
+        finding: {
+          file: f.file,
+          start_line: f.start_line,
+          end_line: f.end_line,
+          category: f.category,
+          severity_estimate: f.severity_estimate,
+          confidence: f.confidence,
+          claim: f.claim,
+          evidence: f.evidence,
+          suggested_fix: f.suggested_fix,
+          explanation: f.explanation,
+          needs_context: f.needs_context,
+        },
         first: f.verifier,
         final: f.verifier,
         passed: true,
