@@ -2,14 +2,15 @@
 // the first verifier of one arm only, and report the figures of the arm.
 // A replay asks no escalation verifier and no merge, and applies no cap, so
 // its posted figures compare only with other replays. "--arm stored" is the
-// comparison arm: the stored first results, with no verifier call.
+// comparison arm: the stored first results, with no verifier call. The
+// golden match can still ask the judge, and --max-cost counts those calls.
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { EXIT_OK, EXIT_STOPPED, EXIT_USAGE } from "../../cli.js";
 import { withRepoGlobs } from "../../config/globs.js";
-import { JUDGE_DEFAULTS } from "../../config/models.js";
+import { JUDGE_DEFAULTS, ROLE_DEFAULTS } from "../../config/models.js";
 import { loadRepoConfig, type RepoConfig } from "../../config/repo-config.js";
 import { readHeadFile } from "../../find/evidence.js";
 import { diffSections } from "../../gather/diff.js";
@@ -100,6 +101,8 @@ export type ReplayOptions = {
   resume: boolean;
   concurrency: number;
   maxCost?: number;
+  /** The dollar cap of one verifier call. The codex backend ignores it. */
+  verifierCap?: number;
   sample: SampleKind;
   seed: number;
   format: "table" | "json";
@@ -151,10 +154,17 @@ function say(message: string): void {
   process.stderr.write(`pr-review replay: ${message}\n`);
 }
 
-const armText = (arm: ReplayArm): string =>
-  arm.kind === "stored"
-    ? "stored"
-    : `${arm.verifier.backend}:${arm.verifier.model}:${arm.verifier.effort}/${arm.form}`;
+// The arm names the cap only when it is not the default. The codex backend
+// has no dollar cap, so its arm never names one.
+const armText = (arm: ReplayArm, cap?: number): string => {
+  if (arm.kind === "stored") return "stored";
+  const base = `${arm.verifier.backend}:${arm.verifier.model}:${arm.verifier.effort}/${arm.form}`;
+  const custom =
+    arm.verifier.backend === "claude" &&
+    cap !== undefined &&
+    cap !== ROLE_DEFAULTS.verifier.maxBudgetUsd;
+  return custom ? `${base}/cap=${cap}` : base;
+};
 
 /** The spend of the invocation and the limit. */
 class Spend {
@@ -388,7 +398,7 @@ async function replay(opts: ReplayOptions, clientOf: () => Promise<SdkClient>): 
     );
   }
   const version = toolVersion();
-  const arm = armText(opts.arm);
+  const arm = armText(opts.arm, opts.verifierCap);
   const options: RunOptions = { allowApiKey: opts.allowApiKey, env: process.env };
   const spend = new Spend(opts.maxCost);
   let inner: SdkClient | null = null;
@@ -402,7 +412,7 @@ async function replay(opts: ReplayOptions, clientOf: () => Promise<SdkClient>): 
   let backend: VerifierBackend | null = null;
   let form: LoadedForm | null = null;
   if (opts.arm.kind === "verifier") {
-    backend = backendFor(opts.arm.verifier, () => client, options);
+    backend = backendFor(opts.arm.verifier, () => client, options, opts.verifierCap);
     if (backend.unavailable !== null) throw new ReplayUsageError(backend.unavailable);
     form = loadForm(opts.arm.form);
   }
@@ -927,6 +937,7 @@ export function renderReplay(report: ReplayReport): string {
         "severity agreement",
         "in band",
         "unsure",
+        "capped",
         "failed",
         "cost",
       ],
@@ -944,6 +955,7 @@ export function renderReplay(report: ReplayReport): string {
         f.severity === null ? "-" : share(f.severity.agreement),
         String(f.in_band),
         String(f.unsure),
+        String(f.capped),
         String(f.failed),
         usd(f.cost_usd + f.severity_cost_usd),
       ]);

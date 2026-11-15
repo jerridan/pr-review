@@ -57,6 +57,8 @@ export type Figures = {
   in_band: number;
   /** The decisions that ended unsure. */
   unsure: number;
+  /** The verifier calls that stopped on their limit. Each is also in "unsure". */
+  capped: number;
   /** The verifier and severity calls that failed. */
   failed: number;
   verifications: number;
@@ -191,6 +193,7 @@ export function caseFigures(
       })),
     in_band: entries.filter((e) => e.in_band).length,
     unsure: entries.filter((e) => e.decision?.unsure !== undefined).length,
+    capped: entries.filter((e) => isQueryFailure(e.result) && e.result.kind === "limit").length,
     failed:
       entries.filter((e) => isQueryFailure(e.result)).length +
       entries.filter((e) => e.severity?.failure !== undefined).length,
@@ -284,6 +287,7 @@ export function sumFigures(rows: Figures[]): Figures {
       })),
     in_band: sum((f) => f.in_band),
     unsure: sum((f) => f.unsure),
+    capped: sum((f) => f.capped),
     failed: sum((f) => f.failed),
     verifications,
     cost_usd: cost,

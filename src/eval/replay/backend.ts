@@ -49,12 +49,13 @@ export function claudeBackend(
   spec: VerifierSpec,
   client: SdkClient,
   options: RunOptions,
+  capUsd: number = ROLE_DEFAULTS.verifier.maxBudgetUsd,
 ): VerifierBackend {
   const model = resolveModel(spec.model);
   return {
     spec,
     unavailable: null,
-    capUsd: ROLE_DEFAULTS.verifier.maxBudgetUsd,
+    capUsd,
     async verify(call) {
       const start = performance.now();
       const meta = (
@@ -75,7 +76,7 @@ export function claudeBackend(
             userMessage: call.userMessage,
             schema: call.schema,
             cwd: call.cwd,
-            overrides: { model, effort: spec.effort },
+            overrides: { model, effort: spec.effort, maxBudgetUsd: capUsd },
           },
           options,
         );
@@ -157,6 +158,9 @@ export function backendFor(
   spec: VerifierSpec,
   client: () => SdkClient,
   options: RunOptions,
+  capUsd?: number,
 ): VerifierBackend {
-  return spec.backend === "codex" ? codexBackend(spec) : claudeBackend(spec, client(), options);
+  return spec.backend === "codex"
+    ? codexBackend(spec)
+    : claudeBackend(spec, client(), options, capUsd);
 }
