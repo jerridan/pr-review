@@ -59,6 +59,21 @@ A severity call has no tools, but a call for one finding costs from $0.03 (Sonne
 
 A possible later saving: put the policy before the finding, in the system prompt or at the start of the user message, so that the cache holds it for every call of a run.
 
+## Time
+
+From the stored durations, with no model call. The severity step runs after the verifier of the same finding, so it adds its time to that finding.
+
+| Severity step | Calls | Median | 90th percentile | Maximum |
+|---|---|---|---|---|
+| finding, Sonnet 5.5 high | 226 | 6.6 s | 13.4 s | 53.7 s |
+| finding, Opus 5.5 medium | 226 | 4.7 s | 6.8 s | 10.1 s |
+| finding, Opus 5.5 high | 226 | 5.5 s | 8.4 s | 12.1 s |
+| pr, Sonnet 5.5 high (one call for each case) | 23 | 17.9 s | 34.8 s | 60.0 s |
+| pr, Opus 5.5 medium | 23 | 15.3 s | 25.7 s | 30.4 s |
+| pr, Opus 5.5 high | 23 | 19.8 s | 33.9 s | 44.7 s |
+
+A `finding` step adds 5 to 7 s to each finding at the median. A `pr` step waits for every verification of the case, then adds 15 to 20 s to the review at the median. The verifier alone (Sonnet 5.5 medium) takes 8.0 s for each finding at the median.
+
 ## Spend
 
 The paid runs of this note cost $55.36: the truth check $2.58, the probes $7.02, the three `pr` arms $7.65, and the three `finding` arms $38.11.

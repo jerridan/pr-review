@@ -76,6 +76,10 @@ For each score range of the score arm:
 
 The score has the same weakness at its top: from 70 up, the share of real candidates is about one third in every range. The score separates the clear false candidates (below 50) and little else. This agrees with E3: the verifier holds almost every real candidate, but it rejects only 7 to 9% of the others.
 
+## Time
+
+From the stored durations, with no model call. The five bands prompt took 7.2 s for each verification at the median (90th percentile 13.0 s, maximum 34.9 s), against 8.0 s (20.9 s, 41.9 s) for the score prompt on the same verifier. The bands prompt is a little faster and has a shorter tail.
+
 ## Spend
 
 The bands arm cost $19.84: $2.41 for the probe of two cases, and $17.43 for the rest. The last start passed the limit of the principal ($10) by $7.43, because the arm had nearly finished when the lower limit arrived.
