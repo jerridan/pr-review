@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, afterEach, describe, expect, it, vi } from "vitest";
@@ -42,6 +42,7 @@ writeFileSync(argv[argv.indexOf("-o") + 1], JSON.stringify({ findings: step.find
 
 const made: string[] = [];
 let cases = "";
+let template = "";
 let shimDir = "";
 let out = "";
 
@@ -49,7 +50,7 @@ beforeAll(async () => {
   const fx = await makeFixture();
   made.push(fx.repo);
   const root = tempDir("codex-review", made);
-  const template = await makeTemplate(fx, root);
+  template = await makeTemplate(fx, root);
   cases = casesFrom(template, join(root, "cases"), [
     { name: "case-a", golden: [] },
     { name: "case-b", golden: [] },
@@ -138,10 +139,10 @@ describe("pr-review eval-codex-review", () => {
       });
     }
     expect(readdirSync(out).sort()).toEqual([
+      ".tokens.json",
       "case-a.json",
       "case-b.json",
       "case-c.json",
-      "tokens.json",
     ]);
   }, 60_000);
 
@@ -225,7 +226,7 @@ describe("pr-review eval-codex-review", () => {
   it("fails the case when a finding fails the finding schema", async () => {
     plan({ default: { findings: [{ ...FINDING, category: "style" }] } });
     expect(await run()).toBe(1);
-    expect(existsSync(out) ? readdirSync(out).filter((n) => n !== "tokens.json") : []).toEqual([]);
+    expect(readdirSync(out)).toEqual([]);
   }, 60_000);
 
   it("stops at a quota error before the next case, and keeps the finished cases", async () => {
@@ -236,16 +237,16 @@ describe("pr-review eval-codex-review", () => {
     });
     expect(await run()).toBe(1);
     expect(calls()).toHaveLength(2);
-    expect(readdirSync(out).sort()).toEqual(["case-a.json", "tokens.json"]);
+    expect(readdirSync(out).sort()).toEqual([".tokens.json", "case-a.json"]);
     expect(output.stderr).toMatch(/quota is out/i);
     // A rerun continues with the cases that have no file.
     plan({ default: { findings: [] } });
     expect(await run()).toBe(0);
     expect(readdirSync(out).sort()).toEqual([
+      ".tokens.json",
       "case-a.json",
       "case-b.json",
       "case-c.json",
-      "tokens.json",
     ]);
   }, 60_000);
 
@@ -275,28 +276,106 @@ describe("pr-review eval-codex-review", () => {
     expect(lines[3]).toBe("done: 2");
   }, 60_000);
 
-  it("writes tokens.json with the tokens of each case, and keeps old entries on a rerun", async () => {
+  const MODEL = { model: "gpt-6.1-terra", effort: "high" };
+  const SOURCE = "codex-general-review-gpt-6.1-terra-high";
+
+  function tokenMap(): unknown {
+    return JSON.parse(readFileSync(join(out, ".tokens.json"), "utf8"));
+  }
+
+  it("writes .tokens.json with the tokens, model and effort of each done case, and keeps old entries on a rerun", async () => {
     plan({
       "MARK-a": { findings: [], stderr: "tokens used\n1,200\n" },
       "MARK-b": { exit: 1, stderr: "boom\ntokens used\n300\n" },
       "MARK-c": { findings: [] },
     });
     await run();
-    const file = join(out, "tokens.json");
-    expect(JSON.parse(readFileSync(file, "utf8"))).toEqual({
-      "case-a": 1200,
-      "case-b": 300,
-      "case-c": null,
+    // The failed case has no entry.
+    expect(tokenMap()).toEqual({
+      "case-a": { tokens: 1200, ...MODEL },
+      "case-c": { tokens: null, ...MODEL },
     });
     // The rerun does case-b only, and keeps the other entries.
     plan({ default: { findings: [], stderr: "tokens used\n50\n" } });
-    expect(await run()).toBe(0);
-    expect(JSON.parse(readFileSync(file, "utf8"))).toEqual({
-      "case-a": 1200,
-      "case-b": 50,
-      "case-c": null,
+    expect(await run("--effort", "low")).toBe(0);
+    expect(tokenMap()).toEqual({
+      "case-a": { tokens: 1200, ...MODEL },
+      "case-b": { tokens: 50, model: "gpt-6.1-terra", effort: "low" },
+      "case-c": { tokens: null, ...MODEL },
     });
-    expect(readdirSync(out).filter((n) => n.startsWith("."))).toEqual([]);
+    expect(readdirSync(out).filter((n) => n.includes(".tmp"))).toEqual([]);
+  }, 60_000);
+
+  it("keeps the earlier entry of a case that fails on a forced rerun, and prints its tokens", async () => {
+    plan({ default: { findings: [], stderr: "tokens used\n1,200\n" } });
+    await run();
+    plan({ default: { exit: 1, stderr: "boom\ntokens used\n77\n" } });
+    output.stdout = "";
+    expect(await run("--force")).toBe(1);
+    expect(output.stdout).toContain("case case-a: failed tokens 77");
+    expect(tokenMap()).toEqual({
+      "case-a": { tokens: 1200, ...MODEL },
+      "case-b": { tokens: 1200, ...MODEL },
+      "case-c": { tokens: 1200, ...MODEL },
+    });
+  }, 60_000);
+
+  it("keeps a case named tokens apart from the tokens file", async () => {
+    const root = tempDir("codex-review-tokens-case", made);
+    const named = casesFrom(template, join(root, "cases"), [{ name: "tokens", golden: [] }]);
+    plan({ default: { findings: [], stderr: "tokens used\n9\n" } });
+    expect(await codexReviewCommand(["--cases", named, "--out", out])).toBe(0);
+    expect(written("tokens")).toEqual({ source: SOURCE, findings: [] });
+    expect(tokenMap()).toEqual({ tokens: { tokens: 9, ...MODEL } });
+  }, 60_000);
+
+  it("goes on with a warning when the tokens file cannot be written", async () => {
+    // A directory holds the temp name of the tokens file, so its write fails.
+    mkdirSync(join(out, `.tokens.json.tmp-${process.pid}`), { recursive: true });
+    plan({ default: { findings: [] } });
+    expect(await run()).toBe(0);
+    expect(output.stderr).toContain(".tokens.json");
+    expect(output.stderr).toMatch(/EISDIR|directory/i);
+    expect(output.stdout).toMatch(/done: 3/);
+    expect(written("case-c")).toEqual({ source: SOURCE, findings: [] });
+  }, 60_000);
+
+  it("moves a tokens file that does not parse aside, with a warning, and starts a new map", async () => {
+    mkdirSync(out, { recursive: true });
+    writeFileSync(join(out, ".tokens.json"), "{not json");
+    plan({ default: { findings: [] } });
+    expect(await run()).toBe(0);
+    expect(output.stderr).toContain(".tokens.json");
+    const bad = readdirSync(out).filter((n) => n.startsWith(".tokens.json.bad-"));
+    expect(bad).toHaveLength(1);
+    expect(bad[0]).toMatch(/^\.tokens\.json\.bad-\d+$/);
+    expect(readFileSync(join(out, bad[0] ?? ""), "utf8")).toBe("{not json");
+    expect(readdirSync(out).sort()).toEqual([
+      ".tokens.json",
+      bad[0],
+      "case-a.json",
+      "case-b.json",
+      "case-c.json",
+    ]);
+    expect(tokenMap()).toEqual({
+      "case-a": { tokens: null, ...MODEL },
+      "case-b": { tokens: null, ...MODEL },
+      "case-c": { tokens: null, ...MODEL },
+    });
+  }, 60_000);
+
+  it("moves a tokens file that fails the schema aside and keeps its content", async () => {
+    mkdirSync(out, { recursive: true });
+    const old = JSON.stringify({ "case-z": 5 });
+    writeFileSync(join(out, ".tokens.json"), old);
+    plan({ "MARK-a": { findings: [] }, default: { exit: 1, stderr: "boom" } });
+    expect(await run()).toBe(1);
+    const bad = readdirSync(out).filter((n) => n.startsWith(".tokens.json.bad-"));
+    expect(bad).toHaveLength(1);
+    expect(readFileSync(join(out, bad[0] ?? ""), "utf8")).toBe(old);
+    expect(readdirSync(out).sort()).toEqual([".tokens.json", bad[0], "case-a.json"]);
+    expect(output.stderr).toContain(".tokens.json");
+    expect(tokenMap()).toEqual({ "case-a": { tokens: null, ...MODEL } });
   }, 60_000);
 
   it("exits 2 for a missing option or an unknown effort, and calls no codex", async () => {
