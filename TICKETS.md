@@ -168,6 +168,7 @@ Question: when does one reviewer do as well as the seven specialists? The theory
 - Report for each arm and each size group of S3: the posted-label goldens found, the precision, and the cost. Report the difference between the specialist set and each single arm for each case against the changed lines of the case.
 - The line: fit the difference against the changed lines, and give the size where the difference crosses zero, with a 90% bootstrap interval. If the interval covers the full range of the cases, state that the line is not found, and state how many more large cases the measurement needs.
 - This experiment changes no default. Its result is the evidence for a tier rule by size, which is a design decision of the principal.
+- Done 2026-11-16: the line is not found. For each single arm (Opus 5.5 medium and high, Terra high), the 90% interval covers the full range of 12 to 3164 lines. After the verifier, recall is 0.496 for the specialists, 0.456 for Opus high, 0.376 for Opus medium and 0.352 for Terra; precision is 0.392 against 0.547 to 0.638. The note is `docs/research/e2-single-reviewer.md`.
 
 ### E3: the model and the effort of the verifier
 
