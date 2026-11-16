@@ -2,7 +2,7 @@
 // through Codex on each case of a cases directory, and write the findings as
 // outside candidates, one file per case. The prompt texts are in prompts/.
 // The command reads no credential. Codex finds its own login.
-import { mkdtemp, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, rename, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
@@ -15,6 +15,7 @@ import { sanitizeGitHubText } from "../github/sanitize.js";
 import { loadPrompt, render } from "../prompts/load.js";
 import { loadBuiltinReviewers } from "../reviewers/loader.js";
 import { FindingSchema, findingShape, type Finding } from "../schemas/finding.js";
+import { writeFileAtomic } from "./atomic.js";
 import { CaseError, loadCases, type Case } from "./case.js";
 import { cloneCase } from "./checkout.js";
 import { codexQuotaError, runCodex, TERRA_MODEL, type CodexEffort } from "./codex.js";
@@ -158,11 +159,11 @@ async function reviewCase(c: Case, options: CodexReviewOptions): Promise<CaseRes
       }
       findings.push(parsed.data);
     }
-    // Write to a temp file, then rename, so a stop leaves no half file.
-    const file = join(options.out, `${c.name}.json`);
-    const temp = join(options.out, `.${c.name}.json.tmp`);
-    await writeFile(temp, `${JSON.stringify({ source: options.source, findings }, null, 2)}\n`);
-    await rename(temp, file);
+    // A stop leaves no half file.
+    await writeFileAtomic(
+      join(options.out, `${c.name}.json`),
+      `${JSON.stringify({ source: options.source, findings }, null, 2)}\n`,
+    );
     return { kind: "done", tokens: outcome.tokens };
   } catch (err) {
     return { kind: "failed", error: messageOf(err), tokens: null };
@@ -171,32 +172,62 @@ async function reviewCase(c: Case, options: CodexReviewOptions): Promise<CaseRes
   }
 }
 
-const TOKENS_FILE = "tokens.json";
+// A dot file, so no case name can collide with it.
+const TOKENS_FILE = ".tokens.json";
 
-// The tokens of each case. A missing or unreadable file gives no entries.
-async function readTokens(out: string): Promise<Record<string, number | null>> {
+const TokenEntrySchema = z.strictObject({
+  tokens: z.number().nullable(),
+  model: z.string(),
+  effort: z.string(),
+});
+type TokenEntry = z.infer<typeof TokenEntrySchema>;
+const TokenMapSchema = z.record(z.string(), TokenEntrySchema);
+
+// The token entries of the earlier runs. A missing file gives no entries. A
+// file that does not parse, or fails the schema, is moved aside, never
+// deleted, and the command starts a new map.
+async function readTokens(out: string): Promise<Record<string, TokenEntry>> {
+  const file = join(out, TOKENS_FILE);
+  let text: string;
   try {
-    const raw: unknown = JSON.parse(await readFile(join(out, TOKENS_FILE), "utf8"));
-    const parsed = z.record(z.string(), z.number().nullable()).safeParse(raw);
-    return parsed.success ? parsed.data : {};
-  } catch {
+    text = await readFile(file, "utf8");
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return {};
+    process.stderr.write(`warning: cannot read ${file}: ${messageOf(err)}\n`);
     return {};
   }
+  let problem: string;
+  try {
+    const parsed = TokenMapSchema.safeParse(JSON.parse(text));
+    if (parsed.success) return parsed.data;
+    problem = "it fails the schema";
+  } catch {
+    problem = "it does not parse";
+  }
+  const aside = `${file}.bad-${Date.now()}`;
+  try {
+    await rename(file, aside);
+    process.stderr.write(
+      `warning: ${file}: ${problem}. Moved it to ${aside}. Starting a new map.\n`,
+    );
+  } catch (err) {
+    process.stderr.write(`warning: ${file}: ${problem}. Cannot move it aside: ${messageOf(err)}\n`);
+  }
+  return {};
 }
 
-async function writeTokens(out: string, tokens: Record<string, number | null>): Promise<void> {
-  const temp = join(out, `.${TOKENS_FILE}.tmp`);
-  await writeFile(temp, `${JSON.stringify(tokens, null, 2)}\n`);
-  await rename(temp, join(out, TOKENS_FILE));
+async function writeTokens(out: string, tokens: Record<string, TokenEntry>): Promise<void> {
+  const file = join(out, TOKENS_FILE);
+  try {
+    await writeFileAtomic(file, `${JSON.stringify(tokens, null, 2)}\n`);
+  } catch (err) {
+    process.stderr.write(`warning: cannot write ${file}: ${messageOf(err)}\n`);
+  }
 }
 
 async function finished(out: string): Promise<Set<string>> {
   try {
-    return new Set(
-      (await readdir(out)).filter(
-        (n) => n.endsWith(".json") && !n.startsWith(".") && n !== TOKENS_FILE,
-      ),
-    );
+    return new Set((await readdir(out)).filter((n) => n.endsWith(".json") && !n.startsWith(".")));
   } catch {
     return new Set();
   }
@@ -237,9 +268,9 @@ export async function codexReviewCommand(args: string[]): Promise<number> {
     const result = await reviewCase(c, options);
     tokens += result.tokens ?? 0;
     process.stdout.write(`case ${c.name}: ${result.kind} tokens ${result.tokens ?? "unknown"}\n`);
-    perCase[c.name] = result.tokens;
-    await writeTokens(options.out, perCase);
     if (result.kind === "done") {
+      perCase[c.name] = { tokens: result.tokens, model: options.model, effort: options.effort };
+      await writeTokens(options.out, perCase);
       done += 1;
       continue;
     }
