@@ -96,7 +96,7 @@ The whole review in S1 is the sum of `cost.stage_ms`, which holds five stages: c
 | Sonnet 5.5 medium (the new verifier) | 239 | 8.0 s | 20.9 s | 41.9 s | 41.1 min |
 | Opus 5.5 low | 239 | 4.0 s | 7.0 s | 11.0 s | 17.9 min |
 
-- The escalation runs after the first call of the same finding, so an escalated finding waits for two calls in series. At the median, that adds 12.6 s to that finding. In the median case, the escalation is 43% of the call time of the verifier.
+- The escalation runs after the first call of the same finding, so an escalated finding waits for two calls in series. At the median, that adds 12.6 s to that finding. For each case, the escalation calls take a share of the sum of the verifier and escalation call time of that case. The median of that share over the 28 cases is 43%. Over all calls together, the share is 35% (30.4 min of 85.7 min). The two differ because a case with few verifications weighs as much as a large case in the median.
 - The verifier calls of a review run at the same time (5 at once by default). So the review time follows the slowest finding, and the slowest finding is often an escalated one.
 - Opus 5.5 low verifies in about half the time of Sonnet 5.5 medium, with a much shorter tail (11 s at most against 42 s). The rule of E3 does not count time. A later decision that counts time can weigh this.
 
