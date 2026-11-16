@@ -1,0 +1,767 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 61,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Add the E3b and E4 notes of D4c and the time figures of E3, E3b and E4",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/61"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "3da265ca07b02efd96d132a396e7def794762506",
+    "head": "c03bd5fb30969096efbbc60d5458f8bce6df46a2",
+    "started_at": "2026-11-16T08:06:15.754Z",
+    "tool_version": "0.18.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Add the E3b and E4 notes of D4c and the time figures of E3, E3b and E4\n\n## Summary\n\nThe E3b and E4 notes of D4c, the time figures of E3, E3b and E4, and both experiments marked done in TICKETS.md. Notes only: no code and no default change, so no version bump.\n\n- **E3b** (`docs/research/e3b-severity-step.md`): the severity stays in the verifier. No split arm passes the rule. The best arm, a step on Opus 5.5 medium for each finding, agrees on post against no post in 0.899 of the findings, against 0.835 for the single call. But the lower end of its 90% interval is exactly 0.000, and the rule needs it above zero. The truth check agreed on 30 of 30 candidates. The note states the labeler limit (the goldens were labeled by Opus with a Sol judge) and a possible cache saving (the policy before the finding).\n- **E4** (`docs/research/e4-score-scale.md`): the score from 0 to 100 stays. With the map from a band to a score chosen before the run, the five bands lose 0.208 posted recall and put more results in the band. The note also decides the stored results again under other maps, with no model call. A map chosen after the figures would pass the rule, and the note gives it as a hypothesis for a later run. In both scales, the share of real candidates is about one third from 70 up.\n- **Time** (E3, E3b and E4 notes): the time of each call from the stored durations, and the S1 review time from `cost.stage_ms`: a median of 1.7 min, from 0.4 to 3.9 min. The escalation is 43% of the verifier call time in the median case. Opus 5.5 low verifies in about half the time of Sonnet 5.5 medium.\n\n## Spend\n\nE3b cost $55.36 and E4 cost $19.84 on the plan login. The extra figures of the notes made no model call.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZg7V9Qr9viaw1dTW3s\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": "TICKETS.md",
+        "hunks": 2
+      },
+      {
+        "path": "docs/research/e3-verifier-model.md",
+        "hunks": 1
+      },
+      {
+        "path": "docs/research/e3b-severity-step.md",
+        "hunks": 1
+      },
+      {
+        "path": "docs/research/e4-score-scale.md",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "fast",
+      "reason": "Documentation-only change adding research notes and ticket status; no code or config is touched, but the notes record figures and decisions that a reviewer could check for consistency.",
+      "confidence": "medium",
+      "categories": [
+        "docs"
+      ],
+      "hotspots": [
+        "docs/research/e3b-severity-step.md: Result table vs. TICKETS.md figures (0.899 vs 0.835, interval lower end 0.000)",
+        "docs/research/e4-score-scale.md: recall/precision/band counts consistent with TICKETS.md (0.208 drop, 154 vs 145)",
+        "docs/research/e3-verifier-model.md: new Time table figures and the '43%' claim"
+      ],
+      "file_notes": [
+        {
+          "file": "TICKETS.md",
+          "note": "Adds two 'Done 2026-11-16' lines for E3b and E4 outcomes; check they match the notes."
+        },
+        {
+          "file": "docs/research/e3-verifier-model.md",
+          "note": "New Time section with duration tables from stored data."
+        },
+        {
+          "file": "docs/research/e3b-severity-step.md",
+          "note": "New research note; its status date (2026-11-15) differs from the ticket's 2026-11-16."
+        },
+        {
+          "file": "docs/research/e4-score-scale.md",
+          "note": "New research note; E4 result and map analysis."
+        }
+      ],
+      "summary": "The change records the results of experiments E3b (severity step) and E4 (score scale) in two new research notes. It adds a Time section to the E3 note and marks both tickets done in TICKETS.md. It changes no code."
+    },
+    "tier": "fast",
+    "tier_reason": "Triage: Documentation-only change adding research notes and ticket status; no code or config is touched, but the notes record figures and decisions that a reviewer could check for consistency.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= fast; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= fast; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    },
+    "mode": "full"
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 3208,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 10563,
+              "outputTokens": 20,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0010663,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 270,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 15207,
+              "webSearchRequests": 0,
+              "costUSD": 0.127064,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 85,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1281303
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "docs/research/e3-verifier-model.md",
+            "start_line": 99,
+            "end_line": 99,
+            "category": "other",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The 43% share does not follow from the figures in the table.",
+            "evidence": "In the median case, the escalation is 43% of the call time of the verifier.",
+            "suggested_fix": "Give the calculation, or correct the figure.",
+            "explanation": "The medians give 12.6/(11.1+12.6) = 53% and the sums give 30.4/(55.3+30.4) = 35%; neither is 43%.",
+            "needs_context": true
+          },
+          {
+            "file": "docs/research/e3b-severity-step.md",
+            "start_line": 3,
+            "end_line": 3,
+            "category": "other",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The note gives 2026-11-15 as the done date, but TICKETS.md gives 2026-11-16.",
+            "evidence": "Status: done 2026-11-15.",
+            "suggested_fix": "Use the same date in both documents.",
+            "explanation": "The two documents give different dates for the same experiment.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 9224,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 10573,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0010683000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 983,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 15444,
+              "webSearchRequests": 0,
+              "costUSD": 0.14322,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 568,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.14428829999999998
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "docs/research/e3-verifier-model.md",
+          "start_line": 99,
+          "end_line": 99,
+          "category": "other",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The 43% share does not follow from the figures in the table.",
+          "evidence": "In the median case, the escalation is 43% of the call time of the verifier.",
+          "suggested_fix": "Give the calculation, or correct the figure.",
+          "explanation": "The medians give 12.6/(11.1+12.6) = 53% and the sums give 30.4/(55.3+30.4) = 35%; neither is 43%.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "In the median case, the escalation is 43% of the call time of the verifier."
+          ],
+          "rationale": "The table's medians give 53% and its sums give 35%, so 43% cannot be rebuilt from it. It could be a median of per-finding ratios from data that is not shown. The sentence gives no calculation, so a reader cannot check it.",
+          "score": 62,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "| S1 first verifier, Sonnet 5.5 high | 239 | 11.1 s | 26.6 s | 71.9 s | 55.3 min |",
+            "| S1 escalation, Opus 5.5 high | 135 | 12.6 s | 23.3 s | 36.4 s | 30.4 min |",
+            "In the median case, the escalation is 43% of the call time of the verifier."
+          ],
+          "rationale": "The table's medians give 12.6/(11.1+12.6) ≈ 53%, and its sums give 30.4/85.7 ≈ 35%. Neither is 43%, so the figure cannot be derived from the table as written. It may be a median of per-finding ratios from data the note does not show, so it is unclear rather than certainly wrong, but readers cannot check it.",
+          "score": 72,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "| S1 first verifier, Sonnet 5.5 high | 239 | 11.1 s | 26.6 s | 71.9 s | 55.3 min |",
+            "| S1 escalation, Opus 5.5 high | 135 | 12.6 s | 23.3 s | 36.4 s | 30.4 min |",
+            "In the median case, the escalation is 43% of the call time of the verifier."
+          ],
+          "rationale": "The table's medians give 12.6/(11.1+12.6) ≈ 53%, and its sums give 30.4/85.7 ≈ 35%. Neither is 43%, so the figure cannot be derived from the table as written. It may be a median of per-finding ratios from data the note does not show, so it is unclear rather than certainly wrong, but readers cannot check it.",
+          "score": 72,
+          "severity": "suggestion"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "docs/research/e3b-severity-step.md",
+          "start_line": 3,
+          "end_line": 3,
+          "category": "other",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The note gives 2026-11-15 as the done date, but TICKETS.md gives 2026-11-16.",
+          "evidence": "Status: done 2026-11-15.",
+          "suggested_fix": "Use the same date in both documents.",
+          "explanation": "The two documents give different dates for the same experiment.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "Status: done 2026-11-15."
+          ],
+          "rationale": "The note says done 2026-11-15, while TICKETS.md line 202 says \"Done 2026-11-16\" for E3b. The dates differ, but the mismatch is minor.",
+          "score": 93,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "Status: done 2026-11-15."
+          ],
+          "rationale": "The note says done 2026-11-15, while TICKETS.md line 202 says \"Done 2026-11-16\" for E3b. The dates differ, but the mismatch is minor.",
+          "score": 93,
+          "severity": "nit"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "diff-bugs"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [
+      {
+        "file": "docs/research/e3-verifier-model.md",
+        "start_line": 99,
+        "end_line": 99,
+        "category": "other",
+        "severity_estimate": "nit",
+        "confidence": "low",
+        "claim": "The 43% share does not follow from the figures in the table.",
+        "evidence": "In the median case, the escalation is 43% of the call time of the verifier.",
+        "suggested_fix": "Give the calculation, or correct the figure.",
+        "explanation": "The medians give 12.6/(11.1+12.6) = 53% and the sums give 30.4/(55.3+30.4) = 35%; neither is 43%.",
+        "needs_context": true,
+        "fingerprint": "136df2d974705f48",
+        "severity": "suggestion",
+        "score": 72,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "| S1 first verifier, Sonnet 5.5 high | 239 | 11.1 s | 26.6 s | 71.9 s | 55.3 min |",
+            "| S1 escalation, Opus 5.5 high | 135 | 12.6 s | 23.3 s | 36.4 s | 30.4 min |",
+            "In the median case, the escalation is 43% of the call time of the verifier."
+          ],
+          "rationale": "The table's medians give 12.6/(11.1+12.6) ≈ 53%, and its sums give 30.4/85.7 ≈ 35%. Neither is 43%, so the figure cannot be derived from the table as written. It may be a median of per-finding ratios from data the note does not show, so it is unclear rather than certainly wrong, but readers cannot check it.",
+          "score": 72,
+          "severity": "suggestion"
+        },
+        "span_text": "- The escalation runs after the first call of the same finding, so an escalated finding waits for two calls in series. At the median, that adds 12.6 s to that finding. In the median case, the escalation is 43% of the call time of the verifier.",
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "file": "docs/research/e3b-severity-step.md",
+        "start_line": 3,
+        "end_line": 3,
+        "category": "other",
+        "severity_estimate": "nit",
+        "confidence": "low",
+        "claim": "The note gives 2026-11-15 as the done date, but TICKETS.md gives 2026-11-16.",
+        "evidence": "Status: done 2026-11-15.",
+        "suggested_fix": "Use the same date in both documents.",
+        "explanation": "The two documents give different dates for the same experiment.",
+        "needs_context": false,
+        "fingerprint": "882c3e0b5c24e2d2",
+        "severity": "nit",
+        "score": 93,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "Status: done 2026-11-15."
+          ],
+          "rationale": "The note says done 2026-11-15, while TICKETS.md line 202 says \"Done 2026-11-16\" for E3b. The dates differ, but the mismatch is minor.",
+          "score": 93,
+          "severity": "nit"
+        },
+        "span_text": "Status: done 2026-11-15. Part of D4c in TICKETS.md. The data is the stored candidates of S1, the reference run of D4c, and the verifier results of E3.",
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      }
+    ],
+    "github": {
+      "review_id": 5916742499,
+      "review_url": "https://github.com/jerridan/pr-review/pull/61#pullrequestreview-5916742499",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [
+        {
+          "fingerprint": "136df2d974705f48",
+          "comment_id": 4583278014
+        },
+        {
+          "fingerprint": "882c3e0b5c24e2d2",
+          "comment_id": 4583278020
+        }
+      ],
+      "in_body": [],
+      "check_run": {
+        "id": 133168391407
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 5120,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9447,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009572000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 641,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 10221,
+            "webSearchRequests": 0,
+            "costUSD": 0.04729799999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.04825519999999999
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 3208,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10563,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0010663,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 270,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 15207,
+            "webSearchRequests": 0,
+            "costUSD": 0.127064,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 85,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1281303
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 9224,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10573,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0010683000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 983,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 15444,
+            "webSearchRequests": 0,
+            "costUSD": 0.14322,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 568,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.14428829999999998
+      },
+      {
+        "role": "verifier",
+        "verification": 1,
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 6066,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8762,
+            "outputTokens": 17,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0008847000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 696,
+            "cacheReadInputTokens": 25888,
+            "cacheCreationInputTokens": 15206,
+            "webSearchRequests": 0,
+            "costUSD": 0.0703848,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0712695
+      },
+      {
+        "role": "verifier",
+        "verification": 0,
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 8090,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8375,
+            "outputTokens": 238,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009565000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 219,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 816,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 12250,
+            "webSearchRequests": 0,
+            "costUSD": 0.057164000000000006,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 355,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.058120500000000005
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 0,
+        "model": "claude-opus-5-5",
+        "effort": "high",
+        "duration_ms": 7907,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8361,
+            "outputTokens": 254,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009631000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 235,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 860,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 12232,
+            "webSearchRequests": 0,
+            "costUSD": 0.115064,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 410,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1160271
+      }
+    ],
+    "total_cost_usd": 0.5660909000000001,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 55,
+      "gather": 75,
+      "triage": 5969,
+      "find_verify": 27442,
+      "merge": 9
+    },
+    "errors": []
+  }
+}
