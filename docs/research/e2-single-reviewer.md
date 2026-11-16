@@ -1,6 +1,6 @@
 # E2: one reviewer over the whole diff against the specialist set
 
-Result: the line is not found. For each of the three single arms, the 90% bootstrap interval of the line covers the full range of the cases, 12 to 3164 changed lines. Over all 28 cases, the specialists post the most goldens (recall 0.496 after the verifier), and Opus 5.5 at high is close (0.456). Each single arm has a higher precision (0.547 to 0.638 against 0.392). The specialists lead in the medium group. On small cases Opus at medium equals them, and on large cases Opus at high is ahead of them.
+Result: up to about 700 changed lines, the data permits a comparison. Above 1,000 lines it does not: the set holds only two such cases. In this report, a PR is large only at 1,000 lines or more. No line between one reviewer and the specialists is found: for each of the three single arms, the 90% bootstrap interval of the line covers the full range of the cases, 12 to 3164 changed lines. Under 100 lines, Opus 5.5 at medium posts as many goldens as the specialists (recall 0.444 each) with a higher precision (0.800 against 0.500). From 100 to 300 lines, the specialists lead (0.700 against at most 0.575). From 300 to 1,000 lines, Opus 5.5 at high leads (0.476 against 0.381), on five cases. The reviewer stage of a single Opus arm costs about a third of that of the specialists, and it takes about three times as long, because the specialists run Opus at low effort.
 
 ## Question
 
@@ -132,6 +132,62 @@ Reading of the figures:
 - The fit: the slope of Opus medium is +0.149 of recall for each tenfold of size, that of Opus high +0.076, and that of Terra -0.014. The per-case differences are large next to these slopes (from -1.0 to +1.0), so the bootstrap interval covers the full range for every arm.
 - Cases needed: the heuristic of the fit script estimates 6 more large cases for each arm. It holds only if the trend is real. With slopes this small against this spread, more large cases alone may not give a line. More repeats of each case would cut the noise of each difference.
 
+### Fixed size limits
+
+The groups of S3 hold equal counts of cases. This table uses fixed limits instead. Only two cases have 1,000 changed lines or more, so the last row permits no conclusion.
+
+| group | cases | goldens | arm | recall before | recall after | precision after |
+|---|---|---|---|---|---|---|
+| under 100 | 9 | 27 | specialists | 0.556 | 0.444 | 0.500 |
+| under 100 | 9 | 27 | opus-medium | 0.630 | 0.444 | 0.800 |
+| under 100 | 9 | 27 | opus-high | 0.667 | 0.407 | 0.688 |
+| under 100 | 9 | 27 | terra-high | 0.444 | 0.407 | 0.846 |
+| 100 to 300 | 12 | 40 | specialists | 0.775 | 0.700 | 0.378 |
+| 100 to 300 | 12 | 40 | opus-medium | 0.575 | 0.475 | 0.528 |
+| 100 to 300 | 12 | 40 | opus-high | 0.575 | 0.575 | 0.489 |
+| 100 to 300 | 12 | 40 | terra-high | 0.475 | 0.425 | 0.586 |
+| 300 to 1,000 | 5 | 42 | specialists | 0.381 | 0.381 | 0.348 |
+| 300 to 1,000 | 5 | 42 | opus-medium | 0.405 | 0.333 | 0.483 |
+| 300 to 1,000 | 5 | 42 | opus-high | 0.500 | 0.476 | 0.714 |
+| 300 to 1,000 | 5 | 42 | terra-high | 0.381 | 0.310 | 0.591 |
+| 1,000 or more | 2 | 16 | specialists | 0.438 | 0.375 | 0.429 |
+| 1,000 or more | 2 | 16 | opus-medium | 0.125 | 0.125 | 0.333 |
+| 1,000 or more | 2 | 16 | opus-high | 0.188 | 0.188 | 0.300 |
+| 1,000 or more | 2 | 16 | terra-high | 0.250 | 0.188 | 0.600 |
+| total | 28 | 125 | specialists | 0.552 | 0.496 | 0.392 |
+| total | 28 | 125 | opus-medium | 0.472 | 0.376 | 0.547 |
+| total | 28 | 125 | opus-high | 0.520 | 0.456 | 0.564 |
+| total | 28 | 125 | terra-high | 0.408 | 0.352 | 0.638 |
+
+
+### The walle and websites cases
+
+These cases come from the repos that the next cases come from. Only six of their goldens are posted-label goldens, so the table shows a direction at most.
+
+| group | cases | goldens | arm | recall before | recall after | precision after |
+|---|---|---|---|---|---|---|
+| injection-walle | 2 | 2 | specialists | 1.000 | 1.000 | 0.182 |
+| injection-walle | 2 | 2 | opus-medium | 1.000 | 1.000 | 0.333 |
+| injection-walle | 2 | 2 | opus-high | 1.000 | 1.000 | 0.286 |
+| injection-walle | 2 | 2 | terra-high | 1.000 | 1.000 | 0.400 |
+| injection-websites | 2 | 2 | specialists | 1.000 | 1.000 | 0.250 |
+| injection-websites | 2 | 2 | opus-medium | 1.000 | 1.000 | 0.667 |
+| injection-websites | 2 | 2 | opus-high | 1.000 | 1.000 | 1.000 |
+| injection-websites | 2 | 2 | terra-high | 1.000 | 1.000 | 1.000 |
+| pool-walle | 2 | 0 | specialists | - | - | - |
+| pool-walle | 2 | 0 | opus-medium | - | - | 0.000 |
+| pool-walle | 2 | 0 | opus-high | - | - | - |
+| pool-walle | 2 | 0 | terra-high | - | - | - |
+| pool-websites | 2 | 2 | specialists | 1.000 | 1.000 | 1.000 |
+| pool-websites | 2 | 2 | opus-medium | 0.000 | 0.000 | 0.000 |
+| pool-websites | 2 | 2 | opus-high | 0.000 | 0.000 | - |
+| pool-websites | 2 | 2 | terra-high | 0.500 | 0.500 | 1.000 |
+| total | 8 | 6 | specialists | 1.000 | 1.000 | 0.286 |
+| total | 8 | 6 | opus-medium | 0.667 | 0.667 | 0.364 |
+| total | 8 | 6 | opus-high | 0.667 | 0.667 | 0.444 |
+| total | 8 | 6 | terra-high | 0.833 | 0.833 | 0.625 |
+
+
 ## Costs
 
 | Arm | Reviewer stage | Verifier step (replay) |
@@ -141,7 +197,35 @@ Reading of the figures:
 | opus-high | $24.17 | $17.69 |
 | terra-high | 1.19M Codex tokens, 29% of one 5-hour Codex window, no dollar cost | $16.77 |
 
+The reviewer stage alone, from the queries of the records (role `reviewer`), compares the arms at the same stage. The whole-pipeline cost of S1 stays apart.
+
+Reviewer-stage cost: the sum of the reviewer queries of the record. The time of a case: the longest reviewer query, because the reviewers run at the same time. Terra: the time of each case of the sequential Codex run; the two probe cases have no time of their own.
+
+| arm | cases | reviewer-stage cost | whole-pipeline cost | median time (s) | maximum time (s) |
+|---|---|---|---|---|---|
+| specialists | 28 | $64.06 | $155.76 | 14 | 37 |
+| opus-medium | 28 | $17.83 | - | 37 | 85 |
+| opus-high | 28 | $22.29 | - | 53 | 138 |
+| terra-high | 26 (of 28) | Codex tokens only | - | 34 | 59 |
+
+
+### Time of the reviewer stage by fixed size limits (median / maximum, seconds)
+
+| group | specialists | opus-medium | opus-high | terra-high |
+|---|---|---|---|---|
+| under 100 | 13 / 22 | 25 / 60 | 37 / 83 | 26 / 43 |
+| 100 to 300 | 13 / 23 | 38 / 85 | 54 / 97 | 36 / 59 |
+| 300 to 1,000 | 15 / 28 | 45 / 60 | 95 / 138 | 46 / 56 |
+| 1,000 or more | 29 / 37 | 38 / 51 | 70 / 91 | 18 / 18 |
+
+The specialists run Opus 5.5 at low effort, and the single Opus arms at medium and at high. That is why one specialist query is faster than one single-arm query. The time of the specialist stage is the longest reviewer query of the case. The run starts at most five queries at once, and S1 had nine reviewer passes. So for a case with more passes than that, the stage takes longer than this figure, and the figure is a lower bound.
+
 Spend of this experiment on the plan: $43.66 for the two Opus stage 1 runs and $52.29 for the verifier steps of the three single arms with their judge calls ($17.36 Opus medium, $17.83 Opus high, $17.10 Terra), $95.95 in all. The probes are inside these figures. The Terra review used the Codex quota only. The specialist base used no new call.
+
+## Follow-ups
+
+- Run more repeats of the small cases (under 100 changed lines) of the specialists and of Opus 5.5 at medium, to confirm that one reviewer posts as many goldens there.
+- Before a tier rule by size, add cases from the walle and websites repos with PRs of 1,000 changed lines or more. The set holds two such cases now.
 
 ## Limits
 
