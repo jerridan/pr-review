@@ -1,0 +1,659 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 61,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Add the E3b and E4 notes of D4c and the time figures of E3, E3b and E4",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/61"
+    },
+    "run_kind": "later",
+    "prior": {
+      "head": "c03bd5fb30969096efbbc60d5458f8bce6df46a2",
+      "source": "record",
+      "record": "/home/runner/work/_temp/pr-review-records/pr-61/2026-11-16T080615.754Z-c03bd5f.json",
+      "open": [],
+      "dismissed": [
+        "136df2d974705f48",
+        "882c3e0b5c24e2d2"
+      ],
+      "fetch_failed": false
+    },
+    "base": "4e0fd7a6c55fd43dcf916844a1dc11ff62d02d45",
+    "head": "17d5ef69f8e91124be758c44e8b6d68c6bce7f95",
+    "started_at": "2026-11-16T08:22:29.160Z",
+    "tool_version": "0.19.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Add the E3b and E4 notes of D4c and the time figures of E3, E3b and E4\n\n## Summary\n\nThe E3b and E4 notes of D4c, the time figures of E3, E3b and E4, and both experiments marked done in TICKETS.md. Notes only: no code and no default change, so no version bump.\n\n- **E3b** (`docs/research/e3b-severity-step.md`): the severity stays in the verifier. No split arm passes the rule. The best arm, a step on Opus 5.5 medium for each finding, agrees on post against no post in 0.899 of the findings, against 0.835 for the single call. But the lower end of its 90% interval is exactly 0.000, and the rule needs it above zero. The truth check agreed on 30 of 30 candidates. The note states the labeler limit (the goldens were labeled by Opus with a Sol judge) and a possible cache saving (the policy before the finding).\n- **E4** (`docs/research/e4-score-scale.md`): the score from 0 to 100 stays. With the map from a band to a score chosen before the run, the five bands lose 0.208 posted recall and put more results in the band. The note also decides the stored results again under other maps, with no model call. A map chosen after the figures would pass the rule, and the note gives it as a hypothesis for a later run. In both scales, the share of real candidates is about one third from 70 up.\n- **Time** (E3, E3b and E4 notes): the time of each call from the stored durations, and the S1 review time from `cost.stage_ms`: a median of 1.7 min, from 0.4 to 3.9 min. The escalation is 43% of the verifier call time in the median case. Opus 5.5 low verifies in about half the time of Sonnet 5.5 medium.\n\n## Spend\n\nE3b cost $55.36 and E4 cost $19.84 on the plan login. The extra figures of the notes made no model call.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZg7V9Qr9viaw1dTW3s\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": "TICKETS.md",
+        "hunks": 2
+      },
+      {
+        "path": "docs/research/e3-verifier-model.md",
+        "hunks": 1
+      },
+      {
+        "path": "docs/research/e3b-severity-step.md",
+        "hunks": 1
+      },
+      {
+        "path": "docs/research/e4-score-scale.md",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "fast",
+      "reason": "The change only adds or edits markdown research notes and ticket status, with no code, config or prompt changes, so it cannot cause a runtime bug.",
+      "confidence": "medium",
+      "categories": [
+        "docs"
+      ],
+      "hotspots": [
+        "docs/research/e3b-severity-step.md: figures table and the rule outcome (lower interval end 0.000)",
+        "docs/research/e4-score-scale.md: the figures and map tables, and the posted recall difference",
+        "TICKETS.md: the Done lines against the notes",
+        "docs/research/e3-verifier-model.md: new Time section figures (35% and 43% share)"
+      ],
+      "file_notes": [
+        {
+          "file": "TICKETS.md",
+          "note": "Adds Done lines for E3b and E4 that summarize the results. They should match the notes."
+        },
+        {
+          "file": "docs/research/e3-verifier-model.md",
+          "note": "New Time section with call durations from stored data. Check the numbers are consistent, such as the 30.4 of 85.7 min share."
+        },
+        {
+          "file": "docs/research/e3b-severity-step.md",
+          "note": "New research note. The conclusion is that the severity stays in the verifier. The best arm misses the rule by a zero lower bound."
+        },
+        {
+          "file": "docs/research/e4-score-scale.md",
+          "note": "New research note. The conclusion is that the 0-100 score stays. The post-hoc map A is flagged as a hypothesis only."
+        }
+      ],
+      "summary": "The change records the results of two experiments, E3b (where the severity label comes from) and E4 (the score scale), as new research notes. It adds a Time section to the E3 note and marks both experiments done in TICKETS.md. No code or prompts change. The notes' conclusions are that the severity stays in the verifier and that the 0-100 score stays."
+    },
+    "tier": "fast",
+    "tier_reason": "Triage: The change only adds or edits markdown research notes and ticket status, with no code, config or prompt changes, so it cannot cause a runtime bug.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= fast; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= fast; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    },
+    "mode": "full"
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 1252,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 6722,
+              "outputTokens": 19,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0006816999999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 53,
+              "cacheReadInputTokens": 5136,
+              "cacheCreationInputTokens": 6230,
+              "webSearchRequests": 0,
+              "costUSD": 0.0519352,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0526169
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "docs/research/e3b-severity-step.md",
+            "start_line": 59,
+            "end_line": 59,
+            "category": "other",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "The note says a `pr` severity call costs about half as much for each finding, but the figures table shows about one fifth to one sixth.",
+            "evidence": "A `pr` call holds the policy one time for all the findings of a case, so it costs about half as much for each finding.",
+            "suggested_fix": "Say that the step costs about one fifth as much for each finding, or quote the figures from the table.",
+            "explanation": "In the table, the step adds $0.008 to $0.018 for each finding in `pr` mode, against $0.040 to $0.078 in `finding` mode, so \"half\" understates the gap.",
+            "needs_context": false
+          },
+          {
+            "file": "docs/research/e3b-severity-step.md",
+            "start_line": 76,
+            "end_line": 76,
+            "category": "other",
+            "severity_estimate": "nit",
+            "confidence": "medium",
+            "claim": "The note says a `finding` step adds 5 to 7 s at the median, but the table gives a median of 4.7 s for Opus 5.5 medium.",
+            "evidence": "A `finding` step adds 5 to 7 s to each finding at the median.",
+            "suggested_fix": "Say \"about 5 to 7 s\" or \"4.7 to 6.6 s\".",
+            "explanation": "The table medians are 4.7 s, 5.5 s and 6.6 s, so the stated range does not include the lowest value.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 11866,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 6730,
+              "outputTokens": 19,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0006825,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 1271,
+              "cacheReadInputTokens": 5363,
+              "cacheCreationInputTokens": 6238,
+              "webSearchRequests": 0,
+              "costUSD": 0.07640459999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 630,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.07708709999999999
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "docs/research/e3b-severity-step.md",
+          "start_line": 59,
+          "end_line": 59,
+          "category": "other",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "The note says a `pr` severity call costs about half as much for each finding, but the figures table shows about one fifth to one sixth.",
+          "evidence": "A `pr` call holds the policy one time for all the findings of a case, so it costs about half as much for each finding.",
+          "suggested_fix": "Say that the step costs about one fifth as much for each finding, or quote the figures from the table.",
+          "explanation": "In the table, the step adds $0.008 to $0.018 for each finding in `pr` mode, against $0.040 to $0.078 in `finding` mode, so \"half\" understates the gap.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "A `pr` call holds the policy one time for all the findings of a case, so it costs about half as much for each finding.",
+            "| pr, Opus 5.5 medium | 0.557 | 0.848 | 3 | 0.464 | 0.406 | $0.116 |"
+          ],
+          "rationale": "The table implies the pr step adds about $0.008-0.018 per finding against $0.040-0.078 for finding mode, which is about one fifth to one third, not half. The note's \"half\" understates the gap, but the error is small and doesn't change any conclusion.",
+          "score": 75,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "A `pr` call holds the policy one time for all the findings of a case, so it costs about half as much for each finding.",
+            "| Single call (Sonnet 5.5 medium) | 0.392 | 0.835 | 3 | 0.464 | 0.403 | $0.103 | - | - | - |",
+            "| finding, Opus 5.5 medium | 0.646 | 0.899 | 1 | 0.456 | 0.390 | $0.181 | +0.063 (0.000 to +0.111) | 1.76 | stays |",
+            "| pr, Opus 5.5 medium | 0.557 | 0.848 | 3 | 0.464 | 0.406 | $0.116 | +0.013 (-0.044 to +0.070) | 1.13 | stays |",
+            "the three `pr` arms $7.65, and the three `finding` arms $38.11."
+          ],
+          "rationale": "I subtracted the single-call cost ($0.103) from each arm. The severity step then adds $0.008 to $0.018 per finding in `pr` mode and $0.040 to $0.078 in `finding` mode, which is about 1/5 to 1/6 for the same model (about 1/3.5 for Opus high). The spend line ($7.65 against $38.11) also shows about 1/5, so \"about half\" does not match the note's own figures.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "A `pr` call holds the policy one time for all the findings of a case, so it costs about half as much for each finding.",
+            "| Single call (Sonnet 5.5 medium) | 0.392 | 0.835 | 3 | 0.464 | 0.403 | $0.103 | - | - | - |",
+            "| finding, Opus 5.5 medium | 0.646 | 0.899 | 1 | 0.456 | 0.390 | $0.181 | +0.063 (0.000 to +0.111) | 1.76 | stays |",
+            "| pr, Opus 5.5 medium | 0.557 | 0.848 | 3 | 0.464 | 0.406 | $0.116 | +0.013 (-0.044 to +0.070) | 1.13 | stays |",
+            "the three `pr` arms $7.65, and the three `finding` arms $38.11."
+          ],
+          "rationale": "I subtracted the single-call cost ($0.103) from each arm. The severity step then adds $0.008 to $0.018 per finding in `pr` mode and $0.040 to $0.078 in `finding` mode, which is about 1/5 to 1/6 for the same model (about 1/3.5 for Opus high). The spend line ($7.65 against $38.11) also shows about 1/5, so \"about half\" does not match the note's own figures.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "diff-bugs"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 5916937564,
+      "review_url": "https://github.com/jerridan/pr-review/pull/61#pullrequestreview-5916937564",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 133175322285
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [
+      {
+        "file": "docs/research/e3b-severity-step.md",
+        "start_line": 59,
+        "end_line": 59,
+        "category": "other",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "The note says a `pr` severity call costs about half as much for each finding, but the figures table shows about one fifth to one sixth.",
+        "evidence": "A `pr` call holds the policy one time for all the findings of a case, so it costs about half as much for each finding.",
+        "suggested_fix": "Say that the step costs about one fifth as much for each finding, or quote the figures from the table.",
+        "explanation": "In the table, the step adds $0.008 to $0.018 for each finding in `pr` mode, against $0.040 to $0.078 in `finding` mode, so \"half\" understates the gap.",
+        "needs_context": false,
+        "fingerprint": "258be515ac758405",
+        "severity": "nit",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "A `pr` call holds the policy one time for all the findings of a case, so it costs about half as much for each finding.",
+            "| Single call (Sonnet 5.5 medium) | 0.392 | 0.835 | 3 | 0.464 | 0.403 | $0.103 | - | - | - |",
+            "| finding, Opus 5.5 medium | 0.646 | 0.899 | 1 | 0.456 | 0.390 | $0.181 | +0.063 (0.000 to +0.111) | 1.76 | stays |",
+            "| pr, Opus 5.5 medium | 0.557 | 0.848 | 3 | 0.464 | 0.406 | $0.116 | +0.013 (-0.044 to +0.070) | 1.13 | stays |",
+            "the three `pr` arms $7.65, and the three `finding` arms $38.11."
+          ],
+          "rationale": "I subtracted the single-call cost ($0.103) from each arm. The severity step then adds $0.008 to $0.018 per finding in `pr` mode and $0.040 to $0.078 in `finding` mode, which is about 1/5 to 1/6 for the same model (about 1/3.5 for Opus high). The spend line ($7.65 against $38.11) also shows about 1/5, so \"about half\" does not match the note's own figures.",
+          "score": 88,
+          "severity": "nit"
+        },
+        "span_text": "",
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      }
+    ],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 5084,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9531,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009636,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 714,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 9043,
+            "webSearchRequests": 0,
+            "costUSD": 0.0434422,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0444058
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 1252,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 6722,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0006816999999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 53,
+            "cacheReadInputTokens": 5136,
+            "cacheCreationInputTokens": 6230,
+            "webSearchRequests": 0,
+            "costUSD": 0.0519352,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0526169
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 11866,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 6730,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0006825,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1271,
+            "cacheReadInputTokens": 5363,
+            "cacheCreationInputTokens": 6238,
+            "webSearchRequests": 0,
+            "costUSD": 0.07640459999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 630,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.07708709999999999
+      },
+      {
+        "role": "verifier",
+        "verification": 0,
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 9708,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8862,
+            "outputTokens": 21,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0008967000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 1248,
+            "cacheReadInputTokens": 8734,
+            "cacheCreationInputTokens": 16767,
+            "webSearchRequests": 0,
+            "costUSD": 0.08042940000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 559,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.08132610000000001
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 0,
+        "model": "claude-opus-5-5",
+        "effort": "high",
+        "duration_ms": 9472,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8852,
+            "outputTokens": 240,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0010052000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 224,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1099,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 8356,
+            "webSearchRequests": 0,
+            "costUSD": 0.08970940000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 478,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0907146
+      }
+    ],
+    "total_cost_usd": 0.3461505,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 49,
+      "gather": 75,
+      "scope": 4,
+      "triage": 5919,
+      "find_verify": 33126,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
