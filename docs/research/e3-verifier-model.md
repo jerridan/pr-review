@@ -83,6 +83,23 @@ From the S1 records, with no model call:
 
 The cost of one call in S1: the first verifier had a median of $0.101 and a maximum of $0.424. The escalation had a median of $0.206 and a maximum of $0.999. See `e7-passes-dedupe.md`.
 
+## Time
+
+The user counts the time of a review beside recall, precision and cost. These figures come from the stored durations of each call, with no model call. A call duration is the wall time of one query.
+
+The whole review in S1 is the sum of `cost.stage_ms`, which holds five stages: config, gather, triage, find_verify (the reviewers and the verifier, which run at the same time) and merge. The median review took 1.7 min, from 0.4 to 3.9 min, with a 90th percentile of 2.9 min. The find_verify stage took 1.2 min at the median and 3.5 min at most.
+
+| Verifier call | Calls | Median | 90th percentile | Maximum | Sum of calls |
+|---|---|---|---|---|---|
+| S1 first verifier, Sonnet 5.5 high | 239 | 11.1 s | 26.6 s | 71.9 s | 55.3 min |
+| S1 escalation, Opus 5.5 high | 135 | 12.6 s | 23.3 s | 36.4 s | 30.4 min |
+| Sonnet 5.5 medium (the new verifier) | 239 | 8.0 s | 20.9 s | 41.9 s | 41.1 min |
+| Opus 5.5 low | 239 | 4.0 s | 7.0 s | 11.0 s | 17.9 min |
+
+- The escalation runs after the first call of the same finding, so an escalated finding waits for two calls in series. At the median, that adds 12.6 s to that finding. In the median case, the escalation is 43% of the call time of the verifier.
+- The verifier calls of a review run at the same time (5 at once by default). So the review time follows the slowest finding, and the slowest finding is often an escalated one.
+- Opus 5.5 low verifies in about half the time of Sonnet 5.5 medium, with a much shorter tail (11 s at most against 42 s). The rule of E3 does not count time. A later decision that counts time can weigh this.
+
 ## Spend
 
 The paid runs of this note cost $69.05: Sonnet 5.5 medium $24.84, Opus 5.5 low $43.66, and the judge $0.55. The Terra arm used the Codex quota and is the spend of another session. The reference row and the stored arm made no model call.
