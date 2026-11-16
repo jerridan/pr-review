@@ -1075,7 +1075,7 @@ For each case, the command clones the case at its head, as the eval does. It bui
 
 The command writes `<out>/<case name>.json` with `{ "source": "<source>", "findings": [ ... ] }`. Each finding has the fields of a reviewer finding. A finding that fails the finding schema fails the case. The command does not filter by evidence or by line range. The replay does that.
 
-The command prints one line per case, `case <name>: <done|failed|quota> tokens <n|unknown>`, before the summary. It also writes `<out>/tokens.json`, an object from case name to token count (a number, or `null` when unknown). A rerun adds its cases to the file and keeps the other entries.
+The command prints one line per case, `case <name>: <done|failed|quota> tokens <n|unknown>`, before the summary. It also writes `<out>/.tokens.json`, an object from case name to `{ "tokens": <number or null>, "model": <id>, "effort": <level> }`. Tokens are `null` when unknown. A case gets an entry only when it is done. A failed case keeps its earlier entry, and its tokens show on its line. A rerun adds its cases and keeps the other entries. When the file does not parse or fails the schema, the command warns, moves it to `.tokens.json.bad-<epoch ms>`, and starts a new map. When the command cannot write the file, it warns and goes on.
 
 **Resume rule.** The command writes each finished case at once, to a temp file and then by rename. A rerun with the same `--out` directory skips each case whose file exists, unless `--force` is set. A failed case writes no file. The command prints the case and the error, and goes on with the next case. A rerun does the cases that have no file.
 
