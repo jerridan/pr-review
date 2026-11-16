@@ -1,6 +1,6 @@
 # E3b: where the severity label comes from
 
-Status: done 2026-11-15. Part of D4c in TICKETS.md. The data is the stored candidates of S1, the reference run of D4c, and the verifier results of E3.
+Status: done 2026-11-16. Part of D4c in TICKETS.md. The data is the stored candidates of S1, the reference run of D4c, and the verifier results of E3.
 
 ## Result
 
