@@ -202,6 +202,7 @@ Question: must the verifier give the severity label, or does a separate step do 
 - Rule: the severity moves to its own step when a split arm has a higher agreement on post against no post than the single call, with a 90% bootstrap interval of the difference above zero, and the cost per finding of the two steps is at most two times the cost of the single call. If no split arm passes, the severity stays in the verifier.
 - A limit to state in the note: the labels of the goldens came from the labeler, which is Opus 5.5 with a Sol judge. A severity step on Opus can agree with those labels for that reason.
 - A split changes the verifier prompt, the record and the design. The experiment gives the evidence; the change is a later deliverable.
+- Done 2026-11-16: the severity stays in the verifier. No split arm passes the rule. The best arm, a step on Opus 5.5 medium for each finding, agrees on post against no post in 0.899 of the findings against 0.835, but the lower end of its 90% interval is exactly 0.000. The truth check agreed on 30 of 30 candidates, so the split arms reused the E3 truth results. `docs/research/e3b-severity-step.md` holds every figure.
 
 ### E4: the score scale of the verifier
 
@@ -210,6 +211,7 @@ Question: does a scale of five bands work as well as the score from 0 to 100?
 - Arms: the verifier prompt with the score from 0 to 100, and the same prompt with five named bands. Run this after E3 and E3b, on the verifier model, effort and prompt form that they select, so the result holds for the verifier that ships. The first arm then exists from E3 or E3b, and only the second arm is a new run. The two verify the same stored candidates through S2.
 - Report the figures of E3 for each arm, and for each band or each score range the share of candidates that are real.
 - Rule: the five bands become the default when the posted recall and the posted precision are each not more than 0.05 lower and the count of escalations is lower.
+- Done 2026-11-16: the score from 0 to 100 stays. With the map chosen before the run (5, 25, 50, 75, 95), the five bands lose 0.208 posted recall and put more results in the band (154 against 145). `likely` and `certain` hold real candidates at the same share, and so do the scores from 70 up. A map chosen after the figures would pass the rule; it is a hypothesis for a later run. `docs/research/e4-score-scale.md` holds every figure.
 
 ### E5: the cap on non-blocking findings
 
