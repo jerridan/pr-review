@@ -444,7 +444,7 @@ Notes on the keys:
 - **Band and threshold.** The upper bound of `thresholds.middle_band` must be at least `thresholds.default`. A `reviewers.<name>.threshold` must not be above that upper bound. A score above the band and below the threshold could never escalate and never pass, so the config is an error.
 - **Reviewer names.** `<name>` is a built-in reviewer or a custom reviewer. Any other name is an error.
 - **Models.** A model is an alias (`opus`, `sonnet` or `haiku`) or an exact model id.
-- **Effective model and effort.** The order is `reviewers.<name>.model`, then `models.reviewer.model`, then the frontmatter `model` when it is set, then the role default. The role default is Opus at `low` effort. The effort follows the same order. The model and the effort resolve apart. The frontmatter fields `model` and `effort` are optional. No built-in reviewer sets them, so each built-in reviewer takes the role default. A custom reviewer can set either field as the default for that one reviewer.
+- **Effective model and effort.** The order is `reviewers.<name>.model`, then `models.reviewer.model`, then the frontmatter `model` when it is set, then the role default. The role default is Opus at `low` effort. The effort follows the same order. The model and the effort resolve apart. The frontmatter fields `model` and `effort` are optional. `diff-bugs` and `tests` set Sonnet 5.5 at medium effort. The other built-in reviewers set neither, so they take the role default. A custom reviewer can set either field as the default for that one reviewer.
 - **Roles.** The roles of `models.<role>` are `triage`, `reviewer`, `verifier`, `verifier-escalation` and `merge`. The defaults are `sonnet` with `medium` for triage, `opus` with `low` for reviewer, `sonnet` with `medium` for verifier (since 0.18.0; it was `high`), `opus` with `high` for verifier-escalation, and `sonnet` with `medium` for merge. A `models.<role>` object can give `model` alone, `effort` alone, or both.
 - **`pre_existing`.** With `comment`, the run posts the verified pre-existing findings as one issue comment. See [What the run posts](#what-the-run-posts).
 - **Token ceiling.** When the tokens of the finished queries reach the ceiling, no new reviewer pass starts. Coverage lists each pass that did not start with the reason `token ceiling`, and the verdict is `incomplete`. Verification of findings that the run already has still runs.
@@ -494,15 +494,17 @@ The run never grants Write or Edit. A built-in reviewer never gets Bash. When a 
 
 Seven built-in reviewers run by default. One more, `general-review`, runs only when a run names it (see "The general-review reviewer"). The tier and the triggers decide which of them run. Each reviewer reports only what the diff adds, changes or aggravates. Each one has its own evidence source and a "Do not flag" list, so the reviewers do not report the same problem twice. The files are in `prompts/reviewers/`.
 
-| Reviewer | Evidence | Lowest tier | Passes |
-|----------|----------|-------------|--------|
-| `diff-bugs` | The diff and the head files. | fast | 2 |
-| `conventions` | The repo rules and the nearby code. | fast | 1 |
-| `tests` | The behaviour changes of the diff, compared with its test changes. | full | 1 |
-| `security` | Input handling, secrets and authorization on the changed paths, and the diff of `.pr-review/`. | full | 2 |
-| `history` | The blame and log of the changed lines, read at the merge base. | full | 1 |
-| `description-drift` | The description of the change, compared with what the code does. | full | 1 |
-| `docs-and-comments` | The comments and docs that the change makes stale. | full | 1 |
+| Reviewer | Evidence | Lowest tier | Passes | Model and effort |
+|----------|----------|-------------|--------|------------------|
+| `diff-bugs` | The diff and the head files. | fast | 1 | Sonnet 5.5, medium |
+| `conventions` | The repo rules and the nearby code. | fast | 1 | Opus 5.5, low |
+| `tests` | The behaviour changes of the diff, compared with its test changes. | full | 1 | Sonnet 5.5, medium |
+| `security` | Input handling, secrets and authorization on the changed paths, and the diff of `.pr-review/`. | full | 1 | Opus 5.5, low |
+| `history` | The blame and log of the changed lines, read at the merge base. | full | 1 | Opus 5.5, low |
+| `description-drift` | The description of the change, compared with what the code does. | full | 1 | Opus 5.5, low |
+| `docs-and-comments` | The comments and docs that the change makes stale. | full | 1 | Opus 5.5, low |
+
+The model and effort of `diff-bugs` and `tests` come from their frontmatter, by D4c E1 (`docs/research/e1-reviewer-models.md`). The others take the role default. A repo config overrides both, as the order below says.
 
 `diff-bugs` is the original reviewer. The other six are new. All seven run on every change at or above their lowest tier. At the fast tier, every reviewer runs one pass.
 
@@ -749,7 +751,7 @@ The eval makes real SDK calls. It needs a Claude login and it costs money.
 | `--tier full\|fast\|skip` | The tier of every run. | `full` |
 | `--judge-model <id>` | The model of the judge. An alias or an exact ID. | `claude-sonnet-5-5` |
 | `--allow-api-key` | Keep `ANTHROPIC_API_KEY` in the environment, also for the judge. | off |
-| `--allow-same-judge` | Let the judge model equal a reviewer model. | off |
+| `--allow-same-judge` | Let the judge model equal a reviewer model that a case config, `--models` or `--judge-model` gives. A built-in default that equals the judge model needs no flag: the eval warns and the report names it. | off |
 | `--no-extras` | Do not ask the extras judge about the posted findings that match no golden finding. Adjudicated precision is then null, and the eval writes no `candidates.json`. | extras on |
 | `--raw-judge` | Also ask the judge about the ambiguous pairs of the raw candidates. Without it, raw recall counts exact matches and the judge answers that the posted pass already got. | off |
 | `--resume` | Reuse the finished repeats that the `--out` directory holds. See "Resume a run". | off |
@@ -983,7 +985,7 @@ The match pass pairs each posted finding with each golden finding:
 - The same file and spans within 10 lines give an ambiguous pair when the spans do not overlap or the categories differ.
 - Every other pair is no match.
 
-The judge gets one query for each ambiguous pair. Its answer `yes` is a match. The answers `no` and `unknown` are not. A failed judge query counts as `unknown`. Each finding is in one match at most. The judge runs on `claude-sonnet-5-5` at high effort, with no tools. The eval exits 2 before any model call when the judge model equals the model of the `reviewer` role. It also exits 2 when the `.pr-review/` config of a case gives a reviewer the judge model. `--allow-same-judge` permits this.
+The judge gets one query for each ambiguous pair. Its answer `yes` is a match. The answers `no` and `unknown` are not. A failed judge query counts as `unknown`. Each finding is in one match at most. The judge runs on `claude-sonnet-5-5` at high effort, with no tools. The eval exits 2 before any model call when the judge model equals the model of the `reviewer` role. It also exits 2 when the `.pr-review/` config of a case, or `--models`, gives a reviewer the judge model. `--allow-same-judge` permits this. A built-in reviewer whose own frontmatter default is the judge model (since 0.20.0, `diff-bugs` and `tests` on Sonnet 5.5) does not stop the eval: the eval warns on stderr, the table ends with a line that names the shared model, and `report.json` holds `shared_judge` with the model and the reviewers. The judge can favour findings of its own model, so a judge of another model family is the real fix.
 
 The posted goldens get their matches first: the exact matches, then the judge. The posted findings that are still free then go to the not-real goldens in the same two steps. So when a posted finding can match a posted golden and a not-real golden, the posted golden wins. A match to a posted golden is a hit. Recall counts the posted goldens only. A posted finding that matches a not-real golden is a false positive. It counts in `not_real_matches` and not in `matched`.
 

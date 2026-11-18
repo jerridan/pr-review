@@ -11,6 +11,11 @@ export type Spread = { mean: number | null; min: number | null; max: number | nu
 type CaseMetrics = { name: string; repeats: RepeatMetrics[] };
 
 export type Report = {
+  /**
+   * The built-in reviewers whose own default is the judge model, so the
+   * judge scores findings of its own model. Absent when there are none.
+   */
+  shared_judge?: { model: string; reviewers: string[] };
   cases: CaseMetrics[];
   repeats: {
     repeat: number;

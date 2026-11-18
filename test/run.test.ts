@@ -951,13 +951,14 @@ describe("the repo config in a run (R3)", () => {
 
     const byRole = (role: string) => fake.calls.filter((c) => c.role === role);
     expect(byRole("triage").map((c) => c.overrides)).toEqual([{ model: "claude-haiku-5-5" }]);
-    // No built-in reviewer sets an effort in its frontmatter, so the role
-    // default low applies, and models.reviewer sets the model of each one.
+    // models.reviewer sets the model of each one. The effort is the role
+    // default low, except for diff-bugs and tests, whose frontmatter sets
+    // medium (D4c E1).
     expect(byRole("reviewer").length).toBeGreaterThan(1);
     for (const call of byRole("reviewer")) {
       expect(call.overrides, call.reviewerName).toEqual({
         model: "claude-sonnet-5-5",
-        effort: "low",
+        effort: ["diff-bugs", "tests"].includes(call.reviewerName ?? "") ? "medium" : "low",
         ...DEFAULT_BUDGET,
       });
     }
@@ -979,7 +980,10 @@ describe("the repo config in a run (R3)", () => {
     });
     expect(record.identity.selected_reviewers.map((r) => r.name)).toContain("diff-bugs");
     for (const entry of record.identity.selected_reviewers) {
-      expect(entry, entry.name).toMatchObject({ model: "claude-sonnet-5-5", effort: "low" });
+      expect(entry, entry.name).toMatchObject({
+        model: "claude-sonnet-5-5",
+        effort: ["diff-bugs", "tests"].includes(entry.name) ? "medium" : "low",
+      });
     }
     expect(record.identity.excluded_files).toContainEqual({
       path: ".github/workflows/ci.yml",
@@ -1134,7 +1138,13 @@ describe("the repo config in a run (R3)", () => {
     const overrides = { ...expected, ...DEFAULT_BUDGET };
     expect(calls.map((c) => c.reviewerName)).toContain("naming");
     expect(calls.map((c) => c.reviewerName)).toContain("diff-bugs");
-    for (const call of calls) expect(call.overrides, call.reviewerName).toEqual(overrides);
+    // diff-bugs and tests set Sonnet 5.5 at medium effort in their
+    // frontmatter (D4c E1); every other reviewer gets the role default.
+    const own = { model: "claude-sonnet-5-5", effort: "medium", ...DEFAULT_BUDGET };
+    for (const call of calls) {
+      const want = ["diff-bugs", "tests"].includes(call.reviewerName ?? "") ? own : overrides;
+      expect(call.overrides, call.reviewerName).toEqual(want);
+    }
     expect(record.identity.models.reviewer).toEqual(expected);
   }, 30_000);
 
