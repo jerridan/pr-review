@@ -113,6 +113,10 @@ describe("built-in reviewers (A4, R1)", () => {
           threshold: 80,
           trusted: false,
           ...(name === "general-review" ? { opt_in: true } : {}),
+          // D4c E1 set these two on Sonnet 5.5 at medium effort.
+          ...(name === "diff-bugs" || name === "tests"
+            ? { model: "sonnet", effort: "medium" }
+            : {}),
         });
         expect(def.frontmatter.description.trim()).not.toBe("");
         expect(def.source).toBe("builtin");

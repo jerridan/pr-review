@@ -2,6 +2,8 @@
 name: tests
 description: Finds behaviour changes in the diff that have no test, tests that the diff weakens or makes pass for the wrong reason, and tests that assert an internal, fake a module of the same repo, restate the code or duplicate a smaller test.
 tools: [Read, Grep, Glob]
+model: sonnet
+effort: medium
 triggers:
   paths: []
   categories: []

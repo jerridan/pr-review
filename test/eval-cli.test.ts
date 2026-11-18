@@ -967,7 +967,7 @@ describe("pr-review eval: the judge (R4.4, R5.2)", () => {
       stderr = "";
       const answered = await evalJson(evalFake({ judgeAnswer: "yes" }), cases, "--repeat", "1");
       expect(answered.code, stderr).toBe(0);
-      expect(stderr).not.toMatch(/judge/);
+      expect(stderr).not.toMatch(/judge queries gave no answer/);
     },
     RUN_TIMEOUT,
   );
@@ -985,6 +985,32 @@ describe("pr-review eval: the judge (R4.4, R5.2)", () => {
     },
     RUN_TIMEOUT,
   );
+
+  it(
+    "runs, warns and names the built-in reviewers whose own default is the judge model",
+    async () => {
+      const fake = evalFake();
+      const { code, report } = await evalJson(
+        fake,
+        casesDir([{ name: "only", golden: [PLANTED()] }]),
+        "--repeat",
+        "1",
+      );
+      expect(code, stderr).toBe(0);
+      expect(report?.shared_judge?.model).toBe("claude-sonnet-5-5");
+      expect(report?.shared_judge?.reviewers).toContain("diff-bugs");
+      expect(stderr).toMatch(/warning: the built-in reviewers .*diff-bugs.* use the judge model/);
+    },
+    RUN_TIMEOUT,
+  );
+
+  it("exits 2 with no query when --models gives a reviewer the judge model", async () => {
+    const fake = evalFake();
+    const { code } = await evalCli(fake, twoCases(), "--models", "diff-bugs=sonnet:medium");
+    expect(code).toBe(2);
+    expect(stderr).toContain("diff-bugs");
+    expect(fake.calls).toHaveLength(0);
+  });
 
   it("exits 2 with no query when --judge-model equals the reviewer model", async () => {
     const fake = evalFake();

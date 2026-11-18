@@ -17,12 +17,14 @@ import {
   type ProgramDeps,
 } from "../cli.js";
 import { JUDGE_DEFAULTS, ROLE_DEFAULTS, resolveModel } from "../config/models.js";
-import { loadRepoConfig } from "../config/repo-config.js";
+import { loadRepoConfig, type RepoConfig } from "../config/repo-config.js";
 import {
   ALL_REVIEWERS,
   effectiveModel,
   loadBuiltinReviewers,
   type ModelPick,
+  reviewerEntry,
+  type ReviewerDefinition,
   type RunModels,
 } from "../reviewers/loader.js";
 import { runReview, toolVersion } from "../run.js";
@@ -131,25 +133,49 @@ async function caseReviewers(
   c: Case,
   opts: EvalOptions,
   judgeModel: string,
-): Promise<{ judgeModel: string[]; custom: string[] }> {
+): Promise<{ judgeModel: string[]; shared: string[]; custom: string[] }> {
   let loaded;
   try {
     loaded = await loadRepoConfig(clone, c.base);
   } catch {
-    return { judgeModel: [], custom: [] };
+    return { judgeModel: [], shared: [], custom: [] };
   }
   const custom = loaded.customReviewers.map((def) => def.frontmatter.name);
   const tier = opts.tier;
-  if (tier === "skip") return { judgeModel: [], custom };
+  if (tier === "skip") return { judgeModel: [], shared: [], custom };
   const only = opts.reviewers ? new Set(opts.reviewers) : null;
   const { config } = loaded;
   const same = [...loadBuiltinReviewers(), ...loaded.customReviewers]
     .filter((def) => only === null || only.has(def.frontmatter.name))
     .filter((def) => TIER_RANK[def.frontmatter.triggers.min_tier] <= TIER_RANK[tier])
     .filter((def) => config.reviewers[def.frontmatter.name]?.enabled !== false)
-    .filter((def) => effectiveModel(def, config, opts.models).model === judgeModel)
-    .map((def) => def.frontmatter.name);
-  return { judgeModel: same, custom };
+    .filter((def) => effectiveModel(def, config, opts.models).model === judgeModel);
+  const shared = same.filter((def) => builtinDefaultModel(def, config, opts.models));
+  return {
+    judgeModel: same.filter((def) => !shared.includes(def)).map((def) => def.frontmatter.name),
+    shared: shared.map((def) => def.frontmatter.name),
+    custom,
+  };
+}
+
+/**
+ * True when the model of a built-in reviewer comes from its own frontmatter:
+ * no --models target, no reviewers.<name>.model and no models.reviewer.model
+ * sets it. Such a reviewer can share the judge model: the eval warns and
+ * the report names it, but the eval does not stop (D4c E1).
+ */
+function builtinDefaultModel(
+  def: ReviewerDefinition,
+  config: RepoConfig,
+  run: RunModels | undefined,
+): boolean {
+  const name = def.frontmatter.name;
+  if (def.source !== "builtin" || def.frontmatter.model === undefined) return false;
+  if (run !== undefined && (Object.hasOwn(run, name) || Object.hasOwn(run, ALL_REVIEWERS))) {
+    return false;
+  }
+  if (reviewerEntry(config, name)?.model !== undefined) return false;
+  return config.models.reviewer?.model === undefined;
 }
 
 type SameJudge = { case: string; reviewers: string[] };
@@ -163,20 +189,22 @@ async function checkCases(
   cases: Case[],
   opts: EvalOptions,
   judgeModel: string,
-): Promise<{ sameJudge: SameJudge | null; names: Set<string> }> {
+): Promise<{ sameJudge: SameJudge | null; names: Set<string>; shared: Set<string> }> {
   const names = new Set(loadBuiltinReviewers().map((def) => def.frontmatter.name));
+  const shared = new Set<string>();
   const root = await mkdtemp(join(tmpdir(), "pr-review-eval-check-"));
   try {
     for (const c of cases) {
       const clone = await cloneCase(c, join(root, c.name));
       const found = await caseReviewers(clone, c, opts, judgeModel);
       for (const name of found.custom) names.add(name);
+      for (const name of found.shared) shared.add(name);
       if (opts.allowSameJudge) continue;
       if (found.judgeModel.length > 0) {
-        return { sameJudge: { case: c.name, reviewers: found.judgeModel }, names };
+        return { sameJudge: { case: c.name, reviewers: found.judgeModel }, names, shared };
       }
     }
-    return { sameJudge: null, names };
+    return { sameJudge: null, names, shared };
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -191,6 +219,13 @@ function unknownReviewers(opts: EvalOptions, names: Set<string>): string[] {
     ...Object.keys(opts.models ?? {}).filter((name) => name !== ALL_REVIEWERS),
   ];
   return [...new Set(asked.filter((name) => !names.has(name)))];
+}
+
+function sharedJudgeMessage(reviewers: string[], judgeModel: string): string {
+  return (
+    `warning: the built-in reviewers ${reviewers.join(", ")} use the judge model ${judgeModel} by default. ` +
+    "The judge can favour findings of its own model."
+  );
 }
 
 function sameJudgeMessage(where: string, reviewers: string[], judgeModel: string): string {
@@ -232,6 +267,8 @@ type EvalContext = {
   startedAt: string;
   /** The version of this tool, read one time per run. */
   toolVersion: string;
+  /** The built-in reviewers whose own default is the judge model (see builtinDefaultModel). */
+  sharedJudge: Set<string>;
 };
 
 /** The options that change the result of a repeat. */
@@ -533,7 +570,7 @@ async function runRepeat(ctx: EvalContext, c: Case, repeat: number): Promise<Rep
     if (result.record.posted.verdict === "incomplete")
       return failed(incompleteMessage(result.record));
     const same = result.record.identity.selected_reviewers.filter(
-      (r) => r.model === ctx.judgeModel,
+      (r) => r.model === ctx.judgeModel && !ctx.sharedJudge.has(r.name),
     );
     if (same.length > 0 && !ctx.opts.allowSameJudge) {
       return { kind: "same-judge", reviewers: same.map((r) => r.name) };
@@ -642,7 +679,7 @@ export async function runEval(opts: EvalOptions, deps: ProgramDeps): Promise<num
   }
 
   let cases: Case[];
-  let checked: { sameJudge: SameJudge | null; names: Set<string> };
+  let checked: { sameJudge: SameJudge | null; names: Set<string>; shared: Set<string> };
   try {
     cases = await loadCases(opts.cases);
     checked = await checkCases(cases, opts, judgeModel);
@@ -683,7 +720,12 @@ export async function runEval(opts: EvalOptions, deps: ProgramDeps): Promise<num
     judgeModel,
     startedAt,
     toolVersion: toolVersion(),
+    sharedJudge: checked.shared,
   };
+  // A built-in reviewer whose own default is the judge model shares it with
+  // the judge. The eval goes on, and says so here and in the report.
+  const sharedNames = [...checked.shared].sort();
+  if (sharedNames.length > 0) say(sharedJudgeMessage(sharedNames, judgeModel));
 
   let reuse = new Map<string, RepeatMetrics>();
   if (opts.resume) {
@@ -792,11 +834,16 @@ export async function runEval(opts: EvalOptions, deps: ProgramDeps): Promise<num
     );
   }
 
+  if (sharedNames.length > 0) report.shared_judge = { model: judgeModel, reviewers: sharedNames };
   const json = `${JSON.stringify(report, null, 2)}\n`;
   await mkdir(out, { recursive: true });
   await writeFile(join(out, "report.json"), json);
+  const sharedLine =
+    sharedNames.length > 0
+      ? `Judge: ${judgeModel}, the default model of ${sharedNames.join(", ")}.\n`
+      : "";
   process.stdout.write(
-    opts.format === "json" ? json : renderTable(report, base.gate?.cases_ref ?? null),
+    opts.format === "json" ? json : renderTable(report, base.gate?.cases_ref ?? null) + sharedLine,
   );
 
   if (opts.resume) {

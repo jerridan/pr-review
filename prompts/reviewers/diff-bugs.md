@@ -2,6 +2,8 @@
 name: diff-bugs
 description: Finds bugs in the code that the diff adds or changes, from the diff and the head files.
 tools: [Read, Grep, Glob]
+model: sonnet
+effort: medium
 triggers:
   paths: []
   categories: []

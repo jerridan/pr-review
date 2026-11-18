@@ -527,10 +527,14 @@ describe("loadRepoConfig: custom reviewers", () => {
 });
 
 describe("effective reviewer values (R3, R6)", () => {
+  // The diff-bugs definition with no model and no effort of its own, so the
+  // tests of the order reach the role default. The built-in file sets Sonnet
+  // 5.5 at medium effort (D4c E1).
   const diffBugs = (): ReviewerDefinition => {
     const def = loadBuiltinReviewers().find((d) => d.frontmatter.name === "diff-bugs");
     if (!def) throw new Error("diff-bugs is missing");
-    return def;
+    const { model: _model, effort: _effort, ...frontmatter } = def.frontmatter;
+    return { ...def, frontmatter };
   };
   const withConfig = (patch: Partial<RepoConfig>): RepoConfig => ({
     ...DEFAULT_REPO_CONFIG,

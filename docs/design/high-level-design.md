@@ -277,7 +277,7 @@ A custom reviewer can also override `threshold` to be stricter, never looser tha
 | Role | Default model | Effort | Reason |
 |------|---------------|--------|--------|
 | triage | Sonnet 5.5 | medium, thinking on | judgment on risk from one read of the diff; failure falls back to full |
-| reviewers | Opus 5.5 | low | half the old price gap; best published bug-catch rates at low effort; Sonnet 5.5 medium is the first harness comparison |
+| reviewers | Opus 5.5; Sonnet 5.5 for diff-bugs and tests | low; medium for diff-bugs and tests | half the old price gap; best published bug-catch rates at low effort. D4c E1 moved diff-bugs and tests to Sonnet 5.5 medium by its rule: more posted goldens at the same precision for less cost (`docs/research/e1-reviewer-models.md`) |
 | verifier | Sonnet 5.5, Opus 5.5 on escalation | medium (D4c E3), high on escalation, thinking on | a different model from the finders; escalation on `needs_context` or a middle-band score |
 | semantic merge | Sonnet 5.5 | medium | needs judgment on wording |
 | summarizer | Haiku 5.5 | medium, thinking on | formatting only; low effort leaks reasoning text |
@@ -419,7 +419,7 @@ Settled on 2026-10-13:
 12. **Records**: workflow artifact plus a `pr-review-records` branch.
 13. **Distribution**: composite action run from source, wrapped in a reusable workflow, plus the CLI. No npm package. The concurrency limit is the `concurrency` key of the repo config, default 5, as decision 17 says.
 14. **Orchestrator**: plain code, no model. Every judgment call is a bounded agent call with a schema.
-15. **Model versions**: exact IDs pinned in config, 5.5 family by default. Reviewers on Opus 5.5 at low effort, verifier on Sonnet 5.5 at medium with Opus escalation at high, triage and merge on Sonnet 5.5, summarizer on Haiku 5.5. Harness hypotheses, see section 5.1.
+15. **Model versions**: exact IDs pinned in config, 5.5 family by default. Reviewers on Opus 5.5 at low effort, except diff-bugs and tests on Sonnet 5.5 at medium (D4c E1), verifier on Sonnet 5.5 at medium with Opus escalation at high, triage and merge on Sonnet 5.5, summarizer on Haiku 5.5. Harness hypotheses, see section 5.1.
 16. **Reviewer prompts**: report everything in scope with confidence and severity; filtering is the verifier's job. Follows the 5.x guidance that conservative review prompts over-filter.
 17. **Parallelism**: a semaphore sized to runner memory, default 5, because each SDK query is a process of about 1 GiB. This is a resource bound, not a rate-limit policy.
 18. **Dispatch**: one SDK `query()` per reviewer pass is the dispatch mechanism. A subagent mode, if a later change adds one, is a budget option for the deep reviewers. It is not a recall lever. The turn budget, not the mechanism, is how a repo buys depth.
