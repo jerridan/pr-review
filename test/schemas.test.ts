@@ -530,6 +530,7 @@ describe("RecordSchema", () => {
       }).success;
     expect(withSkipped([{ name: "diff-bugs", reason: "disabled by config" }])).toBe(true);
     expect(withSkipped([{ name: "diff-bugs", reason: "token ceiling", pass: 2 }])).toBe(true);
+    // A record from before 0.20.0 can hold "no description".
     expect(withSkipped([{ name: "description-drift", reason: "no description" }])).toBe(true);
     expect(withSkipped([{ name: "diff-bugs", reason: "bored" }])).toBe(false);
     expect(withSkipped(undefined)).toBe(false);

@@ -83,15 +83,8 @@ describe("scripts/measure-passes.sh (R6)", () => {
     }
   });
 
-  it("turns off the six other built-in reviewers in both arms, so only diff-bugs posts findings", () => {
-    const others = [
-      "conventions",
-      "tests",
-      "security",
-      "history",
-      "description-drift",
-      "docs-and-comments",
-    ];
+  it("turns off the five other built-in reviewers in both arms, so only diff-bugs posts findings", () => {
+    const others = ["conventions", "tests", "security", "history", "docs-and-comments"];
     for (const passes of [1, 2]) {
       const text = readFileSync(join(stubDir, `config-arm-${passes}.yaml`), "utf8");
       expect(text).toContain(`passes: ${passes}`);
@@ -99,7 +92,7 @@ describe("scripts/measure-passes.sh (R6)", () => {
         expect(text).toMatch(new RegExp(`^  ${name}:\\n    enabled: false$`, "m"));
       }
       expect(text).not.toMatch(/diff-bugs:\n {4}enabled/);
-      expect(text.match(/enabled: false/g)).toHaveLength(6);
+      expect(text.match(/enabled: false/g)).toHaveLength(5);
     }
   });
 

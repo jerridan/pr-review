@@ -1,4 +1,4 @@
-pr-review reviews the diff between two commits of a local git repo, or the diff of a GitHub pull request. It runs triage, seven reviewers, verification and merge with the Claude Agent SDK. It writes a JSON run record. With `--format github`, it posts one review on the pull request.
+pr-review reviews the diff between two commits of a local git repo, or the diff of a GitHub pull request. It runs triage, six reviewers, verification and merge with the Claude Agent SDK. It writes a JSON run record. With `--format github`, it posts one review on the pull request.
 
 ## Setup
 
@@ -492,7 +492,7 @@ The run never grants Write or Edit. A built-in reviewer never gets Bash. When a 
 
 ## Reviewers
 
-Seven built-in reviewers run by default. One more, `general-review`, runs only when a run names it (see "The general-review reviewer"). The tier and the triggers decide which of them run. Each reviewer reports only what the diff adds, changes or aggravates. Each one has its own evidence source and a "Do not flag" list, so the reviewers do not report the same problem twice. The files are in `prompts/reviewers/`.
+Six built-in reviewers run by default. One more, `general-review`, runs only when a run names it (see "The general-review reviewer"). The tier and the triggers decide which of them run. Each reviewer reports only what the diff adds, changes or aggravates. Each one has its own evidence source and a "Do not flag" list, so the reviewers do not report the same problem twice. The files are in `prompts/reviewers/`.
 
 | Reviewer | Evidence | Lowest tier | Passes | Model and effort |
 |----------|----------|-------------|--------|------------------|
@@ -500,13 +500,14 @@ Seven built-in reviewers run by default. One more, `general-review`, runs only w
 | `conventions` | The repo rules and the nearby code. | fast | 1 | Opus 5.5, low |
 | `tests` | The behaviour changes of the diff, compared with its test changes. | full | 1 | Sonnet 5.5, medium |
 | `security` | Input handling, secrets and authorization on the changed paths, and the diff of `.pr-review/`. | full | 1 | Opus 5.5, low |
-| `history` | The blame and log of the changed lines, read at the merge base. | full | 1 | Opus 5.5, low |
-| `description-drift` | The description of the change, compared with what the code does. | full | 1 | Opus 5.5, low |
+| `history` | The blame and log of the changed lines, read at the merge base. | full | 1 | Sonnet 5.5, medium |
 | `docs-and-comments` | The comments and docs that the change makes stale. | full | 1 | Opus 5.5, low |
 
-The model and effort of `diff-bugs` and `tests` come from their frontmatter, by D4c E1 (`docs/research/e1-reviewer-models.md`). The others take the role default. A repo config overrides both, as the order below says.
+The model and effort of `diff-bugs`, `history` and `tests` come from their frontmatter. `diff-bugs` and `tests` moved by the D4c E1 rule (`docs/research/e1-reviewer-models.md`). `history` moved by the decision of the principal, against the rule: precision went from 0.905 to 0.793, for 28% less cost and 4 more goldens. The others take the role default. A repo config overrides both, as the order below says.
 
-`diff-bugs` is the original reviewer. The other six are new. All seven run on every change at or above their lowest tier. At the fast tier, every reviewer runs one pass.
+`diff-bugs` is the original reviewer. The other five are new. All six run on every change at or above their lowest tier. At the fast tier, every reviewer runs one pass.
+
+The `description-drift` reviewer was removed in 0.20.0. The principal decided this after D4c E1, because its value was low. A repo config that names it gets a warning, and the tool ignores the entry.
 
 ### The general-review reviewer
 
@@ -527,7 +528,7 @@ The eval records of a `--stage1` run hold the findings before the verifier. Repl
 
 The Terra arm runs the same prompt through Codex. See "The Codex general reviewer".
 
-The description is the sanitized PR title, labels and body with `--pr`. Without `--pr`, it is the sanitized subject and body of each commit between the base and the head. Every reviewer and the verifier get it. When the description is empty, `description-drift` does not run, and coverage lists it under `reviewers_skipped` with the reason `no description`. The same list names a reviewer that the config disables, with the reason `disabled by config`.
+The description is the sanitized PR title, labels and body with `--pr`. Without `--pr`, it is the sanitized subject and body of each commit between the base and the head. Every reviewer and the verifier get it. Before 0.20.0, an empty description made `description-drift` skip, with the reason `no description`. Old records can still hold that reason. A new run never writes it. The list `reviewers_skipped` names a reviewer that the config disables, with the reason `disabled by config`.
 
 All passes of a reviewer use the same input. The run removes repeated findings by fingerprint before verification, so the verifier checks one copy. The record keeps the findings of every pass.
 
@@ -1137,7 +1138,7 @@ A failed repeat is a run that exits 1, throws, or gives an incomplete review. A 
 
 ## Measure the passes
 
-`scripts/measure-passes.sh` measures the recall of `diff-bugs` with one pass against two passes. It builds the fixture repo twice. The base commit of the first fixture sets `reviewers.diff-bugs.passes` to 1. The base commit of the second sets it to 2. Both configs also set `enabled: false` for the six other built-in reviewers: `conventions`, `tests`, `security`, `history`, `description-drift` and `docs-and-comments`. Only `diff-bugs` runs. Every posted finding comes from `diff-bugs`. So `covered` measures `diff-bugs` alone. For each arm, the script runs `pr-review run --format json` the given number of times, with the `pr-review` command on your PATH.
+`scripts/measure-passes.sh` measures the recall of `diff-bugs` with one pass against two passes. It builds the fixture repo twice. The base commit of the first fixture sets `reviewers.diff-bugs.passes` to 1. The base commit of the second sets it to 2. Both configs also set `enabled: false` for the five other built-in reviewers: `conventions`, `tests`, `security`, `history` and `docs-and-comments`. Only `diff-bugs` runs. Every posted finding comes from `diff-bugs`. So `covered` measures `diff-bugs` alone. For each arm, the script runs `pr-review run --format json` the given number of times, with the `pr-review` command on your PATH.
 
 ```bash
 scripts/measure-passes.sh 5

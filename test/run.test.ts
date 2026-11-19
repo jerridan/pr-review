@@ -958,7 +958,9 @@ describe("the repo config in a run (R3)", () => {
     for (const call of byRole("reviewer")) {
       expect(call.overrides, call.reviewerName).toEqual({
         model: "claude-sonnet-5-5",
-        effort: ["diff-bugs", "tests"].includes(call.reviewerName ?? "") ? "medium" : "low",
+        effort: ["diff-bugs", "history", "tests"].includes(call.reviewerName ?? "")
+          ? "medium"
+          : "low",
         ...DEFAULT_BUDGET,
       });
     }
@@ -982,7 +984,7 @@ describe("the repo config in a run (R3)", () => {
     for (const entry of record.identity.selected_reviewers) {
       expect(entry, entry.name).toMatchObject({
         model: "claude-sonnet-5-5",
-        effort: ["diff-bugs", "tests"].includes(entry.name) ? "medium" : "low",
+        effort: ["diff-bugs", "history", "tests"].includes(entry.name) ? "medium" : "low",
       });
     }
     expect(record.identity.excluded_files).toContainEqual({
@@ -1138,11 +1140,13 @@ describe("the repo config in a run (R3)", () => {
     const overrides = { ...expected, ...DEFAULT_BUDGET };
     expect(calls.map((c) => c.reviewerName)).toContain("naming");
     expect(calls.map((c) => c.reviewerName)).toContain("diff-bugs");
-    // diff-bugs and tests set Sonnet 5.5 at medium effort in their
+    // diff-bugs, history and tests set Sonnet 5.5 at medium effort in their
     // frontmatter (D4c E1); every other reviewer gets the role default.
     const own = { model: "claude-sonnet-5-5", effort: "medium", ...DEFAULT_BUDGET };
     for (const call of calls) {
-      const want = ["diff-bugs", "tests"].includes(call.reviewerName ?? "") ? own : overrides;
+      const want = ["diff-bugs", "history", "tests"].includes(call.reviewerName ?? "")
+        ? own
+        : overrides;
       expect(call.overrides, call.reviewerName).toEqual(want);
     }
     expect(record.identity.models.reviewer).toEqual(expected);
@@ -1249,16 +1253,8 @@ describe("the repo config in a run (R3)", () => {
   }, 30_000);
 });
 
-describe("the seven built-in reviewers in a run (R1, R6)", () => {
-  const SEVEN = [
-    "conventions",
-    "description-drift",
-    "diff-bugs",
-    "docs-and-comments",
-    "history",
-    "security",
-    "tests",
-  ];
+describe("the six default built-in reviewers in a run (R1, R6)", () => {
+  const SIX = ["conventions", "diff-bugs", "docs-and-comments", "history", "security", "tests"];
   const fixtures: Fixture[] = [];
   afterAll(() => {
     for (const f of fixtures) rmSync(f.repo, { recursive: true, force: true });
@@ -1296,7 +1292,7 @@ describe("the seven built-in reviewers in a run (R1, R6)", () => {
       fixtures.push(made);
       return made;
     }
-    const source = mkdtempSync(join(tmpdir(), "pr-review-run-seven-"));
+    const source = mkdtempSync(join(tmpdir(), "pr-review-run-six-"));
     try {
       mkdirSync(join(source, "dir"));
       writeFileSync(join(source, "dir", "config.yaml"), configYaml);
@@ -1326,24 +1322,24 @@ describe("the seven built-in reviewers in a run (R1, R6)", () => {
   const passesOf = (record: RunRecord, name: string) =>
     record.stages.reviewers.filter((r) => r.name === name).map((r) => r.pass);
 
-  it("selects all seven at tier full, with two passes for diff-bugs and security", async () => {
+  it("selects all six at tier full, with two passes for diff-bugs and security", async () => {
     const f = await fixtureWith(
       "reviewers:\n  diff-bugs:\n    passes: 2\n  security:\n    passes: 2\n",
     );
-    const { record } = await review(f, "seven-full", "full");
-    expect(record.identity.selected_reviewers.map((r) => r.name).sort()).toEqual(SEVEN);
-    expect([...record.posted.coverage.reviewers_ran].sort()).toEqual(SEVEN);
+    const { record } = await review(f, "six-full", "full");
+    expect(record.identity.selected_reviewers.map((r) => r.name).sort()).toEqual(SIX);
+    expect([...record.posted.coverage.reviewers_ran].sort()).toEqual(SIX);
     expect(record.posted.coverage.reviewers_skipped).toEqual([]);
     expect(passesOf(record, "diff-bugs").sort()).toEqual([1, 2]);
     expect(passesOf(record, "security").sort()).toEqual([1, 2]);
     expect(passesOf(record, "tests")).toEqual([1]);
-    expect(record.stages.reviewers).toHaveLength(9);
+    expect(record.stages.reviewers).toHaveLength(8);
     // One verification per reviewer: the passes of one reviewer give one.
-    expect(record.stages.verifications).toHaveLength(7);
+    expect(record.stages.verifications).toHaveLength(6);
     expect(record.posted.findings).toHaveLength(1);
   }, 30_000);
 
-  it("selects six and lists description-drift as skipped when the description is empty", async () => {
+  it("selects every reviewer and skips none when the description is empty", async () => {
     const f = await fixtureWith(null);
     // A head whose only commit after the merge base has an empty message.
     const env = {
@@ -1366,20 +1362,16 @@ describe("the seven built-in reviewers in a run (R1, R6)", () => {
     await git("commit", "--quiet", "--no-gpg-sign", "--allow-empty-message", "-am", "");
     const head = await git("rev-parse", "HEAD");
 
-    const { record } = await review({ ...f, head }, "seven-no-description", "full");
+    const { record } = await review({ ...f, head }, "six-no-description", "full");
     expect(record.identity.description).toBe("");
-    expect(record.identity.selected_reviewers.map((r) => r.name).sort()).toEqual(
-      SEVEN.filter((n) => n !== "description-drift"),
-    );
-    expect(record.posted.coverage.reviewers_skipped).toEqual([
-      { name: "description-drift", reason: "no description" },
-    ]);
-    expect(record.posted.coverage.reviewers_ran).not.toContain("description-drift");
+    expect(record.identity.selected_reviewers.map((r) => r.name).sort()).toEqual(SIX);
+    expect([...record.posted.coverage.reviewers_ran].sort()).toEqual(SIX);
+    expect(record.posted.coverage.reviewers_skipped).toEqual([]);
   }, 30_000);
 
-  it("does not list description-drift as skipped at the fast tier, which does not select it", async () => {
+  it("does not list a reviewer as skipped at the fast tier, which does not select the others", async () => {
     const f = await fixtureWith(null);
-    const { record } = await review(f, "seven-fast", "fast");
+    const { record } = await review(f, "six-fast", "fast");
     expect(record.identity.selected_reviewers.map((r) => r.name)).toEqual([
       "conventions",
       "diff-bugs",
@@ -1388,11 +1380,11 @@ describe("the seven built-in reviewers in a run (R1, R6)", () => {
   }, 30_000);
 
   it("verifies one copy of a finding that two passes return, and records both passes", async () => {
-    const others = SEVEN.filter((n) => n !== "diff-bugs")
+    const others = SIX.filter((n) => n !== "diff-bugs")
       .map((n) => `  ${n}:\n    enabled: false\n`)
       .join("");
     const f = await fixtureWith(`reviewers:\n${others}  diff-bugs:\n    passes: 2\n`);
-    const { record, fake } = await review(f, "seven-dedupe", "full");
+    const { record, fake } = await review(f, "six-dedupe", "full");
     expect(record.stages.reviewers.map((r) => [r.name, r.pass, r.findings.length])).toEqual([
       ["diff-bugs", 1, 1],
       ["diff-bugs", 2, 1],
@@ -1406,10 +1398,10 @@ describe("the seven built-in reviewers in a run (R1, R6)", () => {
     const f = await fixtureWith(
       "reviewers:\n  diff-bugs:\n    passes: 3\n  conventions:\n    passes: 2\n",
     );
-    const fast = await review(f, "seven-passes-fast", "fast");
+    const fast = await review(f, "six-passes-fast", "fast");
     expect(passesOf(fast.record, "diff-bugs")).toEqual([1]);
     expect(passesOf(fast.record, "conventions")).toEqual([1]);
-    const full = await review(f, "seven-passes-full", "full");
+    const full = await review(f, "six-passes-full", "full");
     expect(passesOf(full.record, "diff-bugs").sort()).toEqual([1, 2, 3]);
     expect(passesOf(full.record, "conventions").sort()).toEqual([1, 2]);
   }, 30_000);
@@ -1585,14 +1577,7 @@ describe("the token ceiling (R8)", () => {
     for (const f of fixtures) rmSync(f.repo, { recursive: true, force: true });
   });
 
-  const ONLY_DIFF_BUGS = [
-    "conventions",
-    "description-drift",
-    "docs-and-comments",
-    "history",
-    "security",
-    "tests",
-  ]
+  const ONLY_DIFF_BUGS = ["conventions", "docs-and-comments", "history", "security", "tests"]
     .map((n) => `  ${n}:\n    enabled: false\n`)
     .join("")
     .concat("  diff-bugs:\n    passes: 2\n");

@@ -32,7 +32,7 @@ const CONFIG = [
   "reviewers:",
   "  diff-bugs:",
   "    passes: 2",
-  ...["conventions", "description-drift", "docs-and-comments", "history", "security", "tests"].map(
+  ...["conventions", "docs-and-comments", "history", "security", "tests"].map(
     (n) => `  ${n}:\n    enabled: false`,
   ),
   "",

@@ -267,8 +267,8 @@ describe("pr-review run through the CLI", () => {
     expect(typeof doc.total_cost_usd).toBe("number");
     expect(doc.tier).toBe("full");
     expect(doc.verdict).toBe("would request changes");
-    // Seven reviewers report the same finding, and merge keeps one.
-    expect(doc.coverage.reviewers_ran).toHaveLength(7);
+    // Six reviewers report the same finding, and merge keeps one.
+    expect(doc.coverage.reviewers_ran).toHaveLength(6);
     expect(doc.findings).toHaveLength(1);
     expect(doc.findings[0]).toMatchObject({
       file: fx.file,

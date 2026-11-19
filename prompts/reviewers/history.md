@@ -2,6 +2,8 @@
 name: history
 description: Finds changes that undo or repeat a prior fix, from the blame and log of the changed lines.
 tools: [Read, Grep, Glob]
+model: sonnet
+effort: medium
 triggers:
   paths: []
   categories: []
