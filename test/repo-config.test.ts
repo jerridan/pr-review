@@ -641,6 +641,39 @@ describe("loadRepoConfig: suppressions name a known reviewer", () => {
   });
 });
 
+describe("loadRepoConfig: a removed reviewer name", () => {
+  it("loads a config that names description-drift, drops the entries and warns for each", async () => {
+    const { repo, sha } = await repoWith({
+      ".pr-review/config.yaml": [
+        "reviewers:",
+        "  description-drift:",
+        "    enabled: false",
+        "  diff-bugs:",
+        "    passes: 1",
+        "suppressions:",
+        "  - reviewer: description-drift",
+        "    reason: noisy",
+        "  - reviewer: diff-bugs",
+        "    reason: ok",
+        "",
+      ].join("\n"),
+    });
+    const loaded = await loadRepoConfig(repo, sha);
+    expect(Object.keys(loaded.config.reviewers)).toEqual(["diff-bugs"]);
+    expect(loaded.config.suppressions.map((s) => s.reviewer)).toEqual(["diff-bugs"]);
+    const named = loaded.warnings.filter((w) => w.includes("description-drift"));
+    expect(named).toHaveLength(2);
+    for (const w of named) expect(w).toContain("removed in 0.20.0");
+  });
+
+  it("still fails for a reviewer name that is unknown", async () => {
+    const err = await loadError({
+      ".pr-review/config.yaml": "reviewers:\n  no-such-reviewer:\n    enabled: false\n",
+    });
+    expect(err.field).toBe("reviewers.no-such-reviewer");
+  });
+});
+
 describe("loadRepoConfig: a config path that is not a regular file", () => {
   async function errorOf(repo: string, sha: string): Promise<RepoConfigError> {
     try {
