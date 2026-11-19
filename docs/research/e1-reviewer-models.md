@@ -1,12 +1,23 @@
 # E1: the model and the effort of each reviewer
 
-Status: done 2026-11-18. Part of D4c in TICKETS.md. The default change waits for the choice of the user.
+Status: done 2026-11-19. Part of D4c in TICKETS.md.
 
 ## Result
 
-- By the rules, diff-bugs and tests move to Sonnet 5.5 at medium effort, and description-drift moves to Haiku 5.5 at medium effort (or to Sonnet 5.5 at medium effort, which is faster; the user chooses). Security, history, conventions and docs-and-comments stay on Opus 5.5 at low effort.
-- With that setting, the reviewers and the verifier find 103 posted-label goldens against 93, post 41 false findings against 36, and cost 13% less ($64.13 against $73.52 on the 28 cases), in about the same time (31 s against 33 s at the median).
-- Every reviewer that stays fails on precision: the new models find as many goldens or more, but the verifier passes more of their false findings.
+By the rules of E1:
+
+- diff-bugs and tests move to Sonnet 5.5 at medium effort. Each finds more posted-label goldens at the same precision for less cost.
+- description-drift passes the rule for a cheaper setting on Haiku 5.5 medium, Sonnet 5.5 medium and Sonnet 5.5 high.
+- security, history, conventions and docs-and-comments stay on Opus 5.5 at low effort: every new model posts more false findings for them.
+- Opus 5.5 medium, measured in stage 2 for diff-bugs and tests only, fails both rules for both: it finds the most goldens (34 for diff-bugs against 22), but its precision falls by 0.11 to 0.13 and it costs 1.5 to 2.3 times as much.
+
+By the principal's decision, after the user read the figures (these are not results of the rules):
+
+- history moves to Sonnet 5.5 at medium effort. The rule rejects it on precision (0.905 to 0.793, 4 more false findings), but it finds 4 more goldens for 28% less cost. The user accepts the drop and wants the verifier improved, so that it rejects more of the false findings.
+- description-drift is removed from the tool, as a reviewer of low value. The eval loses its findings: in S1 (Opus 5.5 low, after the first verifier) it posted 9 goldens and 8 false findings. E6 saw it report the planted bug in 17 of the 25 runs of its table, always beside other reviewers that also reported it. A repo config that names it gets a warning, and the tool ignores the entry.
+- security, conventions and docs-and-comments stay on Opus 5.5 at low effort.
+
+With these defaults (diff-bugs, tests and history on Sonnet 5.5 medium; the others on Opus 5.5 low; no description-drift), the six reviewers and the first verifier find 96 posted-label goldens against 84 today without description-drift, post 36 false findings against 28, and cost $55.24 against $64.17 on the 28 cases (the sums over the reviewers before the merge).
 
 ## Result of stage 1
 
@@ -145,7 +156,7 @@ Reviewer stage, median of the slowest reviewer pass of each case: opus-low (S1 p
 
 ## Stage 2
 
-Stage 2 sent the candidates of three arms to the verifier, Sonnet 5.5 at medium effort, through `pr-review replay`: Sonnet 5.5 medium and Sonnet 5.5 high for every reviewer, and Haiku 5.5 medium for the three light reviewers. The user chose these arms after stage 1. Opus 5.5 medium did not go to stage 2: in stage 1 it raised about the same goldens as Sonnet 5.5 high (99 against 96) at two times the cost. Haiku 5.5 high did not go either: in stage 1 it was not better than Haiku 5.5 medium and cost two times as much. The stored arm is the Opus 5.5 low reviewers of S1 (pass 1), whose candidates E3 verified with the same verifier.
+Stage 2 sent the candidates of three arms to the verifier, Sonnet 5.5 at medium effort, through `pr-review replay`: Sonnet 5.5 medium and Sonnet 5.5 high for every reviewer, and Haiku 5.5 medium for the three light reviewers. The user chose these arms after stage 1. Opus 5.5 medium went to stage 2 later, for diff-bugs and tests only, on the principal's word; in stage 1 it raised about the same goldens as Sonnet 5.5 high (99 against 96) at two times the cost. Haiku 5.5 high did not go either: in stage 1 it was not better than Haiku 5.5 medium and cost two times as much. The stored arm is the Opus 5.5 low reviewers of S1 (pass 1), whose candidates E3 verified with the same verifier.
 
 The posted set is the candidates whose first verifier decision passed. A replay has no escalation, no merge and no cap, so these figures compare only with each other. The cost of a reviewer is its reviewer queries and the verifier calls of its candidates. The time of a reviewer in a case is its pass and the slowest verification of its candidates; the tables give the median over the cases. The rules compare each arm with the stored arm, with the noise of one pass of stage 1.
 
@@ -156,27 +167,34 @@ The posted set is the candidates whose first verifier decision passed. A replay 
 | diff-bugs | stored | 22 | 6 | 0.786 | $10.73 | $0.49 | 16 s | - | - |
 | diff-bugs | sonnet-medium | 23 | 6 | 0.793 | $6.83 | $0.30 | 17 s | passes | fails |
 | diff-bugs | sonnet-high | 27 | 10 | 0.730 | $10.26 | $0.38 | 34 s | fails | fails |
+| diff-bugs | opus-medium | 34 | 17 | 0.667 | $16.16 | $0.48 | 32 s | fails | fails |
 | security | stored | 7 | 1 | 0.875 | $8.03 | $1.15 | 5 s | - | - |
 | security | sonnet-medium | 7 | 3 | 0.700 | $6.00 | $0.86 | 7 s | fails | fails |
 | security | sonnet-high | 7 | 4 | 0.636 | $8.23 | $1.18 | 15 s | fails | fails |
+| security | opus-medium | 0 | 0 | - | $13.98 | - | 7 s | fails | fails |
 | history | stored | 19 | 2 | 0.905 | $12.71 | $0.67 | 8 s | - | - |
 | history | sonnet-medium | 23 | 6 | 0.793 | $9.18 | $0.40 | 15 s | fails | fails |
 | history | sonnet-high | 30 | 14 | 0.682 | $12.00 | $0.40 | 36 s | fails | fails |
+| history | opus-medium | 0 | 0 | - | $11.29 | - | 13 s | fails | fails |
 | tests | stored | 17 | 13 | 0.567 | $18.64 | $1.10 | 29 s | - | - |
 | tests | sonnet-medium | 24 | 17 | 0.585 | $17.13 | $0.71 | 21 s | passes | fails |
 | tests | sonnet-high | 28 | 26 | 0.519 | $19.11 | $0.68 | 29 s | fails | passes |
+| tests | opus-medium | 28 | 33 | 0.459 | $31.37 | $1.12 | 36 s | fails | fails |
 | conventions | stored | 8 | 3 | 0.727 | $5.92 | $0.74 | 5 s | - | - |
 | conventions | sonnet-medium | 16 | 9 | 0.640 | $6.33 | $0.40 | 10 s | fails | fails |
 | conventions | sonnet-high | 17 | 18 | 0.486 | $11.07 | $0.65 | 25 s | fails | fails |
 | conventions | haiku-medium | 18 | 26 | 0.409 | $8.59 | $0.48 | 35 s | fails | fails |
+| conventions | opus-medium | 0 | 0 | - | $8.13 | - | 12 s | fails | fails |
 | docs-and-comments | stored | 11 | 3 | 0.786 | $8.14 | $0.74 | 9 s | - | - |
 | docs-and-comments | sonnet-medium | 9 | 6 | 0.600 | $6.19 | $0.69 | 14 s | fails | fails |
 | docs-and-comments | sonnet-high | 8 | 17 | 0.320 | $9.51 | $1.19 | 25 s | fails | fails |
 | docs-and-comments | haiku-medium | 7 | 11 | 0.389 | $4.09 | $0.58 | 25 s | fails | fails |
+| docs-and-comments | opus-medium | 0 | 0 | - | $9.50 | - | 16 s | fails | fails |
 | description-drift | stored | 9 | 8 | 0.529 | $9.36 | $1.04 | 12 s | - | - |
 | description-drift | sonnet-medium | 14 | 11 | 0.560 | $7.89 | $0.56 | 14 s | passes | fails |
 | description-drift | sonnet-high | 13 | 9 | 0.591 | $8.57 | $0.66 | 22 s | passes | fails |
 | description-drift | haiku-medium | 11 | 9 | 0.550 | $5.37 | $0.49 | 27 s | passes | fails |
+| description-drift | opus-medium | 0 | 0 | - | $8.53 | - | 12 s | fails | fails |
 
 ### walle and websites cases (8)
 
@@ -185,27 +203,36 @@ The posted set is the candidates whose first verifier decision passed. A replay 
 | diff-bugs | stored | 4 | 0 | 1.000 | $2.60 | $0.65 | 13 s | - | - |
 | diff-bugs | sonnet-medium | 4 | 1 | 0.800 | $1.42 | $0.36 | 12 s | fails | fails |
 | diff-bugs | sonnet-high | 4 | 1 | 0.800 | $1.58 | $0.39 | 21 s | fails | fails |
+| diff-bugs | opus-medium | 4 | 1 | 0.800 | $4.20 | $1.05 | 23 s | fails | fails |
 | security | stored | 0 | 0 | - | $1.55 | - | 5 s | - | - |
 | security | sonnet-medium | 1 | 0 | 1.000 | $1.07 | $1.07 | 7 s | fails | fails |
 | security | sonnet-high | 1 | 0 | 1.000 | $1.74 | $1.74 | 9 s | fails | fails |
+| security | opus-medium | 0 | 0 | - | $3.54 | - | 6 s | fails | fails |
 | history | stored | 3 | 0 | 1.000 | $3.75 | $1.25 | 11 s | - | - |
 | history | sonnet-medium | 3 | 1 | 0.750 | $3.01 | $1.00 | 14 s | fails | fails |
 | history | sonnet-high | 4 | 1 | 0.800 | $3.10 | $0.77 | 24 s | fails | fails |
+| history | opus-medium | 0 | 0 | - | $4.07 | - | 9 s | fails | fails |
 | tests | stored | 4 | 1 | 0.800 | $5.32 | $1.33 | 23 s | - | - |
 | tests | sonnet-medium | 4 | 4 | 0.500 | $4.42 | $1.10 | 24 s | fails | fails |
 | tests | sonnet-high | 4 | 4 | 0.500 | $4.69 | $1.17 | 26 s | fails | fails |
+| tests | opus-medium | 5 | 6 | 0.455 | $9.82 | $1.96 | 26 s | fails | fails |
 | conventions | stored | 1 | 0 | 1.000 | $2.05 | $2.05 | 6 s | - | - |
 | conventions | sonnet-medium | 2 | 0 | 1.000 | $1.19 | $0.60 | 7 s | passes | fails |
 | conventions | sonnet-high | 2 | 1 | 0.667 | $3.59 | $1.79 | 38 s | fails | fails |
 | conventions | haiku-medium | 2 | 2 | 0.500 | $1.20 | $0.60 | 27 s | fails | fails |
+| conventions | opus-medium | 0 | 0 | - | $2.33 | - | 12 s | fails | fails |
 | docs-and-comments | stored | 2 | 1 | 0.667 | $3.50 | $1.75 | 16 s | - | - |
 | docs-and-comments | sonnet-medium | 1 | 1 | 0.500 | $1.92 | $1.92 | 13 s | fails | fails |
 | docs-and-comments | sonnet-high | 2 | 6 | 0.250 | $2.92 | $1.46 | 26 s | fails | fails |
 | docs-and-comments | haiku-medium | 3 | 3 | 0.500 | $1.71 | $0.57 | 24 s | fails | fails |
+| docs-and-comments | opus-medium | 0 | 0 | - | $3.77 | - | 17 s | fails | fails |
 | description-drift | stored | 3 | 0 | 1.000 | $3.30 | $1.10 | 20 s | - | - |
 | description-drift | sonnet-medium | 4 | 0 | 1.000 | $2.13 | $0.53 | 9 s | passes | fails |
 | description-drift | sonnet-high | 3 | 3 | 0.500 | $3.12 | $1.04 | 24 s | fails | fails |
 | description-drift | haiku-medium | 4 | 2 | 0.667 | $1.19 | $0.30 | 24 s | fails | fails |
+| description-drift | opus-medium | 0 | 0 | - | $2.28 | - | 9 s | fails | fails |
+
+Opus 5.5 medium has rows for diff-bugs and tests only: the principal sent only those two to stage 2, to ask if Opus 5.5 at medium effort is the better bug and tests reviewer. It is not by the rules: against Opus 5.5 low the upper end of R is 2.81 for diff-bugs and 2.87 for tests (the limit is 2), and against Sonnet 5.5 medium it is 11.4 and has no upper end.
 
 ### The choice between two arms that pass
 
@@ -242,7 +269,7 @@ These settings are cheaper or find more goldens, but post more false findings. N
 
 ## Spend
 
-Stage 1 cost $178.39 for the five arms and $1.17 for the judge of the stored arm. Stage 2 cost about $85: Sonnet 5.5 medium $28.4, Haiku 5.5 medium $17.07, Sonnet 5.5 high $39.43. About three cases were running when a window stopped and are in no result file. All runs used the plan login.
+Stage 1 cost $178.39 for the five arms and $1.17 for the judge of the stored arm. Stage 2 cost about $103: Sonnet 5.5 medium $28.4, Haiku 5.5 medium $17.07, Sonnet 5.5 high $39.43, Opus 5.5 medium (diff-bugs and tests) $17.81. About three cases were running when a window stopped and are in no result file. All runs used the plan login.
 
 ## The cost of stage 2 (estimate before the run)
 
