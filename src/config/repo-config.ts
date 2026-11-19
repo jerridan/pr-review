@@ -233,14 +233,24 @@ function messageOf(err: unknown): string {
 }
 
 /**
+ * The built-in reviewers that the tool no longer has. A config that names
+ * one of them still loads. The loader drops the entry and warns.
+ */
+const REMOVED_REVIEWERS: ReadonlyMap<string, string> = new Map([
+  ["description-drift", "removed in 0.20.0"],
+]);
+
+/**
  * Parse and check the text of config.yaml. "reviewerNames" holds every
  * built-in and custom reviewer name. Throw RepoConfigError on the first
- * problem, with the file and the field.
+ * problem, with the file and the field. A reviewer entry or a suppression
+ * for a removed reviewer is dropped, and "warnings" gets one line for each.
  */
 export function parseRepoConfig(
   text: string,
   file: string,
   reviewerNames: readonly string[],
+  warnings: string[] = [],
 ): RepoConfig {
   let raw: unknown;
   try {
@@ -263,6 +273,25 @@ export function parseRepoConfig(
   }
 
   const known = new Set(reviewerNames);
+  const removedNote = (name: string): string | undefined =>
+    known.has(name) ? undefined : REMOVED_REVIEWERS.get(name);
+  const data = result.data;
+  for (const name of Object.keys(data.reviewers)) {
+    const note = removedNote(name);
+    if (note === undefined) continue;
+    delete data.reviewers[name];
+    warnings.push(
+      `${file}: ${fieldOf(["reviewers", name])} names the reviewer "${name}", which was ${note}. The tool ignores this entry.`,
+    );
+  }
+  data.suppressions = data.suppressions.filter((item, i) => {
+    const note = item.reviewer === undefined ? undefined : removedNote(item.reviewer);
+    if (note === undefined) return true;
+    warnings.push(
+      `${file}: ${fieldOf(["suppressions", i, "reviewer"])} names the reviewer "${item.reviewer}", which was ${note}. The tool ignores this suppression.`,
+    );
+    return false;
+  });
   for (const name of Object.keys(result.data.reviewers)) {
     if (!known.has(name)) {
       throw new RepoConfigError(
@@ -440,13 +469,16 @@ export async function loadRepoConfig(repo: string, commit: string): Promise<Load
     loaded.set(path, bytes);
   }
 
+  const warnings: string[] = [];
   let config = DEFAULT_REPO_CONFIG;
   const configBytes = await readConfigFile(repo, commit, CONFIG_FILE);
   if (configBytes !== null) {
-    config = parseRepoConfig(configBytes.toString("utf8"), CONFIG_FILE, [
-      ...builtinNames,
-      ...customPaths.keys(),
-    ]);
+    config = parseRepoConfig(
+      configBytes.toString("utf8"),
+      CONFIG_FILE,
+      [...builtinNames, ...customPaths.keys()],
+      warnings,
+    );
     loaded.set(CONFIG_FILE, configBytes);
   }
 
@@ -454,7 +486,6 @@ export async function loadRepoConfig(repo: string, commit: string): Promise<Load
   if (rulesBytes !== null) loaded.set(RULES_FILE, rulesBytes);
 
   // CLAUDE.md is injected into the prompts, but it is not part of the hash.
-  const warnings: string[] = [];
   const claudeBytes = await readClaudeMd(repo, commit, warnings);
 
   return {
