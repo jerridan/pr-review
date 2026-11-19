@@ -66,7 +66,6 @@ function loadError(path: string): ReviewerLoadError {
 // The built-in reviewers of spec R1, in file name order, with their triggers.
 const BUILTINS: { name: string; minTier: "fast" | "full"; passes: number }[] = [
   { name: "conventions", minTier: "fast", passes: 1 },
-  { name: "description-drift", minTier: "full", passes: 1 },
   { name: "diff-bugs", minTier: "fast", passes: 1 },
   { name: "docs-and-comments", minTier: "full", passes: 1 },
   { name: "general-review", minTier: "fast", passes: 1 },
@@ -113,8 +112,9 @@ describe("built-in reviewers (A4, R1)", () => {
           threshold: 80,
           trusted: false,
           ...(name === "general-review" ? { opt_in: true } : {}),
-          // D4c E1 set these two on Sonnet 5.5 at medium effort.
-          ...(name === "diff-bugs" || name === "tests"
+          // D4c E1 set these two on Sonnet 5.5 at medium effort for diff-bugs and tests.
+          // The principal set them for history.
+          ...(name === "diff-bugs" || name === "history" || name === "tests"
             ? { model: "sonnet", effort: "medium" }
             : {}),
         });
@@ -164,7 +164,6 @@ describe("built-in reviewers (A4, R1)", () => {
     expect(doNotFlag("tests")).toMatch(/naming/i);
     expect(doNotFlag("security")).toMatch(/no security effect/i);
     expect(doNotFlag("history")).toMatch(/does not show/i);
-    expect(doNotFlag("description-drift")).toMatch(/code itself/i);
     expect(doNotFlag("docs-and-comments")).toMatch(/no comment or doc/i);
   });
 
@@ -176,7 +175,6 @@ describe("built-in reviewers (A4, R1)", () => {
     expect(opening("tests")).toMatch(/test/i);
     expect(opening("security")).toContain(".pr-review/");
     expect(opening("history")).toMatch(/history block/i);
-    expect(opening("description-drift")).toMatch(/description block/i);
     expect(opening("docs-and-comments")).toMatch(/comments/i);
     expect(opening("diff-bugs")).toMatch(/diff and the files of the head commit/);
   });
@@ -215,13 +213,6 @@ describe("built-in reviewers (A4, R1)", () => {
     for (const text of [user.body, String(user.frontmatter.history_user_message)]) {
       expect(text).not.toMatch(/in full/i);
     }
-  });
-
-  it("tells the description-drift reviewer what to report and where to quote from", () => {
-    const body = builtin("description-drift").systemPrompt;
-    expect(body).toMatch(/does not keep/i);
-    expect(body).toMatch(/does not mention/i);
-    expect(body).toMatch(/never quote the description block/i);
   });
 });
 
@@ -546,8 +537,8 @@ describe("selectReviewers", () => {
     expect(picked?.trigger).toContain("bug");
   });
 
-  it("skips a disabled reviewer, and the description reviewer when the description is empty", () => {
-    const picked = [def("diff-bugs"), def("description-drift"), def("tests")].map((d) => ({
+  it("skips a disabled reviewer, and skips none for an empty description", () => {
+    const picked = [def("diff-bugs"), def("security"), def("tests")].map((d) => ({
       def: d,
       trigger: "t",
     }));
@@ -556,25 +547,16 @@ describe("selectReviewers", () => {
       reviewers: { tests: { enabled: false } },
     };
     const empty = skipSelected(picked, { config, description: "  \n" });
-    expect(names(empty.run)).toEqual(["diff-bugs"]);
-    expect(empty.skipped).toEqual([
-      { name: "description-drift", reason: "no description" },
-      { name: "tests", reason: "disabled by config" },
-    ]);
+    expect(names(empty.run)).toEqual(["diff-bugs", "security"]);
+    expect(empty.skipped).toEqual([{ name: "tests", reason: "disabled by config" }]);
     const described = skipSelected(picked, { config, description: "Adds average." });
-    expect(names(described.run)).toEqual(["diff-bugs", "description-drift"]);
+    expect(names(described.run)).toEqual(["diff-bugs", "security"]);
     expect(described.skipped).toEqual([{ name: "tests", reason: "disabled by config" }]);
-    // A disabled description reviewer gives the config reason.
-    const off = skipSelected(picked, {
-      config: { ...DEFAULT_REPO_CONFIG, reviewers: { "description-drift": { enabled: false } } },
-      description: "",
-    });
-    expect(off.skipped).toEqual([{ name: "description-drift", reason: "disabled by config" }]);
     // A reviewer that was not selected is in neither list.
     expect(skipSelected([], { config, description: "" })).toEqual({ run: [], skipped: [] });
   });
 
-  it("selects conventions and diff-bugs at the fast tier, and all seven at the full tier, with no opt-in reviewer", () => {
+  it("selects conventions and diff-bugs at the fast tier, and all six at the full tier, with no opt-in reviewer", () => {
     const builtins = loadBuiltinReviewers();
     expect(names(selectReviewers(builtins, "fast", ["src/stats.ts"], []))).toEqual([
       "conventions",

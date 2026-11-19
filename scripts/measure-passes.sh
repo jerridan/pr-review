@@ -8,7 +8,7 @@
 # The script builds the fixture repo twice. Each fixture holds a
 # .pr-review/config.yaml on its base commit. The first sets
 # reviewers.diff-bugs.passes to 1. The second sets it to 2. Both also set
-# enabled to false for the six other built-in reviewers. So every posted
+# enabled to false for the five other built-in reviewers. So every posted
 # finding comes from diff-bugs. For each arm
 # the script runs "pr-review run --base <sha> --head <sha> --format json"
 # <runs> times inside the fixture, and then prints one line:
