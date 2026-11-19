@@ -53,7 +53,7 @@ cleanup() {
 trap cleanup EXIT
 
 # The built-in reviewers other than diff-bugs. The config turns them off.
-other_reviewers=(conventions tests security history description-drift docs-and-comments)
+other_reviewers=(conventions tests security history docs-and-comments)
 
 for passes in 1 2; do
   # The config goes to the base commit of the fixture.

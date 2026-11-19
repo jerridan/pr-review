@@ -88,7 +88,11 @@ export type PostedGitHub = {
   errors: { step: string; message: string }[];
 };
 
-/** A reviewer that the tier and the triggers selected, but that did not run. */
+/**
+ * A reviewer that the tier and the triggers selected, but that did not run.
+ * The reason "no description" stays so that a record from before 0.20.0
+ * still parses. A new run never writes it.
+ */
 export type SkippedReviewer = {
   name: string;
   reason: "disabled by config" | "no description" | "token ceiling";
