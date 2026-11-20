@@ -528,8 +528,8 @@ describe("loadRepoConfig: custom reviewers", () => {
 
 describe("effective reviewer values (R3, R6)", () => {
   // The diff-bugs definition with no model and no effort of its own, so the
-  // tests of the order reach the role default. The built-in file sets Sonnet
-  // 5.5 at medium effort (D4c E1).
+  // tests of the order reach the role default. The built-in file sets Opus
+  // 5.5 at medium effort.
   const diffBugs = (): ReviewerDefinition => {
     const def = loadBuiltinReviewers().find((d) => d.frontmatter.name === "diff-bugs");
     if (!def) throw new Error("diff-bugs is missing");
@@ -664,6 +664,31 @@ describe("loadRepoConfig: a removed reviewer name", () => {
     const named = loaded.warnings.filter((w) => w.includes("description-drift"));
     expect(named).toHaveLength(2);
     for (const w of named) expect(w).toContain("removed in 0.20.0");
+  });
+
+  it("drops an entry of a removed reviewer whose threshold is above the band", async () => {
+    const { repo, sha } = await repoWith({
+      ".pr-review/config.yaml":
+        "reviewers:\n  description-drift:\n    threshold: 95\n  diff-bugs:\n    passes: 1\n",
+    });
+    const loaded = await loadRepoConfig(repo, sha);
+    expect(Object.keys(loaded.config.reviewers)).toEqual(["diff-bugs"]);
+    expect(loaded.warnings.filter((w) => w.includes("description-drift"))).toHaveLength(1);
+  });
+
+  it("keeps the config entry of a custom reviewer named description-drift, with no warning", async () => {
+    const { repo, sha } = await repoWith({
+      ".pr-review/reviewers/description-drift.md": CUSTOM_REVIEWER.replace(
+        "name: migration-safety",
+        "name: description-drift",
+      ),
+      ".pr-review/config.yaml":
+        "reviewers:\n  description-drift:\n    passes: 2\nsuppressions:\n  - reviewer: description-drift\n    reason: ok\n",
+    });
+    const loaded = await loadRepoConfig(repo, sha);
+    expect(loaded.config.reviewers["description-drift"]).toMatchObject({ passes: 2 });
+    expect(loaded.config.suppressions.map((s) => s.reviewer)).toEqual(["description-drift"]);
+    expect(loaded.warnings).toEqual([]);
   });
 
   it("still fails for a reviewer name that is unknown", async () => {
