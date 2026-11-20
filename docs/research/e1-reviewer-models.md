@@ -13,11 +13,20 @@ By the rules of E1:
 
 By the principal's decision, after the user read the figures (these are not results of the rules):
 
+- diff-bugs moves to Opus 5.5 at medium effort. The rule rejects it: against Opus 5.5 low the upper end of R is 2.81 (the limit is 2) and precision falls from 0.786 to 0.667; against Sonnet 5.5 medium it fails both rules too. But it finds 34 posted-label goldens, against 22 for Opus 5.5 low and 23 for Sonnet 5.5 medium, for $16.16 against $10.73 and in 32 s against 16 s. The user takes the recall, and the verifier improvement is the follow-up.
+- tests stays on Sonnet 5.5 at medium effort, by the rule.
 - history moves to Sonnet 5.5 at medium effort. The rule rejects it on precision (0.905 to 0.793, 4 more false findings), but it finds 4 more goldens for 28% less cost. The user accepts the drop and wants the verifier improved, so that it rejects more of the false findings.
 - description-drift is removed from the tool, as a reviewer of low value. The eval loses its findings: in S1 (Opus 5.5 low, after the first verifier) it posted 9 goldens and 8 false findings. E6 saw it report the planted bug in 17 of the 25 runs of its table, always beside other reviewers that also reported it. A repo config that names it gets a warning, and the tool ignores the entry.
 - security, conventions and docs-and-comments stay on Opus 5.5 at low effort.
 
-With these defaults (diff-bugs, tests and history on Sonnet 5.5 medium; the others on Opus 5.5 low; no description-drift), the six reviewers and the first verifier find 96 posted-label goldens against 84 today without description-drift, post 36 false findings against 28, and cost $55.24 against $64.17 on the 28 cases (the sums over the reviewers before the merge).
+With these defaults (diff-bugs on Opus 5.5 medium; tests and history on Sonnet 5.5 medium; security, conventions and docs-and-comments on Opus 5.5 low; no description-drift), the six reviewers and the first verifier, against today without description-drift, as sums over the reviewers before the merge:
+
+| Setting | Goldens | False posted | Precision | Cost (28 cases) | Stage time, median / 90th percentile |
+|---|---|---|---|---|---|
+| Today, without description-drift | 84 | 28 | 0.750 | $64.17 | 33 s / 55 s |
+| The new defaults | 107 | 47 | 0.695 | $64.57 | 32 s / 61 s |
+
+On the walle and websites cases, the two settings find the same 14 goldens; the new defaults post 7 false findings against 2, for the same cost ($18.74 against $18.78). So the new defaults find 23 more goldens on all cases for the same cost and median time, and post 19 more false findings. The verifier decides how many of those reach a review.
 
 ## Result of stage 1
 

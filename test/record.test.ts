@@ -512,7 +512,7 @@ describe("the record parts", () => {
     expect(id.selected_reviewers.find((r) => r.name === "diff-bugs")).toEqual({
       name: "diff-bugs",
       trigger: expect.stringContaining("min_tier fast"),
-      model: "claude-sonnet-5-5",
+      model: "claude-opus-5-5",
       effort: "medium",
       tools_ignored: [],
     });
