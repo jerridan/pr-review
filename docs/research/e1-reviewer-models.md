@@ -274,7 +274,7 @@ These settings are cheaper or find more goldens, but post more false findings. N
 - The escalation, the merge and the cap downstream of the new reviewers. The replay used the first verifier only.
 - A judge on another model. The judge is Sonnet 5.5, the model of the Sonnet arms.
 - The effect of Haiku 5.5 on refusals and on work reported as done without a check, which the design names as the reason not to use Haiku 5.5 as a reviewer.
-- Whether a Sonnet 5.5 judge favours the findings of Sonnet 5.5 reviewers. The judge is Sonnet 5.5, so the eval scores the Sonnet arms with their own model. After the change, the default eval does the same for diff-bugs and tests: the eval warns and the report names the shared model. A judge of a second model family for the eval is the real fix, and a follow-up.
+- Whether a Sonnet 5.5 judge favours the findings of Sonnet 5.5 reviewers. The judge is Sonnet 5.5, so the eval scores the Sonnet arms with their own model. After the change, the default eval does the same for tests and history: the eval warns and the report names the shared model. A judge of a second model family for the eval is the real fix, and a follow-up.
 
 ## Spend
 
