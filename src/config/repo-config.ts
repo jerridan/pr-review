@@ -261,6 +261,42 @@ export function parseRepoConfig(
   // An empty file gives the defaults.
   if (raw === null || raw === undefined) raw = {};
 
+  // Drop the entries of a removed reviewer before the schema runs. A
+  // removed name that is also a custom reviewer name is a known name, so
+  // it stays.
+  const known = new Set(reviewerNames);
+  const removedNote = (name: unknown): string | undefined =>
+    typeof name !== "string" || known.has(name) ? undefined : REMOVED_REVIEWERS.get(name);
+  if (typeof raw === "object" && raw !== null && !Array.isArray(raw)) {
+    const doc = raw as Record<string, unknown>;
+    const entries = doc.reviewers;
+    if (typeof entries === "object" && entries !== null && !Array.isArray(entries)) {
+      const kept: Record<string, unknown> = {};
+      for (const [name, entry] of Object.entries(entries)) {
+        const note = removedNote(name);
+        if (note === undefined) {
+          kept[name] = entry;
+          continue;
+        }
+        warnings.push(
+          `${file}: ${fieldOf(["reviewers", name])} names the reviewer "${name}", which was ${note}. The tool ignores this entry.`,
+        );
+      }
+      doc.reviewers = kept;
+    }
+    if (Array.isArray(doc.suppressions)) {
+      doc.suppressions = doc.suppressions.filter((item: unknown, i: number) => {
+        const name = (item as { reviewer?: unknown } | null)?.reviewer;
+        const note = removedNote(name);
+        if (note === undefined) return true;
+        warnings.push(
+          `${file}: ${fieldOf(["suppressions", i, "reviewer"])} names the reviewer "${String(name)}", which was ${note}. The tool ignores this suppression.`,
+        );
+        return false;
+      });
+    }
+  }
+
   const result = RepoConfigSchema.safeParse(raw);
   if (!result.success) {
     const issue = result.error.issues[0];
@@ -272,26 +308,6 @@ export function parseRepoConfig(
     throw new RepoConfigError(file, fieldOf(issue.path), issue.message);
   }
 
-  const known = new Set(reviewerNames);
-  const removedNote = (name: string): string | undefined =>
-    known.has(name) ? undefined : REMOVED_REVIEWERS.get(name);
-  const data = result.data;
-  for (const name of Object.keys(data.reviewers)) {
-    const note = removedNote(name);
-    if (note === undefined) continue;
-    delete data.reviewers[name];
-    warnings.push(
-      `${file}: ${fieldOf(["reviewers", name])} names the reviewer "${name}", which was ${note}. The tool ignores this entry.`,
-    );
-  }
-  data.suppressions = data.suppressions.filter((item, i) => {
-    const note = item.reviewer === undefined ? undefined : removedNote(item.reviewer);
-    if (note === undefined) return true;
-    warnings.push(
-      `${file}: ${fieldOf(["suppressions", i, "reviewer"])} names the reviewer "${item.reviewer}", which was ${note}. The tool ignores this suppression.`,
-    );
-    return false;
-  });
   for (const name of Object.keys(result.data.reviewers)) {
     if (!known.has(name)) {
       throw new RepoConfigError(
