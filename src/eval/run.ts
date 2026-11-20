@@ -17,14 +17,12 @@ import {
   type ProgramDeps,
 } from "../cli.js";
 import { JUDGE_DEFAULTS, ROLE_DEFAULTS, resolveModel } from "../config/models.js";
-import { loadRepoConfig, type RepoConfig } from "../config/repo-config.js";
+import { loadRepoConfig } from "../config/repo-config.js";
 import {
   ALL_REVIEWERS,
   effectiveModelSource,
   loadBuiltinReviewers,
   type ModelPick,
-  reviewerEntry,
-  type ReviewerDefinition,
   type RunModels,
 } from "../reviewers/loader.js";
 import { runReview, toolVersion } from "../run.js";
