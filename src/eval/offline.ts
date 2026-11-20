@@ -49,8 +49,8 @@ import {
   pairedRepeat,
   type PairedSection,
 } from "./paired.js";
-import { buildReport, renderTable } from "./report.js";
-import { readResult } from "./run.js";
+import { buildReport, renderTable, sharedJudgeLine } from "./report.js";
+import { readResult, sharedJudgeOfRecord } from "./run.js";
 import { scoreRecord, type ScoreJudge } from "./score.js";
 
 /** The flags of "pr-review eval-report". */
@@ -123,7 +123,14 @@ type Kept = {
 };
 
 /** "mode" is the mode of the scored record, or absent when no record was scored. */
-type Scored = { metrics: RepeatMetrics; uncached: number; kept?: Kept; mode?: "full" | "stage1" };
+type Scored = {
+  metrics: RepeatMetrics;
+  uncached: number;
+  kept?: Kept;
+  mode?: "full" | "stage1";
+  /** The judge model and the built-in reviewers of the record that share it. */
+  shared?: { model: string; reviewers: string[] };
+};
 
 // Score one repeat again from its record and its judge cache. A repeat
 // that failed in the eval keeps its metrics. "checkout" is a clone of the
@@ -187,6 +194,10 @@ async function scoreRepeat(
     uncached,
     ...(kept ? { kept } : {}),
     mode: record.identity.mode ?? "full",
+    shared: {
+      model: result.options.judge_model,
+      reviewers: sharedJudgeOfRecord(record, result.options.judge_model),
+    },
   };
 }
 
@@ -349,6 +360,8 @@ type Collected = {
   reviewerInputs: ByPassInput[];
   /** The mode of each scored record. */
   modes: ("full" | "stage1")[];
+  /** The judge model, and the built-in reviewers that share it in any record. */
+  shared: { model: string; reviewers: Set<string> } | null;
 };
 
 // Score every repeat in "out". With "keep", collect what the by-pass
@@ -367,6 +380,7 @@ async function collect(
     missing: [],
     reviewerInputs: [],
     modes: [],
+    shared: null,
   };
   for (const c of cases) {
     const caseDir = join(out, c.name);
@@ -380,6 +394,10 @@ async function collect(
           collected.uncached.push({ case: c.name, repeat, pairs: scored.uncached });
         }
         if (scored.mode !== undefined) collected.modes.push(scored.mode);
+        if (scored.shared !== undefined && scored.shared.reviewers.length > 0) {
+          collected.shared ??= { model: scored.shared.model, reviewers: new Set() };
+          for (const name of scored.shared.reviewers) collected.shared.reviewers.add(name);
+        }
         if (scored.kept) collected.reviewerInputs.push({ case: c, repeat, kept: scored.kept });
         if (scored.kept && hasSources(scored.kept.record))
           collected.inputs.push({ case: c, repeat, kept: scored.kept });
@@ -475,6 +493,12 @@ export async function runEvalReport(
   if (collected.modes.length > 0 && collected.modes.every((m) => m === "stage1")) {
     report.mode = "stage1";
   }
+  if (collected.shared !== null) {
+    report.shared_judge = {
+      model: collected.shared.model,
+      reviewers: [...collected.shared.reviewers].sort(),
+    };
+  }
   const notValid = notValidLines(report.paired as PairedSection);
   if (opts.format === "json") {
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
@@ -482,7 +506,9 @@ export async function runEvalReport(
   } else {
     const top = notValid.length > 0 ? `${notValid.join("\n")}\n\n` : "";
     const tail = byPass !== null ? `${renderByPass(byPass).join("\n")}\n` : "";
-    process.stdout.write(`${top}${renderTable(report)}${tail}`);
+    process.stdout.write(
+      `${top}${renderTable(report)}${sharedJudgeLine(report.shared_judge)}${tail}`,
+    );
   }
   return EXIT_OK;
 }

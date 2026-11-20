@@ -536,7 +536,7 @@ describe("selectReviewers", () => {
     expect(picked?.trigger).toContain("bug");
   });
 
-  it("skips a disabled reviewer, and skips none for an empty description", () => {
+  it("skips a disabled reviewer with the reason, and lists a reviewer that was not selected in neither list", () => {
     const picked = [def("diff-bugs"), def("security"), def("tests")].map((d) => ({
       def: d,
       trigger: "t",
@@ -545,14 +545,10 @@ describe("selectReviewers", () => {
       ...DEFAULT_REPO_CONFIG,
       reviewers: { tests: { enabled: false } },
     };
-    const empty = skipSelected(picked, { config, description: "  \n" });
-    expect(names(empty.run)).toEqual(["diff-bugs", "security"]);
-    expect(empty.skipped).toEqual([{ name: "tests", reason: "disabled by config" }]);
-    const described = skipSelected(picked, { config, description: "Adds average." });
-    expect(names(described.run)).toEqual(["diff-bugs", "security"]);
-    expect(described.skipped).toEqual([{ name: "tests", reason: "disabled by config" }]);
-    // A reviewer that was not selected is in neither list.
-    expect(skipSelected([], { config, description: "" })).toEqual({ run: [], skipped: [] });
+    const result = skipSelected(picked, { config });
+    expect(names(result.run)).toEqual(["diff-bugs", "security"]);
+    expect(result.skipped).toEqual([{ name: "tests", reason: "disabled by config" }]);
+    expect(skipSelected([], { config })).toEqual({ run: [], skipped: [] });
   });
 
   it("selects conventions and diff-bugs at the fast tier, and all six at the full tier, with no opt-in reviewer", () => {

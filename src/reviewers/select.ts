@@ -66,8 +66,7 @@ export function selectReviewers(
  */
 export function skipSelected<T extends { def: ReviewerDefinition }>(
   selected: T[],
-  // No reviewer needs the description now. The field stays for the caller.
-  context: { config: RepoConfig; description?: string },
+  context: { config: RepoConfig },
 ): { run: T[]; skipped: SkippedReviewer[] } {
   const run: T[] = [];
   const skipped: SkippedReviewer[] = [];
