@@ -952,8 +952,8 @@ describe("the repo config in a run (R3)", () => {
     const byRole = (role: string) => fake.calls.filter((c) => c.role === role);
     expect(byRole("triage").map((c) => c.overrides)).toEqual([{ model: "claude-haiku-5-5" }]);
     // models.reviewer sets the model of each one. The effort is the role
-    // default low, except for diff-bugs and tests, whose frontmatter sets
-    // medium (D4c E1).
+    // default low, except for diff-bugs, history and tests, whose
+    // frontmatter sets medium (D4c E1).
     expect(byRole("reviewer").length).toBeGreaterThan(1);
     for (const call of byRole("reviewer")) {
       expect(call.overrides, call.reviewerName).toEqual({
@@ -1140,13 +1140,15 @@ describe("the repo config in a run (R3)", () => {
     const overrides = { ...expected, ...DEFAULT_BUDGET };
     expect(calls.map((c) => c.reviewerName)).toContain("naming");
     expect(calls.map((c) => c.reviewerName)).toContain("diff-bugs");
-    // diff-bugs, history and tests set Sonnet 5.5 at medium effort in their
-    // frontmatter (D4c E1); every other reviewer gets the role default.
+    // history and tests set Sonnet 5.5 at medium effort in their frontmatter,
+    // and diff-bugs sets Opus 5.5 at medium effort (D4c E1); every other
+    // reviewer gets the role default.
     const own = { model: "claude-sonnet-5-5", effort: "medium", ...DEFAULT_BUDGET };
+    const opusMedium = { model: "claude-opus-5-5", effort: "medium", ...DEFAULT_BUDGET };
     for (const call of calls) {
-      const want = ["diff-bugs", "history", "tests"].includes(call.reviewerName ?? "")
-        ? own
-        : overrides;
+      const name = call.reviewerName ?? "";
+      const want =
+        name === "diff-bugs" ? opusMedium : ["history", "tests"].includes(name) ? own : overrides;
       expect(call.overrides, call.reviewerName).toEqual(want);
     }
     expect(record.identity.models.reviewer).toEqual(expected);

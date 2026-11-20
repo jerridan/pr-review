@@ -998,8 +998,9 @@ describe("pr-review eval: the judge (R4.4, R5.2)", () => {
       );
       expect(code, stderr).toBe(0);
       expect(report?.shared_judge?.model).toBe("claude-sonnet-5-5");
-      expect(report?.shared_judge?.reviewers).toContain("diff-bugs");
-      expect(stderr).toMatch(/warning: the built-in reviewers .*diff-bugs.* use the judge model/);
+      expect(report?.shared_judge?.reviewers).toContain("tests");
+      expect(report?.shared_judge?.reviewers).not.toContain("diff-bugs");
+      expect(stderr).toMatch(/warning: the built-in reviewers .*tests.* use the judge model/);
     },
     RUN_TIMEOUT,
   );

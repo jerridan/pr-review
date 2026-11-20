@@ -112,11 +112,10 @@ describe("built-in reviewers (A4, R1)", () => {
           threshold: 80,
           trusted: false,
           ...(name === "general-review" ? { opt_in: true } : {}),
-          // D4c E1 set these two on Sonnet 5.5 at medium effort for diff-bugs and tests.
-          // The principal set them for history.
-          ...(name === "diff-bugs" || name === "history" || name === "tests"
-            ? { model: "sonnet", effort: "medium" }
-            : {}),
+          // D4c E1 set tests on Sonnet 5.5 at medium effort. The principal set
+          // history on the same setting and diff-bugs on Opus 5.5 at medium effort.
+          ...(name === "history" || name === "tests" ? { model: "sonnet", effort: "medium" } : {}),
+          ...(name === "diff-bugs" ? { model: "opus", effort: "medium" } : {}),
         });
         expect(def.frontmatter.description.trim()).not.toBe("");
         expect(def.source).toBe("builtin");
