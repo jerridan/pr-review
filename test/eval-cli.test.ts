@@ -1005,6 +1005,62 @@ describe("pr-review eval: the judge (R4.4, R5.2)", () => {
     RUN_TIMEOUT,
   );
 
+  it(
+    "prints a Judge line in the table that names the shared judge model and its reviewers",
+    async () => {
+      const fake = evalFake();
+      const { code } = await evalCli(
+        fake,
+        casesDir([{ name: "only", golden: [PLANTED()] }]),
+        "--repeat",
+        "1",
+      );
+      expect(code, stderr).toBe(0);
+      expect(stdout).toMatch(/^Judge: claude-sonnet-5-5, the default model of .*tests/m);
+      expect(stdout).not.toMatch(/the default model of .*diff-bugs/);
+    },
+    RUN_TIMEOUT,
+  );
+
+  it(
+    "gives the same shared_judge field and Judge line from eval-report, with no query",
+    async () => {
+      const fake = evalFake();
+      const cases = casesDir([{ name: "only", golden: [PLANTED()] }]);
+      const live = await evalJson(fake, cases, "--repeat", "1");
+      expect(live.code, stderr).toBe(0);
+      const offline = async (format: "json" | "table") => {
+        stdout = "";
+        const quiet = createFakeSdkClient(() => {
+          throw new Error("the offline report makes no query");
+        });
+        const code = await exitCodeOf(
+          createProgram({ client: quiet }).parseAsync([
+            "node",
+            "pr-review",
+            "eval-report",
+            "--cases",
+            cases,
+            "--out",
+            live.out,
+            "--format",
+            format,
+          ]),
+        );
+        expect(code, stderr).toBe(0);
+        return stdout;
+      };
+      const json = JSON.parse(await offline("json")) as Report;
+      expect(json.shared_judge).toEqual(live.report?.shared_judge);
+      expect(json.shared_judge?.reviewers).toContain("tests");
+      expect(json.shared_judge?.reviewers).not.toContain("diff-bugs");
+      expect(await offline("table")).toMatch(
+        /^Judge: claude-sonnet-5-5, the default model of .*tests/m,
+      );
+    },
+    RUN_TIMEOUT,
+  );
+
   it("exits 2 with no query when --models gives a reviewer the judge model", async () => {
     const fake = evalFake();
     const { code } = await evalCli(fake, twoCases(), "--models", "diff-bugs=sonnet:medium");

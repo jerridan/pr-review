@@ -324,3 +324,12 @@ export function renderTable(report: Report, baselineCasesRef: string | null = nu
   if (report.by_reviewer) lines.push(...renderByReviewer(report.by_reviewer));
   return `${lines.join("\n")}\n`;
 }
+
+/**
+ * The table line that names the shared judge model, with its newline.
+ * Empty when no reviewer shares the judge model.
+ */
+export function sharedJudgeLine(shared: Report["shared_judge"]): string {
+  if (shared === undefined || shared.reviewers.length === 0) return "";
+  return `Judge: ${shared.model}, the default model of ${shared.reviewers.join(", ")}.\n`;
+}

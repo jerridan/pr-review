@@ -214,22 +214,55 @@ export function effectiveModel(
   config: RepoConfig,
   run?: RunModels,
 ): { model: string; effort: Effort } {
+  const { model, effort } = effectiveModelSource(def, config, run);
+  return { model, effort };
+}
+
+/** Where the model of a reviewer comes from. */
+export type ModelSource = "run" | "reviewer" | "role" | "frontmatter" | "default";
+
+/**
+ * The same pick as effectiveModel, with the source of the model. "run" is
+ * --models of the eval, "reviewer" is reviewers.<name>.model, "role" is
+ * models.reviewer.model, "frontmatter" is the model of the reviewer file,
+ * and "default" is ROLE_DEFAULTS.reviewer.
+ */
+export function effectiveModelSource(
+  def: ReviewerDefinition,
+  config: RepoConfig,
+  run?: RunModels,
+): { model: string; effort: Effort; source: ModelSource } {
   const name = def.frontmatter.name;
-  if (run !== undefined) {
-    const pick = Object.hasOwn(run, name)
-      ? run[name]
-      : Object.hasOwn(run, ALL_REVIEWERS)
-        ? run[ALL_REVIEWERS]
-        : undefined;
-    if (pick !== undefined) return { model: pick.model, effort: pick.effort };
-  }
   const own = reviewerEntry(config, name);
   const role = config.models.reviewer;
+  let source: ModelSource;
+  let alias: string;
+  const pick =
+    run === undefined
+      ? undefined
+      : Object.hasOwn(run, name)
+        ? run[name]
+        : Object.hasOwn(run, ALL_REVIEWERS)
+          ? run[ALL_REVIEWERS]
+          : undefined;
+  if (pick !== undefined) return { model: pick.model, effort: pick.effort, source: "run" };
+  if (own?.model !== undefined) {
+    source = "reviewer";
+    alias = own.model;
+  } else if (role?.model !== undefined) {
+    source = "role";
+    alias = role.model;
+  } else if (def.frontmatter.model !== undefined) {
+    source = "frontmatter";
+    alias = def.frontmatter.model;
+  } else {
+    source = "default";
+    alias = ROLE_DEFAULTS.reviewer.model;
+  }
   return {
-    model: resolveModel(
-      own?.model ?? role?.model ?? def.frontmatter.model ?? ROLE_DEFAULTS.reviewer.model,
-    ),
+    model: resolveModel(alias),
     effort: own?.effort ?? role?.effort ?? def.frontmatter.effort ?? ROLE_DEFAULTS.reviewer.effort,
+    source,
   };
 }
 

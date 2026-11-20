@@ -20,7 +20,7 @@ import { JUDGE_DEFAULTS, ROLE_DEFAULTS, resolveModel } from "../config/models.js
 import { loadRepoConfig, type RepoConfig } from "../config/repo-config.js";
 import {
   ALL_REVIEWERS,
-  effectiveModel,
+  effectiveModelSource,
   loadBuiltinReviewers,
   type ModelPick,
   reviewerEntry,
@@ -57,7 +57,7 @@ import {
 import { buildByReviewer, byReviewerRecord } from "./by-reviewer.js";
 import { failedMetrics, metrics, type RepeatMetrics } from "./metrics.js";
 import { hasSources, pairedRepeat } from "./paired.js";
-import { buildReport, renderTable, type Report } from "./report.js";
+import { buildReport, renderTable, sharedJudgeLine, type Report } from "./report.js";
 import { findingKey, scoreRecord, type ScoreJudge, type ScoreResult } from "./score.js";
 
 /** The flags of "pr-review eval". */
@@ -149,33 +149,34 @@ async function caseReviewers(
     .filter((def) => only === null || only.has(def.frontmatter.name))
     .filter((def) => TIER_RANK[def.frontmatter.triggers.min_tier] <= TIER_RANK[tier])
     .filter((def) => config.reviewers[def.frontmatter.name]?.enabled !== false)
-    .filter((def) => effectiveModel(def, config, opts.models).model === judgeModel);
-  const shared = same.filter((def) => builtinDefaultModel(def, config, opts.models));
+    .map((def) => ({ def, pick: effectiveModelSource(def, config, opts.models) }))
+    .filter(({ pick }) => pick.model === judgeModel);
+  const shared = same
+    .filter(({ def, pick }) => def.source === "builtin" && pick.source === "frontmatter")
+    .map(({ def }) => def);
+  const sharedSet = new Set(shared);
   return {
-    judgeModel: same.filter((def) => !shared.includes(def)).map((def) => def.frontmatter.name),
+    judgeModel: same
+      .map(({ def }) => def)
+      .filter((def) => !sharedSet.has(def))
+      .map((def) => def.frontmatter.name),
     shared: shared.map((def) => def.frontmatter.name),
     custom,
   };
 }
 
 /**
- * True when the model of a built-in reviewer comes from its own frontmatter:
- * no --models target, no reviewers.<name>.model and no models.reviewer.model
- * sets it. Such a reviewer can share the judge model: the eval warns and
- * the report names it, but the eval does not stop (D4c E1).
+ * The built-in reviewers of a record that share the judge model by their own
+ * default: the selected reviewers whose model is the judge model, and that
+ * are built-in reviewers with a model in their frontmatter. The offline
+ * report uses this, because it has the record and not the run options.
  */
-function builtinDefaultModel(
-  def: ReviewerDefinition,
-  config: RepoConfig,
-  run: RunModels | undefined,
-): boolean {
-  const name = def.frontmatter.name;
-  if (def.source !== "builtin" || def.frontmatter.model === undefined) return false;
-  if (run !== undefined && (Object.hasOwn(run, name) || Object.hasOwn(run, ALL_REVIEWERS))) {
-    return false;
-  }
-  if (reviewerEntry(config, name)?.model !== undefined) return false;
-  return config.models.reviewer?.model === undefined;
+export function sharedJudgeOfRecord(record: RunRecord, judgeModel: string): string[] {
+  const builtins = new Map(loadBuiltinReviewers().map((def) => [def.frontmatter.name, def]));
+  return record.identity.selected_reviewers
+    .filter((r) => r.model === judgeModel)
+    .filter((r) => builtins.get(r.name)?.frontmatter.model !== undefined)
+    .map((r) => r.name);
 }
 
 type SameJudge = { case: string; reviewers: string[] };
@@ -267,7 +268,7 @@ type EvalContext = {
   startedAt: string;
   /** The version of this tool, read one time per run. */
   toolVersion: string;
-  /** The built-in reviewers whose own default is the judge model (see builtinDefaultModel). */
+  /** The built-in reviewers whose own default is the judge model (a built-in reviewer whose model source is its frontmatter). */
   sharedJudge: Set<string>;
 };
 
@@ -838,10 +839,7 @@ export async function runEval(opts: EvalOptions, deps: ProgramDeps): Promise<num
   const json = `${JSON.stringify(report, null, 2)}\n`;
   await mkdir(out, { recursive: true });
   await writeFile(join(out, "report.json"), json);
-  const sharedLine =
-    sharedNames.length > 0
-      ? `Judge: ${judgeModel}, the default model of ${sharedNames.join(", ")}.\n`
-      : "";
+  const sharedLine = sharedJudgeLine(report.shared_judge);
   process.stdout.write(
     opts.format === "json" ? json : renderTable(report, base.gate?.cases_ref ?? null) + sharedLine,
   );

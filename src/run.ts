@@ -657,8 +657,7 @@ export async function runReview(input: RunInput): Promise<RunResult> {
 
       // The tier and the triggers select from the built-in and the custom
       // reviewers. A selected reviewer that the config disables does not
-      // run, nor does the description reviewer when the description is
-      // empty. Coverage names each of them.
+      // run. Coverage names each of them.
       // With "onlyReviewers", the run keeps only the named reviewers that
       // the normal selection picked.
       const only = input.onlyReviewers ? new Set(input.onlyReviewers) : null;
@@ -669,10 +668,7 @@ export async function runReview(input: RunInput): Promise<RunResult> {
         brief?.categories ?? [],
         only ?? undefined,
       ).filter((s) => only === null || only.has(s.def.frontmatter.name));
-      const { run: selected, skipped } = skipSelected(candidates, {
-        config,
-        description: gathered.description,
-      });
+      const { run: selected, skipped } = skipSelected(candidates, { config });
       // A selected custom reviewer whose tools name Bash, and that does not
       // get it, runs with read-only tools. Coverage names it with the reason.
       const withoutBash = selected.flatMap(({ def }) => {
