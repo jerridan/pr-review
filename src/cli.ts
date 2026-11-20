@@ -364,6 +364,11 @@ async function runCommand(deps: ProgramDeps, options: RunCliOptions): Promise<vo
       ...(deps.client ? { client: deps.client } : {}),
       ...(deps.github ? { github: deps.github } : {}),
     });
+    // The record holds the warnings of the loaded config. Show each one to
+    // the user once, on stderr, so stdout stays the report.
+    for (const { stage, message } of record.cost.errors) {
+      if (stage === "config") process.stderr.write(`warning: ${message}\n`);
+    }
     // The github format prints the JSON document with the review url.
     if (options.format === "json" || options.format === "github") {
       // stdout holds one JSON document, so the skip reason goes to stderr.

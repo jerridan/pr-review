@@ -367,6 +367,22 @@ describe("the repo config on the base commit (R3)", () => {
     expect(stderr).toContain("thresholds.default");
   }, 30_000);
 
+  it("writes a warning of the loaded config to stderr once, and keeps stdout a JSON document", async () => {
+    const old = await fixtureWithConfig("reviewers:\n  description-drift:\n    enabled: false\n");
+    fixtures.push(old);
+    const fake = createFakeSdkClient(script(old));
+    const code = await exitCodeOf(
+      createProgram({ client: fake }).parseAsync(
+        argsFor(old, join(outRoot, "config-warning"), "--format", "json"),
+      ),
+    );
+    expect(code).toBe(0);
+    const lines = stderr.split("\n").filter((l) => l.includes("description-drift"));
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatch(/^warning: .*removed in 0\.20\.0/);
+    expect(() => JSON.parse(stdout)).not.toThrow();
+  }, 30_000);
+
   it("lists a reviewer that the config disables under reviewers_skipped, not reviewers_ran", async () => {
     const off = await fixtureWithConfig("reviewers:\n  diff-bugs:\n    enabled: false\n");
     fixtures.push(off);
