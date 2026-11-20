@@ -1,0 +1,2756 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 66,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Set the reviewer models by D4c E1 and the principal's decisions, and remove description-drift",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/66"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "7f4fb3e7cd0b128c1a3bcb15113632fcec9dc145",
+    "head": "660247029c576ee124d0f48e8137015f9c0d36b4",
+    "started_at": "2026-11-20T18:35:32.632Z",
+    "tool_version": "0.19.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Set the reviewer models by D4c E1 and the principal's decisions, and remove description-drift\n\n## Summary\n\nE1 of D4c, the model and the effort of each reviewer, and the new reviewer defaults. Version 0.20.0. This is the last PR of D4c.\n\n**By the E1 rules** (`docs/research/e1-reviewer-models.md`):\n- `tests` moves to Sonnet 5.5 at medium effort: more posted-label goldens (24 against 17) at the same precision, for less cost.\n\n**By the principal's decision, against the rule** (the note and TICKETS.md state this apart from the rule results):\n- `diff-bugs` moves to Opus 5.5 at medium effort. It finds 34 posted-label goldens against 22, but its precision goes from 0.786 to 0.667, for 1.5 times the cost. Sonnet 5.5 medium passed the rule for it, and the user prefers the recall.\n- `history` moves to Sonnet 5.5 at medium effort. Precision goes from 0.905 to 0.793, for 28% less cost and 4 more goldens.\n- `description-drift` is removed, as a reviewer of low value. A repo config that names it loads with a warning, and the tool ignores the entry. An unknown name still fails. The record schema still parses the old \"no description\" skip.\n- security, conventions and docs-and-comments stay on Opus 5.5 at low effort.\n\n**The judge check of the eval.** The eval judge is Sonnet 5.5, and `tests` and `history` now use it by default. A built-in reviewer whose own frontmatter default is the judge model no longer stops the eval. The eval warns on stderr, the table ends with a line that names the shared model, and `report.json` holds `shared_judge`. A case config or `--models` that gives a reviewer the judge model still exits 2. A judge of a second model family is a follow-up in TICKETS.md.\n\n**The figures.** These are sums over the six reviewers and the first verifier, before the merge, on the 28 cases:\n\n| Setting | Goldens | False posted | Cost | Stage time, median |\n|---|---|---|---|---|\n| Today, without description-drift | 84 | 28 | $64.17 | 33 s |\n| The new defaults | 107 | 47 | $64.57 | 32 s |\n\nThe note holds stage 1 and stage 2 of every arm, the walle and websites cases, the times, the rejected trades and the limits. The README reviewer table gains a model column, and its pass counts are 1, which E7 had missed.\n\n## Spend\n\nE1 cost about $282 on the plan login: stage 1 $179.56, stage 2 about $103.\n\n## Test plan\n\n- [x] `npm test` (1703 tests), `npm run lint`, `npm run typecheck`, `npm run build`\n- [x] `scripts/check-version-bump.sh` gives 0.19.0 to 0.20.0\n- [x] New tests: a built-in default on the judge model runs and is named in the report; `--models` that sets the judge model still exits 2; a config that names description-drift loads with a warning. Each red commit failed before its change.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZg7V9Qr9viaw1dTW3s\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": true
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": ".claude-plugin/marketplace.json",
+        "hunks": 1
+      },
+      {
+        "path": ".claude-plugin/plugin.json",
+        "hunks": 1
+      },
+      {
+        "path": "README.md",
+        "hunks": 7
+      },
+      {
+        "path": "TICKETS.md",
+        "hunks": 1
+      },
+      {
+        "path": "docs/design/high-level-design.md",
+        "hunks": 5
+      },
+      {
+        "path": "docs/research/claude-5-5-models.md",
+        "hunks": 1
+      },
+      {
+        "path": "docs/research/e1-reviewer-models.md",
+        "hunks": 1
+      },
+      {
+        "path": "package.json",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/reviewers/description-drift.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/reviewers/diff-bugs.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/reviewers/history.md",
+        "hunks": 1
+      },
+      {
+        "path": "prompts/reviewers/tests.md",
+        "hunks": 1
+      },
+      {
+        "path": "scripts/measure-passes.sh",
+        "hunks": 2
+      },
+      {
+        "path": "src/config/repo-config.ts",
+        "hunks": 4
+      },
+      {
+        "path": "src/eval/report.ts",
+        "hunks": 1
+      },
+      {
+        "path": "src/eval/run.ts",
+        "hunks": 9
+      },
+      {
+        "path": "src/reviewers/select.ts",
+        "hunks": 3
+      },
+      {
+        "path": "src/schemas/record.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/cli-run.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/eval-cli.test.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/measure-passes.test.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/record-sources.test.ts",
+        "hunks": 1
+      },
+      {
+        "path": "test/record.test.ts",
+        "hunks": 6
+      },
+      {
+        "path": "test/repo-config.test.ts",
+        "hunks": 2
+      },
+      {
+        "path": "test/reviewers.test.ts",
+        "hunks": 7
+      },
+      {
+        "path": "test/run.test.ts",
+        "hunks": 10
+      },
+      {
+        "path": "test/schemas.test.ts",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [
+      {
+        "path": "package-lock.json",
+        "reason": "generated"
+      }
+    ],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "Changes default reviewer models/effort, removes a built-in reviewer, adds config-loader logic that drops removed reviewer entries, and changes eval judge-sharing behaviour.",
+      "confidence": "high",
+      "categories": [
+        "bug",
+        "test",
+        "docs",
+        "other"
+      ],
+      "hotspots": [
+        "src/config/repo-config.ts: parseRepoConfig removed-reviewer handling (mutates result.data; later loop uses result.data.reviewers; warnings default param)",
+        "src/eval/run.ts: caseReviewers/builtinDefaultModel/checkCases shared-judge logic and runRepeat same-judge filter",
+        "src/reviewers/select.ts: skipSelected signature change and removal of DESCRIPTION_REVIEWER (check other importers)",
+        "prompts/reviewers/{diff-bugs,history,tests}.md frontmatter model/effort",
+        "src/schemas/record.ts: SkippedReviewer reason kept for old records",
+        "src/eval/run.ts: table output plus sharedLine appended"
+      ],
+      "file_notes": [
+        {
+          "file": "src/config/repo-config.ts",
+          "note": "New REMOVED_REVIEWERS handling: drops entries and suppressions for description-drift with warnings; warnings now collected before parse."
+        },
+        {
+          "file": "src/eval/run.ts",
+          "note": "Built-in reviewers whose frontmatter default equals the judge model warn instead of exit 2; report gets shared_judge."
+        },
+        {
+          "file": "src/eval/report.ts",
+          "note": "Adds optional shared_judge field to Report type."
+        },
+        {
+          "file": "src/reviewers/select.ts",
+          "note": "Removes description-drift skip logic and exported constant."
+        },
+        {
+          "file": "prompts/reviewers/description-drift.md",
+          "note": "Reviewer deleted."
+        },
+        {
+          "file": "prompts/reviewers/diff-bugs.md",
+          "note": "Sets model opus, effort medium."
+        },
+        {
+          "file": "prompts/reviewers/history.md",
+          "note": "Sets model sonnet, effort medium."
+        },
+        {
+          "file": "prompts/reviewers/tests.md",
+          "note": "Sets model sonnet, effort medium."
+        },
+        {
+          "file": "src/schemas/record.ts",
+          "note": "Comment only."
+        },
+        {
+          "file": "scripts/measure-passes.sh",
+          "note": "Drops description-drift from disabled list."
+        },
+        {
+          "file": "docs/research/e1-reviewer-models.md",
+          "note": "New research doc."
+        },
+        {
+          "file": "package.json",
+          "note": "Version bump to 0.20.0 (also plugin manifests)."
+        },
+        {
+          "file": "test/repo-config.test.ts",
+          "note": "New tests for removed reviewer warnings; diff-bugs helper strips model/effort."
+        },
+        {
+          "file": "test/eval-cli.test.ts",
+          "note": "New tests for shared judge warning and --models exit 2."
+        },
+        {
+          "file": "test/run.test.ts",
+          "note": "Updated counts from seven to six and per-reviewer model/effort expectations."
+        }
+      ],
+      "summary": "Release 0.20.0 removes the description-drift reviewer and changes default models: diff-bugs on Opus medium, history and tests on Sonnet medium. The repo-config loader now warns and drops config entries naming the removed reviewer. The eval now warns instead of failing when a built-in default model equals the judge model, and records this in the report. Docs, research notes and tests are updated to match."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: Changes default reviewer models/effort, removes a built-in reviewer, adds config-loader logic that drops removed reviewer entries, and changes eval judge-sharing behaviour.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "description-drift",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    },
+    "mode": "full"
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "test/repo-config.test.ts",
+            "start_line": 530,
+            "end_line": 532,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "high",
+            "claim": "The new comment says the built-in diff-bugs file sets Sonnet 5.5 at medium effort, but it sets Opus at medium effort.",
+            "evidence": "// tests of the order reach the role default. The built-in file sets Sonnet",
+            "suggested_fix": "Say that the built-in file sets Opus 5.5 at medium effort.",
+            "explanation": "prompts/reviewers/diff-bugs.md has model: opus, so the comment is wrong.",
+            "needs_context": false
+          },
+          {
+            "file": "TICKETS.md",
+            "start_line": 162,
+            "end_line": 162,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "high",
+            "claim": "The follow-up says diff-bugs and tests are on Sonnet 5.5, but the reviewers on Sonnet 5.5 are history and tests.",
+            "evidence": "With diff-bugs and tests on Sonnet 5.5, the Sonnet 5.5 judge scores findings of its own model",
+            "suggested_fix": "Replace diff-bugs with history.",
+            "explanation": "diff-bugs moved to Opus 5.5 medium, so the judge does not share its model.",
+            "needs_context": false
+          },
+          {
+            "file": "docs/research/e1-reviewer-models.md",
+            "start_line": 277,
+            "end_line": 277,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "high",
+            "claim": "The note says the default eval shares the judge model with diff-bugs and tests, but it shares it with history and tests.",
+            "evidence": "After the change, the default eval does the same for diff-bugs and tests",
+            "suggested_fix": "Replace diff-bugs with history.",
+            "explanation": "The new defaults put diff-bugs on Opus and history on Sonnet.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 10948,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 46530,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.004664,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 1140,
+              "cacheReadInputTokens": 51175,
+              "cacheCreationInputTokens": 51873,
+              "webSearchRequests": 0,
+              "costUSD": 0.448035,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 229,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.452699
+        }
+      },
+      {
+        "name": "description-drift",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "TICKETS.md",
+            "start_line": 162,
+            "end_line": 162,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "high",
+            "claim": "The description says tests and history now share the Sonnet 5.5 judge, but the TICKETS follow-up names diff-bugs and tests.",
+            "evidence": "With diff-bugs and tests on Sonnet 5.5, the Sonnet 5.5 judge scores findings of its own model",
+            "suggested_fix": "Write \"With tests and history on Sonnet 5.5\".",
+            "explanation": "diff-bugs.md sets model: opus, and history.md sets model: sonnet.",
+            "needs_context": false
+          },
+          {
+            "file": "docs/research/e1-reviewer-models.md",
+            "start_line": 277,
+            "end_line": 277,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "high",
+            "claim": "The note names diff-bugs and tests as the reviewers that share the judge model, but the description and the code give tests and history.",
+            "evidence": "After the change, the default eval does the same for diff-bugs and tests: the eval warns and the report names the shared model.",
+            "suggested_fix": "Replace \"diff-bugs and tests\" with \"tests and history\".",
+            "explanation": "diff-bugs now runs on Opus, so it does not share the Sonnet judge.",
+            "needs_context": false
+          },
+          {
+            "file": "test/repo-config.test.ts",
+            "start_line": 531,
+            "end_line": 533,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "medium",
+            "claim": "The test comment says the diff-bugs built-in file sets Sonnet 5.5 at medium effort, but the description and the code set diff-bugs on Opus 5.5 at medium effort.",
+            "evidence": "The built-in file sets Sonnet",
+            "suggested_fix": "Change the comment to say Opus 5.5 at medium effort.",
+            "explanation": "diff-bugs.md has model: opus.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 9155,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 46550,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.004666,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 1034,
+              "cacheReadInputTokens": 51153,
+              "cacheCreationInputTokens": 51848,
+              "webSearchRequests": 0,
+              "costUSD": 0.44571059999999996,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 230,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.45037659999999996
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/run.ts",
+            "start_line": 572,
+            "end_line": 576,
+            "category": "bug",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "The shared-judge set is merged over all cases, so a reviewer that keeps its built-in default in one case is also exempt from the same-judge check in another case, where the case config gives it the judge model.",
+            "evidence": "(r) => r.model === ctx.judgeModel && !ctx.sharedJudge.has(r.name),",
+            "suggested_fix": "Keep the shared set per case (a map from case name to names) and check it against the case of the repeat.",
+            "explanation": "The set holds reviewer names from all cases, but the check in each repeat should apply to that case only.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 15742,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 46530,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.004664,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 1385,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 51402,
+              "webSearchRequests": 0,
+              "costUSD": 0.43892400000000004,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 640,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.44358800000000004
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "test/repo-config.test.ts",
+            "start_line": 530,
+            "end_line": 532,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "high",
+            "claim": "The comment says that the built-in diff-bugs file sets Sonnet 5.5 at medium effort, but it sets Opus at medium.",
+            "evidence": "The built-in file sets Sonnet",
+            "suggested_fix": "Write \"The built-in file sets Opus 5.5 at medium effort\".",
+            "explanation": "prompts/reviewers/diff-bugs.md has `model: opus`, so the comment names the wrong model.",
+            "needs_context": false
+          },
+          {
+            "file": "TICKETS.md",
+            "start_line": 162,
+            "end_line": 162,
+            "category": "docs",
+            "severity_estimate": "suggestion",
+            "confidence": "high",
+            "claim": "The follow-up says that diff-bugs and tests use Sonnet 5.5, but the reviewers on Sonnet are tests and history.",
+            "evidence": "With diff-bugs and tests on Sonnet 5.5, the Sonnet 5.5 judge scores findings of its own model",
+            "suggested_fix": "Replace \"diff-bugs and tests\" with \"tests and history\".",
+            "explanation": "diff-bugs now uses Opus. history is the other reviewer on Sonnet, and it shares the judge model.",
+            "needs_context": false
+          },
+          {
+            "file": "docs/research/e1-reviewer-models.md",
+            "start_line": 277,
+            "end_line": 277,
+            "category": "docs",
+            "severity_estimate": "suggestion",
+            "confidence": "high",
+            "claim": "The note says that the default eval shares the judge model for diff-bugs and tests, but the reviewers that share it are tests and history.",
+            "evidence": "After the change, the default eval does the same for diff-bugs and tests",
+            "suggested_fix": "Replace \"diff-bugs and tests\" with \"tests and history\".",
+            "explanation": "diff-bugs moved to Opus 5.5 medium, so it does not share the Sonnet judge. history does share it.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 10581,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 46538,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0046648,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 1163,
+              "cacheReadInputTokens": 51093,
+              "cacheCreationInputTokens": 51894,
+              "webSearchRequests": 0,
+              "costUSD": 0.44864659999999995,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 333,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.4533114
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7896,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 77595,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0077705,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 678,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 82542,
+              "webSearchRequests": 0,
+              "costUSD": 0.6739040000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 232,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.6816745000000001
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 6578,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 46536,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0046646,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 517,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 48316,
+              "webSearchRequests": 0,
+              "costUSD": 0.3974878,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 92,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.4021524
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "src/eval/run.ts",
+            "start_line": 841,
+            "end_line": 846,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "No test checks the new table line that names the shared judge model. The only new test of the shared judge uses JSON output.",
+            "evidence": "opts.format === \"json\" ? json : renderTable(report, base.gate?.cases_ref ?? null) + sharedLine,",
+            "suggested_fix": "Add an eval test that uses the table format and checks that stdout ends with \"Judge: claude-sonnet-5-5, the default model of history, tests.\"",
+            "explanation": "If the table output loses this line, no test fails, although the description promises it to the user.",
+            "needs_context": false
+          },
+          {
+            "file": "src/config/repo-config.ts",
+            "start_line": 276,
+            "end_line": 277,
+            "category": "test",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "No test covers a custom reviewer named description-drift. Its config entry must stay and must give no warning.",
+            "evidence": "known.has(name) ? undefined : REMOVED_REVIEWERS.get(name);",
+            "suggested_fix": "Add a loadRepoConfig test with a custom reviewer named description-drift. Check that its entry stays and that no warning names it.",
+            "explanation": "If this branch breaks, the loader silently drops a valid custom reviewer's config, and no test fails.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 11547,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 46542,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0046651999999999996,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 1057,
+              "cacheReadInputTokens": 55215,
+              "cacheCreationInputTokens": 49742,
+              "webSearchRequests": 0,
+              "costUSD": 0.430135,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 355,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.43480019999999997
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "TICKETS.md",
+          "start_line": 162,
+          "end_line": 162,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "high",
+          "claim": "The description says tests and history now share the Sonnet 5.5 judge, but the TICKETS follow-up names diff-bugs and tests.",
+          "evidence": "With diff-bugs and tests on Sonnet 5.5, the Sonnet 5.5 judge scores findings of its own model",
+          "suggested_fix": "Write \"With tests and history on Sonnet 5.5\".",
+          "explanation": "diff-bugs.md sets model: opus, and history.md sets model: sonnet.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "With diff-bugs and tests on Sonnet 5.5, the Sonnet 5.5 judge scores findings of its own model",
+            "diff-bugs moves to Opus 5.5 at medium effort",
+            "history moves to Sonnet 5.5 medium"
+          ],
+          "rationale": "The same TICKETS entry says diff-bugs moves to Opus 5.5 and history to Sonnet 5.5, so the follow-up should name tests and history, not diff-bugs and tests. It is a small documentation inconsistency.",
+          "score": 93,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "With diff-bugs and tests on Sonnet 5.5, the Sonnet 5.5 judge scores findings of its own model",
+            "diff-bugs moves to Opus 5.5 at medium effort",
+            "history moves to Sonnet 5.5 medium"
+          ],
+          "rationale": "The same TICKETS entry says diff-bugs moves to Opus 5.5 and history to Sonnet 5.5, so the follow-up should name tests and history, not diff-bugs and tests. It is a small documentation inconsistency.",
+          "score": 93,
+          "severity": "nit"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "description-drift",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "docs/research/e1-reviewer-models.md",
+          "start_line": 277,
+          "end_line": 277,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "high",
+          "claim": "The note names diff-bugs and tests as the reviewers that share the judge model, but the description and the code give tests and history.",
+          "evidence": "After the change, the default eval does the same for diff-bugs and tests: the eval warns and the report names the shared model.",
+          "suggested_fix": "Replace \"diff-bugs and tests\" with \"tests and history\".",
+          "explanation": "diff-bugs now runs on Opus, so it does not share the Sonnet judge.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "After the change, the default eval does the same for diff-bugs and tests: the eval warns and the report names the shared model.",
+            "tests and history on Sonnet 5.5 medium"
+          ],
+          "rationale": "The note's own defaults put diff-bugs on Opus 5.5 medium and tests and history on Sonnet 5.5 medium. The judge is Sonnet 5.5, so the shared-judge reviewers are tests and history, as the description says. Line 277 names diff-bugs instead of history.",
+          "score": 93,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "After the change, the default eval does the same for diff-bugs and tests: the eval warns and the report names the shared model.",
+            "tests and history on Sonnet 5.5 medium"
+          ],
+          "rationale": "The note's own defaults put diff-bugs on Opus 5.5 medium and tests and history on Sonnet 5.5 medium. The judge is Sonnet 5.5, so the shared-judge reviewers are tests and history, as the description says. Line 277 names diff-bugs instead of history.",
+          "score": 93,
+          "severity": "nit"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "description-drift",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "test/repo-config.test.ts",
+          "start_line": 531,
+          "end_line": 533,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "medium",
+          "claim": "The test comment says the diff-bugs built-in file sets Sonnet 5.5 at medium effort, but the description and the code set diff-bugs on Opus 5.5 at medium effort.",
+          "evidence": "The built-in file sets Sonnet",
+          "suggested_fix": "Change the comment to say Opus 5.5 at medium effort.",
+          "explanation": "diff-bugs.md has model: opus.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "The built-in file sets Sonnet",
+            "5.5 at medium effort (D4c E1)."
+          ],
+          "rationale": "The comment added in this PR says Sonnet 5.5, but diff-bugs.md has model: opus and effort: medium, and the description says Opus 5.5. The comment is wrong, but it is only a comment.",
+          "score": 96,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "The built-in file sets Sonnet",
+            "5.5 at medium effort (D4c E1)."
+          ],
+          "rationale": "The comment added in this PR says Sonnet 5.5, but diff-bugs.md has model: opus and effort: medium, and the description says Opus 5.5. The comment is wrong, but it is only a comment.",
+          "score": 96,
+          "severity": "nit"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "description-drift",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "test/repo-config.test.ts",
+          "start_line": 530,
+          "end_line": 532,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "high",
+          "claim": "The comment says that the built-in diff-bugs file sets Sonnet 5.5 at medium effort, but it sets Opus at medium.",
+          "evidence": "The built-in file sets Sonnet",
+          "suggested_fix": "Write \"The built-in file sets Opus 5.5 at medium effort\".",
+          "explanation": "prompts/reviewers/diff-bugs.md has `model: opus`, so the comment names the wrong model.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "// tests of the order reach the role default. The built-in file sets Sonnet",
+            "// 5.5 at medium effort (D4c E1)."
+          ],
+          "rationale": "diff-bugs.md has `model: opus` and `effort: medium`, and the description says diff-bugs moved to Opus 5.5. The new comment names Sonnet, so it is wrong.",
+          "score": 96,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "// tests of the order reach the role default. The built-in file sets Sonnet",
+            "// 5.5 at medium effort (D4c E1)."
+          ],
+          "rationale": "diff-bugs.md has `model: opus` and `effort: medium`, and the description says diff-bugs moved to Opus 5.5. The new comment names Sonnet, so it is wrong.",
+          "score": 96,
+          "severity": "nit"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "docs-and-comments",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "TICKETS.md",
+          "start_line": 162,
+          "end_line": 162,
+          "category": "docs",
+          "severity_estimate": "suggestion",
+          "confidence": "high",
+          "claim": "The follow-up says that diff-bugs and tests use Sonnet 5.5, but the reviewers on Sonnet are tests and history.",
+          "evidence": "With diff-bugs and tests on Sonnet 5.5, the Sonnet 5.5 judge scores findings of its own model",
+          "suggested_fix": "Replace \"diff-bugs and tests\" with \"tests and history\".",
+          "explanation": "diff-bugs now uses Opus. history is the other reviewer on Sonnet, and it shares the judge model.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "With diff-bugs and tests on Sonnet 5.5, the Sonnet 5.5 judge scores findings of its own model",
+            "diff-bugs moves to Opus 5.5 at medium effort (34 posted-label goldens against 22",
+            "history moves to Sonnet 5.5 medium"
+          ],
+          "rationale": "The added follow-up names diff-bugs as a Sonnet reviewer, but the Done line in the same diff moves diff-bugs to Opus 5.5 medium and moves tests and history to Sonnet 5.5 medium.",
+          "score": 95,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "With diff-bugs and tests on Sonnet 5.5, the Sonnet 5.5 judge scores findings of its own model",
+            "diff-bugs moves to Opus 5.5 at medium effort (34 posted-label goldens against 22",
+            "history moves to Sonnet 5.5 medium"
+          ],
+          "rationale": "The added follow-up names diff-bugs as a Sonnet reviewer, but the Done line in the same diff moves diff-bugs to Opus 5.5 medium and moves tests and history to Sonnet 5.5 medium.",
+          "score": 95,
+          "severity": "nit"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "docs-and-comments",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "docs/research/e1-reviewer-models.md",
+          "start_line": 277,
+          "end_line": 277,
+          "category": "docs",
+          "severity_estimate": "suggestion",
+          "confidence": "high",
+          "claim": "The note says that the default eval shares the judge model for diff-bugs and tests, but the reviewers that share it are tests and history.",
+          "evidence": "After the change, the default eval does the same for diff-bugs and tests",
+          "suggested_fix": "Replace \"diff-bugs and tests\" with \"tests and history\".",
+          "explanation": "diff-bugs moved to Opus 5.5 medium, so it does not share the Sonnet judge. history does share it.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "After the change, the default eval does the same for diff-bugs and tests: the eval warns and the report names the shared model.",
+            "- diff-bugs moves to Opus 5.5 at medium effort.",
+            "- history moves to Sonnet 5.5 at medium effort."
+          ],
+          "rationale": "The same note puts diff-bugs on Opus 5.5 medium, and tests and history on Sonnet 5.5 medium. The PR description also says tests and history use the Sonnet judge model. Line 277 names diff-bugs and tests, which is wrong.",
+          "score": 95,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "After the change, the default eval does the same for diff-bugs and tests: the eval warns and the report names the shared model.",
+            "- diff-bugs moves to Opus 5.5 at medium effort.",
+            "- history moves to Sonnet 5.5 at medium effort."
+          ],
+          "rationale": "The same note puts diff-bugs on Opus 5.5 medium, and tests and history on Sonnet 5.5 medium. The PR description also says tests and history use the Sonnet judge model. Line 277 names diff-bugs and tests, which is wrong.",
+          "score": 95,
+          "severity": "nit"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "docs-and-comments",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "test/repo-config.test.ts",
+          "start_line": 530,
+          "end_line": 532,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "high",
+          "claim": "The new comment says the built-in diff-bugs file sets Sonnet 5.5 at medium effort, but it sets Opus at medium effort.",
+          "evidence": "// tests of the order reach the role default. The built-in file sets Sonnet",
+          "suggested_fix": "Say that the built-in file sets Opus 5.5 at medium effort.",
+          "explanation": "prompts/reviewers/diff-bugs.md has model: opus, so the comment is wrong.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "// tests of the order reach the role default. The built-in file sets Sonnet",
+            "// 5.5 at medium effort (D4c E1)."
+          ],
+          "rationale": "diff-bugs.md has model: opus and effort: medium, so the new comment saying Sonnet 5.5 is wrong. The PR description also says diff-bugs moves to Opus 5.5 at medium effort.",
+          "score": 97,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "// tests of the order reach the role default. The built-in file sets Sonnet",
+            "// 5.5 at medium effort (D4c E1)."
+          ],
+          "rationale": "diff-bugs.md has model: opus and effort: medium, so the new comment saying Sonnet 5.5 is wrong. The PR description also says diff-bugs moves to Opus 5.5 at medium effort.",
+          "score": 97,
+          "severity": "nit"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "conventions",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "TICKETS.md",
+          "start_line": 162,
+          "end_line": 162,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "high",
+          "claim": "The follow-up says diff-bugs and tests are on Sonnet 5.5, but the reviewers on Sonnet 5.5 are history and tests.",
+          "evidence": "With diff-bugs and tests on Sonnet 5.5, the Sonnet 5.5 judge scores findings of its own model",
+          "suggested_fix": "Replace diff-bugs with history.",
+          "explanation": "diff-bugs moved to Opus 5.5 medium, so the judge does not share its model.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "With diff-bugs and tests on Sonnet 5.5, the Sonnet 5.5 judge scores findings of its own model",
+            "diff-bugs moves to Opus 5.5 at medium effort",
+            "history moves to Sonnet 5.5 medium"
+          ],
+          "rationale": "The same PR's done line moves diff-bugs to Opus 5.5 medium and history and tests to Sonnet 5.5 medium. The follow-up therefore names diff-bugs where it should name history.",
+          "score": 95,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "With diff-bugs and tests on Sonnet 5.5, the Sonnet 5.5 judge scores findings of its own model",
+            "diff-bugs moves to Opus 5.5 at medium effort",
+            "history moves to Sonnet 5.5 medium"
+          ],
+          "rationale": "The same PR's done line moves diff-bugs to Opus 5.5 medium and history and tests to Sonnet 5.5 medium. The follow-up therefore names diff-bugs where it should name history.",
+          "score": 95,
+          "severity": "nit"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "conventions",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "docs/research/e1-reviewer-models.md",
+          "start_line": 277,
+          "end_line": 277,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "high",
+          "claim": "The note says the default eval shares the judge model with diff-bugs and tests, but it shares it with history and tests.",
+          "evidence": "After the change, the default eval does the same for diff-bugs and tests",
+          "suggested_fix": "Replace diff-bugs with history.",
+          "explanation": "The new defaults put diff-bugs on Opus and history on Sonnet.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "After the change, the default eval does the same for diff-bugs and tests",
+            "tests and history on Sonnet 5.5 medium"
+          ],
+          "rationale": "The note's own defaults put diff-bugs on Opus 5.5 medium and history and tests on Sonnet 5.5 medium. The judge is Sonnet 5.5, so history and tests share it, not diff-bugs and tests. The PR description agrees.",
+          "score": 96,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "After the change, the default eval does the same for diff-bugs and tests",
+            "tests and history on Sonnet 5.5 medium"
+          ],
+          "rationale": "The note's own defaults put diff-bugs on Opus 5.5 medium and history and tests on Sonnet 5.5 medium. The judge is Sonnet 5.5, so history and tests share it, not diff-bugs and tests. The PR description agrees.",
+          "score": 96,
+          "severity": "suggestion"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "conventions",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/eval/run.ts",
+          "start_line": 572,
+          "end_line": 576,
+          "category": "bug",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "The shared-judge set is merged over all cases, so a reviewer that keeps its built-in default in one case is also exempt from the same-judge check in another case, where the case config gives it the judge model.",
+          "evidence": "(r) => r.model === ctx.judgeModel && !ctx.sharedJudge.has(r.name),",
+          "suggested_fix": "Keep the shared set per case (a map from case name to names) and check it against the case of the repeat.",
+          "explanation": "The set holds reviewer names from all cases, but the check in each repeat should apply to that case only.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "(r) => r.model === ctx.judgeModel && !ctx.sharedJudge.has(r.name),",
+            "for (const name of found.shared) shared.add(name);"
+          ],
+          "rationale": "The shared set is global across cases, so the run-time exemption is wider than per case. However, checkCases already exits 2 per case for explicit judge-model assignments before any run, so the leak rarely has an effect.",
+          "score": 70,
+          "severity": "dont_post"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "for (const name of found.shared) shared.add(name);",
+            "if (found.judgeModel.length > 0) {\n        return { sameJudge: { case: c.name, reviewers: found.judgeModel }, names, shared };",
+            "judgeModel: same.filter((def) => !shared.includes(def)).map((def) => def.frontmatter.name),",
+            "if (reviewerEntry(config, name)?.model !== undefined) return false;",
+            "(r) => r.model === ctx.judgeModel && !ctx.sharedJudge.has(r.name),"
+          ],
+          "rationale": "The shared set is merged across cases, but checkCases looks at every case before any run. A case whose config gives a reviewer the judge model puts that reviewer in found.judgeModel, because builtinDefaultModel returns false for it, so the eval exits 2 before runRepeat runs. With --allow-same-judge, the runtime check is skipped anyway, so the merged set never lets a wrong reviewer through.",
+          "score": 15,
+          "severity": "not_real"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "for (const name of found.shared) shared.add(name);",
+            "if (found.judgeModel.length > 0) {\n        return { sameJudge: { case: c.name, reviewers: found.judgeModel }, names, shared };",
+            "judgeModel: same.filter((def) => !shared.includes(def)).map((def) => def.frontmatter.name),",
+            "if (reviewerEntry(config, name)?.model !== undefined) return false;",
+            "(r) => r.model === ctx.judgeModel && !ctx.sharedJudge.has(r.name),"
+          ],
+          "rationale": "The shared set is merged across cases, but checkCases looks at every case before any run. A case whose config gives a reviewer the judge model puts that reviewer in found.judgeModel, because builtinDefaultModel returns false for it, so the eval exits 2 before runRepeat runs. With --allow-same-judge, the runtime check is skipped anyway, so the merged set never lets a wrong reviewer through.",
+          "score": 15,
+          "severity": "not_real"
+        },
+        "passed": false,
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/eval/run.ts",
+          "start_line": 841,
+          "end_line": 846,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "No test checks the new table line that names the shared judge model. The only new test of the shared judge uses JSON output.",
+          "evidence": "opts.format === \"json\" ? json : renderTable(report, base.gate?.cases_ref ?? null) + sharedLine,",
+          "suggested_fix": "Add an eval test that uses the table format and checks that stdout ends with \"Judge: claude-sonnet-5-5, the default model of history, tests.\"",
+          "explanation": "If the table output loses this line, no test fails, although the description promises it to the user.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "? `Judge: ${judgeModel}, the default model of ${sharedNames.join(\", \")}.\\n`",
+            "expect(report?.shared_judge?.model).toBe(\"claude-sonnet-5-5\");"
+          ],
+          "rationale": "The new test reads the JSON report and stderr. No test checks the table stdout for the new \"the default model of\" line, which the description promises.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "? `Judge: ${judgeModel}, the default model of ${sharedNames.join(\", \")}.\\n`",
+            "expect(report?.shared_judge?.model).toBe(\"claude-sonnet-5-5\");"
+          ],
+          "rationale": "The new test reads the JSON report and stderr. No test checks the table stdout for the new \"the default model of\" line, which the description promises.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "src/config/repo-config.ts",
+          "start_line": 276,
+          "end_line": 277,
+          "category": "test",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "No test covers a custom reviewer named description-drift. Its config entry must stay and must give no warning.",
+          "evidence": "known.has(name) ? undefined : REMOVED_REVIEWERS.get(name);",
+          "suggested_fix": "Add a loadRepoConfig test with a custom reviewer named description-drift. Check that its entry stays and that no warning names it.",
+          "explanation": "If this branch breaks, the loader silently drops a valid custom reviewer's config, and no test fails.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "known.has(name) ? undefined : REMOVED_REVIEWERS.get(name);"
+          ],
+          "rationale": "The `known.has(name)` guard exists in the new code. The only test that names description-drift uses it as a removed built-in, not as a custom reviewer. Nothing checks that a custom reviewer with that name keeps its entry and gets no warning.",
+          "score": 85,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "known.has(name) ? undefined : REMOVED_REVIEWERS.get(name);",
+            "[\"description-drift\", \"removed in 0.20.0\"],",
+            "it(\"loads a config that names description-drift, drops the entries and warns for each\", async () => {"
+          ],
+          "rationale": "The finding holds. The `known.has(name)` guard is new in this change and is what keeps a custom reviewer named description-drift from being dropped. The tests that mention description-drift cover only the removed built-in case and the schema skip, so no test covers a custom reviewer with that name.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "known.has(name) ? undefined : REMOVED_REVIEWERS.get(name);",
+            "[\"description-drift\", \"removed in 0.20.0\"],",
+            "it(\"loads a config that names description-drift, drops the entries and warns for each\", async () => {"
+          ],
+          "rationale": "The finding holds. The `known.has(name)` guard is new in this change and is what keeps a custom reviewer named description-drift from being dropped. The tests that mention description-drift cover only the removed built-in case and the schema skip, so no test covers a custom reviewer with that name.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ]
+      }
+    ],
+    "merges": [
+      {
+        "group": [
+          0,
+          4,
+          7
+        ],
+        "result": {
+          "merged": [
+            {
+              "member_index": 1,
+              "claim": "The TICKETS.md follow-up says diff-bugs and tests are on Sonnet 5.5, but diff-bugs now uses Opus and the Sonnet reviewers are tests and history.",
+              "explanation": "diff-bugs.md sets model: opus, while history.md sets model: sonnet, so the judge shares its model with tests and history, not diff-bugs.",
+              "suggested_fix": "Replace \"diff-bugs and tests\" with \"tests and history\".",
+              "severity": "nit"
+            }
+          ]
+        }
+      },
+      {
+        "group": [
+          1,
+          5,
+          8
+        ],
+        "result": {
+          "merged": [
+            {
+              "member_index": 2,
+              "claim": "The note says the default eval shares the judge model with diff-bugs and tests, but the reviewers that share it are tests and history.",
+              "explanation": "diff-bugs now runs on Opus, so it does not share the Sonnet judge; history does.",
+              "suggested_fix": "Replace \"diff-bugs and tests\" with \"tests and history\".",
+              "severity": "nit"
+            }
+          ]
+        }
+      },
+      {
+        "group": [
+          2,
+          3,
+          6
+        ],
+        "result": {
+          "merged": [
+            {
+              "member_index": 2,
+              "claim": "The test comment says the built-in diff-bugs file sets Sonnet 5.5 at medium effort, but it actually sets Opus at medium effort.",
+              "explanation": "prompts/reviewers/diff-bugs.md has model: opus, so the comment names the wrong model.",
+              "suggested_fix": "Change the comment to say the built-in file sets Opus 5.5 at medium effort.",
+              "severity": "nit"
+            }
+          ]
+        }
+      }
+    ],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "description-drift",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [
+      {
+        "file": "src/config/repo-config.ts",
+        "start_line": 276,
+        "end_line": 277,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "low",
+        "claim": "No test covers a custom reviewer named description-drift. Its config entry must stay and must give no warning.",
+        "evidence": "known.has(name) ? undefined : REMOVED_REVIEWERS.get(name);",
+        "suggested_fix": "Add a loadRepoConfig test with a custom reviewer named description-drift. Check that its entry stays and that no warning names it.",
+        "explanation": "If this branch breaks, the loader silently drops a valid custom reviewer's config, and no test fails.",
+        "needs_context": false,
+        "fingerprint": "2991d09587593150",
+        "severity": "suggestion",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "known.has(name) ? undefined : REMOVED_REVIEWERS.get(name);",
+            "[\"description-drift\", \"removed in 0.20.0\"],",
+            "it(\"loads a config that names description-drift, drops the entries and warns for each\", async () => {"
+          ],
+          "rationale": "The finding holds. The `known.has(name)` guard is new in this change and is what keeps a custom reviewer named description-drift from being dropped. The tests that mention description-drift cover only the removed built-in case and the schema skip, so no test covers a custom reviewer with that name.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "span_text": "const removedNote = (name: string): string | undefined => known.has(name) ? undefined : REMOVED_REVIEWERS.get(name);",
+        "sources": [
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "file": "src/eval/run.ts",
+        "start_line": 841,
+        "end_line": 846,
+        "category": "test",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "No test checks the new table line that names the shared judge model. The only new test of the shared judge uses JSON output.",
+        "evidence": "opts.format === \"json\" ? json : renderTable(report, base.gate?.cases_ref ?? null) + sharedLine,",
+        "suggested_fix": "Add an eval test that uses the table format and checks that stdout ends with \"Judge: claude-sonnet-5-5, the default model of history, tests.\"",
+        "explanation": "If the table output loses this line, no test fails, although the description promises it to the user.",
+        "needs_context": false,
+        "fingerprint": "324faeb6e5795407",
+        "severity": "suggestion",
+        "score": 88,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "? `Judge: ${judgeModel}, the default model of ${sharedNames.join(\", \")}.\\n`",
+            "expect(report?.shared_judge?.model).toBe(\"claude-sonnet-5-5\");"
+          ],
+          "rationale": "The new test reads the JSON report and stderr. No test checks the table stdout for the new \"the default model of\" line, which the description promises.",
+          "score": 88,
+          "severity": "suggestion"
+        },
+        "span_text": "const sharedLine = sharedNames.length > 0 ? `Judge: ${judgeModel}, the default model of ${sharedNames.join(\", \")}.\\n` : \"\"; process.stdout.write( opts.format === \"json\" ? json : renderTable(report, base.gate?.cases_ref ?? null) + sharedLine,",
+        "sources": [
+          {
+            "reviewer": "tests",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "file": "test/repo-config.test.ts",
+        "start_line": 530,
+        "end_line": 532,
+        "category": "docs",
+        "severity_estimate": "nit",
+        "confidence": "high",
+        "claim": "The test comment says the built-in diff-bugs file sets Sonnet 5.5 at medium effort, but it actually sets Opus at medium effort.",
+        "evidence": "// tests of the order reach the role default. The built-in file sets Sonnet",
+        "explanation": "prompts/reviewers/diff-bugs.md has model: opus, so the comment names the wrong model.",
+        "needs_context": false,
+        "fingerprint": "30d09ab2e7b87682",
+        "severity": "nit",
+        "score": 97,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "// tests of the order reach the role default. The built-in file sets Sonnet",
+            "// 5.5 at medium effort (D4c E1)."
+          ],
+          "rationale": "diff-bugs.md has model: opus and effort: medium, so the new comment saying Sonnet 5.5 is wrong. The PR description also says diff-bugs moves to Opus 5.5 at medium effort.",
+          "score": 97,
+          "severity": "nit"
+        },
+        "span_text": "// The diff-bugs definition with no model and no effort of its own, so the // tests of the order reach the role default. The built-in file sets Sonnet // 5.5 at medium effort (D4c E1).",
+        "sources": [
+          {
+            "reviewer": "conventions",
+            "pass": 1
+          },
+          {
+            "reviewer": "description-drift",
+            "pass": 1
+          },
+          {
+            "reviewer": "docs-and-comments",
+            "pass": 1
+          }
+        ],
+        "suggested_fix": "Change the comment to say the built-in file sets Opus 5.5 at medium effort."
+      },
+      {
+        "file": "docs/research/e1-reviewer-models.md",
+        "start_line": 277,
+        "end_line": 277,
+        "category": "docs",
+        "severity_estimate": "nit",
+        "confidence": "high",
+        "claim": "The note says the default eval shares the judge model with diff-bugs and tests, but the reviewers that share it are tests and history.",
+        "evidence": "After the change, the default eval does the same for diff-bugs and tests",
+        "explanation": "diff-bugs now runs on Opus, so it does not share the Sonnet judge; history does.",
+        "needs_context": false,
+        "fingerprint": "18cf87339878690c",
+        "severity": "nit",
+        "score": 96,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "After the change, the default eval does the same for diff-bugs and tests",
+            "tests and history on Sonnet 5.5 medium"
+          ],
+          "rationale": "The note's own defaults put diff-bugs on Opus 5.5 medium and history and tests on Sonnet 5.5 medium. The judge is Sonnet 5.5, so history and tests share it, not diff-bugs and tests. The PR description agrees.",
+          "score": 96,
+          "severity": "suggestion"
+        },
+        "span_text": "- Whether a Sonnet 5.5 judge favours the findings of Sonnet 5.5 reviewers. The judge is Sonnet 5.5, so the eval scores the Sonnet arms with their own model. After the change, the default eval does the same for diff-bugs and tests: the eval warns and the report names the shared model. A judge of a second model family for the eval is the real fix, and a follow-up.",
+        "sources": [
+          {
+            "reviewer": "conventions",
+            "pass": 1
+          },
+          {
+            "reviewer": "description-drift",
+            "pass": 1
+          },
+          {
+            "reviewer": "docs-and-comments",
+            "pass": 1
+          }
+        ],
+        "suggested_fix": "Replace \"diff-bugs and tests\" with \"tests and history\"."
+      },
+      {
+        "file": "TICKETS.md",
+        "start_line": 162,
+        "end_line": 162,
+        "category": "docs",
+        "severity_estimate": "suggestion",
+        "confidence": "high",
+        "claim": "The TICKETS.md follow-up says diff-bugs and tests are on Sonnet 5.5, but diff-bugs now uses Opus and the Sonnet reviewers are tests and history.",
+        "evidence": "With diff-bugs and tests on Sonnet 5.5, the Sonnet 5.5 judge scores findings of its own model",
+        "explanation": "diff-bugs.md sets model: opus, while history.md sets model: sonnet, so the judge shares its model with tests and history, not diff-bugs.",
+        "needs_context": false,
+        "fingerprint": "a5c14ce13d41dc9a",
+        "severity": "nit",
+        "score": 95,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "With diff-bugs and tests on Sonnet 5.5, the Sonnet 5.5 judge scores findings of its own model",
+            "diff-bugs moves to Opus 5.5 at medium effort (34 posted-label goldens against 22",
+            "history moves to Sonnet 5.5 medium"
+          ],
+          "rationale": "The added follow-up names diff-bugs as a Sonnet reviewer, but the Done line in the same diff moves diff-bugs to Opus 5.5 medium and moves tests and history to Sonnet 5.5 medium.",
+          "score": 95,
+          "severity": "nit"
+        },
+        "span_text": "- Follow-up of E1: a judge of a second model family for the eval. With diff-bugs and tests on Sonnet 5.5, the Sonnet 5.5 judge scores findings of its own model; the eval warns and the report names it, but E1 did not measure whether the judge favours them.",
+        "sources": [
+          {
+            "reviewer": "conventions",
+            "pass": 1
+          },
+          {
+            "reviewer": "description-drift",
+            "pass": 1
+          },
+          {
+            "reviewer": "docs-and-comments",
+            "pass": 1
+          }
+        ],
+        "suggested_fix": "Replace \"diff-bugs and tests\" with \"tests and history\"."
+      }
+    ],
+    "github": {
+      "review_id": 5997631581,
+      "review_url": "https://github.com/jerridan/pr-review/pull/66#pullrequestreview-5997631581",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [
+        {
+          "fingerprint": "2991d09587593150",
+          "comment_id": 4646277538
+        },
+        {
+          "fingerprint": "324faeb6e5795407",
+          "comment_id": 4646277548
+        },
+        {
+          "fingerprint": "30d09ab2e7b87682",
+          "comment_id": 4646277558
+        },
+        {
+          "fingerprint": "18cf87339878690c",
+          "comment_id": 4646277568
+        },
+        {
+          "fingerprint": "a5c14ce13d41dc9a",
+          "comment_id": 4646277582
+        }
+      ],
+      "in_body": [],
+      "check_run": {
+        "id": 136489923755
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 7664,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 44903,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0045013,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1229,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 45678,
+            "webSearchRequests": 0,
+            "costUSD": 0.195006,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1995073
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 7896,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 77595,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0077705,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 678,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 82542,
+            "webSearchRequests": 0,
+            "costUSD": 0.6739040000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 232,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.6816745000000001
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "description-drift",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 9155,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 46550,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.004666,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 1034,
+            "cacheReadInputTokens": 51153,
+            "cacheCreationInputTokens": 51848,
+            "webSearchRequests": 0,
+            "costUSD": 0.44571059999999996,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 230,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.45037659999999996
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 10581,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 46538,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0046648,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 1163,
+            "cacheReadInputTokens": 51093,
+            "cacheCreationInputTokens": 51894,
+            "webSearchRequests": 0,
+            "costUSD": 0.44864659999999995,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 333,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.4533114
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 10948,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 46530,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.004664,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 1140,
+            "cacheReadInputTokens": 51175,
+            "cacheCreationInputTokens": 51873,
+            "webSearchRequests": 0,
+            "costUSD": 0.448035,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 229,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.452699
+      },
+      {
+        "role": "verifier",
+        "verification": 0,
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 3580,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 23805,
+            "outputTokens": 27,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0023940000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 532,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 27681,
+            "webSearchRequests": 0,
+            "costUSD": 0.116048,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 172,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.11844199999999999
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 6578,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 46536,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0046646,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 517,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 48316,
+            "webSearchRequests": 0,
+            "costUSD": 0.3974878,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 92,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.4021524
+      },
+      {
+        "role": "verifier",
+        "verification": 1,
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 3821,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 29102,
+            "outputTokens": 389,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0031047,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 364,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 522,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 28611,
+            "webSearchRequests": 0,
+            "costUSD": 0.12010470000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.12320940000000001
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 15742,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 46530,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.004664,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1385,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 51402,
+            "webSearchRequests": 0,
+            "costUSD": 0.43892400000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 640,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.44358800000000004
+      },
+      {
+        "role": "verifier",
+        "verification": 3,
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 3248,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 442,
+            "cacheReadInputTokens": 19388,
+            "cacheCreationInputTokens": 10860,
+            "webSearchRequests": 0,
+            "costUSD": 0.0498068,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-haiku-5-5": {
+            "inputTokens": 11145,
+            "outputTokens": 354,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012915000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 327,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0510983
+      },
+      {
+        "role": "verifier",
+        "verification": 2,
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 3520,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 446,
+            "cacheReadInputTokens": 19378,
+            "cacheCreationInputTokens": 10902,
+            "webSearchRequests": 0,
+            "costUSD": 0.050013800000000004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-haiku-5-5": {
+            "inputTokens": 11135,
+            "outputTokens": 410,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0013185000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 383,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.051332300000000004
+      },
+      {
+        "role": "verifier",
+        "verification": 5,
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 2923,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 29099,
+            "outputTokens": 360,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0030899,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 341,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 461,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 28608,
+            "webSearchRequests": 0,
+            "costUSD": 0.11948270000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.12257260000000002
+      },
+      {
+        "role": "verifier",
+        "verification": 4,
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 4385,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 23820,
+            "outputTokens": 242,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0025030000000000005,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 219,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 663,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 23329,
+            "webSearchRequests": 0,
+            "costUSD": 0.1003867,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 142,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1028897
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 11547,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 46542,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0046651999999999996,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 1057,
+            "cacheReadInputTokens": 55215,
+            "cacheCreationInputTokens": 49742,
+            "webSearchRequests": 0,
+            "costUSD": 0.430135,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 355,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.43480019999999997
+      },
+      {
+        "role": "verifier",
+        "verification": 6,
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 3276,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 450,
+            "cacheReadInputTokens": 19387,
+            "cacheCreationInputTokens": 10862,
+            "webSearchRequests": 0,
+            "costUSD": 0.04989469999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-haiku-5-5": {
+            "inputTokens": 11144,
+            "outputTokens": 307,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0012679,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 280,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.051162599999999996
+      },
+      {
+        "role": "verifier",
+        "verification": 8,
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 3079,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 29070,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0029165,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 472,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 28579,
+            "webSearchRequests": 0,
+            "costUSD": 0.1194767,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.12239320000000001
+      },
+      {
+        "role": "verifier",
+        "verification": 7,
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 3861,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 23796,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0023921000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 512,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 23305,
+            "webSearchRequests": 0,
+            "costUSD": 0.0987807,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1011728
+      },
+      {
+        "role": "verifier",
+        "verification": 9,
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 5644,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16435,
+            "outputTokens": 244,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0017655000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 223,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 708,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 15944,
+            "webSearchRequests": 0,
+            "costUSD": 0.0712967,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.07306220000000001
+      },
+      {
+        "role": "verifier",
+        "verification": 10,
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 6037,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 824,
+            "cacheReadInputTokens": 41548,
+            "cacheCreationInputTokens": 15602,
+            "webSearchRequests": 0,
+            "costUSD": 0.07481479999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 54,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-haiku-5-5": {
+            "inputTokens": 14483,
+            "outputTokens": 236,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0015663,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 218,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0763811
+      },
+      {
+        "role": "verifier",
+        "verification": 11,
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 5214,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-sonnet-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 683,
+            "cacheReadInputTokens": 42570,
+            "cacheCreationInputTokens": 16251,
+            "webSearchRequests": 0,
+            "costUSD": 0.07610299999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 32,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-haiku-5-5": {
+            "inputTokens": 14961,
+            "outputTokens": 308,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016501000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 289,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.07775309999999999
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 11,
+        "model": "claude-opus-5-5",
+        "effort": "high",
+        "duration_ms": 9060,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 14965,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0015085,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 892,
+            "cacheReadInputTokens": 42883,
+            "cacheCreationInputTokens": 16264,
+            "webSearchRequests": 0,
+            "costUSD": 0.1565526,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 160,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.15806109999999998
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 9,
+        "model": "claude-opus-5-5",
+        "effort": "high",
+        "duration_ms": 13663,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16425,
+            "outputTokens": 19,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016519999999999998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 1422,
+            "cacheReadInputTokens": 43589,
+            "cacheCreationInputTokens": 23645,
+            "webSearchRequests": 0,
+            "costUSD": 0.2263418,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 664,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.2279938
+      },
+      {
+        "role": "merge",
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 1647,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 1963,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0002078,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 200,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 2538,
+            "webSearchRequests": 0,
+            "costUSD": 0.012156,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0123638
+      },
+      {
+        "role": "merge",
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 1562,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 1974,
+            "outputTokens": 20,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.00020740000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 185,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 2549,
+            "webSearchRequests": 0,
+            "costUSD": 0.01205,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0122574
+      },
+      {
+        "role": "merge",
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 1795,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 2022,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0002132,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 229,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 2597,
+            "webSearchRequests": 0,
+            "costUSD": 0.012681999999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.012895199999999999
+      }
+    ],
+    "total_cost_usd": 5.0131499999999996,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 36,
+      "gather": 438,
+      "triage": 8355,
+      "find_verify": 41971,
+      "merge": 2422
+    },
+    "errors": []
+  }
+}
