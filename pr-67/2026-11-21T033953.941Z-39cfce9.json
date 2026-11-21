@@ -1,0 +1,214 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 67,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Mark D4c done and add the follow-up deliverables D9 to D14",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/67"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "d342898f3109b6f2149de47eae748f48d222637c",
+    "head": "39cfce92b1b7f07ef9f6828870a91c0b6721b337",
+    "started_at": "2026-11-21T03:39:53.941Z",
+    "tool_version": "0.20.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Mark D4c done and add the follow-up deliverables D9 to D14\n\nTICKETS.md only: D4c is done, and the follow-ups of the D4c notes become six deliverables. No code change, so no version change.\n\n## Changes\n\n- D4c: a \"Done 2026-11-20\" block with one line for each experiment and its note.\n- \"Rules for every experiment after D4c\": count the time of a review beside recall, precision and cost; probe 3 to 4 cases across the sizes; report by fixed size limits (under 100, 100 to 300, 300 to 1,000, 1,000 or more); fix the rule before any run. The order: D11 first, D14 beside it, then D9 with D10, D12 after D11, D13 last.\n- D9, the verifier: a verifier that rejects more false candidates (it rejects 7 to 9% now), the threshold, the escalation (56% of verifications, $47.81 against $39.99), Opus 5.5 low for speed (4.0 s against 8.0 s median), and the band map of E4 registered before the run. The user's E1 overrides of diff-bugs and history are measured again.\n- D10, the severity label: a separate Opus step for each finding (E3b: +0.063, interval 0.000 to +0.111), against labels of Sol at high, best of three.\n- D11, the case set: at least 12 new cases from walle and websites, 6 of them at 1,000 changed lines or more, goldens by the pool method. It says how issue 26 relates.\n- D12, issue 63: each direction of the issue on the E6 variants, with repeats.\n- D13, a tier by PR size: after D11, with more repeats of the small cases first.\n- D14, a judge of a second family for the eval (Terra at medium), from the E1 note.\n- \"Smaller follow-ups found during D4c\", and the old follow-up lines that named D4c now point at their outcome or their new ticket.\n\nOne critic round checked the text against the notes. Its 15 findings are applied: time and cost terms in each rule, the D12 arm restated for the removal of description-drift, full-set runs in D12, and a person (not a model of either family) as the tie-break of D14.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZdfE1rqbczPpmGQQ5S\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [],
+    "changed_files": [
+      {
+        "path": "TICKETS.md",
+        "hunks": 3
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "skip",
+      "reason": "The change edits only a planning document (TICKETS.md) that no code reads, so it cannot cause a bug.",
+      "confidence": "high",
+      "categories": [
+        "docs"
+      ],
+      "hotspots": [],
+      "file_notes": [
+        {
+          "file": "TICKETS.md",
+          "note": "Docs only: records D4c experiment results and adds new tickets D9 to D14 with their decision rules."
+        }
+      ],
+      "summary": "The change updates TICKETS.md. It records the completed D4c experiments (E1 to E7) with links to their research notes. It adds the post-D4c experiment rules and new tickets D9 to D14, and it updates the follow-up lists. No code or configuration changes."
+    },
+    "tier": "skip",
+    "tier_reason": "Triage: The change edits only a planning document (TICKETS.md) that no code reads, so it cannot cause a bug.",
+    "selected_reviewers": [],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    },
+    "mode": "full"
+  },
+  "stages": {
+    "reviewers": [],
+    "verifications": [],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "skipped",
+    "coverage": {
+      "reviewers_ran": [],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 6002615589,
+      "review_url": "https://github.com/jerridan/pr-review/pull/67#pullrequestreview-6002615589",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 136718128305
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 2440,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9305,
+            "outputTokens": 29,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009450000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 366,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 8818,
+            "webSearchRequests": 0,
+            "costUSD": 0.0390622,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0400072
+      }
+    ],
+    "total_cost_usd": 0.0400072,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 44,
+      "gather": 45,
+      "triage": 3382,
+      "find_verify": 1,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
