@@ -373,6 +373,29 @@ Method: score the stored records of S1 and E1 again with Terra at medium effort 
 
 Decision rule: the second-family judge becomes the default when it agrees with the Sonnet judge on at least 90% of the pairs; on a sample of 20 pairs where they differ, a person sides with it at least as often as with Sonnet (no model of either family is a fair third judge, and 20 pairs is no hand labelling at scale); and the judge time of one eval run is at most 1.5 times that of the Sonnet judge, within one Codex quota window for the 28 cases. Then rescore E1. When the order of the tests or history arms changes, the E1 decision on that reviewer opens again.
 
+## D15: A staff-engineer reviewer on Sol 6.2
+
+Goal: measure what one more reviewer adds beside the specialists. The reviewer is a skeptical staff engineer that judges the design of a change and its fit with the codebase. It runs on Sol 6.2 (`gpt-6.2-sol`) at medium effort through the Codex CLI. The specialists stay as they are.
+
+This is an experiment in the eval only. It adds no reviewer to the shipped pipeline. A reviewer through the Codex CLI in CI needs a Codex login there, and rule 4 of CLAUDE.md keeps credentials out of the code. How it would run in CI is an open design question for the user.
+
+Method:
+- The prompt is `prompts/staff-reviewer.md`, from the user's draft: contracts, open for extension and closed for change, responsibilities and coupling, module boundaries, patterns, YAGNI, cases not handled, performance and security trade-offs, a simpler change, and at most two refactor recommendations written as tickets. Each claim starts with a tag ([design], [boundary], [edge-case], [scope], [performance], [security-tradeoff] or [refactor]), and the tag maps to a category of the finding schema.
+- Run only the new reviewer: `pr-review eval-codex-review --prompt staff-reviewer.md --model gpt-6.2-sol --effort medium` on the 28 pinned cases, with resume across Codex quota windows. Probe 4 cases across the fixed size limits first.
+- Verify its candidates with `pr-review replay --candidates` and the default verifier (Sonnet 5.5 medium), first verifier only, as in E2.
+- Compare with the baseline records of 0.20.0 (two repeats of the six specialists) and their `--arm stored` view, with no model call where the caches permit.
+
+Report:
+- the known items that the new reviewer finds and no specialist found in either repeat (new), and those that a specialist also found (existing), by case and severity;
+- its posted findings that match no known item, what the extras judge says of them, and 10 examples chosen by a fixed seed. The known-item lists were not built for design-level findings, so "false" here often means "not in the list";
+- the refactor recommendations apart, before the verifier, with what the verifier did with each. The verifier checks that a finding is introduced by the change, so it is likely to reject a refactor recommendation;
+- the count of findings that name a principle with no concrete cost;
+- the combined figures of the specialists plus this reviewer against the specialists alone: recall, precision, and posted findings by severity, on the same first-verifier base;
+- the cost on the plan, the Codex quota (reviews for each five-hour window and each week), and the time of a review. The reviewer runs beside the specialists, so its time counts only when it is the slowest;
+- all of it by the fixed size limits, and for the walle and websites cases apart.
+
+What it does not decide: no decision rule changes a default. The note ends with what the user decides: whether to add the reviewer, and how it would run in CI.
+
 ## Smaller follow-ups found during D4c
 
 - E1 did not measure whether Haiku 5.5 changes the rate of refusals, or of work reported as done with no check.
