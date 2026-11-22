@@ -285,6 +285,7 @@ The order: D11 first, because more model experiments on the present set cannot t
 Goal: a first verifier that rejects more false candidates at the same recall, and a decision on the threshold, the band and the escalation.
 
 Evidence:
+- The target: the baseline of 0.20.0 posts 66.5 false findings in each repeat of the 28 cases (137.5 posted, posted precision 0.517), and 17 of 26 posted findings on the walle and websites cases are false. Source: `docs/research/baseline-0-20.md`.
 - The verifier rejects only 7 to 9% of the candidates that match no real golden, in every Claude arm (Sonnet 5.5 high 15 of 164). Source: `docs/research/e3-verifier-model.md`.
 - The score gives almost no signal at its top: from 70 up, the share of real candidates is about one third in every range (0.31, 0.35, 0.37), and the top two bands "carry no signal for the threshold". The score separates the clear false candidates below 50, and little else. Source: `docs/research/e4-score-scale.md`.
 - 135 of 239 verifications escalate (56%). The escalation changes 28 of them (21%), for +0.040 posted recall and -0.020 posted precision, and it costs $47.81 against $39.99 for the first calls. Source: `docs/research/e7-passes-dedupe.md`, `docs/research/e3-verifier-model.md`.
@@ -293,7 +294,7 @@ Evidence:
 - By the user's decision against the rules of E1, diff-bugs runs on Opus 5.5 medium and history on Sonnet 5.5 medium. The new defaults post 107 posted-label goldens against 84, and 47 false findings against 28 (precision 0.695 against 0.750). The user accepted the precision drop and asked for a better verifier. Source: `docs/research/e1-reviewer-models.md`.
 
 Method:
-- R1, the reference run: one repeat of the full pipeline at the current defaults on the case set of D11, with stored records. It is the comparison arm of every arm below, and the new gate baseline (the baseline of the gate still holds figures of the old high effort).
+- R1, the reference run: one repeat of the full pipeline at the current defaults on the case set of D11, with stored records. It is the comparison arm of every arm below, and the new gate baseline (since 2026-11-22 the gate baseline measures the defaults of 0.20.0: `docs/research/baseline-0-20.md`).
 - Every arm verifies the same stored candidates of R1 through replay, so the arms are paired. The escalation arms run the escalation, which replay leaves out today.
 - The times: the verifier time of a case is the sum of its verifier call times divided by the concurrency (5), from the replay, with an escalated finding as two calls in series. The review time of a case is the R1 review time with the R1 verifier time replaced by the verifier time of the arm. Report the median and the maximum of both.
 - Arms:
