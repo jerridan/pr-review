@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -10,6 +11,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { codexReviewCommand } from "../src/eval/codex-review.js";
 import {
@@ -385,6 +387,68 @@ describe("pr-review eval-codex-review", () => {
     expect(output.stderr).toContain(".tokens.json");
     expect(tokenMap()).toEqual({ "case-a": { tokens: null, ...MODEL } });
   }, 60_000);
+
+  describe("--prompt", () => {
+    // The prompt loader reads PR_REVIEW_PROMPTS_DIR when it loads, so load a
+    // new copy of the command after the variable is set. The directory is a
+    // copy of prompts/ with the test prompt added.
+    async function runWithPrompt(...extra: string[]): Promise<number> {
+      const prompts = join(tempDir("codex-review-prompts", made), "prompts");
+      cpSync(fileURLToPath(new URL("../prompts/", import.meta.url)), prompts, { recursive: true });
+      cpSync(
+        fileURLToPath(new URL("./fixtures/prompts/test-reviewer.md", import.meta.url)),
+        join(prompts, "test-reviewer.md"),
+      );
+      vi.stubEnv("PR_REVIEW_PROMPTS_DIR", prompts);
+      vi.resetModules();
+      try {
+        const fresh = await import("../src/eval/codex-review.js");
+        return await fresh.codexReviewCommand(["--cases", cases, "--out", out, ...extra]);
+      } finally {
+        vi.unstubAllEnvs();
+        vi.resetModules();
+      }
+    }
+
+    it("gives codex the body of the named prompt in place of the general-review body", async () => {
+      plan({ default: { findings: [] } });
+      expect(await runWithPrompt("--prompt", "test-reviewer.md")).toBe(0);
+      const prompt = calls()[0]?.at(-1) ?? "";
+      expect(prompt).toContain("UNIQUE-TEST-REVIEWER-LINE");
+      expect(prompt).not.toContain("You review one code change in every category");
+      expect(prompt).toContain("MARK-a title\n\nThe body of the change.");
+    }, 60_000);
+
+    it("names the default source after the prompt, the model and the effort", async () => {
+      plan({ default: { findings: [] } });
+      await runWithPrompt("--prompt", "test-reviewer.md", "--effort", "max");
+      expect(written("case-a")).toEqual({
+        source: "codex-test-reviewer-gpt-6.1-terra-max",
+        findings: [],
+      });
+    }, 60_000);
+
+    it("keeps a --source that is given", async () => {
+      plan({ default: { findings: [] } });
+      await runWithPrompt("--prompt", "test-reviewer.md", "--source", "mine");
+      expect(written("case-a")).toEqual({ source: "mine", findings: [] });
+    }, 60_000);
+
+    it("exits 2 for a prompt file that does not exist, and runs no case", async () => {
+      expect(await run("--prompt", "no-such-prompt.md")).toBe(2);
+      expect(calls()).toEqual([]);
+      expect(existsSync(out)).toBe(false);
+    });
+
+    it("keeps the general-review body when no prompt is given", async () => {
+      plan({ default: { findings: [] } });
+      expect(await run("--effort", "max")).toBe(0);
+      const prompt = calls()[0]?.at(-1) ?? "";
+      expect(prompt).toContain("You review one code change in every category");
+      expect(prompt).not.toContain("UNIQUE-TEST-REVIEWER-LINE");
+      expect(written("case-a")).toMatchObject({ source: "codex-general-review-gpt-6.1-terra-max" });
+    }, 60_000);
+  });
 
   it("exits 2 for a missing option or an unknown effort, and calls no codex", async () => {
     expect(await codexReviewCommand(["--cases", cases])).toBe(2);
