@@ -285,7 +285,7 @@ The order: D11 first, because more model experiments on the present set cannot t
 Goal: a first verifier that rejects more false candidates at the same recall, and a decision on the threshold, the band and the escalation.
 
 Evidence:
-- The target: the baseline of 0.20.0 posts 66.5 false findings in each repeat of the 28 cases (137.5 posted, posted precision 0.517), and 17 of 26 posted findings on the walle and websites cases are false. Source: `docs/research/baseline-0-20.md`.
+- The target: the baseline of 0.20.0 posts 66.5 false findings in each repeat of the 28 cases (137.5 posted, posted precision 0.517), and 8.5 of 13 posted findings in each repeat on the walle and websites cases are false. Source: `docs/research/baseline-0-20.md`.
 - The verifier rejects only 7 to 9% of the candidates that match no real golden, in every Claude arm (Sonnet 5.5 high 15 of 164). Source: `docs/research/e3-verifier-model.md`.
 - The score gives almost no signal at its top: from 70 up, the share of real candidates is about one third in every range (0.31, 0.35, 0.37), and the top two bands "carry no signal for the threshold". The score separates the clear false candidates below 50, and little else. Source: `docs/research/e4-score-scale.md`.
 - 135 of 239 verifications escalate (56%). The escalation changes 28 of them (21%), for +0.040 posted recall and -0.020 posted precision, and it costs $47.81 against $39.99 for the first calls. Source: `docs/research/e7-passes-dedupe.md`, `docs/research/e3-verifier-model.md`.
