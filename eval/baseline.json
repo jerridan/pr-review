@@ -1,12 +1,42 @@
 {
-  "recall": 0.5419506997631998,
-  "precision": 0.5982016569003838,
+  "recall": 0.6188105297480297,
+  "precision": 0.5168310008481765,
   "margin": {
     "recall": 0.05,
     "precision": 0.05
   },
   "cases_ref": "373266bc2a7d1fc6057b991cc66c73b8a5640af7",
   "repeat": 2,
-  "written_at": "2026-11-14T05:05:27.100Z",
-  "tool_version": "0.10.0"
+  "written_at": "2026-11-21T18:44:35.201Z",
+  "tool_version": "0.20.0",
+  "case_costs": {
+    "injection-walle-21": 3.244144999999999,
+    "injection-walle-6": 5.8944922,
+    "injection-websites-120": 4.60938005,
+    "injection-websites-130": 1.98993795,
+    "martian-calcom-10600": 5.7153265,
+    "martian-calcom-8330": 6.230149599999999,
+    "martian-discourse-graphite-1": 5.1919746,
+    "martian-sentry-67876": 6.230611,
+    "martian-sentry-93824": 4.88368305,
+    "martian-sentry-greptile-1": 6.248216650000002,
+    "pool-pr-review-15": 2.9421891999999996,
+    "pool-pr-review-17": 2.6729797,
+    "pool-pr-review-41": 3.41595155,
+    "pool-pr-review-44": 3.13564035,
+    "pool-pr-review-45": 9.46547035,
+    "pool-pr-review-46": 7.0320811,
+    "pool-walle-14": 1.0379013000000001,
+    "pool-walle-16": 1.9335491999999999,
+    "pool-websites-114": 1.45610205,
+    "pool-websites-130": 2.83894945,
+    "reviewbench-axios-10836": 0.4955784999999999,
+    "reviewbench-claire-de-binare-1550": 1.3532820500000002,
+    "reviewbench-disaster-ninja-fe-1166": 2.0002763,
+    "reviewbench-ensnode-1938": 0.8553519999999999,
+    "reviewbench-flatten-js-244": 5.9585848,
+    "reviewbench-node-postgres-3650": 7.531400900000001,
+    "reviewbench-spm-19": 11.698755599999998,
+    "reviewbench-statswales-frontend-626": 5.4306566
+  }
 }
