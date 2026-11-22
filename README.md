@@ -1070,11 +1070,14 @@ For example, a precision with mean 0.667 and min 0.5 has a spread of 0.167. Twic
 | `--cases <dir>` | The cases directory. | required |
 | `--out <dir>` | The directory for the candidates files. | required |
 | `--model <id>` | The Codex model. | `gpt-6.1-terra` |
-| `--effort low\|medium\|high\|xhigh` | The reasoning effort. | `high` |
-| `--source <name>` | The `source` field of each file. | `codex-general-review-<model>-<effort>` |
+| `--effort low\|medium\|high\|xhigh\|max` | The reasoning effort. | `high` |
+| `--prompt <file>` | A prompt file under `prompts/`, named by its path relative to `prompts/`, for example `staff-reviewer.md`. Its body replaces the `general-review` body. | the `general-review` body |
+| `--source <name>` | The `source` field of each file. | `codex-general-review-<model>-<effort>`, or `codex-<prompt name without .md>-<model>-<effort>` with `--prompt` |
 | `--force` | Run again the cases that already have a file. | off |
 
 For each case, the command clones the case at its head, as the eval does. It builds the system prompt and the user message of a pipeline reviewer from the prompt files, with the `general-review` body, the rule files of the base commit, the diff and the changed files. The description is the title and the body of the case, each sanitized and joined with a blank line. A case with `description_from` set to `commits` gets the sanitized commit messages of base..head instead. The exclusions are those of the repo config. The message holds no triage brief and no history block. A brief needs a triage model call. So the Terra arm gets no brief, and the Opus arms do. The E2 note must state this as a limit. Codex reads the files of the checkout with its own read-only sandbox.
+
+With `--prompt`, the command loads that file with the prompt loader and uses its body as the reviewer body. The rule files are added as before. A file that does not exist is a usage error: the command exits with 2 before it runs a case.
 
 The command writes `<out>/<case name>.json` with `{ "source": "<source>", "findings": [ ... ] }`. Each finding has the fields of a reviewer finding. A finding that fails the finding schema fails the case. The command does not filter by evidence or by line range. The replay does that.
 
