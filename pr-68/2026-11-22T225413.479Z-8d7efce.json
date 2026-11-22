@@ -1,0 +1,996 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 68,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "Write the baseline of 0.20.0: recall 0.619, precision 0.517 at two repeats",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/68"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "3f5c75091960bd337331e3b146ea89e5147da4b6",
+    "head": "8d7efce5b3bdf9e297bf3018b9e4d169d5a6f8b4",
+    "started_at": "2026-11-22T22:54:13.479Z",
+    "tool_version": "0.20.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "Write the baseline of 0.20.0: recall 0.619, precision 0.517 at two repeats\n\n## Summary\n\n- `eval/baseline.json` now measures the defaults of 0.20.0. Posted recall is 0.619 and posted precision is 0.517, at two repeats of the 28 pinned cases (pin `373266b`). The cost is $4.34 for each case, with $0.14 of judge calls. No repeat failed.\n- The margins stay 0.05 and 0.05 by the README rule. The spread is 0.013 for recall and 0.010 for precision.\n- `docs/research/baseline-0-20.md` gives the figures against S1 and the old baseline, and the walle and websites cases apart. It also gives the review time, the posted findings by severity, the false posted findings, the escalation, the sources of the precision cost, and what the stage experiments did not predict.\n- TICKETS.md: D9 names the false posted findings as its target (66.5 in each repeat; 17 of 26 on the walle and websites cases). The R1 line says that the gate baseline now measures 0.20.0.\n\n| | New (0.20.0) | S1 (0.15.0, 1 repeat) | Old baseline (0.10.0) |\n|---|---|---|---|\n| Posted recall | 0.619 | 0.570 | 0.542 |\n| Posted precision | 0.517 | 0.534 | 0.598 |\n| Cost for each case | $4.34 | $5.56 | $4.66 |\n| Review time, median | 1.1 min | 1.7 min | not recorded |\n\nPrecision is 0.081 under the old baseline file. Most of that gap is older than D4c: S1 gave 0.534 on the old defaults. The user saw these figures and accepts the baseline.\n\nThe PR holds no code, so it has no version change.\n\n## Test plan\n\n- [x] `npm test` (1708 passed), `npm run lint`, `npm run typecheck`, `npm run build`\n- [x] `test/eval-pin.test.ts`: the `cases_ref` of the baseline equals the pin, at two repeats\n- [x] The run: `eval --repeat 2 --write-baseline --resume` on a frozen build of d342898, in five windows, $250.80\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZg7V9Qr9viaw1dTW3s\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": "TICKETS.md",
+        "hunks": 2
+      },
+      {
+        "path": "docs/research/baseline-0-20.md",
+        "hunks": 1
+      },
+      {
+        "path": "eval/baseline.json",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "full",
+      "reason": "eval/baseline.json is data that the eval gate reads, so new thresholds and a new case_costs field can change gate behavior; the rest is docs.",
+      "confidence": "medium",
+      "categories": [
+        "bug",
+        "docs",
+        "test"
+      ],
+      "hotspots": [
+        "eval/baseline.json",
+        "docs/research/baseline-0-20.md",
+        "TICKETS.md"
+      ],
+      "file_notes": [
+        {
+          "file": "eval/baseline.json",
+          "note": "Gate baseline rewritten: recall 0.619 (was 0.542), precision 0.517 (was 0.598), tool_version 0.20.0. New case_costs map. Check that the baseline loader and schema accept the new field and that the margins and cases_ref are still correct."
+        },
+        {
+          "file": "docs/research/baseline-0-20.md",
+          "note": "New research note. Check that its figures match baseline.json (0.619, 0.517, $4.34 per case, 2 repeats, 28 cases). The note says done 2026-11-22 but written_at is 2026-11-21."
+        },
+        {
+          "file": "TICKETS.md",
+          "note": "Adds an evidence bullet and updates the R1 text to point to the new baseline. Docs only."
+        }
+      ],
+      "summary": "The change records a new eval gate baseline measured on the 0.20.0 defaults. It adds a research note that explains the figures, and it updates TICKETS.md to cite the note. The baseline file lowers the precision floor from 0.598 to 0.517 and raises the recall floor, and it adds a per-case cost map."
+    },
+    "tier": "full",
+    "tier_reason": "Triage: eval/baseline.json is data that the eval gate reads, so new thresholds and a new case_costs field can change gate behavior; the rest is docs.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "medium",
+        "tools_ignored": []
+      },
+      {
+        "name": "docs-and-comments",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "history",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "tools_ignored": []
+      },
+      {
+        "name": "security",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "tests",
+        "trigger": "min_tier full <= full; paths: any; categories: any",
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    },
+    "mode": "full"
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 3763,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 7282,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0007392000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 212,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 11925,
+              "webSearchRequests": 0,
+              "costUSD": 0.099648,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 24,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1003872
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 18288,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 7262,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0007372000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 1738,
+              "cacheReadInputTokens": 12132,
+              "cacheCreationInputTokens": 12490,
+              "webSearchRequests": 0,
+              "costUSD": 0.1371224,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 973,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1378596
+        }
+      },
+      {
+        "name": "docs-and-comments",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "TICKETS.md",
+            "start_line": 288,
+            "end_line": 288,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The D9 target line gives figures for each repeat and then gives the walle and websites figures as a total of two repeats, without saying so.",
+            "evidence": "and 17 of 26 posted findings on the walle and websites cases are false",
+            "suggested_fix": "Write \"8.5 of 13 posted findings in each repeat on the walle and websites cases are false\".",
+            "explanation": "The note gives 13 posted and 8.5 false in each repeat, so 17 of 26 is the total of two repeats, and the line mixes per-repeat and total figures.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 8892,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 7266,
+              "outputTokens": 24,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0007386,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 882,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 11819,
+              "webSearchRequests": 0,
+              "costUSD": 0.1122,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 591,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1129386
+        }
+      },
+      {
+        "name": "history",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-sonnet-5-5",
+          "durationMs": 7856,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 9249,
+              "outputTokens": 24,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0009369000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-sonnet-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 1104,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 14198,
+              "webSearchRequests": 0,
+              "costUSD": 0.06783600000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 1050,
+              "canonicalModel": "claude-sonnet-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.06877290000000001
+        }
+      },
+      {
+        "name": "security",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 2619,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 7258,
+              "outputTokens": 24,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0007377999999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 91,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 12095,
+              "webSearchRequests": 0,
+              "costUSD": 0.098588,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 37,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.09932579999999999
+        }
+      },
+      {
+        "name": "tests",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-sonnet-5-5",
+          "durationMs": 2661,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 7268,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0007378000000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-sonnet-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 248,
+              "cacheReadInputTokens": 15943,
+              "cacheCreationInputTokens": 10112,
+              "webSearchRequests": 0,
+              "costUSD": 0.0445303,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 90,
+              "canonicalModel": "claude-sonnet-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0452681
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "TICKETS.md",
+          "start_line": 288,
+          "end_line": 288,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The D9 target line gives figures for each repeat and then gives the walle and websites figures as a total of two repeats, without saying so.",
+          "evidence": "and 17 of 26 posted findings on the walle and websites cases are false",
+          "suggested_fix": "Write \"8.5 of 13 posted findings in each repeat on the walle and websites cases are false\".",
+          "explanation": "The note gives 13 posted and 8.5 false in each repeat, so 17 of 26 is the total of two repeats, and the line mixes per-repeat and total figures.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "and 17 of 26 posted findings on the walle and websites cases are false",
+            "| Posted findings in each repeat, false posted | 13, 8.5 | 14, 8 |"
+          ],
+          "rationale": "The source note gives 13 posted and 8.5 false in each repeat for the walle and websites cases. So 17 of 26 is the total of two repeats, which the line mixes with per-repeat figures without saying so.",
+          "score": 85,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- The target: the baseline of 0.20.0 posts 66.5 false findings in each repeat of the 28 cases (137.5 posted, posted precision 0.517), and 17 of 26 posted findings on the walle and websites cases are false. Source: `docs/research/baseline-0-20.md`.",
+            "| Posted findings in each repeat, false posted | 13, 8.5 | 14, 8 |"
+          ],
+          "rationale": "The source note gives 13 posted and 8.5 false findings per repeat on the walle and websites cases. So \"17 of 26\" is the two-repeat total, while the same sentence gives the 66.5 and 137.5 figures per repeat. The ratio is still correct, so the harm is only a less clear count, and the fix is one cheap wording change.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- The target: the baseline of 0.20.0 posts 66.5 false findings in each repeat of the 28 cases (137.5 posted, posted precision 0.517), and 17 of 26 posted findings on the walle and websites cases are false. Source: `docs/research/baseline-0-20.md`.",
+            "| Posted findings in each repeat, false posted | 13, 8.5 | 14, 8 |"
+          ],
+          "rationale": "The source note gives 13 posted and 8.5 false findings per repeat on the walle and websites cases. So \"17 of 26\" is the two-repeat total, while the same sentence gives the 66.5 and 137.5 figures per repeat. The ratio is still correct, so the harm is only a less clear count, and the fix is one cheap wording change.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "docs-and-comments",
+            "pass": 1
+          }
+        ]
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "diff-bugs",
+        "docs-and-comments",
+        "history",
+        "security",
+        "tests"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [
+      {
+        "file": "TICKETS.md",
+        "start_line": 288,
+        "end_line": 288,
+        "category": "docs",
+        "severity_estimate": "nit",
+        "confidence": "low",
+        "claim": "The D9 target line gives figures for each repeat and then gives the walle and websites figures as a total of two repeats, without saying so.",
+        "evidence": "and 17 of 26 posted findings on the walle and websites cases are false",
+        "suggested_fix": "Write \"8.5 of 13 posted findings in each repeat on the walle and websites cases are false\".",
+        "explanation": "The note gives 13 posted and 8.5 false in each repeat, so 17 of 26 is the total of two repeats, and the line mixes per-repeat and total figures.",
+        "needs_context": false,
+        "fingerprint": "3bf811ae89822a6c",
+        "severity": "nit",
+        "score": 92,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- The target: the baseline of 0.20.0 posts 66.5 false findings in each repeat of the 28 cases (137.5 posted, posted precision 0.517), and 17 of 26 posted findings on the walle and websites cases are false. Source: `docs/research/baseline-0-20.md`.",
+            "| Posted findings in each repeat, false posted | 13, 8.5 | 14, 8 |"
+          ],
+          "rationale": "The source note gives 13 posted and 8.5 false findings per repeat on the walle and websites cases. So \"17 of 26\" is the two-repeat total, while the same sentence gives the 66.5 and 137.5 figures per repeat. The ratio is still correct, so the harm is only a less clear count, and the fix is one cheap wording change.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "span_text": "- The target: the baseline of 0.20.0 posts 66.5 false findings in each repeat of the 28 cases (137.5 posted, posted precision 0.517), and 17 of 26 posted findings on the walle and websites cases are false. Source: `docs/research/baseline-0-20.md`.",
+        "sources": [
+          {
+            "reviewer": "docs-and-comments",
+            "pass": 1
+          }
+        ]
+      }
+    ],
+    "github": {
+      "review_id": 6014967946,
+      "review_url": "https://github.com/jerridan/pr-review/pull/68#pullrequestreview-6014967946",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [
+        {
+          "fingerprint": "3bf811ae89822a6c",
+          "comment_id": 4660430565
+        }
+      ],
+      "in_body": [],
+      "check_run": {
+        "id": 137386822916
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 5442,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 6086,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0006206,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 814,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 6859,
+            "webSearchRequests": 0,
+            "costUSD": 0.03558,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 178,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0362006
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "security",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 2619,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7258,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007377999999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 91,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 12095,
+            "webSearchRequests": 0,
+            "costUSD": 0.098588,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 37,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.09932579999999999
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 3763,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7282,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007392000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 212,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 11925,
+            "webSearchRequests": 0,
+            "costUSD": 0.099648,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 24,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1003872
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "tests",
+        "pass": 1,
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 2661,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7268,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007378000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 248,
+            "cacheReadInputTokens": 15943,
+            "cacheCreationInputTokens": 10112,
+            "webSearchRequests": 0,
+            "costUSD": 0.0445303,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 90,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0452681
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "history",
+        "pass": 1,
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 7856,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 9249,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009369000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 1104,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 14198,
+            "webSearchRequests": 0,
+            "costUSD": 0.06783600000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 1050,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.06877290000000001
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "docs-and-comments",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 8892,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7266,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007386,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 882,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 11819,
+            "webSearchRequests": 0,
+            "costUSD": 0.1122,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 591,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1129386
+      },
+      {
+        "role": "verifier",
+        "verification": 0,
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 5581,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 30347,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0030472,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 745,
+            "cacheReadInputTokens": 34221,
+            "cacheCreationInputTokens": 34672,
+            "webSearchRequests": 0,
+            "costUSD": 0.1495681,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 198,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1526153
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "medium",
+        "duration_ms": 18288,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 7262,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0007372000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 1738,
+            "cacheReadInputTokens": 12132,
+            "cacheCreationInputTokens": 12490,
+            "webSearchRequests": 0,
+            "costUSD": 0.1371224,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 973,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1378596
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 0,
+        "model": "claude-opus-5-5",
+        "effort": "high",
+        "duration_ms": 11702,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 30353,
+            "outputTokens": 25,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0030478000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 856,
+            "cacheReadInputTokens": 69182,
+            "cacheCreationInputTokens": 36965,
+            "webSearchRequests": 0,
+            "costUSD": 0.3267004,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 173,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.32974819999999994
+      }
+    ],
+    "total_cost_usd": 1.0831163,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 40,
+      "gather": 49,
+      "triage": 6315,
+      "find_verify": 28742,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
