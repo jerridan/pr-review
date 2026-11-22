@@ -21,7 +21,7 @@ import { cloneCase } from "./checkout.js";
 import { codexQuotaError, runCodex, TERRA_MODEL, type CodexEffort } from "./codex.js";
 
 const REVIEWER = "general-review";
-const EFFORTS: readonly CodexEffort[] = ["low", "medium", "high", "xhigh"];
+const EFFORTS: readonly CodexEffort[] = ["low", "medium", "high", "xhigh", "max"];
 
 /** What the command line holds. */
 export type CodexReviewOptions = {
@@ -33,6 +33,11 @@ export type CodexReviewOptions = {
   source: string;
   /** Run again the cases that already have a file. */
   force: boolean;
+  /**
+   * A prompt file, named by its path relative to prompts/. Its body replaces
+   * the body of the general-review reviewer. Not set: use general-review.
+   */
+  prompt?: string;
 };
 
 // Codex checks the output schema in strict mode: each property is required.
@@ -42,7 +47,7 @@ const CodexFindingSchema = z.strictObject({ ...findingShape, suggested_fix: z.st
 const CodexOutputSchema = z.strictObject({ findings: z.array(CodexFindingSchema) });
 
 const USAGE =
-  "usage: pr-review eval-codex-review --cases <dir> --out <dir> [--model <id>] [--effort low|medium|high|xhigh] [--source <name>] [--force]";
+  "usage: pr-review eval-codex-review --cases <dir> --out <dir> [--model <id>] [--effort low|medium|high|xhigh|max] [--prompt <file>] [--source <name>] [--force]";
 
 function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -63,6 +68,7 @@ export function parseCodexReviewArgs(
         model: { type: "string" },
         effort: { type: "string" },
         source: { type: "string" },
+        prompt: { type: "string" },
         force: { type: "boolean" },
       },
     }).values;
@@ -78,8 +84,10 @@ export function parseCodexReviewArgs(
     return { ok: false, error: `--effort must be one of ${EFFORTS.join(", ")}` };
   }
   const model = typeof values.model === "string" ? values.model : TERRA_MODEL;
+  const prompt = typeof values.prompt === "string" ? values.prompt : undefined;
+  const promptName = prompt === undefined ? "general-review" : prompt.replace(/\.md$/, "");
   const source =
-    typeof values.source === "string" ? values.source : `codex-general-review-${model}-${effort}`;
+    typeof values.source === "string" ? values.source : `codex-${promptName}-${model}-${effort}`;
   return {
     ok: true,
     options: {
@@ -89,6 +97,7 @@ export function parseCodexReviewArgs(
       effort: effort as CodexEffort,
       source,
       force: values.force === true,
+      ...(prompt === undefined ? {} : { prompt }),
     },
   };
 }
@@ -96,7 +105,7 @@ export function parseCodexReviewArgs(
 // The Codex prompt of one case: the system prompt of a pipeline reviewer and
 // its user message, with no triage brief and no history, in the wrapper of
 // prompts/codex-review.md.
-async function promptOf(c: Case, checkout: string): Promise<string> {
+async function promptOf(c: Case, checkout: string, reviewerBody: string): Promise<string> {
   const baseSha = await resolveCommit(checkout, c.base);
   const loaded = await loadRepoConfig(checkout, baseSha);
   // The exclusions are those of the repo config, as in an eval run. The
@@ -114,9 +123,7 @@ async function promptOf(c: Case, checkout: string): Promise<string> {
     c.description_from === "commits"
       ? gathered.description
       : `${sanitizeGitHubText(c.title).text}\n\n${sanitizeGitHubText(c.body).text}`;
-  const def = loadBuiltinReviewers().find((d) => d.frontmatter.name === REVIEWER);
-  if (!def) throw new Error(`The built-in reviewer ${REVIEWER} is missing.`);
-  const system = buildReviewerSystemPrompt(def.systemPrompt, {
+  const system = buildReviewerSystemPrompt(reviewerBody, {
     claudeMd: loaded.claudeMd,
     rulesMd: loaded.rulesMd,
   }).prompt;
@@ -133,11 +140,24 @@ type CaseResult =
   | { kind: "failed"; error: string; tokens: number | null }
   | { kind: "quota"; error: string; tokens: number | null };
 
-async function reviewCase(c: Case, options: CodexReviewOptions): Promise<CaseResult> {
+// The body of the reviewer prompt: the named prompt file, or the body of the
+// built-in reviewer general-review.
+function reviewerBodyOf(options: CodexReviewOptions): string {
+  if (options.prompt !== undefined) return loadPrompt(options.prompt).body;
+  const def = loadBuiltinReviewers().find((d) => d.frontmatter.name === REVIEWER);
+  if (!def) throw new Error(`The built-in reviewer ${REVIEWER} is missing.`);
+  return def.systemPrompt;
+}
+
+async function reviewCase(
+  c: Case,
+  options: CodexReviewOptions,
+  reviewerBody: string,
+): Promise<CaseResult> {
   const tmp = await mkdtemp(join(tmpdir(), "pr-review-codex-review-"));
   try {
     const checkout = await cloneCase(c, join(tmp, "repo"));
-    const prompt = await promptOf(c, checkout);
+    const prompt = await promptOf(c, checkout, reviewerBody);
     const outcome = await runCodex(prompt, checkout, CodexOutputSchema, "findings", {
       model: options.model,
       effort: options.effort,
@@ -245,6 +265,13 @@ export async function codexReviewCommand(args: string[]): Promise<number> {
     return 2;
   }
   const { options } = parsed;
+  let reviewerBody: string;
+  try {
+    reviewerBody = reviewerBodyOf(options);
+  } catch (err) {
+    process.stderr.write(`${messageOf(err)}\n`);
+    return 2;
+  }
   let cases: Case[];
   try {
     cases = await loadCases(options.cases);
@@ -265,7 +292,7 @@ export async function codexReviewCommand(args: string[]): Promise<number> {
       skipped += 1;
       continue;
     }
-    const result = await reviewCase(c, options);
+    const result = await reviewCase(c, options, reviewerBody);
     tokens += result.tokens ?? 0;
     process.stdout.write(`case ${c.name}: ${result.kind} tokens ${result.tokens ?? "unknown"}\n`);
     if (result.kind === "done") {
