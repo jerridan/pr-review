@@ -4,7 +4,7 @@
 
 1. Which option do you choose: A (a self-hosted private runner), B (a GitHub-hosted job that carries the login file through a secret), C (an API key for this one reviewer), or D (the reviewer runs only where a logged-in Codex CLI exists, and CI skips it)? A and B are not allowed for a public repo. pr-review is public, so A and B can apply only to your private repos.
 2. For A or B: do the terms of your plan permit a login that a CI job uses? The terms bar sharing account credentials, and they do not name Codex CI (see "Not documented").
-3. For C: is an API cost of about $0.11 to $0.20 for each review acceptable?
+3. For C: is an API cost of about $0.11 to $0.19 for each review acceptable?
 
 ## Question
 
@@ -98,15 +98,15 @@ pr-review itself is a public repo, so it cannot use A or B by the rule of the ve
 
 ### C: an API key for this one reviewer
 
-- What it is: the way that the vendor recommends. The job gives the key to `codex login --with-api-key` from a secret, or uses `openai/codex-action`.
+- What it is: the way that the vendor recommends. A workflow step gives the key from a secret to `codex login --with-api-key` before the review. The design keeps the key out of the environment of the Codex process (`docs/design/staff-reviewer.md`, "The sandbox"), so the `openai-api-key` input of `openai/codex-action` does not fit.
 - The tool must: the same as A. Rule 4 of CLAUDE.md holds: the workflow passes the key to the Codex CLI, and the tool never reads, writes or logs it.
 - The user must: create an API key, put it in a secret, and pay for the use. It works for public and private repos.
-- Cost: a D15 review used about 57,000 to 67,000 tokens. The record holds only the total, not the split between input, cached input and output. At the list price, all input gives $0.11 to $0.13 for each review. With about 10% output, a review costs about $0.17 to $0.20. Cached input lowers it. So about $0.11 to $0.20 for each review.
+- Cost: a D15 review used about 57,000 to 67,000 tokens. The record holds only the total, not the split between input, cached input and output. At the list price, all input gives $0.11 to $0.13 for each review. With about 10% output, a review costs about $0.16 to $0.19. Cached input lowers it. So about $0.11 to $0.19 for each review.
 
 ### D: the reviewer runs only where a logged-in Codex CLI already exists
 
 - What it is: the user's machine, through the local CLI and the plugin. CI does not run the reviewer, and the summary of a CI review says that it did not run and why.
-- The tool must: the same skip path as in A, with the reason "no Codex CLI" or "not logged in".
+- The tool must: the same skip path as in A, with the reason `codex not installed` or `codex not logged in`.
 - The user must: nothing more than a login on their own machine.
 - Cost: plan allowance on the user's machine only.
 
