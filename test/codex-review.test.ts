@@ -10,7 +10,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { codexReviewCommand } from "../src/eval/codex-review.js";
@@ -36,7 +36,7 @@ type Step = {
 // its argv, finds its step by the marker "MARK-x" in the prompt, and
 // writes the out file of that step.
 const SHIM = `import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 const dir = process.env.FAKE_CODEX_DIR;
 const argv = process.argv.slice(2);
 appendFileSync(join(dir, "log.jsonl"), JSON.stringify(argv) + "\\n");
@@ -286,7 +286,7 @@ describe("pr-review eval-codex-review", () => {
     expect(lines[3]).toBe("done: 2");
   }, 60_000);
 
-  const MODEL = { model: "gpt-6.1-terra", effort: "high" };
+  const MODEL = { model: "gpt-6.1-terra", effort: "high", prompt: "general-review" };
   const SOURCE = "codex-general-review-gpt-6.1-terra-high";
 
   function tokenMap(): unknown {
@@ -307,10 +307,10 @@ describe("pr-review eval-codex-review", () => {
     });
     // The rerun does case-b only, and keeps the other entries.
     plan({ default: { findings: [], stderr: "tokens used\n50\n" } });
-    expect(await run("--effort", "low")).toBe(0);
+    expect(await run("--effort", "low", "--source", SOURCE)).toBe(0);
     expect(tokenMap()).toEqual({
       "case-a": { tokens: 1200, ...MODEL },
-      "case-b": { tokens: 50, model: "gpt-6.1-terra", effort: "low" },
+      "case-b": { tokens: 50, model: "gpt-6.1-terra", effort: "low", prompt: "general-review" },
       "case-c": { tokens: null, ...MODEL },
     });
     expect(readdirSync(out).filter((n) => n.includes(".tmp"))).toEqual([]);
@@ -393,12 +393,23 @@ describe("pr-review eval-codex-review", () => {
     // new copy of the command after the variable is set. The directory is a
     // copy of prompts/ with the test prompt added.
     async function runWithPrompt(...extra: string[]): Promise<number> {
+      return runWithFiles({}, ...extra);
+    }
+
+    async function runWithFiles(
+      files: Record<string, string>,
+      ...extra: string[]
+    ): Promise<number> {
       const prompts = join(tempDir("codex-review-prompts", made), "prompts");
       cpSync(fileURLToPath(new URL("../prompts/", import.meta.url)), prompts, { recursive: true });
       cpSync(
         fileURLToPath(new URL("./fixtures/prompts/test-reviewer.md", import.meta.url)),
         join(prompts, "test-reviewer.md"),
       );
+      for (const [name, text] of Object.entries(files)) {
+        mkdirSync(dirname(join(prompts, name)), { recursive: true });
+        writeFileSync(join(prompts, name), text);
+      }
       vi.stubEnv("PR_REVIEW_PROMPTS_DIR", prompts);
       vi.resetModules();
       try {
@@ -442,11 +453,84 @@ describe("pr-review eval-codex-review", () => {
 
     it("keeps the general-review body when no prompt is given", async () => {
       plan({ default: { findings: [] } });
-      expect(await run("--effort", "max")).toBe(0);
+      expect(await run()).toBe(0);
       const prompt = calls()[0]?.at(-1) ?? "";
       expect(prompt).toContain("You review one code change in every category");
       expect(prompt).not.toContain("UNIQUE-TEST-REVIEWER-LINE");
+    }, 60_000);
+
+    it("names the default source with the effort max when no prompt is given", async () => {
+      plan({ default: { findings: [] } });
+      expect(await run("--effort", "max")).toBe(0);
       expect(written("case-a")).toMatchObject({ source: "codex-general-review-gpt-6.1-terra-max" });
+    }, 60_000);
+
+    it("passes the effort max to codex", async () => {
+      plan({ default: { findings: [] } });
+      await run("--effort", "max");
+      expect(calls()[0]).toContain("model_reasoning_effort=max");
+    }, 60_000);
+
+    it.each(["", "  \n\t\n"])(
+      "exits 2 for a prompt file with an empty body %j, and runs no case",
+      async (body) => {
+        const code = await runWithFiles(
+          { "empty.md": `---\nname: empty\n---\n${body}` },
+          "--prompt",
+          "empty.md",
+        );
+        expect(code).toBe(2);
+        expect(calls()).toEqual([]);
+        expect(existsSync(out)).toBe(false);
+      },
+    );
+
+    it.each(["x.md", "./x.md", "dir/x.md"])(
+      "names the default source after the base name of the prompt path %s",
+      async (path) => {
+        plan({ default: { findings: [] } });
+        const text = "---\nname: x\n---\nA reviewer body.";
+        const code = await runWithFiles({ [path]: text }, "--prompt", path, "--effort", "low");
+        expect(code).toBe(0);
+        expect(written("case-a")).toMatchObject({ source: "codex-x-gpt-6.1-terra-low" });
+      },
+      60_000,
+    );
+
+    it("stores the prompt value in the token entry", async () => {
+      plan({ default: { findings: [] } });
+      await runWithPrompt("--prompt", "test-reviewer.md");
+      expect(tokenMap()).toMatchObject({ "case-a": { prompt: "test-reviewer.md" } });
+    }, 60_000);
+  });
+
+  describe("resume", () => {
+    it("stops with exit 2 before any call when a file holds another source", async () => {
+      plan({ default: { findings: [] } });
+      await run("--source", "first");
+      const before = calls().length;
+      output.stderr = "";
+      expect(await run("--source", "second")).toBe(2);
+      expect(calls()).toHaveLength(before);
+      expect(output.stderr).toContain("case-a");
+      expect(output.stderr).toContain("first");
+      expect(output.stderr).toContain("second");
+      expect(output.stderr).toContain("--force");
+      expect(written("case-a")).toEqual({ source: "first", findings: [] });
+    }, 60_000);
+
+    it("skips a case whose file holds the same source", async () => {
+      plan({ default: { findings: [] } });
+      await run("--source", "same");
+      expect(await run("--source", "same")).toBe(0);
+      expect(calls()).toHaveLength(3);
+    }, 60_000);
+
+    it("runs again with --force when a file holds another source", async () => {
+      plan({ default: { findings: [] } });
+      await run("--source", "first");
+      expect(await run("--source", "second", "--force")).toBe(0);
+      expect(written("case-a")).toEqual({ source: "second", findings: [] });
     }, 60_000);
   });
 
