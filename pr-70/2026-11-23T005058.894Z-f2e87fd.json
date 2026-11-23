@@ -1,0 +1,819 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 70,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "D16 documents: Codex in CI, and the staff reviewer design",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/70"
+    },
+    "run_kind": "later",
+    "prior": {
+      "head": "d689dbb79e809193c08b2240f60160d70143e1bd",
+      "source": "record",
+      "record": "/home/runner/work/_temp/pr-review-records/pr-70/2026-11-23T004730.989Z-d689dbb.json",
+      "open": [],
+      "dismissed": [
+        "2621286cf8034a55",
+        "2a71aa8b221198ec",
+        "91d507983e43f258",
+        "94877b440a0aa95a"
+      ],
+      "fetch_failed": false
+    },
+    "base": "047fb726fe4f7cb50984e2d973048fc90e677cf7",
+    "head": "f2e87fd7cc6068e0a76d55947738f25b4eee9eb1",
+    "started_at": "2026-11-23T00:50:58.894Z",
+    "tool_version": "0.21.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "D16 documents: Codex in CI, and the staff reviewer design\n\nD16 as documents, for the user to read before any code. Docs only: no code change, no version change.\n\n## Documents\n\n- `docs/research/d16-codex-in-ci.md` (part b): can the Codex CLI run in CI on a ChatGPT subscription? The vendor documents it but says \"The right way to authenticate automation is with an API key\" and \"Do not use this workflow for public or open-source repositories\", and \"Do not share the same file across concurrent jobs or multiple machines\". The note gives four options with what the tool and the user must do: (A) a self-hosted private runner, (B) a GitHub-hosted job with the login file in a secret (fragile: the file refreshes after about 8 days), (C) an API key, about $0.11 to $0.20 a review at the list price of Sol 6.2, (D) the reviewer runs only on a machine with a logged-in Codex CLI. pr-review itself is public, so it cannot use A or B.\n- `docs/design/staff-reviewer.md` (parts a and c): a reviewer of `kind: codex` in a prompt file; selected like the others, opt-in by config; it never fails a review (skip or failure with a reason in the summary); a 10-minute guard limit that kills the process group; first and fresh runs only; a sandbox of a tree with no `.git`, a small environment, read-only, no network setting, and `redact` on its output; the record fields. Refactor recommendations leave the findings list before the verifier, take a truth check with a new prompt, at most two, one PR comment edited on each first or fresh run, an off switch, a record stage, and hand-free eval counts.\n\nEach document states the open questions for the user at the top. The most important one: the read-only sandbox of Codex stops writes but not reads, so a steered review could put a secret into a finding. The design lowers that risk and cannot remove it.\n\nOne critic round on the design: its 12 findings are applied (the read scope of the sandbox, later runs, a new truth-check prompt, the loader and schema changes, the config default of `enabled`, the record fields, the process-group kill, the strict tag parse, the limit before the truth check, the comment mechanics, the eval checks).\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZdfE1rqbczPpmGQQ5S\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": false,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": "docs/design/staff-reviewer.md",
+        "hunks": 1
+      },
+      {
+        "path": "docs/research/d16-codex-in-ci.md",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "fast",
+      "reason": "Only two new markdown docs (a design and a research note) are added; no code, config or runtime behavior changes, though the design text makes security and interface claims worth a quick check.",
+      "confidence": "medium",
+      "categories": [
+        "docs",
+        "security"
+      ],
+      "hotspots": [
+        "docs/design/staff-reviewer.md: 'The sandbox' section (read-only does not limit reads; env and secret handling)",
+        "docs/design/staff-reviewer.md: verdict exception for kind: codex versus 'failed reviewer makes verdict incomplete'",
+        "docs/design/staff-reviewer.md: optional `enabled` schema change and the model-resolution move in repo config",
+        "docs/research/d16-codex-in-ci.md: consistency of option C with the design's sandbox rules"
+      ],
+      "file_notes": [
+        {
+          "file": "docs/design/staff-reviewer.md",
+          "note": "New design doc for a Codex-based staff reviewer and a separate refactor-recommendation path; no code yet. Proposes schema, config, record and redact changes."
+        },
+        {
+          "file": "docs/research/d16-codex-in-ci.md",
+          "note": "New research note on running Codex CLI in CI with a ChatGPT login versus an API key; options A to D with costs and open questions."
+        }
+      ],
+      "summary": "Adds two new documents. The design doc specifies a Codex-CLI staff-engineer reviewer that never fails a review, its sandboxing, and a separate refactor-recommendation comment path. The research note compares ways to run Codex in CI (self-hosted runner, secret login file, API key, local only). No code is changed."
+    },
+    "tier": "fast",
+    "tier_reason": "Triage: Only two new markdown docs (a design and a research note) are added; no code, config or runtime behavior changes, though the design text makes security and interface claims worth a quick check.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= fast; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= fast; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "medium",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    },
+    "mode": "full"
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 5736,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11861,
+              "outputTokens": 26,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011991,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 399,
+              "cacheReadInputTokens": 5136,
+              "cacheCreationInputTokens": 11370,
+              "webSearchRequests": 0,
+              "costUSD": 0.0999752,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 131,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1011743
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "docs/design/staff-reviewer.md",
+            "start_line": 80,
+            "end_line": 80,
+            "category": "bug",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "For option C, keeping the API key out of the environment does not keep it from the model, because `codex login --with-api-key` stores the key in `$CODEX_HOME/auth.json`, which the design passes to the process and which the read-only sandbox lets commands read.",
+            "evidence": "an API key in the environment of Codex is readable by the commands that the model runs, so the key never goes there. A workflow step logs Codex in before the review (`codex login --with-api-key`, with the key from the secret on stdin), and the review process finds the login in the Codex home.",
+            "suggested_fix": "Say that the key ends up in auth.json, which the model can read, so moving it out of the environment does not lower the read risk. Rely on `redact`, which matches `sk-` keys, and list this under open question 1.",
+            "explanation": "Logging in writes the key to a file that the sandboxed commands can still read, so the reason given for this mitigation does not hold; only `redact` still protects the key.",
+            "needs_context": false
+          },
+          {
+            "file": "docs/design/staff-reviewer.md",
+            "start_line": 106,
+            "end_line": 107,
+            "category": "bug",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "The design does not say what the refactor comment does on a fresh run where the staff reviewer is skipped or fails. If the reviewer gives no passed recommendations in that case, the tool overwrites open recommendations with 'no recommendation is open now'.",
+            "evidence": "With none, it edits an existing comment to say that no recommendation is open now, and it never creates an empty comment.",
+            "suggested_fix": "Edit the comment only when the staff reviewer ran and finished. When it is skipped or fails, do not touch the comment.",
+            "explanation": "A Codex timeout, quota stop or missing login on a fresh run would then post that no recommendation is open, which is false and erases recommendations that are still valid.",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 32670,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11861,
+              "outputTokens": 26,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011991,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 12,
+              "outputTokens": 2480,
+              "cacheReadInputTokens": 102602,
+              "cacheCreationInputTokens": 17900,
+              "webSearchRequests": 0,
+              "costUSD": 0.21336839999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 933,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.2145675
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "docs/design/staff-reviewer.md",
+          "start_line": 80,
+          "end_line": 80,
+          "category": "bug",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "For option C, keeping the API key out of the environment does not keep it from the model, because `codex login --with-api-key` stores the key in `$CODEX_HOME/auth.json`, which the design passes to the process and which the read-only sandbox lets commands read.",
+          "evidence": "an API key in the environment of Codex is readable by the commands that the model runs, so the key never goes there. A workflow step logs Codex in before the review (`codex login --with-api-key`, with the key from the secret on stdin), and the review process finds the login in the Codex home.",
+          "suggested_fix": "Say that the key ends up in auth.json, which the model can read, so moving it out of the environment does not lower the read risk. Rely on `redact`, which matches `sk-` keys, and list this under open question 1.",
+          "explanation": "Logging in writes the key to a file that the sandboxed commands can still read, so the reason given for this mitigation does not hold; only `redact` still protects the key.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "an API key in the environment of Codex is readable by the commands that the model runs, so the key never goes there. A workflow step logs Codex in before the review (`codex login --with-api-key`, with the key from the secret on stdin), and the review process finds the login in the Codex home.",
+            "The commands can read any file that the process user can read: the read-only mode does not limit reads (open question 1)."
+          ],
+          "rationale": "The doc's own text says the sandbox does not limit reads and that auth.json is readable, yet it says option C keeps the key away from model commands by avoiding the environment. The key stored in the Codex home is just as readable, so the stated reasoning is inconsistent. The doc partly discloses the risk in open question 1.",
+          "score": 78,
+          "severity": "suggestion"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "an API key in the environment of Codex is readable by the commands that the model runs, so the key never goes there. A workflow step logs Codex in before the review (`codex login --with-api-key`, with the key from the secret on stdin), and the review process finds the login in the Codex home.",
+            "A command that the model runs can read any file that the user of the process can read, and the login file of Codex (`$CODEX_HOME/auth.json`) too.",
+            "the process gets `PATH`, `HOME` and `CODEX_HOME` only"
+          ],
+          "rationale": "The design's own open question 1 says sandboxed commands can read `$CODEX_HOME/auth.json`. `codex login --with-api-key` writes the key to that file. So keeping the key out of the environment does not keep it from the model, and the reason the sandbox section gives for this step does not hold. Only `redact` still protects the key.",
+          "score": 80,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "an API key in the environment of Codex is readable by the commands that the model runs, so the key never goes there. A workflow step logs Codex in before the review (`codex login --with-api-key`, with the key from the secret on stdin), and the review process finds the login in the Codex home.",
+            "A command that the model runs can read any file that the user of the process can read, and the login file of Codex (`$CODEX_HOME/auth.json`) too.",
+            "the process gets `PATH`, `HOME` and `CODEX_HOME` only"
+          ],
+          "rationale": "The design's own open question 1 says sandboxed commands can read `$CODEX_HOME/auth.json`. `codex login --with-api-key` writes the key to that file. So keeping the key out of the environment does not keep it from the model, and the reason the sandbox section gives for this step does not hold. Only `redact` still protects the key.",
+          "score": 80,
+          "severity": "suggestion"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "docs/design/staff-reviewer.md",
+          "start_line": 106,
+          "end_line": 107,
+          "category": "bug",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "The design does not say what the refactor comment does on a fresh run where the staff reviewer is skipped or fails. If the reviewer gives no passed recommendations in that case, the tool overwrites open recommendations with 'no recommendation is open now'.",
+          "evidence": "With none, it edits an existing comment to say that no recommendation is open now, and it never creates an empty comment.",
+          "suggested_fix": "Edit the comment only when the staff reviewer ran and finished. When it is skipped or fails, do not touch the comment.",
+          "explanation": "A Codex timeout, quota stop or missing login on a fresh run would then post that no recommendation is open, which is false and erases recommendations that are still valid.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "With none, it edits an existing comment to say that no recommendation is open now, and it never creates an empty comment.",
+            "The default is `on` when the staff reviewer runs."
+          ],
+          "rationale": "Step 4 conditions the edit only on having no passed recommendations, not on the reviewer having finished. A skipped or failed reviewer on a fresh run would produce none and overwrite the comment with a false statement. Step 5's \"when the staff reviewer runs\" hints at the intent but does not settle step 4.",
+          "score": 70,
+          "severity": "suggestion"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "On a first or fresh run, the tool looks for the comment of its own login with that marker.",
+            "With none, it edits an existing comment to say that no recommendation is open now, and it never creates an empty comment.",
+            "The default is `on` when the staff reviewer runs.",
+            "A reviewer that started and did not finish (quota, timeout, failed) goes to `reviewers_failed`. Neither is in `reviewers_ran`."
+          ],
+          "rationale": "Step 4 makes the comment edit depend only on a first or fresh run having no passed recommendations. It does not say what happens when the Codex reviewer was skipped or failed. Step 5's \"on when the staff reviewer runs\" hints at a guard but does not settle the case. As written, a timeout could replace still-valid recommendations with \"no recommendation is open now\".",
+          "score": 66,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "On a first or fresh run, the tool looks for the comment of its own login with that marker.",
+            "With none, it edits an existing comment to say that no recommendation is open now, and it never creates an empty comment.",
+            "The default is `on` when the staff reviewer runs.",
+            "A reviewer that started and did not finish (quota, timeout, failed) goes to `reviewers_failed`. Neither is in `reviewers_ran`."
+          ],
+          "rationale": "Step 4 makes the comment edit depend only on a first or fresh run having no passed recommendations. It does not say what happens when the Codex reviewer was skipped or failed. Step 5's \"on when the staff reviewer runs\" hints at a guard but does not settle the case. As written, a timeout could replace still-valid recommendations with \"no recommendation is open now\".",
+          "score": 66,
+          "severity": "suggestion"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "diff-bugs"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 6015468228,
+      "review_url": "https://github.com/jerridan/pr-review/pull/70#pullrequestreview-6015468228",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 137421059446
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [
+      {
+        "file": "docs/design/staff-reviewer.md",
+        "start_line": 80,
+        "end_line": 80,
+        "category": "bug",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "For option C, keeping the API key out of the environment does not keep it from the model, because `codex login --with-api-key` stores the key in `$CODEX_HOME/auth.json`, which the design passes to the process and which the read-only sandbox lets commands read.",
+        "evidence": "an API key in the environment of Codex is readable by the commands that the model runs, so the key never goes there. A workflow step logs Codex in before the review (`codex login --with-api-key`, with the key from the secret on stdin), and the review process finds the login in the Codex home.",
+        "suggested_fix": "Say that the key ends up in auth.json, which the model can read, so moving it out of the environment does not lower the read risk. Rely on `redact`, which matches `sk-` keys, and list this under open question 1.",
+        "explanation": "Logging in writes the key to a file that the sandboxed commands can still read, so the reason given for this mitigation does not hold; only `redact` still protects the key.",
+        "needs_context": false,
+        "fingerprint": "5eee34f50e83e3f3",
+        "severity": "suggestion",
+        "score": 80,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "an API key in the environment of Codex is readable by the commands that the model runs, so the key never goes there. A workflow step logs Codex in before the review (`codex login --with-api-key`, with the key from the secret on stdin), and the review process finds the login in the Codex home.",
+            "A command that the model runs can read any file that the user of the process can read, and the login file of Codex (`$CODEX_HOME/auth.json`) too.",
+            "the process gets `PATH`, `HOME` and `CODEX_HOME` only"
+          ],
+          "rationale": "The design's own open question 1 says sandboxed commands can read `$CODEX_HOME/auth.json`. `codex login --with-api-key` writes the key to that file. So keeping the key out of the environment does not keep it from the model, and the reason the sandbox section gives for this step does not hold. Only `redact` still protects the key.",
+          "score": 80,
+          "severity": "suggestion"
+        },
+        "span_text": "- A small environment: the process gets `PATH`, `HOME` and `CODEX_HOME` only, not the environment of the run. So no token that the run holds in its environment reaches Codex. This holds also for option C of part b: an API key in the environment of Codex is readable by the commands that the model runs, so the key never goes there. A workflow step logs Codex in before the review (`codex login --with-api-key`, with the key from the secret on stdin), and the review process finds the login in the Codex home. The `openai-api-key` input of `openai/codex-action`, which gives the key through the environment, does not fit this design.",
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "file": "docs/design/staff-reviewer.md",
+        "start_line": 106,
+        "end_line": 107,
+        "category": "bug",
+        "severity_estimate": "suggestion",
+        "confidence": "low",
+        "claim": "The design does not say what the refactor comment does on a fresh run where the staff reviewer is skipped or fails. If the reviewer gives no passed recommendations in that case, the tool overwrites open recommendations with 'no recommendation is open now'.",
+        "evidence": "With none, it edits an existing comment to say that no recommendation is open now, and it never creates an empty comment.",
+        "suggested_fix": "Edit the comment only when the staff reviewer ran and finished. When it is skipped or fails, do not touch the comment.",
+        "explanation": "A Codex timeout, quota stop or missing login on a fresh run would then post that no recommendation is open, which is false and erases recommendations that are still valid.",
+        "needs_context": false,
+        "fingerprint": "0e754f75b1702c77",
+        "severity": "suggestion",
+        "score": 66,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "On a first or fresh run, the tool looks for the comment of its own login with that marker.",
+            "With none, it edits an existing comment to say that no recommendation is open now, and it never creates an empty comment.",
+            "The default is `on` when the staff reviewer runs.",
+            "A reviewer that started and did not finish (quota, timeout, failed) goes to `reviewers_failed`. Neither is in `reviewers_ran`."
+          ],
+          "rationale": "Step 4 makes the comment edit depend only on a first or fresh run having no passed recommendations. It does not say what happens when the Codex reviewer was skipped or failed. Step 5's \"on when the staff reviewer runs\" hints at a guard but does not settle the case. As written, a timeout could replace still-valid recommendations with \"no recommendation is open now\".",
+          "score": 66,
+          "severity": "suggestion"
+        },
+        "span_text": "4. The comment: one PR comment, outside the review, with the hidden marker `<!-- pr-review refactor -->` (a new `REFACTOR_MARKER` beside `CLEANUP_MARKER` in `src/github/markers.ts`). On a first or fresh run, the tool looks for the comment of its own login with that marker. With one or more passed recommendations, it edits that comment, or creates one when none exists. With none, it edits an existing comment to say that no recommendation is open now, and it never creates an empty comment. The comment is titled \"Refactor recommendations\" and gives, for each one, the ticket title and lines from the suggested fix, the claim, and a permalink to the lines. `PostedGitHub` gets `refactor_comment_id`. A failed comment goes to `errors`, and the exit code stays 0, as for the cleanup comment. 5. Off switch: `refactor_comment: off` in the repo config. The default is `on` when the staff reviewer runs. With `off`, the split still happens, and the recommendations are kept in the record only.",
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      }
+    ],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 4606,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10566,
+            "outputTokens": 28,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0010706000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 665,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 10079,
+            "webSearchRequests": 0,
+            "costUSD": 0.0470962,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.048166799999999996
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 5736,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11861,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011991,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 399,
+            "cacheReadInputTokens": 5136,
+            "cacheCreationInputTokens": 11370,
+            "webSearchRequests": 0,
+            "costUSD": 0.0999752,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 131,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1011743
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "medium",
+        "duration_ms": 32670,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11861,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011991,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 12,
+            "outputTokens": 2480,
+            "cacheReadInputTokens": 102602,
+            "cacheCreationInputTokens": 17900,
+            "webSearchRequests": 0,
+            "costUSD": 0.21336839999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 933,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.2145675
+      },
+      {
+        "role": "verifier",
+        "verification": 1,
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 3849,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 14972,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0015082,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 529,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 14481,
+            "webSearchRequests": 0,
+            "costUSD": 0.06365470000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 177,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.06516290000000001
+      },
+      {
+        "role": "verifier",
+        "verification": 0,
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 4909,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 15076,
+            "outputTokens": 28,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0015216000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 644,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 14585,
+            "webSearchRequests": 0,
+            "costUSD": 0.0652207,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0667423
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 1,
+        "model": "claude-opus-5-5",
+        "effort": "high",
+        "duration_ms": 8135,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 14988,
+            "outputTokens": 27,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0015123,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 772,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 14493,
+            "webSearchRequests": 0,
+            "costUSD": 0.1322654,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 320,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1337777
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 0,
+        "model": "claude-opus-5-5",
+        "effort": "high",
+        "duration_ms": 9616,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 15072,
+            "outputTokens": 27,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0015207000000000003,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 864,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 14577,
+            "webSearchRequests": 0,
+            "costUSD": 0.1347774,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 391,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1362981
+      }
+    ],
+    "total_cost_usd": 0.7658896000000001,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 41,
+      "gather": 22,
+      "scope": 3,
+      "triage": 5719,
+      "find_verify": 49305,
+      "merge": 7
+    },
+    "errors": []
+  }
+}
