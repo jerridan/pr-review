@@ -1,6 +1,12 @@
 # The staff-engineer reviewer and refactor recommendations (D16 parts a and c)
 
-This design follows D15 (`docs/research/d15-staff-reviewer.md`) and the decisions of the user: add the staff-engineer reviewer to the tool; it never fails a review; its time limit is 10 minutes, a guard against a hung call; refactor recommendations post as a separate PR comment. Part b, how the reviewer runs in CI, is `docs/research/d16-codex-in-ci.md`. No code exists for this design yet.
+> **Status: studied, not built.** Studied on 2026-11-22 and 2026-11-23. On 2026-11-23 the user decided not to add the staff engineer reviewer to pr-review now ("let's start with option A regarding the new reviewer. I'm not sure I'll end up wanting it."). The design review moves into the crew plugin instead: there the staff engineer prompt reviews each implementer plan before code is written, on the user's machine with the local Codex login, so the problem of a Codex login in CI does not arise. The refactor comment (part c) is deferred with it: the crew plan review puts refactor recommendations in its hand-over to the principal.
+>
+> What would reopen it: the user wants a second look at finished PRs, also for PRs that do not come from crew. D15 found 7 blocking known problems that the six specialists missed, and 32 of its 84 findings were edge cases, which a review of a plan cannot see.
+>
+> If it is built later, these decisions of the user stand: the reviewer never fails a review; its time limit is 10 minutes, a guard against a hung call; refactor recommendations take their own path, outside the review.
+
+This design follows D15 (`docs/research/d15-staff-reviewer.md`). It is a design for the case that the reviewer is built later. It keeps the decisions of the user that stand for that case: the reviewer never fails a review; its time limit is 10 minutes, a guard against a hung call; refactor recommendations post as a separate PR comment. Part b, how the reviewer runs in CI, is `docs/research/d16-codex-in-ci.md`. No code exists for this design yet.
 
 ## Open questions for the user
 

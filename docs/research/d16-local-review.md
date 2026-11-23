@@ -1,8 +1,14 @@
 # D16: what it takes to run the review locally instead of in CI
 
+> **Status: studied, not built.** Studied on 2026-11-22 and 2026-11-23. On 2026-11-23 the user decided not to add the staff engineer reviewer to pr-review now ("let's start with option A regarding the new reviewer. I'm not sure I'll end up wanting it."). The design review moves into the crew plugin instead: there the staff engineer prompt reviews each implementer plan before code is written, on the user's machine with the local Codex login, so the problem of a Codex login in CI does not arise. The refactor comment (part c) is deferred with it: the crew plan review puts refactor recommendations in its hand-over to the principal.
+>
+> What would reopen it: the user wants a second look at finished PRs, also for PRs that do not come from crew. D15 found 7 blocking known problems that the six specialists missed, and 32 of its 84 findings were edge cases, which a review of a plan cannot see.
+>
+> If it is built later, these decisions of the user stand: the reviewer never fails a review; its time limit is 10 minutes, a guard against a hung call; refactor recommendations take their own path, outside the review.
+
 ## Open questions for the user
 
-1. Which design do you want to study further: all local, mixed (the six Claude reviewers stay in CI, and the staff engineer reviewer runs on your machine), or a self-hosted runner on your machine? The recommendation at the end is the mixed design, started by a hook when an agent session opens a PR.
+1. (Answered on 2026-11-23: none for now; see the status block.) Which design do you want to study further: all local, mixed (the six Claude reviewers stay in CI, and the staff engineer reviewer runs on your machine), or a self-hosted runner on your machine? The recommendation at the end is the mixed design, started by a hook when an agent session opens a PR.
 2. The staff engineer review once per PR: the design of D16 runs it on a first run or a fresh run only. Is one staff engineer review when the PR opens, and another only when you ask for it, enough?
 3. PRs from another machine or the web: must they get the staff engineer review without a request? A hook on your machine does not see them; a watcher does, at a larger cost (section 3).
 4. The account that posts: a local review posts under your own GitHub account, not as `github-actions[bot]`, and it posts no check run (section 2). Is that acceptable?

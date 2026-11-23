@@ -398,11 +398,21 @@ What it does not decide: no decision rule changes a default. The note ends with 
 
 Done 2026-11-22: beside the specialists, the staff reviewer raises recall from 0.448 / 0.544 to 0.544 / 0.608 and precision from 0.412 / 0.430 to 0.469 / 0.478 (two repeats of the specialists, first verifier only). It finds 8 known items that no specialist found, 7 of them blocking. It is the slowest reviewer in 27 of 28 cases. 1 of its 4 refactor recommendations posts, as a nit. The note is `docs/research/d15-staff-reviewer.md`.
 
-The user's decisions: add the staff reviewer to the tool; run it in CI on the user's Codex subscription; give refactor recommendations their own path, as a separate PR comment. D16 holds the work.
+The user's decisions on 2026-11-22: add the staff reviewer to the tool; run it in CI on the user's Codex subscription; give refactor recommendations their own path, as a separate PR comment. On 2026-11-23 the user deferred the first two: see D16.
 
 ## D16: The staff engineer reviewer in the shipped tool
 
-Goal: ship the staff-engineer reviewer of D15 in the tool, with its refactor recommendations on their own path. Each part starts with a design section or a research note for the user to read before any code.
+Deferred on 2026-11-23 by the principal's decision; not done. The staff engineer reviewer is not added to pr-review now. The design review moves into the crew plugin, where the staff engineer prompt reviews each implementer plan before code is written, on the user's machine with the local Codex login. The refactor comment (part c) is deferred with it: the crew plan review puts refactor recommendations in its hand-over to the principal. The options stay on record:
+
+- Not in pr-review (chosen for now).
+- An API key for this reviewer in CI: about $0.11 to $0.19 a review, about $6 to $11 a month at 50 to 60 PRs.
+- The mixed local design: the six Claude reviewers stay in CI, and the staff engineer reviewer runs on the user's machine, started by a hook when an agent session opens a PR.
+
+The study is in `docs/research/d16-codex-in-ci.md` (Codex in CI; its options are lettered A to D in another order), `docs/design/staff-reviewer.md` (the design of parts a and c) and `docs/research/d16-local-review.md` (a local review). What would reopen it: a second look at finished PRs, also for PRs that do not come from crew. D15 found 7 blocking known problems that the six specialists missed, and 32 of its 84 findings were edge cases, which a review of a plan cannot see. If it is built, the user's decisions stand: it never fails a review; a 10-minute guard limit; refactor recommendations on their own path.
+
+The text below is the ticket as it was written before the deferral.
+
+Goal (if it is built): ship the staff-engineer reviewer of D15 in the tool, with its refactor recommendations on their own path. Each part starts with a design section or a research note for the user to read before any code.
 
 ### Part a: a reviewer through the Codex CLI in the pipeline
 
