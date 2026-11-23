@@ -398,6 +398,44 @@ What it does not decide: no decision rule changes a default. The note ends with 
 
 Done 2026-11-22: beside the specialists, the staff reviewer raises recall from 0.448 / 0.544 to 0.544 / 0.608 and precision from 0.412 / 0.430 to 0.469 / 0.478 (two repeats of the specialists, first verifier only). It finds 8 known items that no specialist found, 7 of them blocking. It is the slowest reviewer in 27 of 28 cases. 1 of its 4 refactor recommendations posts, as a nit. The note is `docs/research/d15-staff-reviewer.md`.
 
+The user's decisions: add the staff reviewer to the tool; run it in CI on the user's Codex subscription; give refactor recommendations their own path, as a separate PR comment. D16 holds the work.
+
+## D16: The staff engineer reviewer in the shipped tool
+
+Goal: ship the staff-engineer reviewer of D15 in the tool, with its refactor recommendations on their own path. Each part starts with a design section or a research note for the user to read before any code.
+
+### Part a: a reviewer through the Codex CLI in the pipeline
+
+Open questions, for a design section first:
+- How such a reviewer is declared and selected. It is not an Agent SDK query, so the reviewer loader and the selection need a new kind of reviewer.
+- What the run does when the Codex CLI is absent, not logged in, or out of quota. The requirement: the review goes on without it and says so in the summary. It never fails the review.
+- Its findings pass the same verifier and the same merge as the other findings.
+- A time limit: it is the slowest reviewer (57 s median, 102 s maximum in D15).
+- The sandbox of the Codex process on PR code that is not trusted: read only, no network, no write outside its work folder. E6 showed that text in a PR can steer a reviewer (issue 63).
+- The local CLI and the plugin, not only CI.
+
+### Part b: Codex in CI on the user's ChatGPT subscription
+
+Research first, not code. Questions:
+- Does the Codex CLI support a login for CI that counts against a ChatGPT subscription, and not an API key?
+- What do the official documents of the vendor say about that use? Give links.
+- How would the secret reach the job? For example, a GitHub secret that the workflow gives to the process as an environment value or a file, as the Claude token reaches it today.
+- What are the limits: the expiry and refresh of the login, one login used from two places, and the terms of the plan?
+
+Rule 4 of CLAUDE.md holds: the tool never reads, writes, logs or commits a credential, and no credential file is added. The user does every login step.
+
+### Part c: refactor recommendations on their own path
+
+A refactor recommendation posts as a separate PR comment, outside the review and outside the scope rule of the verifier. D15 showed that the verifier rejects or holds back 3 of 4 of them, because they are about existing code by design. Open questions, for the design section:
+- What checks a recommendation before it posts: it must still be true of the code. That is a truth check with no "introduced by the change" rule.
+- One comment for a PR, updated on each push, not a new comment each time.
+- A limit of two recommendations.
+- How a repo turns it off.
+- What the record stores.
+- How the eval measures it, since no known-item list holds such items.
+
+Order: part b and the design of parts a and c come first, as documents in one PR (`docs/research/` for b, `docs/design/` for a and c). Code waits for the user to read them.
+
 ## Smaller follow-ups found during D4c
 
 - E1 did not measure whether Haiku 5.5 changes the rate of refusals, or of work reported as done with no check.

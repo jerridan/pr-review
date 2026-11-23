@@ -115,8 +115,14 @@ Candidates and posted findings by tag: edge-case 32 -> 18, design 28 -> 14, secu
 - The known-item lists were not built for design-level findings.
 - The prompt changed once after a first probe, because the user gave its content. The first probe is not in the figures.
 
-## What the user decides
+## What the user had to decide
 
 - Whether to add the staff reviewer. It adds 8 known items (7 blocking) and raises recall and precision, at about 1.5 points of the Codex 5-hour window and $0.17 to $0.19 of plan verifier cost for each candidate, and about 26 s of reviewer-stage time at the median.
 - How it would run in CI. A reviewer through the Codex CLI in CI needs a Codex login there, and rule 4 of CLAUDE.md keeps credentials out of the code. This is an open design question.
 - Whether the pipeline should carry refactor recommendations, for example as a separate list in the summary that the verifier's scope rule does not filter.
+
+## The user's decisions (2026-11-22)
+
+- Add the staff reviewer to the tool. D16 holds the work.
+- Set up the Codex reviewer in CI so that it counts against the user's Codex subscription. How to do that is research first (D16, part b).
+- Give refactor recommendations a separate path outside the review: they post as a separate PR comment (D16, part c).
