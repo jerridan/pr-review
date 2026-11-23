@@ -1,0 +1,649 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 70,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "D16 documents: Codex in CI, and the staff reviewer design",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/70"
+    },
+    "run_kind": "later",
+    "prior": {
+      "head": "52145770ee2e53eb5fbcd3cb45ab72b9428b8c07",
+      "source": "record",
+      "record": "/home/runner/work/_temp/pr-review-records/pr-70/2026-11-23T015851.050Z-5214577.json",
+      "open": [],
+      "dismissed": [
+        "2621286cf8034a55",
+        "2a71aa8b221198ec",
+        "91d507983e43f258",
+        "94877b440a0aa95a"
+      ],
+      "fetch_failed": false
+    },
+    "base": "047fb726fe4f7cb50984e2d973048fc90e677cf7",
+    "head": "27511870c1cdfb1c4f1c1ac7b63081d494bb15cd",
+    "started_at": "2026-11-23T05:50:38.642Z",
+    "tool_version": "0.21.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "D16 documents: Codex in CI, and the staff reviewer design\n\nD16 as documents, for the user to read before any code. Docs only: no code change, no version change.\n\n## Documents\n\n- `docs/research/d16-codex-in-ci.md` (part b): can the Codex CLI run in CI on a ChatGPT subscription? The vendor documents it but says \"The right way to authenticate automation is with an API key\" and \"Do not use this workflow for public or open-source repositories\", and \"Do not share the same file across concurrent jobs or multiple machines\". The note gives four options with what the tool and the user must do: (A) a self-hosted private runner, (B) a GitHub-hosted job with the login file in a secret (fragile: the file refreshes after about 8 days), (C) an API key, about $0.11 to $0.20 a review at the list price of Sol 6.2, (D) the reviewer runs only on a machine with a logged-in Codex CLI. pr-review itself is public, so it cannot use A or B.\n- `docs/design/staff-reviewer.md` (parts a and c): a reviewer of `kind: codex` in a prompt file; selected like the others, opt-in by config; it never fails a review (skip or failure with a reason in the summary); a 10-minute guard limit that kills the process group; first and fresh runs only; a sandbox of a tree with no `.git`, a small environment, read-only, no network setting, and `redact` on its output; the record fields. Refactor recommendations leave the findings list before the verifier, take a truth check with a new prompt, at most two, one PR comment edited on each first or fresh run, an off switch, a record stage, and hand-free eval counts.\n\nEach document states the open questions for the user at the top. The most important one: the read-only sandbox of Codex stops writes but not reads, so a steered review could put a secret into a finding. The design lowers that risk and cannot remove it.\n\nOne critic round on the design: its 12 findings are applied (the read scope of the sandbox, later runs, a new truth-check prompt, the loader and schema changes, the config default of `enabled`, the record fields, the process-group kill, the strict tag parse, the limit before the truth check, the comment mechanics, the eval checks).\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZdfE1rqbczPpmGQQ5S\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": true,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": "TICKETS.md",
+        "hunks": 1
+      },
+      {
+        "path": "docs/design/staff-reviewer.md",
+        "hunks": 1
+      },
+      {
+        "path": "docs/research/d15-staff-reviewer.md",
+        "hunks": 1
+      },
+      {
+        "path": "docs/research/d16-codex-in-ci.md",
+        "hunks": 1
+      },
+      {
+        "path": "docs/research/d16-local-review.md",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "skip",
+      "reason": "The change touches only markdown docs: a ticket deferral note, status banners, and new research and design notes, and no code reads them.",
+      "confidence": "high",
+      "categories": [
+        "docs"
+      ],
+      "hotspots": [
+        "TICKETS.md"
+      ],
+      "file_notes": [
+        {
+          "file": "TICKETS.md",
+          "note": "D16 marked deferred; options recorded"
+        },
+        {
+          "file": "docs/design/staff-reviewer.md",
+          "note": "new design doc, studied not built"
+        },
+        {
+          "file": "docs/research/d15-staff-reviewer.md",
+          "note": "annotated decisions with deferral notes"
+        },
+        {
+          "file": "docs/research/d16-codex-in-ci.md",
+          "note": "new research note"
+        },
+        {
+          "file": "docs/research/d16-local-review.md",
+          "note": "new research note"
+        }
+      ],
+      "summary": "Records the 2026-11-23 decision to defer the staff-engineer reviewer in pr-review and moves the design review to the crew plugin. Adds three new docs: a design for the Codex reviewer and refactor comment, a Codex-in-CI research note, and a local-review research note. Updates TICKETS.md and the D15 note to point to the deferral. No code or config changes."
+    },
+    "tier": "fast",
+    "tier_reason": "Triage: The change touches only markdown docs: a ticket deferral note, status banners, and new research and design notes, and no code reads them. The tier stays fast from the prior record.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= fast; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= fast; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "medium",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    },
+    "mode": "full"
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "docs/research/d16-local-review.md",
+            "start_line": 138,
+            "end_line": 138,
+            "category": "docs",
+            "severity_estimate": "nit",
+            "confidence": "low",
+            "claim": "The heading uses the first person, unlike the impersonal headings of the other research notes.",
+            "evidence": "## What I could not verify",
+            "suggested_fix": "Rename the heading to \"Not verified\".",
+            "explanation": "CLAUDE.md rule 5 asks for ASD-STE100 prose, and the other research notes in this change use impersonal headings such as \"Not documented\" and \"Limits\".",
+            "needs_context": false
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7718,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 21158,
+              "outputTokens": 285,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0022583,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 261,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 671,
+              "cacheReadInputTokens": 28862,
+              "cacheCreationInputTokens": 23108,
+              "webSearchRequests": 0,
+              "costUSD": 0.2040724,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 183,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.20633069999999998
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 7354,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 21148,
+              "outputTokens": 24,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0021268,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 657,
+              "cacheReadInputTokens": 3059,
+              "cacheCreationInputTokens": 22961,
+              "webSearchRequests": 0,
+              "costUSD": 0.19744779999999998,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 317,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.1995746
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "docs/research/d16-local-review.md",
+          "start_line": 138,
+          "end_line": 138,
+          "category": "docs",
+          "severity_estimate": "nit",
+          "confidence": "low",
+          "claim": "The heading uses the first person, unlike the impersonal headings of the other research notes.",
+          "evidence": "## What I could not verify",
+          "suggested_fix": "Rename the heading to \"Not verified\".",
+          "explanation": "CLAUDE.md rule 5 asks for ASD-STE100 prose, and the other research notes in this change use impersonal headings such as \"Not documented\" and \"Limits\".",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "## What I could not verify"
+          ],
+          "rationale": "The heading is in first person, while other research notes use impersonal headings such as \"Limits\" and \"Not documented\". The difference is real but minor, and it changes no meaning for the reader.",
+          "score": 80,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "## What I could not verify",
+            "## Not documented",
+            "## Limits",
+            "5. **Write ASD-STE100 prose.** Use it in every markdown file and every code comment."
+          ],
+          "rationale": "The claim holds. The new note uses the only first-person heading among the research notes, and the others use impersonal headings such as \"Limits\" and \"Not documented\". This is a small inconsistency of style with no effect on meaning, and ASD-STE100 does not clearly forbid the first person. The fix is cheap, so this is a nit.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "## What I could not verify",
+            "## Not documented",
+            "## Limits",
+            "5. **Write ASD-STE100 prose.** Use it in every markdown file and every code comment."
+          ],
+          "rationale": "The claim holds. The new note uses the only first-person heading among the research notes, and the others use impersonal headings such as \"Limits\" and \"Not documented\". This is a small inconsistency of style with no effect on meaning, and ASD-STE100 does not clearly forbid the first person. The fix is cheap, so this is a nit.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "conventions",
+            "pass": 1
+          }
+        ]
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "diff-bugs"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [],
+    "github": {
+      "review_id": 6017103471,
+      "review_url": "https://github.com/jerridan/pr-review/pull/70#pullrequestreview-6017103471",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [],
+      "in_body": [],
+      "check_run": {
+        "id": 137512411066
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [
+      {
+        "file": "docs/research/d16-local-review.md",
+        "start_line": 138,
+        "end_line": 138,
+        "category": "docs",
+        "severity_estimate": "nit",
+        "confidence": "low",
+        "claim": "The heading uses the first person, unlike the impersonal headings of the other research notes.",
+        "evidence": "## What I could not verify",
+        "suggested_fix": "Rename the heading to \"Not verified\".",
+        "explanation": "CLAUDE.md rule 5 asks for ASD-STE100 prose, and the other research notes in this change use impersonal headings such as \"Not documented\" and \"Limits\".",
+        "needs_context": false,
+        "fingerprint": "29e77714386819c5",
+        "severity": "nit",
+        "score": 92,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "## What I could not verify",
+            "## Not documented",
+            "## Limits",
+            "5. **Write ASD-STE100 prose.** Use it in every markdown file and every code comment."
+          ],
+          "rationale": "The claim holds. The new note uses the only first-person heading among the research notes, and the others use impersonal headings such as \"Limits\" and \"Not documented\". This is a small inconsistency of style with no effect on meaning, and ASD-STE100 does not clearly forbid the first person. The fix is cheap, so this is a nit.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "span_text": "## What I could not verify",
+        "sources": [
+          {
+            "reviewer": "conventions",
+            "pass": 1
+          }
+        ]
+      }
+    ],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 3465,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 20011,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0020121,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 527,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 19524,
+            "webSearchRequests": 0,
+            "costUSD": 0.08349619999999999,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0855083
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "medium",
+        "duration_ms": 7354,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 21148,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0021268,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 657,
+            "cacheReadInputTokens": 3059,
+            "cacheCreationInputTokens": 22961,
+            "webSearchRequests": 0,
+            "costUSD": 0.19744779999999998,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 317,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1995746
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 7718,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 21158,
+            "outputTokens": 285,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0022583,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 261,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 671,
+            "cacheReadInputTokens": 28862,
+            "cacheCreationInputTokens": 23108,
+            "webSearchRequests": 0,
+            "costUSD": 0.2040724,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 183,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.20633069999999998
+      },
+      {
+        "role": "verifier",
+        "verification": 0,
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 3115,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16606,
+            "outputTokens": 16,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016686,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 404,
+            "cacheReadInputTokens": 24849,
+            "cacheCreationInputTokens": 17901,
+            "webSearchRequests": 0,
+            "costUSD": 0.07813690000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.07980550000000002
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 0,
+        "model": "claude-opus-5-5",
+        "effort": "high",
+        "duration_ms": 7305,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16610,
+            "outputTokens": 16,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0016690000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 793,
+            "cacheReadInputTokens": 24849,
+            "cacheCreationInputTokens": 16857,
+            "webSearchRequests": 0,
+            "costUSD": 0.1557018,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 211,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1573708
+      }
+    ],
+    "total_cost_usd": 0.7285899,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 43,
+      "gather": 62,
+      "scope": 3,
+      "triage": 4428,
+      "find_verify": 20482,
+      "merge": 1
+    },
+    "errors": []
+  }
+}
