@@ -1,0 +1,1196 @@
+{
+  "identity": {
+    "repo": "/home/runner/work/pr-review/pr-review",
+    "pr": 70,
+    "github": {
+      "slug": "jerridan/pr-review",
+      "title": "D16 documents: Codex in CI, and the staff reviewer design",
+      "draft": false,
+      "labels": [],
+      "author": "jerridan",
+      "author_type": "User",
+      "author_write_access": true,
+      "fork": false,
+      "head_repo": "jerridan/pr-review",
+      "url": "https://github.com/jerridan/pr-review/pull/70"
+    },
+    "run_kind": "first",
+    "prior": null,
+    "base": "047fb726fe4f7cb50984e2d973048fc90e677cf7",
+    "head": "d689dbb79e809193c08b2240f60160d70143e1bd",
+    "started_at": "2026-11-23T00:47:30.989Z",
+    "tool_version": "0.21.0",
+    "config_hash": null,
+    "config": {
+      "files": [],
+      "values": {
+        "thresholds": {
+          "default": 80,
+          "middle_band": [
+            60,
+            85
+          ]
+        },
+        "reviewers": {},
+        "suppressions": [],
+        "sensitive_globs": [],
+        "generated_globs": [],
+        "skip": {
+          "draft": false,
+          "title_keywords": [],
+          "labels": [],
+          "bot_authors": []
+        },
+        "caps": {
+          "non_blocking_base": 3,
+          "non_blocking_per_hunks": 4,
+          "non_blocking_max": 20
+        },
+        "models": {},
+        "pre_existing": "off",
+        "concurrency": 5,
+        "token_ceiling": null
+      },
+      "custom_reviewers": []
+    },
+    "description": "D16 documents: Codex in CI, and the staff reviewer design\n\nD16 as documents, for the user to read before any code. Docs only: no code change, no version change.\n\n## Documents\n\n- `docs/research/d16-codex-in-ci.md` (part b): can the Codex CLI run in CI on a ChatGPT subscription? The vendor documents it but says \"The right way to authenticate automation is with an API key\" and \"Do not use this workflow for public or open-source repositories\", and \"Do not share the same file across concurrent jobs or multiple machines\". The note gives four options with what the tool and the user must do: (A) a self-hosted private runner, (B) a GitHub-hosted job with the login file in a secret (fragile: the file refreshes after about 8 days), (C) an API key, about $0.11 to $0.20 a review at the list price of Sol 6.2, (D) the reviewer runs only on a machine with a logged-in Codex CLI. pr-review itself is public, so it cannot use A or B.\n- `docs/design/staff-reviewer.md` (parts a and c): a reviewer of `kind: codex` in a prompt file; selected like the others, opt-in by config; it never fails a review (skip or failure with a reason in the summary); a 10-minute guard limit that kills the process group; first and fresh runs only; a sandbox of a tree with no `.git`, a small environment, read-only, no network setting, and `redact` on its output; the record fields. Refactor recommendations leave the findings list before the verifier, take a truth check with a new prompt, at most two, one PR comment edited on each first or fresh run, an off switch, a record stage, and hand-free eval counts.\n\nEach document states the open questions for the user at the top. The most important one: the read-only sandbox of Codex stops writes but not reads, so a steered review could put a secret into a finding. The design lowers that risk and cannot remove it.\n\nOne critic round on the design: its 12 findings are applied (the read scope of the sandbox, later runs, a new truth-check prompt, the loader and schema changes, the config default of `enabled`, the record fields, the process-group kill, the strict tag parse, the limit before the truth check, the comment mechanics, the eval checks).\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01XrBTZdfE1rqbczPpmGQQ5S\n",
+    "description_meta": {
+      "source": "pr",
+      "sanitized": false,
+      "truncated": false
+    },
+    "history": {
+      "built": false,
+      "truncated": false
+    },
+    "injected": [
+      {
+        "path": "CLAUDE.md",
+        "truncated": false
+      }
+    ],
+    "changed_files": [
+      {
+        "path": "docs/design/staff-reviewer.md",
+        "hunks": 1
+      },
+      {
+        "path": "docs/research/d16-codex-in-ci.md",
+        "hunks": 1
+      }
+    ],
+    "excluded_files": [],
+    "sensitive_files": [],
+    "triage": {
+      "tier": "fast",
+      "reason": "The change adds only two markdown design and research documents, with no code, config or data that anything reads.",
+      "confidence": "medium",
+      "categories": [
+        "docs",
+        "security"
+      ],
+      "hotspots": [
+        "docs/design/staff-reviewer.md: 'The sandbox' section (read-only does not limit reads, env scrubbing, redact extension)",
+        "docs/design/staff-reviewer.md: 'It never fails a review' verdict exception vs section 3.7",
+        "docs/research/d16-codex-in-ci.md: quotes and claims about vendor docs and cost figures"
+      ],
+      "file_notes": [
+        {
+          "file": "docs/design/staff-reviewer.md",
+          "note": "New design doc for a Codex-based staff-engineer reviewer and a separate refactor-recommendation path. No code yet. It states open questions, sandbox and secret-handling decisions, and the record schema changes that a later plan will implement."
+        },
+        {
+          "file": "docs/research/d16-codex-in-ci.md",
+          "note": "New research note on running the Codex CLI in CI on a ChatGPT login. It lists options A to D with costs and risks. Its claims come from vendor pages and are not verified here."
+        }
+      ],
+      "summary": "Adds a design doc for a built-in Codex-backed staff-engineer reviewer that never fails a review. It also covers a separate verification path and PR comment for refactor recommendations. Adds a research doc that compares ways to run the Codex CLI in CI (self-hosted runner, secret-carried login file, API key, local only). Documentation only, with no code changes."
+    },
+    "tier": "fast",
+    "tier_reason": "Triage: The change adds only two markdown design and research documents, with no code, config or data that anything reads.",
+    "selected_reviewers": [
+      {
+        "name": "conventions",
+        "trigger": "min_tier fast <= fast; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "tools_ignored": []
+      },
+      {
+        "name": "diff-bugs",
+        "trigger": "min_tier fast <= fast; paths: any; categories: any",
+        "model": "claude-opus-5-5",
+        "effort": "medium",
+        "tools_ignored": []
+      }
+    ],
+    "models": {
+      "triage": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "reviewer": {
+        "model": "claude-opus-5-5",
+        "effort": "low"
+      },
+      "verifier": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "verifier-escalation": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "merge": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium"
+      },
+      "smoke": {
+        "model": "claude-sonnet-5-5",
+        "effort": "low"
+      }
+    },
+    "mode": "full"
+  },
+  "stages": {
+    "reviewers": [
+      {
+        "name": "conventions",
+        "pass": 1,
+        "status": "ok",
+        "findings": [],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 4363,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11492,
+              "outputTokens": 22,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011602000000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 2,
+              "outputTokens": 268,
+              "cacheReadInputTokens": 5136,
+              "cacheCreationInputTokens": 11000,
+              "webSearchRequests": 0,
+              "costUSD": 0.0943952,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 93,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.0955554
+        }
+      },
+      {
+        "name": "diff-bugs",
+        "pass": 1,
+        "status": "ok",
+        "findings": [
+          {
+            "file": "docs/design/staff-reviewer.md",
+            "start_line": 36,
+            "end_line": 36,
+            "category": "bug",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "The design says the repo config's `reviewers.staff-reviewer.model` can hold a Codex model id. But `ReviewerEntrySchema.model` runs `resolveModel` when the config is parsed, so `gpt-6.2-sol` would be rejected, and the design's list of code changes leaves this out.",
+            "evidence": "- `reviewers.staff-reviewer.model` and `.effort` in the repo config change the model and the effort, with the same rules.",
+            "suggested_fix": "Add to the planned code changes: check the reviewer entry's model after the reviewer kind is known, or skip resolveModel for entries of Codex reviewers.",
+            "explanation": "`modelName()` in src/config/repo-config.ts runs resolveModel (Claude aliases only) before the config knows which kind of reviewer an entry is for, so any Codex model override is a config error.",
+            "needs_context": false
+          },
+          {
+            "file": "docs/design/staff-reviewer.md",
+            "start_line": 59,
+            "end_line": 59,
+            "category": "bug",
+            "severity_estimate": "suggestion",
+            "confidence": "medium",
+            "claim": "The new key `reviewers.staff-reviewer.timeout_minutes` will fail the strict `ReviewerEntrySchema`, and the design does not plan a change to that per-reviewer schema.",
+            "evidence": "5. The time limit: 10 minutes by default; `reviewers.staff-reviewer.timeout_minutes` in the repo config, an integer of 1 or more, in the config table of section 4.",
+            "suggested_fix": "List the new `timeout_minutes` key of ReviewerEntrySchema (Codex reviewers only) in 'What changes in the code'.",
+            "explanation": "ReviewerEntrySchema is a z.strictObject with no timeout_minutes key, so a repo that sets it gets a config error unless the schema changes.",
+            "needs_context": false
+          },
+          {
+            "file": "docs/research/d16-codex-in-ci.md",
+            "start_line": 105,
+            "end_line": 105,
+            "category": "other",
+            "severity_estimate": "nit",
+            "confidence": "medium",
+            "claim": "The cost figure with about 10% output is off: 57,000 to 67,000 tokens with 10% output at $2/$10 per 1M comes to about $0.16 to $0.19, not $0.17 to $0.20.",
+            "evidence": "With about 10% output, a review costs about $0.17 to $0.20.",
+            "suggested_fix": "State about $0.16 to $0.19, or give the output share that yields $0.17 to $0.20.",
+            "explanation": "57k: 51.3k×$2/1M + 5.7k×$10/1M ≈ $0.160; 67k: 60.3k×$2/1M + 6.7k×$10/1M ≈ $0.188.",
+            "needs_context": false
+          },
+          {
+            "file": "docs/research/d16-codex-in-ci.md",
+            "start_line": 110,
+            "end_line": 110,
+            "category": "other",
+            "severity_estimate": "nit",
+            "confidence": "medium",
+            "claim": "The skip reasons in option D do not match the reasons that the design gives for the same skip path.",
+            "evidence": "- The tool must: the same skip path as in A, with the reason \"no Codex CLI\" or \"not logged in\".",
+            "suggested_fix": "Use `codex not installed` and `codex not logged in` here.",
+            "explanation": "docs/design/staff-reviewer.md uses `codex not installed` and `codex not logged in`, and those become values of SkippedReviewerSchema.reason, so the two documents disagree.",
+            "needs_context": false
+          },
+          {
+            "file": "docs/design/staff-reviewer.md",
+            "start_line": 95,
+            "end_line": 95,
+            "category": "bug",
+            "severity_estimate": "suggestion",
+            "confidence": "low",
+            "claim": "With the small environment (PATH, HOME, CODEX_HOME only), option C breaks when the API key reaches Codex only through an environment variable, for example the `openai-api-key` input of `openai/codex-action`. `codex login status` might then pass while exec has no key, or the reviewer skips for no clear reason.",
+            "evidence": "- A small environment: the process gets `PATH`, `HOME` and `CODEX_HOME` only, not the environment of the run.",
+            "suggested_fix": "State that option C needs a stored login (`codex login --with-api-key`) in CODEX_HOME, or pass OPENAI_API_KEY through on purpose.",
+            "explanation": "The research doc offers `openai/codex-action` as a way to do option C, but the design removes every environment value, including one that may carry the key.",
+            "needs_context": true
+          }
+        ],
+        "dropped": [],
+        "meta": {
+          "model": "claude-opus-5-5",
+          "durationMs": 45801,
+          "stopReason": "tool_use",
+          "subtype": "success",
+          "usage": {
+            "claude-haiku-5-5": {
+              "inputTokens": 11486,
+              "outputTokens": 26,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0011616,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 0,
+              "canonicalModel": "claude-haiku-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            },
+            "claude-opus-5-5": {
+              "inputTokens": 12,
+              "outputTokens": 4214,
+              "cacheReadInputTokens": 124118,
+              "cacheCreationInputTokens": 25758,
+              "webSearchRequests": 0,
+              "costUSD": 0.3152156,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 1593,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "costUsd": 0.3163772
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "finding": {
+          "file": "docs/design/staff-reviewer.md",
+          "start_line": 36,
+          "end_line": 36,
+          "category": "bug",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "The design says the repo config's `reviewers.staff-reviewer.model` can hold a Codex model id. But `ReviewerEntrySchema.model` runs `resolveModel` when the config is parsed, so `gpt-6.2-sol` would be rejected, and the design's list of code changes leaves this out.",
+          "evidence": "- `reviewers.staff-reviewer.model` and `.effort` in the repo config change the model and the effort, with the same rules.",
+          "suggested_fix": "Add to the planned code changes: check the reviewer entry's model after the reviewer kind is known, or skip resolveModel for entries of Codex reviewers.",
+          "explanation": "`modelName()` in src/config/repo-config.ts runs resolveModel (Claude aliases only) before the config knows which kind of reviewer an entry is for, so any Codex model override is a config error.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "const modelName = () =>\n  z.string().superRefine((value, ctx) => {\n    try {\n      resolveModel(value);",
+            "model: modelName().optional(),\n  effort: effort().optional(),",
+            "`reviewers.staff-reviewer.model` and `.effort` in the repo config change the model and the effort, with the same rules."
+          ],
+          "rationale": "ReviewerEntrySchema uses modelName() which calls resolveModel at parse time (and effort() uses the Claude set), so a Codex model override would be rejected. The design lists only parseReviewer and effectiveModel changes and omits the config schema.",
+          "score": 85,
+          "severity": "suggestion"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- `reviewers.staff-reviewer.model` and `.effort` in the repo config change the model and the effort, with the same rules.",
+            "const ReviewerEntrySchema = z.strictObject({",
+            "  model: modelName().optional(),",
+            "      resolveModel(value);",
+            "`Unknown model \"${aliasOrId}\". Use opus, sonnet, haiku or an exact ID that starts with \"claude-\".`,"
+          ],
+          "rationale": "`ReviewerEntrySchema.model` uses `modelName()`, which runs `resolveModel` when the config is parsed. `resolveModel` throws for any id that is not a Claude alias or a `claude-` id, so a repo config with `gpt-6.2-sol` fails before the reviewer kind is known. The design's list of code changes names only `parseReviewer` and `effectiveModel`, not this config-schema check.",
+          "score": 85,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- `reviewers.staff-reviewer.model` and `.effort` in the repo config change the model and the effort, with the same rules.",
+            "const ReviewerEntrySchema = z.strictObject({",
+            "  model: modelName().optional(),",
+            "      resolveModel(value);",
+            "`Unknown model \"${aliasOrId}\". Use opus, sonnet, haiku or an exact ID that starts with \"claude-\".`,"
+          ],
+          "rationale": "`ReviewerEntrySchema.model` uses `modelName()`, which runs `resolveModel` when the config is parsed. `resolveModel` throws for any id that is not a Claude alias or a `claude-` id, so a repo config with `gpt-6.2-sol` fails before the reviewer kind is known. The design's list of code changes names only `parseReviewer` and `effectiveModel`, not this config-schema check.",
+          "score": 85,
+          "severity": "suggestion"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "docs/design/staff-reviewer.md",
+          "start_line": 59,
+          "end_line": 59,
+          "category": "bug",
+          "severity_estimate": "suggestion",
+          "confidence": "medium",
+          "claim": "The new key `reviewers.staff-reviewer.timeout_minutes` will fail the strict `ReviewerEntrySchema`, and the design does not plan a change to that per-reviewer schema.",
+          "evidence": "5. The time limit: 10 minutes by default; `reviewers.staff-reviewer.timeout_minutes` in the repo config, an integer of 1 or more, in the config table of section 4.",
+          "suggested_fix": "List the new `timeout_minutes` key of ReviewerEntrySchema (Codex reviewers only) in 'What changes in the code'.",
+          "explanation": "ReviewerEntrySchema is a z.strictObject with no timeout_minutes key, so a repo that sets it gets a config error unless the schema changes.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "the config keys `timeout_minutes` and `refactor_comment` in the table of section 4",
+            "const ReviewerEntrySchema = z.strictObject({"
+          ],
+          "rationale": "The schema is strict and lacks the key today, but the design's code-change list already includes adding the `timeout_minutes` config key. It only does not name the schema, so the claim that no change is planned is mostly refuted.",
+          "score": 25,
+          "severity": "dont_post"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": false,
+          "introduced_by_pr": true,
+          "quotes": [
+            "the config keys `timeout_minutes` and `refactor_comment` in the table of section 4",
+            "const ReviewerEntrySchema = z.strictObject({"
+          ],
+          "rationale": "The schema is strict and lacks the key today, but the design's code-change list already includes adding the `timeout_minutes` config key. It only does not name the schema, so the claim that no change is planned is mostly refuted.",
+          "score": 25,
+          "severity": "dont_post"
+        },
+        "passed": false,
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "docs/research/d16-codex-in-ci.md",
+          "start_line": 105,
+          "end_line": 105,
+          "category": "other",
+          "severity_estimate": "nit",
+          "confidence": "medium",
+          "claim": "The cost figure with about 10% output is off: 57,000 to 67,000 tokens with 10% output at $2/$10 per 1M comes to about $0.16 to $0.19, not $0.17 to $0.20.",
+          "evidence": "With about 10% output, a review costs about $0.17 to $0.20.",
+          "suggested_fix": "State about $0.16 to $0.19, or give the output share that yields $0.17 to $0.20.",
+          "explanation": "57k: 51.3k×$2/1M + 5.7k×$10/1M ≈ $0.160; 67k: 60.3k×$2/1M + 6.7k×$10/1M ≈ $0.188.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "With about 10% output, a review costs about $0.17 to $0.20."
+          ],
+          "rationale": "At $2 per 1M input and $10 per 1M output, 57k tokens with 10% output costs about $0.160. 67k tokens costs about $0.188. So the range is about $0.16 to $0.19, not $0.17 to $0.20. The error is small. The overall \"$0.11 to $0.20\" range still roughly holds.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "With about 10% output, a review costs about $0.17 to $0.20."
+          ],
+          "rationale": "At $2 per 1M input and $10 per 1M output, 57k tokens with 10% output costs about $0.160. 67k tokens costs about $0.188. So the range is about $0.16 to $0.19, not $0.17 to $0.20. The error is small. The overall \"$0.11 to $0.20\" range still roughly holds.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "docs/research/d16-codex-in-ci.md",
+          "start_line": 110,
+          "end_line": 110,
+          "category": "other",
+          "severity_estimate": "nit",
+          "confidence": "medium",
+          "claim": "The skip reasons in option D do not match the reasons that the design gives for the same skip path.",
+          "evidence": "- The tool must: the same skip path as in A, with the reason \"no Codex CLI\" or \"not logged in\".",
+          "suggested_fix": "Use `codex not installed` and `codex not logged in` here.",
+          "explanation": "docs/design/staff-reviewer.md uses `codex not installed` and `codex not logged in`, and those become values of SkippedReviewerSchema.reason, so the two documents disagree.",
+          "needs_context": false
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- The tool must: the same skip path as in A, with the reason \"no Codex CLI\" or \"not logged in\".",
+            "Absent: skip with the reason `codex not installed`.",
+            "Any other exit: skip with the reason `codex not logged in`."
+          ],
+          "rationale": "The research doc gives the skip reasons as \"no Codex CLI\" and \"not logged in\". The design doc gives `codex not installed` and `codex not logged in`. The wording differs, but the research note only describes the path in prose.",
+          "score": 90,
+          "severity": "nit"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- The tool must: the same skip path as in A, with the reason \"no Codex CLI\" or \"not logged in\".",
+            "Absent: skip with the reason `codex not installed`.",
+            "Any other exit: skip with the reason `codex not logged in`."
+          ],
+          "rationale": "The research doc gives the skip reasons as \"no Codex CLI\" and \"not logged in\". The design doc gives `codex not installed` and `codex not logged in`. The wording differs, but the research note only describes the path in prose.",
+          "score": 90,
+          "severity": "nit"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "finding": {
+          "file": "docs/design/staff-reviewer.md",
+          "start_line": 95,
+          "end_line": 95,
+          "category": "bug",
+          "severity_estimate": "suggestion",
+          "confidence": "low",
+          "claim": "With the small environment (PATH, HOME, CODEX_HOME only), option C breaks when the API key reaches Codex only through an environment variable, for example the `openai-api-key` input of `openai/codex-action`. `codex login status` might then pass while exec has no key, or the reviewer skips for no clear reason.",
+          "evidence": "- A small environment: the process gets `PATH`, `HOME` and `CODEX_HOME` only, not the environment of the run.",
+          "suggested_fix": "State that option C needs a stored login (`codex login --with-api-key`) in CODEX_HOME, or pass OPENAI_API_KEY through on purpose.",
+          "explanation": "The research doc offers `openai/codex-action` as a way to do option C, but the design removes every environment value, including one that may carry the key.",
+          "needs_context": true
+        },
+        "first": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- A small environment: the process gets `PATH`, `HOME` and `CODEX_HOME` only, not the environment of the run.",
+            "- CI: the reviewer runs when the job has a logged-in Codex CLI (options A, B or C of part b)."
+          ],
+          "rationale": "The design strips the environment and requires a logged-in CLI, while the research doc offers option C via `openai-api-key` or `codex login --with-api-key`. A key that reaches Codex only through the environment would be dropped. The design never says option C needs a stored login, so there is a small ambiguity. `codex-action` may well write a login into CODEX_HOME, so the harm is uncertain.",
+          "score": 50,
+          "severity": "nit"
+        },
+        "escalated": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- A small environment: the process gets `PATH`, `HOME` and `CODEX_HOME` only, not the environment of the run. So no token that the run holds in its environment reaches Codex.",
+            "- CI: the reviewer runs when the job has a logged-in Codex CLI (options A, B or C of part b). With none, it skips with its reason, and the review goes on.",
+            "- What it is: the way that the vendor recommends. The job gives the key to `codex login --with-api-key` from a secret, or uses `openai/codex-action`.",
+            "`openai/codex-action` takes an `openai-api-key` input."
+          ],
+          "rationale": "The research doc offers option C either as a stored login or through `openai/codex-action`'s `openai-api-key` input. The design strips every environment value except PATH, HOME and CODEX_HOME, so a key that reaches Codex only through the environment would be dropped. The design never says that option C needs a login stored in CODEX_HOME. Neither document settles exactly how the failure shows up, so that part of the claim is less certain.",
+          "score": 66,
+          "severity": "suggestion"
+        },
+        "final": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- A small environment: the process gets `PATH`, `HOME` and `CODEX_HOME` only, not the environment of the run. So no token that the run holds in its environment reaches Codex.",
+            "- CI: the reviewer runs when the job has a logged-in Codex CLI (options A, B or C of part b). With none, it skips with its reason, and the review goes on.",
+            "- What it is: the way that the vendor recommends. The job gives the key to `codex login --with-api-key` from a secret, or uses `openai/codex-action`.",
+            "`openai/codex-action` takes an `openai-api-key` input."
+          ],
+          "rationale": "The research doc offers option C either as a stored login or through `openai/codex-action`'s `openai-api-key` input. The design strips every environment value except PATH, HOME and CODEX_HOME, so a key that reaches Codex only through the environment would be dropped. The design never says that option C needs a login stored in CODEX_HOME. Neither document settles exactly how the failure shows up, so that part of the claim is less certain.",
+          "score": 66,
+          "severity": "suggestion"
+        },
+        "passed": true,
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      }
+    ],
+    "merges": [],
+    "capped": [],
+    "suppressed": [],
+    "pre_existing": []
+  },
+  "posted": {
+    "verdict": "would approve",
+    "coverage": {
+      "reviewers_ran": [
+        "conventions",
+        "diff-bugs"
+      ],
+      "reviewers_failed": [],
+      "reviewers_skipped": [],
+      "reviewers_without_bash": [],
+      "sensitive_without_hunks": [],
+      "findings_dropped_by_failed_verifier": 0,
+      "findings_unsure": 0,
+      "findings_unsure_on_limit": 0
+    },
+    "findings": [
+      {
+        "file": "docs/design/staff-reviewer.md",
+        "start_line": 36,
+        "end_line": 36,
+        "category": "bug",
+        "severity_estimate": "suggestion",
+        "confidence": "medium",
+        "claim": "The design says the repo config's `reviewers.staff-reviewer.model` can hold a Codex model id. But `ReviewerEntrySchema.model` runs `resolveModel` when the config is parsed, so `gpt-6.2-sol` would be rejected, and the design's list of code changes leaves this out.",
+        "evidence": "- `reviewers.staff-reviewer.model` and `.effort` in the repo config change the model and the effort, with the same rules.",
+        "suggested_fix": "Add to the planned code changes: check the reviewer entry's model after the reviewer kind is known, or skip resolveModel for entries of Codex reviewers.",
+        "explanation": "`modelName()` in src/config/repo-config.ts runs resolveModel (Claude aliases only) before the config knows which kind of reviewer an entry is for, so any Codex model override is a config error.",
+        "needs_context": false,
+        "fingerprint": "2621286cf8034a55",
+        "severity": "suggestion",
+        "score": 85,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- `reviewers.staff-reviewer.model` and `.effort` in the repo config change the model and the effort, with the same rules.",
+            "const ReviewerEntrySchema = z.strictObject({",
+            "  model: modelName().optional(),",
+            "      resolveModel(value);",
+            "`Unknown model \"${aliasOrId}\". Use opus, sonnet, haiku or an exact ID that starts with \"claude-\".`,"
+          ],
+          "rationale": "`ReviewerEntrySchema.model` uses `modelName()`, which runs `resolveModel` when the config is parsed. `resolveModel` throws for any id that is not a Claude alias or a `claude-` id, so a repo config with `gpt-6.2-sol` fails before the reviewer kind is known. The design's list of code changes names only `parseReviewer` and `effectiveModel`, not this config-schema check.",
+          "score": 85,
+          "severity": "suggestion"
+        },
+        "span_text": "- `reviewers.staff-reviewer.model` and `.effort` in the repo config change the model and the effort, with the same rules.",
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "file": "docs/design/staff-reviewer.md",
+        "start_line": 95,
+        "end_line": 95,
+        "category": "bug",
+        "severity_estimate": "suggestion",
+        "confidence": "low",
+        "claim": "With the small environment (PATH, HOME, CODEX_HOME only), option C breaks when the API key reaches Codex only through an environment variable, for example the `openai-api-key` input of `openai/codex-action`. `codex login status` might then pass while exec has no key, or the reviewer skips for no clear reason.",
+        "evidence": "- A small environment: the process gets `PATH`, `HOME` and `CODEX_HOME` only, not the environment of the run.",
+        "suggested_fix": "State that option C needs a stored login (`codex login --with-api-key`) in CODEX_HOME, or pass OPENAI_API_KEY through on purpose.",
+        "explanation": "The research doc offers `openai/codex-action` as a way to do option C, but the design removes every environment value, including one that may carry the key.",
+        "needs_context": true,
+        "fingerprint": "91d507983e43f258",
+        "severity": "suggestion",
+        "score": 66,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- A small environment: the process gets `PATH`, `HOME` and `CODEX_HOME` only, not the environment of the run. So no token that the run holds in its environment reaches Codex.",
+            "- CI: the reviewer runs when the job has a logged-in Codex CLI (options A, B or C of part b). With none, it skips with its reason, and the review goes on.",
+            "- What it is: the way that the vendor recommends. The job gives the key to `codex login --with-api-key` from a secret, or uses `openai/codex-action`.",
+            "`openai/codex-action` takes an `openai-api-key` input."
+          ],
+          "rationale": "The research doc offers option C either as a stored login or through `openai/codex-action`'s `openai-api-key` input. The design strips every environment value except PATH, HOME and CODEX_HOME, so a key that reaches Codex only through the environment would be dropped. The design never says that option C needs a login stored in CODEX_HOME. Neither document settles exactly how the failure shows up, so that part of the claim is less certain.",
+          "score": 66,
+          "severity": "suggestion"
+        },
+        "span_text": "- CI: the reviewer runs when the job has a logged-in Codex CLI (options A, B or C of part b). With none, it skips with its reason, and the review goes on.",
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "file": "docs/research/d16-codex-in-ci.md",
+        "start_line": 105,
+        "end_line": 105,
+        "category": "other",
+        "severity_estimate": "nit",
+        "confidence": "medium",
+        "claim": "The cost figure with about 10% output is off: 57,000 to 67,000 tokens with 10% output at $2/$10 per 1M comes to about $0.16 to $0.19, not $0.17 to $0.20.",
+        "evidence": "With about 10% output, a review costs about $0.17 to $0.20.",
+        "suggested_fix": "State about $0.16 to $0.19, or give the output share that yields $0.17 to $0.20.",
+        "explanation": "57k: 51.3k×$2/1M + 5.7k×$10/1M ≈ $0.160; 67k: 60.3k×$2/1M + 6.7k×$10/1M ≈ $0.188.",
+        "needs_context": false,
+        "fingerprint": "94877b440a0aa95a",
+        "severity": "nit",
+        "score": 92,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "With about 10% output, a review costs about $0.17 to $0.20."
+          ],
+          "rationale": "At $2 per 1M input and $10 per 1M output, 57k tokens with 10% output costs about $0.160. 67k tokens costs about $0.188. So the range is about $0.16 to $0.19, not $0.17 to $0.20. The error is small. The overall \"$0.11 to $0.20\" range still roughly holds.",
+          "score": 92,
+          "severity": "nit"
+        },
+        "span_text": "",
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      },
+      {
+        "file": "docs/research/d16-codex-in-ci.md",
+        "start_line": 110,
+        "end_line": 110,
+        "category": "other",
+        "severity_estimate": "nit",
+        "confidence": "medium",
+        "claim": "The skip reasons in option D do not match the reasons that the design gives for the same skip path.",
+        "evidence": "- The tool must: the same skip path as in A, with the reason \"no Codex CLI\" or \"not logged in\".",
+        "suggested_fix": "Use `codex not installed` and `codex not logged in` here.",
+        "explanation": "docs/design/staff-reviewer.md uses `codex not installed` and `codex not logged in`, and those become values of SkippedReviewerSchema.reason, so the two documents disagree.",
+        "needs_context": false,
+        "fingerprint": "2a71aa8b221198ec",
+        "severity": "nit",
+        "score": 90,
+        "verifier": {
+          "in_scope": true,
+          "claim_holds": true,
+          "introduced_by_pr": true,
+          "quotes": [
+            "- The tool must: the same skip path as in A, with the reason \"no Codex CLI\" or \"not logged in\".",
+            "Absent: skip with the reason `codex not installed`.",
+            "Any other exit: skip with the reason `codex not logged in`."
+          ],
+          "rationale": "The research doc gives the skip reasons as \"no Codex CLI\" and \"not logged in\". The design doc gives `codex not installed` and `codex not logged in`. The wording differs, but the research note only describes the path in prose.",
+          "score": 90,
+          "severity": "nit"
+        },
+        "span_text": "- The user must: nothing more than a login on their own machine.",
+        "sources": [
+          {
+            "reviewer": "diff-bugs",
+            "pass": 1
+          }
+        ]
+      }
+    ],
+    "github": {
+      "review_id": 6015451847,
+      "review_url": "https://github.com/jerridan/pr-review/pull/70#pullrequestreview-6015451847",
+      "author": "github-actions[bot]",
+      "error": null,
+      "inline": [
+        {
+          "fingerprint": "2621286cf8034a55",
+          "comment_id": 4660864378
+        },
+        {
+          "fingerprint": "91d507983e43f258",
+          "comment_id": 4660864385
+        },
+        {
+          "fingerprint": "94877b440a0aa95a",
+          "comment_id": 4660864395
+        },
+        {
+          "fingerprint": "2a71aa8b221198ec",
+          "comment_id": 4660864400
+        }
+      ],
+      "in_body": [],
+      "check_run": {
+        "id": 137420142878
+      },
+      "cleanup_comment_id": null,
+      "resolved": [],
+      "errors": []
+    },
+    "below_floor": [],
+    "not_reposted": [],
+    "carried": []
+  },
+  "cost": {
+    "queries": [
+      {
+        "role": "triage",
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 5140,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 10220,
+            "outputTokens": 27,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0010355000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 651,
+            "cacheReadInputTokens": 1262,
+            "cacheCreationInputTokens": 9732,
+            "webSearchRequests": 0,
+            "costUSD": 0.045568199999999996,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0466037
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "conventions",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "low",
+        "duration_ms": 4363,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11492,
+            "outputTokens": 22,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011602000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 268,
+            "cacheReadInputTokens": 5136,
+            "cacheCreationInputTokens": 11000,
+            "webSearchRequests": 0,
+            "costUSD": 0.0943952,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 93,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0955554
+      },
+      {
+        "role": "reviewer",
+        "reviewer": "diff-bugs",
+        "pass": 1,
+        "model": "claude-opus-5-5",
+        "effort": "medium",
+        "duration_ms": 45801,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 11486,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0011616,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 12,
+            "outputTokens": 4214,
+            "cacheReadInputTokens": 124118,
+            "cacheCreationInputTokens": 25758,
+            "webSearchRequests": 0,
+            "costUSD": 0.3152156,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 1593,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.3163772
+      },
+      {
+        "role": "verifier",
+        "verification": 2,
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 3689,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8986,
+            "outputTokens": 302,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0010496,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 281,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 2,
+            "outputTokens": 501,
+            "cacheReadInputTokens": 4367,
+            "cacheCreationInputTokens": 8494,
+            "webSearchRequests": 0,
+            "costUSD": 0.0394267,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 169,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0404763
+      },
+      {
+        "role": "verifier",
+        "verification": 3,
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 4741,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 8932,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009047000000000001,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 617,
+            "cacheReadInputTokens": 17174,
+            "cacheCreationInputTokens": 8844,
+            "webSearchRequests": 0,
+            "costUSD": 0.0432714,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0441761
+      },
+      {
+        "role": "verifier",
+        "verification": 0,
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 5092,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 14481,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0014601000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 694,
+            "cacheReadInputTokens": 22723,
+            "cacheCreationInputTokens": 14813,
+            "webSearchRequests": 0,
+            "costUSD": 0.0684723,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 144,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0699324
+      },
+      {
+        "role": "verifier",
+        "verification": 1,
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 5447,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 14445,
+            "outputTokens": 26,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0014575,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 716,
+            "cacheReadInputTokens": 22687,
+            "cacheCreationInputTokens": 14827,
+            "webSearchRequests": 0,
+            "costUSD": 0.0687447,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 116,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0702022
+      },
+      {
+        "role": "verifier",
+        "verification": 4,
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "duration_ms": 5725,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 14455,
+            "outputTokens": 23,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0014570000000000002,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-sonnet-5-5": {
+            "inputTokens": 4,
+            "outputTokens": 771,
+            "cacheReadInputTokens": 22697,
+            "cacheCreationInputTokens": 14579,
+            "webSearchRequests": 0,
+            "costUSD": 0.0683037,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 203,
+            "canonicalModel": "claude-sonnet-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.0697607
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 0,
+        "model": "claude-opus-5-5",
+        "effort": "high",
+        "duration_ms": 12625,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 14483,
+            "outputTokens": 24,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0014603,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 0,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 924,
+            "cacheReadInputTokens": 42081,
+            "cacheCreationInputTokens": 15406,
+            "webSearchRequests": 0,
+            "costUSD": 0.1501682,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 168,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.15162849999999997
+      },
+      {
+        "role": "verifier-escalation",
+        "verification": 4,
+        "model": "claude-opus-5-5",
+        "effort": "high",
+        "duration_ms": 17771,
+        "stop_reason": "tool_use",
+        "subtype": "success",
+        "usage": {
+          "claude-haiku-5-5": {
+            "inputTokens": 14457,
+            "outputTokens": 232,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0015617,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 212,
+            "canonicalModel": "claude-haiku-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          },
+          "claude-opus-5-5": {
+            "inputTokens": 6,
+            "outputTokens": 1396,
+            "cacheReadInputTokens": 41533,
+            "cacheCreationInputTokens": 16177,
+            "webSearchRequests": 0,
+            "costUSD": 0.1656666,
+            "contextWindow": 1000000,
+            "maxOutputTokens": 128000,
+            "thinkingTokens": 573,
+            "canonicalModel": "claude-opus-5-5",
+            "provider": "firstParty",
+            "costBasis": "list"
+          }
+        },
+        "cost_usd": 0.1672283
+      }
+    ],
+    "total_cost_usd": 1.0719408000000001,
+    "queries_without_cost": 0,
+    "stage_ms": {
+      "config": 46,
+      "gather": 23,
+      "triage": 5964,
+      "find_verify": 72193,
+      "merge": 9
+    },
+    "errors": []
+  }
+}
