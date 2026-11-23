@@ -408,9 +408,9 @@ Goal: ship the staff-engineer reviewer of D15 in the tool, with its refactor rec
 
 Open questions, for a design section first:
 - How such a reviewer is declared and selected. It is not an Agent SDK query, so the reviewer loader and the selection need a new kind of reviewer.
-- What the run does when the Codex CLI is absent, not logged in, or out of quota. The requirement: the review goes on without it and says so in the summary. It never fails the review.
+- What the run does when the Codex CLI is absent, not logged in, out of quota, or does not finish. The user's decision: the reviewer never fails a whole review. The review goes on without it, and the summary says that it did not run and why.
 - Its findings pass the same verifier and the same merge as the other findings.
-- A time limit: it is the slowest reviewer (57 s median, 102 s maximum in D15).
+- A time limit, by the user's decision: 10 minutes by default, and a repo can change it in its config. It is a guard against a hung call, not a performance target (the reviewer took 57 s median and 102 s maximum in D15). The review waits for the reviewer up to the limit, so a hung call makes one review take 10 minutes. The design says how the summary reports a timeout.
 - The sandbox of the Codex process on PR code that is not trusted: read only, no network, no write outside its work folder. E6 showed that text in a PR can steer a reviewer (issue 63).
 - The local CLI and the plugin, not only CI.
 
