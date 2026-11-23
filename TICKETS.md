@@ -396,6 +396,8 @@ Report:
 
 What it does not decide: no decision rule changes a default. The note ends with what the user decides: whether to add the reviewer, and how it would run in CI.
 
+Done 2026-11-23: beside the specialists, the staff reviewer raises recall from 0.448 / 0.544 to 0.544 / 0.608 and precision from 0.412 / 0.430 to 0.469 / 0.478 (two repeats of the specialists, first verifier only). It finds 8 known items that no specialist found, 7 of them blocking. It is the slowest reviewer in 27 of 28 cases. 1 of its 4 refactor recommendations posts, as a nit. The note is `docs/research/d15-staff-reviewer.md`.
+
 ## Smaller follow-ups found during D4c
 
 - E1 did not measure whether Haiku 5.5 changes the rate of refusals, or of work reported as done with no check.
