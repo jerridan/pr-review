@@ -4,7 +4,7 @@
 // The command reads no credential. Codex finds its own login.
 import { mkdtemp, mkdir, readFile, readdir, rename, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { z } from "zod";
 import { withRepoGlobs } from "../config/globs.js";
@@ -85,7 +85,7 @@ export function parseCodexReviewArgs(
   }
   const model = typeof values.model === "string" ? values.model : TERRA_MODEL;
   const prompt = typeof values.prompt === "string" ? values.prompt : undefined;
-  const promptName = prompt === undefined ? "general-review" : prompt.replace(/\.md$/, "");
+  const promptName = prompt === undefined ? "general-review" : basename(prompt, ".md");
   const source =
     typeof values.source === "string" ? values.source : `codex-${promptName}-${model}-${effort}`;
   return {
@@ -143,7 +143,11 @@ type CaseResult =
 // The body of the reviewer prompt: the named prompt file, or the body of the
 // built-in reviewer general-review.
 function reviewerBodyOf(options: CodexReviewOptions): string {
-  if (options.prompt !== undefined) return loadPrompt(options.prompt).body;
+  if (options.prompt !== undefined) {
+    const { body } = loadPrompt(options.prompt);
+    if (body.trim() === "") throw new Error(`The prompt "${options.prompt}" has an empty body.`);
+    return body;
+  }
   const def = loadBuiltinReviewers().find((d) => d.frontmatter.name === REVIEWER);
   if (!def) throw new Error(`The built-in reviewer ${REVIEWER} is missing.`);
   return def.systemPrompt;
@@ -199,6 +203,8 @@ const TokenEntrySchema = z.strictObject({
   tokens: z.number().nullable(),
   model: z.string(),
   effort: z.string(),
+  // The --prompt value, or "general-review". Entries of older runs have none.
+  prompt: z.string().optional(),
 });
 type TokenEntry = z.infer<typeof TokenEntrySchema>;
 const TokenMapSchema = z.record(z.string(), TokenEntrySchema);
@@ -253,10 +259,29 @@ async function finished(out: string): Promise<Set<string>> {
   }
 }
 
+// The source of an existing candidates file, or null when it has no file.
+// A file that cannot be read or has no source string gives "(unreadable)".
+async function sourceOf(file: string): Promise<string | null> {
+  let text: string;
+  try {
+    text = await readFile(file, "utf8");
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === "ENOENT" ? null : "(unreadable)";
+  }
+  try {
+    const data = JSON.parse(text) as { source?: unknown };
+    return typeof data.source === "string" ? data.source : "(unreadable)";
+  } catch {
+    return "(unreadable)";
+  }
+}
+
 /**
  * Run the command with its arguments. Give the exit code: 0 when every case
  * is done or skipped, 1 when a case failed or the quota is out, and 2 for a
- * usage error or a cases directory that is not valid.
+ * usage error, a cases directory that is not valid, a prompt that cannot load
+ * or is empty, a missing built-in reviewer, or a resume into an --out
+ * directory that holds a file of another source.
  */
 export async function codexReviewCommand(args: string[]): Promise<number> {
   const parsed = parseCodexReviewArgs(args);
@@ -279,6 +304,17 @@ export async function codexReviewCommand(args: string[]): Promise<number> {
     process.stderr.write(`${err instanceof CaseError ? err.message : messageOf(err)}\n`);
     return 2;
   }
+  if (!options.force) {
+    for (const c of cases) {
+      const found = await sourceOf(join(options.out, `${c.name}.json`));
+      if (found !== null && found !== options.source) {
+        process.stderr.write(
+          `case ${c.name} has a file of the source "${found}", and this run has the source "${options.source}". Use another --out directory, or use --force.\n${USAGE}\n`,
+        );
+        return 2;
+      }
+    }
+  }
   await mkdir(options.out, { recursive: true });
   const have = await finished(options.out);
   let done = 0;
@@ -296,7 +332,12 @@ export async function codexReviewCommand(args: string[]): Promise<number> {
     tokens += result.tokens ?? 0;
     process.stdout.write(`case ${c.name}: ${result.kind} tokens ${result.tokens ?? "unknown"}\n`);
     if (result.kind === "done") {
-      perCase[c.name] = { tokens: result.tokens, model: options.model, effort: options.effort };
+      perCase[c.name] = {
+        tokens: result.tokens,
+        model: options.model,
+        effort: options.effort,
+        prompt: options.prompt ?? REVIEWER,
+      };
       await writeTokens(options.out, perCase);
       done += 1;
       continue;
