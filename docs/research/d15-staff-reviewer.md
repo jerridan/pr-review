@@ -123,6 +123,6 @@ Candidates and posted findings by tag: edge-case 32 -> 18, design 28 -> 14, secu
 
 ## The user's decisions (2026-11-22)
 
-- Add the staff reviewer to the tool. D16 holds the work.
-- Set up the Codex reviewer in CI so that it counts against the user's Codex subscription. How to do that is research first (D16, part b).
-- Give refactor recommendations a separate path outside the review: they post as a separate PR comment (D16, part c).
+- Add the staff reviewer to the tool. D16 holds the work. (On 2026-11-23 the user deferred this: the reviewer is not added to pr-review now. See D16 in TICKETS.md.)
+- Set up the Codex reviewer in CI so that it counts against the user's Codex subscription. How to do that is research first (D16, part b). (Deferred with the reviewer on 2026-11-23; the research found that the vendor does not allow a subscription login in CI for a public repo.)
+- Give refactor recommendations a separate path outside the review: they post as a separate PR comment (D16, part c). (Deferred with the reviewer; the crew plan review puts refactor recommendations in its hand-over to the principal.)

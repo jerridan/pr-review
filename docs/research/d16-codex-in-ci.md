@@ -1,5 +1,11 @@
 # D16 part b: the Codex CLI in CI on a ChatGPT subscription
 
+> **Status: studied, not built.** Studied on 2026-11-22 and 2026-11-23. On 2026-11-23 the user decided not to add the staff engineer reviewer to pr-review now ("let's start with option A regarding the new reviewer. I'm not sure I'll end up wanting it."). The design review moves into the crew plugin instead: there the staff engineer prompt reviews each implementer plan before code is written, on the user's machine with the local Codex login, so the problem of a Codex login in CI does not arise. The refactor comment (part c) is deferred with it: the crew plan review puts refactor recommendations in its hand-over to the principal.
+>
+> What would reopen it: the user wants a second look at finished PRs, also for PRs that do not come from crew. D15 found 7 blocking known problems that the six specialists missed, and 32 of its 84 findings were edge cases, which a review of a plan cannot see.
+>
+> If it is built later, these decisions of the user stand: the reviewer never fails a review; its time limit is 10 minutes, a guard against a hung call; refactor recommendations take their own path, outside the review.
+
 ## Open questions for the user
 
 1. Which option do you choose: A (a self-hosted private runner), B (a GitHub-hosted job that carries the login file through a secret), C (an API key for this one reviewer), or D (the reviewer runs only where a logged-in Codex CLI exists, and CI skips it)? A and B are not allowed for a public repo. pr-review is public, so A and B can apply only to your private repos.
